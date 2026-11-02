@@ -58,6 +58,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var zeroBreakageEngine: com.adshield.pro.engine.zero.ZeroBreakageEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -135,6 +136,8 @@ class AdShieldVpnService : VpnService() {
                 preferencesRepository.setVpnShouldRemainActive(true)
                 filterRuleEngine.updateProtectionMode(settings.protectionMode)
                 repository.syncRuntimeModeAndResolver(settings.protectionMode, settings)
+                filterRuleEngine.setShadowModeEnabled(settings.shadowModeEnabled)
+                startZeroBreakageWatchdog(settings.resolverConfig)
 
                 val builder = Builder()
                     .setSession(getString(R.string.vpn_session_name))
@@ -409,6 +412,50 @@ class AdShieldVpnService : VpnService() {
             runCatching {
                 outputStream.write(packetBytes)
                 outputStream.flush()
+            }
+        }
+    }
+
+    private val zeroBreakageProbeHost = "connectivitycheck.gstatic.com"
+
+    /**
+     * Zero-Breakage watchdog (Module 7): probes real connectivity through the filtered
+     * resolver; 3 consecutive failures drop filter lists automatically (custom rules +
+     * Critical Protection stay active), first stable probe restores them. Never blocks
+     * anything on its own — it only relaxes filtering to keep the internet working.
+     */
+    private fun startZeroBreakageWatchdog(resolverConfig: com.adshield.pro.domain.model.DnsResolverConfig) {
+        serviceScope.launch {
+            var safeModeActive = false
+            while (isActive) {
+                kotlinx.coroutines.delay(if (safeModeActive) 60_000L else 30_000L)
+                if (vpnInterface == null || isPaused) continue
+                val probeOk = runCatching {
+                    val probe = DnsPacketCodec.buildStandardQuery(zeroBreakageProbeHost, 1)
+                    upstreamDnsResolver.resolve(probe, resolverConfig).responseBytes.isNotEmpty()
+                }.getOrDefault(false)
+                when (zeroBreakageEngine.onProbeResult(probeOk)) {
+                    com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.SAFE_MODE_FILTERING -> if (!safeModeActive) {
+                        safeModeActive = true
+                        repository.applyZeroBreakageSafeMode()
+                        preferencesRepository.incrementAutoRecoveryCount()
+                        notifyZeroBreakage("Zero-Breakage: connectivity guard suspended filter lists (possible false-positive storm). Your custom rules stay active.")
+                    }
+                    com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.RESTORE_FULL_FILTERING -> if (safeModeActive) {
+                        safeModeActive = false
+                        repository.restoreFullFilterListsAfterSafeMode()
+                        notifyZeroBreakage("Zero-Breakage: connectivity verified — full ad/malware filter lists restored.")
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    private fun notifyZeroBreakage(message: String) {
+        runCatching {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(applicationContext, message, android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }

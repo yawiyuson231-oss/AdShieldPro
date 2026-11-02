@@ -62,6 +62,10 @@ data class AppSettingsState(
     val gameSessionRecords: List<GameSessionRecord> = emptyList(),
     val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC,
     val lastSmartBoostEpochMs: Long = 0L
+    // --- Zero-Breakage Engine (Module 7) ---
+    val shadowModeEnabled: Boolean = false,
+    val falsePositiveReportCount: Int = 0,
+    val autoRecoveryCount: Int = 0
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -92,6 +96,9 @@ class UserPreferencesRepository @Inject constructor(
         val CUSTOM_IPV4_SECONDARY = stringPreferencesKey("custom_ipv4_secondary")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
         val DETAILED_LOGGING = booleanPreferencesKey("detailed_dns_logging_enabled")
+        val SHADOW_MODE_ENABLED = booleanPreferencesKey("shadow_mode_enabled")
+        val FALSE_POSITIVE_REPORTS = intPreferencesKey("false_positive_report_count")
+        val AUTO_RECOVERY_COUNT = intPreferencesKey("auto_recovery_count")
         val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
         val AUTO_UPDATE_FILTERS = booleanPreferencesKey("auto_update_filters")
         val UPDATE_INTERVAL_HOURS = intPreferencesKey("update_interval_hours")
@@ -167,6 +174,9 @@ class UserPreferencesRepository @Inject constructor(
                 enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true
             ),
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
+            shadowModeEnabled = prefs[Keys.SHADOW_MODE_ENABLED] ?: false,
+            falsePositiveReportCount = prefs[Keys.FALSE_POSITIVE_REPORTS] ?: 0,
+            autoRecoveryCount = prefs[Keys.AUTO_RECOVERY_COUNT] ?: 0,
             logRetentionDays = prefs[Keys.LOG_RETENTION_DAYS] ?: 7,
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
             updateIntervalHours = prefs[Keys.UPDATE_INTERVAL_HOURS] ?: 24,
@@ -225,6 +235,19 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setDetailedDnsLogging(enabled: Boolean) {
         context.adShieldDataStore.edit { it[Keys.DETAILED_LOGGING] = enabled }
+
+    suspend fun setShadowModeEnabled(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.SHADOW_MODE_ENABLED] = enabled }
+
+    suspend fun incrementFalsePositiveReports() =
+        context.adShieldDataStore.edit {
+            it[Keys.FALSE_POSITIVE_REPORTS] = (it[Keys.FALSE_POSITIVE_REPORTS] ?: 0) + 1
+        }
+
+    suspend fun incrementAutoRecoveryCount() =
+        context.adShieldDataStore.edit {
+            it[Keys.AUTO_RECOVERY_COUNT] = (it[Keys.AUTO_RECOVERY_COUNT] ?: 0) + 1
+        }
     }
 
     suspend fun setLogRetentionDays(days: Int) {

@@ -2,6 +2,7 @@ package com.adshield.pro.engine.filter
 
 import com.adshield.pro.domain.model.CustomRule
 import com.adshield.pro.domain.model.FilterEvaluationResult
+import com.adshield.pro.engine.compat.ProtectedDomainCatalog
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
@@ -69,6 +70,22 @@ class FilterRuleEngine @Inject constructor() {
     }
 
     private val snapshotRef = AtomicReference(FilterSnapshot())
+
+    // --- Zero-Breakage Shadow Mode (Module 3/7) ---
+    // When enabled, FILTER-LIST blocks (priority <= 50) are recorded and converted to
+    // allows; user custom rules (priority >= 90) always apply for real. Nothing is ever
+    // silently blocked by AI/shadow logic — shadow only RELAXES and REPORTS.
+    @Volatile
+    private var shadowModeEnabled: Boolean = false
+
+    @Volatile
+    var shadowDecisionListener: ((String, FilterEvaluationResult) -> Unit)? = null
+
+    fun setShadowModeEnabled(enabled: Boolean) {
+        shadowModeEnabled = enabled
+    }
+
+    fun isShadowModeEnabled(): Boolean = shadowModeEnabled
 
     fun getCurrentSnapshot(): FilterSnapshot = snapshotRef.get()
 
@@ -178,7 +195,7 @@ class FilterRuleEngine @Inject constructor() {
      * 3. Built-in Safety Allowlist (Priority 80)
      * 4. Active Filter Lists filtered by current ProtectionMode categories (Priority 50)
      */
-    fun evaluate(rawDomain: String): FilterEvaluationResult {
+    private fun evaluateInternal(rawDomain: String): FilterEvaluationResult {
         val startNs = System.nanoTime()
         val domain = normalizeDomain(rawDomain)
         if (domain.isEmpty()) {
@@ -246,6 +263,16 @@ class FilterRuleEngine @Inject constructor() {
             }
         }
 
+        // 5.5 Critical Content & Auth Protection (Modules 4/5): shared video/streaming CDNs,
+        //     authentication, payments, app stores, game servers and messaging are NEVER
+        //     blocked by filter lists in any mode. Explicit user custom rules above win.
+        for (suffix in suffixes) {
+            val label = ProtectedDomainCatalog.protectionLabelFor(suffix)
+            if (label != null) {
+                return buildResult(domain, false, "@@||$suffix^", null, RuleMatchType.SUBDOMAIN, label, 85, startNs)
+            }
+        }
+
         // 6. Built-in Safety Allowlist (Subdomain walk)
         for (suffix in suffixes) {
             if (snap.builtInAllowSubdomains.contains(suffix)) {
@@ -278,6 +305,24 @@ class FilterRuleEngine @Inject constructor() {
         }
 
         return buildResult(domain, false, null, null, null, "Allowed", 0, startNs)
+    }
+
+    fun evaluate(rawDomain: String): FilterEvaluationResult {
+        val result = evaluateInternal(rawDomain)
+        if (shadowModeEnabled && result.isBlocked && result.priority <= 50) {
+            shadowDecisionListener?.invoke(rawDomain, result)
+            return FilterEvaluationResult(
+                domain = result.domain,
+                isBlocked = false,
+                matchedRule = result.matchedRule,
+                matchedCategory = result.matchedCategory,
+                matchType = result.matchType,
+                sourceName = "Shadow Mode (would block by ${result.sourceName})",
+                priority = result.priority,
+                evaluationTimeMicros = result.evaluationTimeMicros
+            )
+        }
+        return result
     }
 
     private fun buildResult(

@@ -84,6 +84,21 @@ class AdShieldViewModel @Inject constructor(
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
 
+    // --- Zero-Breakage Engine (Module 7) ---
+    private val _shadowVerdicts = MutableStateFlow<List<String>>(emptyList())
+    val shadowVerdicts: StateFlow<List<String>> = _shadowVerdicts.asStateFlow()
+
+    init {
+        // Shadow verdicts recorded from the filter engine (never blocking — report only).
+        filterRuleEngine.shadowDecisionListener = { domain, result ->
+            _shadowVerdicts.value =
+                (listOf("$domain :: ${result.sourceName.take(80)}") + _shadowVerdicts.value).take(25)
+        }
+        viewModelScope.launch {
+            filterRuleEngine.setShadowModeEnabled(preferencesRepository.getSettingsSnapshot().shadowModeEnabled)
+        }
+    }
+
     val settingsState: StateFlow<AppSettingsState> = repository.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettingsState())
 
@@ -716,6 +731,32 @@ class AdShieldViewModel @Inject constructor(
                 if (enabled) "Automatic filter updates scheduled every $intervalHours hours."
                 else "Automatic filter updates paused."
             )
+        }
+    }
+
+    // --- Zero-Breakage user actions ---
+
+    fun toggleShadowMode(enabled: Boolean) {
+        viewModelScope.launch {
+            filterRuleEngine.setShadowModeEnabled(enabled)
+            preferencesRepository.setShadowModeEnabled(enabled)
+            showFeedback(if (enabled) "Shadow Mode ON: risky list rules are reported, not enforced. Validate them, then allowlist or keep."
+                else "Shadow Mode OFF: full filtering enforced.")
+        }
+    }
+
+    fun reportFalsePositive(rawDomain: String) {
+        val domain = rawDomain.trim().lowercase().removePrefix("http://").removePrefix("https://").substringBefore('/')
+        if (domain.isBlank() || !domain.contains('.')) {
+            showFeedback("Enter a valid domain that broke, e.g. cdn.example.com")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                repository.addCustomRule("@@||$domain^", RuleType.ALLOW, RuleMatchType.SUBDOMAIN, "Zero-Breakage false-positive report")
+                preferencesRepository.incrementFalsePositiveReports()
+                showFeedback("$domain allowlisted — it will never be blocked by filter lists again.")
+            }
         }
     }
 

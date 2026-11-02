@@ -77,6 +77,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: AdShieldViewModel = hiltViewModel()
             val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+            val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
 
             AdShieldProTheme(themePreference = settings.darkThemeMode) {
                 AdShieldMainApp(viewModel = viewModel)
@@ -451,7 +452,10 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
                     onChangeThemePreference = viewModel::setDarkThemePreference,
                     onExportBackupJson = viewModel::exportFullBackupJson,
-                    onRestoreBackupJson = viewModel::restoreFullBackupJson
+                    onRestoreBackupJson = viewModel::restoreFullBackupJson,
+                    shadowVerdicts = shadowVerdicts,
+                    onToggleShadowMode = viewModel::toggleShadowMode,
+                    onReportFalsePositive = viewModel::reportFalsePositive
                 )
             }
         }

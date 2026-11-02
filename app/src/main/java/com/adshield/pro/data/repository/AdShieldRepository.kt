@@ -658,6 +658,18 @@ class AdShieldRepository @Inject constructor(
         }
     }
 
+    // --- Zero-Breakage Engine (Module 7) hooks ---
+
+    /** Drops all filter-list rules atomically; custom rules + Critical Protection remain active. */
+    suspend fun applyZeroBreakageSafeMode() = withContext(Dispatchers.IO) {
+        filterEngine.updateFilterListRules(emptyMap(), emptyMap(), emptyList())
+    }
+
+    /** Rebuilds the full merged lists from the on-device source database (also used after safe mode). */
+    suspend fun restoreFullFilterListsAfterSafeMode() = withContext(Dispatchers.IO) {
+        rebuildActiveFilterListsLocked(dao.getAllFilterSourcesNow())
+    }
+
     private fun rebuildActiveFilterListsLocked(sources: List<FilterSourceEntity>) {
         val mergedSubdomains = HashMap<String, FilterRuleEngine.FilterListEntry>(4096)
         val mergedExact = HashMap<String, FilterRuleEngine.FilterListEntry>()

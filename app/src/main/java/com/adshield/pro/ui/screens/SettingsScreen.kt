@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.ChevronRight
@@ -28,7 +30,9 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -75,7 +79,10 @@ fun SettingsScreen(
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
-    onRestoreBackupJson: (String) -> Unit
+    onRestoreBackupJson: (String) -> Unit,
+    shadowVerdicts: List<String> = emptyList(),
+    onToggleShadowMode: (Boolean) -> Unit = {},
+    onReportFalsePositive: (String) -> Unit = {}
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -409,6 +416,63 @@ fun SettingsScreen(
             }
         }
 
+        item {
+            // --- Zero-Breakage Engine (Module 7) ---
+            var falsePositiveInput by remember { mutableStateOf("") }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.HealthAndSafety, contentDescription = null, tint = ElectricBlue)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Zero-Breakage Engine", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Connectivity watchdog suspends filter lists automatically if breakage is detected and restores them when the internet is healthy again. Custom rules and video/banking protection always stay on.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Shadow Mode", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Report risky list rules instead of enforcing them. Validate, then allowlist what you need.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.shadowModeEnabled, onCheckedChange = onToggleShadowMode)
+                    }
+                    if (shadowVerdicts.isNotEmpty()) {
+                        Text("Latest shadow reports:", style = MaterialTheme.typography.labelSmall)
+                        shadowVerdicts.take(3).forEach { line ->
+                            Text("• $line", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    HorizontalDivider()
+                    Text("Site or app broken? Report it — the domain is allowlisted instantly.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = falsePositiveInput,
+                            onValueChange = { falsePositiveInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("broken-domain.example") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(
+                            onClick = {
+                                onReportFalsePositive(falsePositiveInput)
+                                falsePositiveInput = ""
+                            },
+                            enabled = falsePositiveInput.isNotBlank()
+                        ) { Text("Fix") }
+                    }
+                    Text(
+                        "False positives reported: ${settings.falsePositiveReportCount}  •  Auto-recoveries: ${settings.autoRecoveryCount}",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
         // Backup & Restore + Privacy Policy Disclosures Card
         item {
             Card(

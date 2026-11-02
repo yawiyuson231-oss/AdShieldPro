@@ -1,5 +1,32 @@
 # Changelog — TitanShield Max
 
+## 3.1.0 — Global DNS Firewall hardening (Modules 1/3/4/5/6/7/11/12)
+
+### NEW: Zero-Breakage Engine (Module 7)
+- Connectivity watchdog in the VPN service probes real DNS resolution every 30s (60s in safe mode).
+- 3 consecutive failures → **automatic Safe-Mode Filtering**: filter lists drop atomically, user rules + Critical Protection stay on — the internet keeps working; auto-restores on first stable probe, counted for the dashboard.
+- **Shadow Mode**: filter-list blocks are reported, not enforced — validate then allowlist (user custom rules still enforce; nothing is ever silently blocked *by* automation).
+- **Report-broken-site**: one tap allowlists the broken domain instantly and increments the false-positive counter.
+- Emergency protection suspension via existing Pause action; Safe-Mode counters surfaced in Settings.
+
+### NEW: Critical Content & Authentication Protection (Modules 4/5)
+- `ProtectedDomainCatalog`: ~130 registrable domains (YouTube/Netflix/TikTok/FB/IG video CDNs, Google/Microsoft/Apple auth, PayPal/Stripe/GCash banking, Play/Store/OTA updates, MLBB/PUBG/Roblox/… game servers, WhatsApp/Telegram/Discord messaging) are **never blocked by filter lists in any mode**; explicit user rules still win.
+- Fully explainable: blocked/allowed decisions carry the protecting group label.
+
+### NEW: DNS Leak & Exposure assessment (Modules 1/6)
+- Honest on-device report: tunnel captures all system DNS; DoH/DoT = encrypted upstream; plaintext = visible on-path; hardcoded private-DoH apps bypass any DNS VPN (disclosed, not faked).
+
+### Module 11: Automated compatibility gate
+- New `DnsFirewallCompatibilityTest` loads the **real bundled 367k-rule production lists** into the real engine in CI and verifies YouTube/Netflix/TikTok/Facebook/Instagram/Play/Banking/Games/Messaging are never blocked while ads/trackers/malware still are — plus watchdog, shadow-mode, protection-layer and leak-report unit tests (13 new tests, 43 total).
+
+### Module 12
+- Configuration import/export confirmed working (JSON backup + restore in Settings); Zero-Breakage card added to Settings.
+
+### Honest limitations (unchanged physics)
+- DNS-over-QUIC and full DNSSEC chain validation are not implemented (no QUIC stack in Android/Kotlin stdlib; documented, not faked).
+- In-app first-party video ads (YouTube/Facebook/TikTok apps) cannot be DNS-blocked — built-in browser blocks website video ads instead.
+
+
 ## 3.0.0 (TitanShield Max rebrand)
 
 ### Identity & UI
