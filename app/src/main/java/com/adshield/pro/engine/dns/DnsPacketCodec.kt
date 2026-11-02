@@ -49,6 +49,26 @@ object DnsPacketCodec {
     }
 
     /**
+     * Builds a standard RFC 1035 recursive DNS query for a hostname (used by Game Turbo
+     * DNS prefetching to pre-warm the resolver cache before a game connects).
+     */
+    fun buildStandardQuery(domain: String, qType: Int): ByteArray {
+        val out = ByteArrayOutputStream(64)
+        val transactionId = (0..0xFFFF).random()
+        // RD = 1 (Recursion Desired)
+        writeU16(out, transactionId)
+        writeU16(out, 0x0100)
+        writeU16(out, 1) // QDCOUNT
+        writeU16(out, 0) // ANCOUNT
+        writeU16(out, 0) // NSCOUNT
+        writeU16(out, 0) // ARCOUNT
+        writeDomainLabels(out, domain.trim('.').lowercase())
+        writeU16(out, qType)
+        writeU16(out, CLASS_IN)
+        return out.toByteArray()
+    }
+
+    /**
      * Parses a raw DNS query packet (without TCP 2-byte length prefix).
      * Returns null if the packet is malformed, truncated, or is already a response (QR == 1).
      */

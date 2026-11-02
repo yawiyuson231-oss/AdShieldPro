@@ -1,4 +1,4 @@
-# AdShield Pro v2.0 - Baseline Multi-Category Filter List
+# TitanShield Max v3.0 - Baseline Multi-Category Filter List
 # Format: [CATEGORY] domain_or_rule
 # Supported categories: ADS, TRACKERS, MALWARE, STRICT_TELEMETRY, ALLOW
 

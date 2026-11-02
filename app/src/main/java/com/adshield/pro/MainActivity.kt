@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
@@ -53,6 +54,7 @@ import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
+import com.adshield.pro.ui.screens.SecurityScreen
 import com.adshield.pro.ui.screens.SettingsScreen
 import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
@@ -60,7 +62,8 @@ import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
-    AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
+    AD_BLOCKER("Ad Block", Icons.Default.Shield),
+    SECURITY("Security", Icons.Default.Security),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     STATISTICS("Statistics", Icons.Default.Analytics),
     SETTINGS("Settings", Icons.Default.Settings)
@@ -126,6 +129,38 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val installedGames by viewModel.installedGames.collectAsStateWithLifecycle()
     val isDndPolicyGranted by viewModel.isDndPolicyGranted.collectAsStateWithLifecycle()
 
+    // TitanShield Max Security Center state
+    val securityPosture by viewModel.securityPosture.collectAsStateWithLifecycle()
+    val appAudits by viewModel.appAudits.collectAsStateWithLifecycle()
+    val isAuditingApps by viewModel.isAuditingApps.collectAsStateWithLifecycle()
+    val urlScanResult by viewModel.urlScanResult.collectAsStateWithLifecycle()
+    val fileScanResult by viewModel.fileScanResult.collectAsStateWithLifecycle()
+    val isScanningSecurity by viewModel.isScanningSecurity.collectAsStateWithLifecycle()
+    val securityHistory by viewModel.securityHistory.collectAsStateWithLifecycle()
+    val malwareBlocks by viewModel.malwareBlocks.collectAsStateWithLifecycle()
+
+    // TitanShield Max Game Turbo & Deep Clean state
+    val turboSession by viewModel.turboSession.collectAsStateWithLifecycle()
+    var isAllFilesAccessGranted by remember { mutableStateOf(viewModel.isAllFilesAccessGranted()) }
+
+    // Keep the security posture in sync with live VPN status
+    LaunchedEffect(vpnState.status) {
+        viewModel.refreshSecurityPosture()
+    }
+
+    // Refresh the All-Files-Access state whenever the app returns to the foreground
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isAllFilesAccessGranted = viewModel.isAllFilesAccessGranted()
+                viewModel.refreshTurboSession()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     var showVpnConsentHelp by remember { mutableStateOf(false) }
 
     // Optional Android 13+ notification permission launcher (requested AFTER VPN consent,
@@ -190,7 +225,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
             title = { Text("VPN permission needed") },
             text = {
                 Text(
-                    "AdShield Pro filters ads through a local, on-device VPN. Android didn't grant " +
+                    "TitanShield Max filters ads through a local, on-device VPN. Android didn't grant " +
                         "the VPN permission. This usually happens when:\n\n" +
                         "• \"Cancel\" was tapped on the connection request, or\n" +
                         "• Another VPN app is set as \"Always-on VPN\" (often with \"Block connections " +
@@ -324,6 +359,21 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onShowFeedback = viewModel::showFeedback
                 )
 
+                MainNavDestination.SECURITY -> SecurityScreen(
+                    posture = securityPosture,
+                    vpnState = vpnState,
+                    malwareBlocks = malwareBlocks,
+                    appAudits = appAudits,
+                    isAuditingApps = isAuditingApps,
+                    urlScanResult = urlScanResult,
+                    fileScanResult = fileScanResult,
+                    isScanning = isScanningSecurity,
+                    scanHistory = securityHistory,
+                    onScanUrl = viewModel::scanUrl,
+                    onScanUri = viewModel::scanUri,
+                    onAuditApps = viewModel::auditInstalledApps
+                )
+
                 MainNavDestination.OPTIMIZER -> OptimizerScreen(
                     settings = settings,
                     ramSnapshot = ramSnapshot,
@@ -339,6 +389,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     ramOptimizationResult = ramOptimizationResult,
                     installedGames = installedGames,
                     isDndPolicyGranted = isDndPolicyGranted,
+                    turboSession = turboSession,
+                    isAllFilesAccessGranted = isAllFilesAccessGranted,
                     onRunSmartBoost = viewModel::runOneTapSmartBoost,
                     onScanJunk = viewModel::scanJunk,
                     onToggleJunkCandidate = viewModel::toggleJunkCandidateSelection,
@@ -350,7 +402,16 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleFavoriteGame = viewModel::toggleFavoriteGame,
                     onUpdateGamingSettings = viewModel::updateGamingBoosterSettings,
                     onTriggerGameBoost = viewModel::triggerGameBoost,
-                    onSelectBatteryMode = viewModel::selectAndApplyBatteryMode
+                    onSelectBatteryMode = viewModel::selectAndApplyBatteryMode,
+                    onActivateTurbo = viewModel::activateGameTurboAndLaunch,
+                    onEndTurbo = viewModel::endGameTurbo,
+                    onRunExtremeBattery = viewModel::runExtremeBatterySaver,
+                    onRestoreBalancedPower = viewModel::restoreBalancedPower,
+                    onRequestAllFilesAccess = {
+                        viewModel.createAllFilesAccessIntent()?.let { intent ->
+                            runCatching { context.startActivity(intent) }
+                        }
+                    }
                 )
 
                 MainNavDestination.STATISTICS -> ActivityScreen(

@@ -37,6 +37,7 @@ import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -76,7 +77,9 @@ class AdShieldViewModel @Inject constructor(
     private val filterRuleEngine: FilterRuleEngine,
     private val upstreamDnsResolver: UpstreamDnsResolver,
     val browserContentBlocker: BrowserContentBlocker,
-    private val optimizerEngine: SystemOptimizerEngine
+    private val optimizerEngine: SystemOptimizerEngine,
+    private val securityEngine: com.adshield.pro.engine.security.SecurityEngine,
+    private val gameTurboEngine: com.adshield.pro.engine.optimizer.GameTurboEngine
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -178,6 +181,47 @@ class AdShieldViewModel @Inject constructor(
     private val _isDndPolicyGranted = MutableStateFlow(optimizerEngine.isDoNotDisturbAccessGranted())
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
+    // --- TitanShield Max Security Center state ---
+    val malwareBlocks: StateFlow<Long> = repository.malwareBlocksFlow.stateIn(
+        viewModelScope, SharingStarted.Eagerly, 0L
+    )
+
+    private val _securityPosture = MutableStateFlow(
+        com.adshield.pro.engine.security.SecurityPosture(
+            protectionScore = if (repository.vpnRuntimeState.value.status == VpnStatus.CONNECTED) 60 else 0,
+            highRiskApps = 0,
+            threatSignatures = 0,
+            webProtectionActive = false
+        )
+    )
+    val securityPosture: StateFlow<com.adshield.pro.engine.security.SecurityPosture> = _securityPosture.asStateFlow()
+
+    private val _appAudits = MutableStateFlow<List<com.adshield.pro.engine.security.AppRiskAuditor.AppRiskAudit>>(emptyList())
+    val appAudits: StateFlow<List<com.adshield.pro.engine.security.AppRiskAuditor.AppRiskAudit>> = _appAudits.asStateFlow()
+
+    private val _isAuditingApps = MutableStateFlow(false)
+    val isAuditingApps: StateFlow<Boolean> = _isAuditingApps.asStateFlow()
+
+    private val _urlScanResult = MutableStateFlow<com.adshield.pro.engine.security.UrlThreatScanner.UrlVerdict?>(null)
+    val urlScanResult: StateFlow<com.adshield.pro.engine.security.UrlThreatScanner.UrlVerdict?> = _urlScanResult.asStateFlow()
+
+    private val _fileScanResult = MutableStateFlow<com.adshield.pro.engine.security.SecurityScanRecord?>(null)
+    val fileScanResult: StateFlow<com.adshield.pro.engine.security.SecurityScanRecord?> = _fileScanResult.asStateFlow()
+
+    private val _isScanningSecurity = MutableStateFlow(false)
+    val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
+
+    private val _securityHistory = MutableStateFlow<List<com.adshield.pro.engine.security.SecurityScanRecord>>(emptyList())
+    val securityHistory: StateFlow<List<com.adshield.pro.engine.security.SecurityScanRecord>> = _securityHistory.asStateFlow()
+
+    // --- TitanShield Max Game Turbo state ---
+    private val _turboSession = MutableStateFlow(gameTurboEngine.getSessionState())
+    val turboSession: StateFlow<com.adshield.pro.engine.optimizer.GameTurboEngine.TurboSessionState> = _turboSession.asStateFlow()
+
+    // --- TitanShield Max battery saver state ---
+    private val _extremeBatteryActions = MutableStateFlow<List<String>>(emptyList())
+    val extremeBatteryActions: StateFlow<List<String>> = _extremeBatteryActions.asStateFlow()
+
     init {
         viewModelScope.launch {
             customRules.collect {
@@ -211,7 +255,7 @@ class AdShieldViewModel @Inject constructor(
                 val release = withContext(Dispatchers.IO) { GitHubReleaseClient.latest() }
                 when {
                     release == null -> showFeedback("Couldn't check for updates. Check your internet connection and try again.")
-                    release.code <= BuildConfig.VERSION_CODE -> showFeedback("AdShield Pro is up to date.")
+                    release.code <= BuildConfig.VERSION_CODE -> showFeedback("TitanShield Max is up to date.")
                     else -> {
                         val intent = Intent(appContext, UpdatePromptActivity::class.java).apply {
                             putExtra(UpdatePromptActivity.TAG, release.tag)
@@ -390,6 +434,165 @@ class AdShieldViewModel @Inject constructor(
             showFeedback(actions.firstOrNull() ?: "Game Booster applied.")
         }
     }
+
+    // --- TitanShield Max Game Turbo (Zero-Lag Mode) ---
+
+    fun activateGameTurboAndLaunch(packageName: String, appName: String) {
+        viewModelScope.launch {
+            val report = gameTurboEngine.activateTurboAndLaunch(
+                gamePackage = packageName,
+                gameName = appName,
+                resolverConfig = settingsState.value.resolverConfig,
+                suppressNotifications = settingsState.value.gameBoosterSuppressNotifications
+            )
+            _turboSession.value = gameTurboEngine.getSessionState()
+            refreshSystemTelemetry()
+            optimizerEngine.applyGameBoostAndLaunch(packageName, appName)
+            showFeedback(
+                "TURBO engaged for ${report.gameName}: ${report.stepsExecuted.size} optimizations " +
+                    "(~${report.ramFreedEstimateMb} MB RAM headroom, ${report.dnsCacheWarmedEntries} servers pre-resolved)."
+            )
+        }
+    }
+
+    fun endGameTurbo() {
+        val steps = gameTurboEngine.endTurbo()
+        _turboSession.value = gameTurboEngine.getSessionState()
+        showFeedback(steps.firstOrNull() ?: "Turbo session ended.")
+    }
+
+    fun refreshTurboSession() {
+        if (_turboSession.value.isActive && !gameTurboEngine.isTurboActive()) {
+            endGameTurbo()
+        } else {
+            _turboSession.value = gameTurboEngine.getSessionState()
+        }
+    }
+
+    fun thermalGuardSummary(): String = gameTurboEngine.thermalGuardSummary()
+
+    // --- TitanShield Max Security Center ---
+
+    fun scanUrl(rawUrl: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isScanningSecurity.value = true
+            val verdict = securityEngine.scanUrl(rawUrl)
+            _urlScanResult.value = verdict
+            val record = com.adshield.pro.engine.security.SecurityScanRecord(
+                id = System.currentTimeMillis(),
+                kind = com.adshield.pro.engine.security.ScanKind.URL,
+                target = rawUrl.take(120),
+                threatLevel = when (verdict.threatLevel) {
+                    com.adshield.pro.engine.security.UrlThreatScanner.ThreatLevel.DANGEROUS ->
+                        com.adshield.pro.engine.security.SecurityLevel.DANGEROUS
+                    com.adshield.pro.engine.security.UrlThreatScanner.ThreatLevel.SUSPICIOUS ->
+                        com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS
+                    else -> com.adshield.pro.engine.security.SecurityLevel.CLEAN
+                },
+                riskScore = verdict.riskScore,
+                threatName = verdict.findings.firstOrNull(),
+                findings = verdict.findings,
+                recommendation = verdict.recommendation,
+                timestampEpochMs = System.currentTimeMillis()
+            )
+            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            _isScanningSecurity.value = false
+        }
+    }
+
+    fun scanFile(file: java.io.File) {
+        viewModelScope.launch {
+            _isScanningSecurity.value = true
+            val record = securityEngine.scanFile(file)
+            _fileScanResult.value = record
+            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            refreshSecurityPosture()
+            _isScanningSecurity.value = false
+            showFeedback(
+                when (record.threatLevel) {
+                    com.adshield.pro.engine.security.SecurityLevel.DANGEROUS ->
+                        "THREAT: ${record.threatName ?: record.target} — do not open or install."
+                    com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS ->
+                        "Suspicious file: ${record.findings.firstOrNull() ?: "risk indicators found"}."
+                    else -> "File is clean: no signatures or structural threats found."
+                }
+            )
+        }
+    }
+
+    fun scanUri(uri: android.net.Uri, displayName: String) {
+        viewModelScope.launch {
+            _isScanningSecurity.value = true
+            val record = securityEngine.scanUriContent(uri, displayName)
+            if (record != null) {
+                _fileScanResult.value = record
+                _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+                showFeedback(
+                    when (record.threatLevel) {
+                        com.adshield.pro.engine.security.SecurityLevel.DANGEROUS ->
+                            "THREAT: ${record.threatName ?: displayName} — do not open or install."
+                        com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS ->
+                            "Suspicious file: ${record.findings.firstOrNull() ?: "risk indicators found"}."
+                        else -> "File is clean: no signatures or structural threats found."
+                    }
+                )
+            } else {
+                showFeedback("Could not read the selected file for scanning.")
+            }
+            _isScanningSecurity.value = false
+        }
+    }
+
+    fun auditInstalledApps() {
+        if (_isAuditingApps.value) return
+        viewModelScope.launch {
+            _isAuditingApps.value = true
+            val audits = securityEngine.auditInstalledApps()
+            _appAudits.value = audits
+            refreshSecurityPosture(highRisk = audits.count { it.riskLevel == com.adshield.pro.engine.security.AppRiskAuditor.RiskLevel.HIGH })
+            _isAuditingApps.value = false
+            val flagged = audits.count { it.riskLevel == com.adshield.pro.engine.security.AppRiskAuditor.RiskLevel.HIGH }
+            showFeedback(
+                if (flagged > 0) "Full app audit complete: $flagged high-risk app(s) found — review them in Security."
+                else "Full app audit complete: no high-risk apps detected."
+            )
+        }
+    }
+
+    fun refreshSecurityPosture(highRisk: Int? = null) {
+        val riskApps = highRisk ?: _securityPosture.value.highRiskApps
+        val vpnActive = repository.vpnRuntimeState.value.status == VpnStatus.CONNECTED
+        val signatures = securityEngine.activeThreatSignatureCount()
+        _securityPosture.value = com.adshield.pro.engine.security.SecurityEngine.buildSecurityPosture(
+            highRiskApps = riskApps,
+            threatSignatures = signatures,
+            vpnActive = vpnActive
+        )
+    }
+
+    // --- TitanShield Max Extreme Battery Saver ---
+
+    fun runExtremeBatterySaver() {
+        viewModelScope.launch {
+            val actions = optimizerEngine.runExtremeBatterySaver()
+            _extremeBatteryActions.value = actions
+            refreshSystemTelemetry()
+            showFeedback("Extreme Battery Saver active — background power use minimized, protection unchanged.")
+        }
+    }
+
+    fun restoreBalancedPower() {
+        viewModelScope.launch {
+            val actions = optimizerEngine.restoreBalancedPower()
+            _extremeBatteryActions.value = actions
+            refreshSystemTelemetry()
+            showFeedback("Balanced power restored.")
+        }
+    }
+
+    fun isAllFilesAccessGranted(): Boolean = optimizerEngine.hasAllFilesAccess()
+
+    fun createAllFilesAccessIntent(): android.content.Intent? = optimizerEngine.createAllFilesAccessIntent()
 
     fun selectAndApplyBatteryMode(mode: BatteryMode) {
         viewModelScope.launch {

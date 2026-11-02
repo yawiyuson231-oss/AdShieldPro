@@ -1,11 +1,11 @@
-# AdShield Pro Next-Generation Upgrade Plan
+# TitanShield Max Next-Generation Upgrade Plan
 
 **Audit date:** 2026-10-24  
-**Scope:** AdShield Pro v2.1.0 and the public BlockAds Android reference
+**Scope:** TitanShield Max v2.1.0 and the public BlockAds Android reference
 
 ## Current architecture and reference review
 
-AdShield Pro already uses Kotlin, Jetpack Compose/Material 3, MVVM, Hilt, Room, DataStore, WorkManager, and Android `VpnService`. Its local TUN interface routes DNS to an on-device filter; it supports filter sources and custom rules, DoH/DoT/UDP selection, per-app VPN exclusions, IPv6 configuration, local query history, an embedded browser, and JSON configuration export/restore. The current app already has a midnight navy and emerald visual identity and a substantial protection dashboard. This means the next step is to improve correctness and clarity around those real capabilities, not add simulated analytics.
+TitanShield Max already uses Kotlin, Jetpack Compose/Material 3, MVVM, Hilt, Room, DataStore, WorkManager, and Android `VpnService`. Its local TUN interface routes DNS to an on-device filter; it supports filter sources and custom rules, DoH/DoT/UDP selection, per-app VPN exclusions, IPv6 configuration, local query history, an embedded browser, and JSON configuration export/restore. The current app already has a midnight navy and emerald visual identity and a substantial protection dashboard. This means the next step is to improve correctness and clarity around those real capabilities, not add simulated analytics.
 
 The public [BlockAds Android repository](https://github.com/pass-with-high-score/blockads-android) provides a broader feature set for comparison: DNS/VPN filtering, optional root proxy, optional browser HTTPS filtering with a local CA, Quick Settings and widget controls, regional filter defaults, and more language coverage. Those features have additional device, certificate, VPN coexistence, and compatibility tradeoffs. The repository is GPL-3.0; this audit does not copy or port its source. Any future reuse or distribution of a derivative must be reviewed against GPL-3.0 source, notice, and installation-information terms.
 
@@ -14,7 +14,7 @@ The public [BlockAds Android repository](https://github.com/pass-with-high-score
 - The IPv6 tunnel literals contained an invalid hexadecimal character, and setup errors were swallowed. The addresses are now valid ULA literals; setup failures reach the existing VPN error path instead of being silently ignored.
 - DoH and DoT previously fell back to plaintext DNS after an upstream failure. The resolver now returns SERVFAIL for that request and keeps using the protocol the user selected. Explicit UDP/TCP mode remains available and is disclosed as unencrypted.
 - Android backup was enabled for app-private data, including local settings and query history. Platform cloud backup and device-transfer backup are now disabled; users can still use the app's explicit JSON configuration export/restore.
-- Release signing previously fell back to the debug key. Release builds now require a real signing keystore. AdShield Pro is free, so the purchase screen, billing SDK, and verifier requirement have been removed.
+- Release signing previously fell back to the debug key. Release builds now require a real signing keystore. TitanShield Max is free, so the purchase screen, billing SDK, and verifier requirement have been removed.
 - Google Play now requires API 36 for new submissions and updates. The project is set to compile/target API 36 and uses the minimum compatible AGP 8.9.3 / Gradle 8.11.1 pair.
 
 ## Capability assessment

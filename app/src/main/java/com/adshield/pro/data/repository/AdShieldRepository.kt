@@ -114,6 +114,7 @@ class AdShieldRepository @Inject constructor(
     val allTimeTotalQueriesFlow: Flow<Long> = dao.observeAllTimeTotalQueries()
     val allTimeBlockedQueriesFlow: Flow<Long> = dao.observeAllTimeBlockedQueries()
     val allTimeAllowedQueriesFlow: Flow<Long> = dao.observeAllTimeAllowedQueries()
+    val malwareBlocksFlow: Flow<Long> = dao.observeMalwareBlockCount()
 
     val customRulesFlow: Flow<List<CustomRule>> = dao.observeCustomRules().map { entities ->
         entities.map { it.toDomain() }
@@ -144,6 +145,14 @@ class AdShieldRepository @Inject constructor(
                 dao.upsertFilterSources(defaults)
                 sources = defaults
             } else {
+                // Merge in any newly shipped built-in sources (e.g. the Titan Max on-device
+                // lists introduced in v3.0) so existing installs gain them on first upgrade.
+                val existingIds = sources.map { it.id }.toSet()
+                val missingBuiltIns = buildDefaultFilterSources().filter { it.isBuiltIn && it.id !in existingIds }
+                if (missingBuiltIns.isNotEmpty()) {
+                    dao.upsertFilterSources(missingBuiltIns)
+                    sources = sources + missingBuiltIns
+                }
                 val migrated = sources.map { src ->
                     if (src.isPremiumOnly || src.lastStatusMessage.contains("Premium", ignoreCase = true)) {
                         src.copy(
@@ -428,7 +437,7 @@ class AdShieldRepository @Inject constructor(
     suspend fun exportRulesAsText(): String = withContext(Dispatchers.IO) {
         val rules = dao.getAllCustomRulesNow()
         buildString {
-            appendLine("# AdShield Pro v2.0 Custom Rules Export")
+            appendLine("# TitanShield Max v2.0 Custom Rules Export")
             appendLine("# Exported at: ${Date()}")
             for (r in rules) {
                 val prefix = if (r.ruleType == RuleType.ALLOW.name) "@@||" else "||"
@@ -537,7 +546,7 @@ class AdShieldRepository @Inject constructor(
                 if (!source.isEnabled) continue
                 if (source.url.startsWith("asset://")) {
                     // Refresh bundled asset rules
-                    val assetContent = readBundledDefaultBlocklist()
+                    val assetContent = readBundledBlocklist(source.url.removePrefix("asset://"))
                     val parsed = filterEngine.parseFilterListContent(
                         assetContent,
                         RuleCategory.valueOf(source.category),
@@ -568,7 +577,7 @@ class AdShieldRepository @Inject constructor(
                     }
                     val req = Request.Builder()
                         .url(source.url)
-                        .header("User-Agent", "AdShieldPro/2.0 (Android; DNS-Filter-Updater)")
+                        .header("User-Agent", "TitanShieldMax/3.0 (Android; DNS-Filter-Updater)")
                         .build()
 
                     filterDownloadClient.newCall(req).execute().use { resp ->
@@ -655,6 +664,7 @@ class AdShieldRepository @Inject constructor(
         val mergedWildcards = ArrayList<FilterRuleEngine.WildcardEntry>()
         val mergedAllow = HashSet<String>()
         val now = System.currentTimeMillis()
+        val lowRam = isLowRamDevice()
 
         // Always load bundled baseline if enabled or if no other source has cached rules yet
         for (source in sources) {
@@ -662,7 +672,11 @@ class AdShieldRepository @Inject constructor(
             val category = runCatching { RuleCategory.valueOf(source.category) }.getOrDefault(RuleCategory.ADS)
 
             val rawContent: String? = if (source.url.startsWith("asset://")) {
-                readBundledDefaultBlocklist()
+                val assetName = source.url.removePrefix("asset://")
+                // Adaptive on-device list selection: entry-level devices use the curated lite
+                // ad list to keep memory low, while the full threat-intel list always loads.
+                val effectiveName = if (lowRam && assetName == "core_max_ads.txt") "core_lite_ads.txt" else assetName
+                readBundledBlocklist(effectiveName)
             } else {
                 val cachedFile = File(filterCacheDir, "${source.id}.txt")
                 if (cachedFile.exists()) runCatching { cachedFile.readText(Charsets.UTF_8) }.getOrNull() else null
@@ -672,12 +686,16 @@ class AdShieldRepository @Inject constructor(
                 val parsed = filterEngine.parseFilterListContent(rawContent, category, source.name).getOrNull()
                 if (parsed != null) {
                     for ((k, v) in parsed.subdomainRules) {
+                        if (mergedSubdomains.size >= MAX_MERGED_RULES) break
                         mergedSubdomains.putIfAbsent(k, v)
                     }
                     for ((k, v) in parsed.exactRules) {
+                        if (mergedExact.size >= MAX_MERGED_RULES) break
                         mergedExact.putIfAbsent(k, v)
                     }
-                    mergedWildcards.addAll(parsed.wildcardRules)
+                    if (mergedWildcards.size < MAX_MERGED_WILDCARDS) {
+                        mergedWildcards.addAll(parsed.wildcardRules.take(MAX_MERGED_WILDCARDS - mergedWildcards.size))
+                    }
                     mergedAllow.addAll(parsed.allowSubdomains)
 
                     if (source.ruleCount == 0) {
@@ -703,10 +721,19 @@ class AdShieldRepository @Inject constructor(
         )
     }
 
-    private fun readBundledDefaultBlocklist(): String {
+    private fun readBundledBlocklist(fileName: String): String {
+        val safeName = fileName.trim()
+        if (!Regex("^[A-Za-z0-9._-]+$").matches(safeName)) return ""
         return runCatching {
-            context.assets.open("default_blocklist.txt").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            context.assets.open(safeName).bufferedReader(Charsets.UTF_8).use { it.readText() }
         }.getOrDefault("")
+    }
+
+    private fun isLowRamDevice(): Boolean {
+        return runCatching {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            am?.isLowRamDevice == true
+        }.getOrDefault(false)
     }
 
     // --- Backup and Restore ---
@@ -806,15 +833,45 @@ class AdShieldRepository @Inject constructor(
         return listOf(
             FilterSourceEntity(
                 id = "bundled_adshield_core",
-                name = "AdShield Core Multi-Layer List",
-                description = "Bundled offline-ready baseline covering major mobile ad SDKs, trackers, telemetry, and malware.",
+                name = "Titan Core Safety Baseline",
+                description = "Bundled offline-ready baseline covering major mobile ad SDKs, trackers, telemetry, and malware plus critical system allowlist exceptions.",
                 url = "asset://default_blocklist.txt",
-                licenseName = "AdShield Pro Open Baseline (GPLv3/MIT Compatible)",
+                licenseName = "TitanShield Max Open Baseline (GPLv3/MIT Compatible)",
                 category = RuleCategory.ADS.name,
                 isBuiltIn = true,
                 isEnabled = true,
                 isPremiumOnly = false,
                 ruleCount = 215,
+                duplicateCount = 0,
+                lastUpdatedEpochMs = now,
+                lastStatusMessage = "Bundled & Active"
+            ),
+            FilterSourceEntity(
+                id = "titan_max_ads",
+                name = "Titan Max Ads & Trackers (On-Device)",
+                description = "176,000+ curated ad, tracker, and telemetry domains bundled offline (HaGeZi Multi Pro). Works without internet and covers every app on the device.",
+                url = "asset://core_max_ads.txt",
+                licenseName = "GNU GPLv3 (HaGeZi dns-blocklists)",
+                category = RuleCategory.ADS.name,
+                isBuiltIn = true,
+                isEnabled = true,
+                isPremiumOnly = false,
+                ruleCount = 176107,
+                duplicateCount = 0,
+                lastUpdatedEpochMs = now,
+                lastStatusMessage = "Bundled & Active"
+            ),
+            FilterSourceEntity(
+                id = "titan_max_threats",
+                name = "Titan Max Threat Intelligence (On-Device)",
+                description = "191,000+ active malware, phishing, and scam domains bundled offline (HaGeZi TIF). Powers both DNS web protection and the Security Center link scanner.",
+                url = "asset://core_max_threats.txt",
+                licenseName = "GNU GPLv3 (HaGeZi dns-blocklists)",
+                category = RuleCategory.MALWARE.name,
+                isBuiltIn = true,
+                isEnabled = true,
+                isPremiumOnly = false,
+                ruleCount = 191527,
                 duplicateCount = 0,
                 lastUpdatedEpochMs = now,
                 lastStatusMessage = "Bundled & Active"
@@ -964,6 +1021,10 @@ class AdShieldRepository @Inject constructor(
 
     companion object {
         const val MILLIS_PER_DAY = 86_400_000L
+
+        /** Hard memory-safety caps for the merged live rule set (protects entry-level devices). */
+        const val MAX_MERGED_RULES = 900_000
+        const val MAX_MERGED_WILDCARDS = 5_000
 
         val FIRST_PARTY_MULTIPLEXED_AD_PACKAGES = setOf(
             "com.google.android.youtube",

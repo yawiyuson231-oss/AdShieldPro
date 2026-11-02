@@ -41,8 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
 import com.adshield.pro.BuildConfig
 import com.adshield.pro.R
-import com.adshield.pro.ui.theme.EmeraldGlow
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.SkyBlueGlow
+import com.adshield.pro.ui.theme.ElectricBlue
 
 private const val REPOSITORY_URL = "https://github.com/hillman3948-cyber/AdShieldPro"
 
@@ -52,7 +52,7 @@ fun AboutScreen(onBack: () -> Unit) {
     val links = listOf(
         AboutLink(
             title = "Source Code (GitHub)",
-            detail = "Browse the AdShield Pro project",
+            detail = "Browse the TitanShield Max project",
             url = REPOSITORY_URL,
             icon = Icons.Default.Code
         ),
@@ -111,16 +111,16 @@ fun AboutScreen(onBack: () -> Unit) {
                         Surface(
                             modifier = Modifier.size(88.dp),
                             shape = CircleShape,
-                            color = EmeraldPrimary.copy(alpha = 0.12f)
+                            color = ElectricBlue.copy(alpha = 0.12f)
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.ic_adshield_mark),
-                                contentDescription = "AdShield Pro shield logo",
+                                contentDescription = "TitanShield Max shield logo",
                                 modifier = Modifier.padding(12.dp)
                             )
                         }
                         Text(
-                            text = "AdShield Pro",
+                            text = "TitanShield Max",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -152,7 +152,7 @@ fun AboutScreen(onBack: () -> Unit) {
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = EmeraldGlow,
+                            tint = SkyBlueGlow,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(Modifier.width(12.dp))
@@ -170,7 +170,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
             item {
                 Text(
-                    text = "AdShield Pro links",
+                    text = "TitanShield Max links",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
@@ -193,12 +193,12 @@ fun AboutScreen(onBack: () -> Unit) {
                         Surface(
                             modifier = Modifier.size(44.dp),
                             shape = RoundedCornerShape(14.dp),
-                            color = EmeraldPrimary.copy(alpha = 0.14f)
+                            color = ElectricBlue.copy(alpha = 0.14f)
                         ) {
                             Icon(
                                 imageVector = link.icon,
                                 contentDescription = null,
-                                tint = EmeraldGlow,
+                                tint = SkyBlueGlow,
                                 modifier = Modifier.padding(10.dp)
                             )
                         }
@@ -223,7 +223,7 @@ fun AboutScreen(onBack: () -> Unit) {
 
             item {
                 Text(
-                    text = "AdShield Pro · ${BuildConfig.VERSION_NAME}",
+                    text = "TitanShield Max · ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

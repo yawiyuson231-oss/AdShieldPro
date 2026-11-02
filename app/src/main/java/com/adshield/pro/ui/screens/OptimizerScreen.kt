@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoNotDisturbOn
 import androidx.compose.material.icons.filled.FolderOff
+import androidx.compose.material.icons.filled.EnergySavingsLeaf
+import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -50,6 +52,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -94,8 +97,8 @@ import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldGlow
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.SkyBlueGlow
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -125,6 +128,8 @@ fun OptimizerScreen(
     ramOptimizationResult: RamOptimizationResult?,
     installedGames: List<GameAppInfo>,
     isDndPolicyGranted: Boolean,
+    turboSession: com.adshield.pro.engine.optimizer.GameTurboEngine.TurboSessionState,
+    isAllFilesAccessGranted: Boolean,
     onRunSmartBoost: () -> Unit,
     onScanJunk: (JunkCleanMode) -> Unit,
     onToggleJunkCandidate: (String, Boolean) -> Unit,
@@ -136,7 +141,12 @@ fun OptimizerScreen(
     onToggleFavoriteGame: (String, Boolean) -> Unit,
     onUpdateGamingSettings: (GamingProfile, Boolean, Int) -> Unit,
     onTriggerGameBoost: (String?, String?) -> Unit,
-    onSelectBatteryMode: (BatteryMode) -> Unit
+    onSelectBatteryMode: (BatteryMode) -> Unit,
+    onActivateTurbo: (String, String) -> Unit,
+    onEndTurbo: () -> Unit,
+    onRunExtremeBattery: () -> Unit,
+    onRestoreBalancedPower: () -> Unit,
+    onRequestAllFilesAccess: () -> Unit
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val tabs = OptimizerSubTab.entries
@@ -192,6 +202,8 @@ fun OptimizerScreen(
                     storage = storageMetrics,
                     scanReport = junkScanReport,
                     isScanning = isScanningJunk,
+                    isAllFilesAccessGranted = isAllFilesAccessGranted,
+                    onRequestAllFilesAccess = onRequestAllFilesAccess,
                     onScanMode = onScanJunk,
                     onToggleCandidate = onToggleJunkCandidate,
                     onCleanSelected = onCleanSelectedJunk,
@@ -212,16 +224,21 @@ fun OptimizerScreen(
                     battery = batterySnapshot,
                     games = installedGames,
                     isDndGranted = isDndPolicyGranted,
+                    turboSession = turboSession,
                     onToggleFavorite = onToggleFavoriteGame,
                     onUpdateSettings = onUpdateGamingSettings,
-                    onBoostAndLaunch = onTriggerGameBoost
+                    onBoostAndLaunch = onTriggerGameBoost,
+                    onActivateTurbo = onActivateTurbo,
+                    onEndTurbo = onEndTurbo
                 )
 
                 OptimizerSubTab.BATTERY_TEMP -> BatteryThermalTabContent(
                     settings = settings,
                     battery = batterySnapshot,
                     tempTrend = temperatureTrend,
-                    onSelectBatteryMode = onSelectBatteryMode
+                    onSelectBatteryMode = onSelectBatteryMode,
+                    onRunExtremeBattery = onRunExtremeBattery,
+                    onRestoreBalancedPower = onRestoreBalancedPower
                 )
             }
         }
@@ -242,7 +259,7 @@ private fun SmartBoostTabContent(
     onOpenJunkTab: () -> Unit
 ) {
     val scoreColor = when {
-        assessment.readinessScore >= 85 -> EmeraldPrimary
+        assessment.readinessScore >= 85 -> ElectricBlue
         assessment.readinessScore >= 65 -> WarningAmber
         else -> AlertRed
     }
@@ -339,7 +356,7 @@ private fun SmartBoostTabContent(
                         label = "Storage",
                         value = String.format(Locale.US, "%.0f%%", storage.usedPercent),
                         sub = "${RuleBasedOptimizationPredictor.formatBytes(storage.availableBytes)} free",
-                        accent = if (storage.isLowStorage) AlertRed else EmeraldPrimary
+                        accent = if (storage.isLowStorage) AlertRed else ElectricBlue
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
@@ -355,7 +372,7 @@ private fun SmartBoostTabContent(
                 Button(
                     onClick = onRunSmartBoost,
                     enabled = !isRunningBoost,
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null)
@@ -371,7 +388,7 @@ private fun SmartBoostTabContent(
                     Spacer(modifier = Modifier.height(8.dp))
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                 }
             }
@@ -389,7 +406,7 @@ private fun SmartBoostTabContent(
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
-                            tint = EmeraldPrimary
+                            tint = ElectricBlue
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -413,7 +430,7 @@ private fun SmartBoostTabContent(
                                 label = "Storage Cleaned",
                                 value = RuleBasedOptimizationPredictor.formatBytes(boostResult.bytesRecoveredAutomatically),
                                 sub = "${boostResult.filesCleanedCount} temp file(s)",
-                                accent = EmeraldPrimary
+                                accent = ElectricBlue
                             )
                             MiniTelemetryPill(
                                 modifier = Modifier.weight(1f),
@@ -581,6 +598,8 @@ private fun JunkCleanerTabContent(
     storage: StorageMetrics,
     scanReport: JunkScanReport?,
     isScanning: Boolean,
+    isAllFilesAccessGranted: Boolean,
+    onRequestAllFilesAccess: () -> Unit,
     onScanMode: (JunkCleanMode) -> Unit,
     onToggleCandidate: (String, Boolean) -> Unit,
     onCleanSelected: () -> Unit,
@@ -599,6 +618,38 @@ private fun JunkCleanerTabContent(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // True Deep Clean — All-Files-Access gate
+        if (!isAllFilesAccessGranted) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = ElectricBlue.copy(alpha = 0.10f))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.FolderZip, contentDescription = null, tint = ElectricBlue)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Unlock the True Deep Clean",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = ElectricBlue
+                            )
+                        }
+                        Text(
+                            text = "Grant All-Files-Access to let the Deep Scan find hidden/secret files, crash logs, orphaned folders and thumbnail caches across your whole storage. Nothing is deleted without your confirmation, and nothing ever leaves your device.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        OutlinedButton(onClick = onRequestAllFilesAccess, modifier = Modifier.fillMaxWidth()) {
+                            Text("Grant All-Files-Access")
+                        }
+                    }
+                }
+            }
+        }
+
         // Storage Overview & Recoverable Size Card
         item {
             Card(
@@ -632,7 +683,7 @@ private fun JunkCleanerTabContent(
                             onClick = { onScanMode(currentMode) },
                             enabled = !isScanning
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Rescan", tint = EmeraldPrimary)
+                            Icon(Icons.Default.Refresh, contentDescription = "Rescan", tint = ElectricBlue)
                         }
                     }
 
@@ -645,7 +696,7 @@ private fun JunkCleanerTabContent(
                             label = "Safe Auto-Clean",
                             value = RuleBasedOptimizationPredictor.formatBytes(scanReport?.safeAutoCleanBytes ?: 0L),
                             sub = "App temp caches",
-                            accent = EmeraldPrimary
+                            accent = ElectricBlue
                         )
                         MiniTelemetryPill(
                             modifier = Modifier.weight(1f),
@@ -687,7 +738,7 @@ private fun JunkCleanerTabContent(
                     if (isScanning) {
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth(),
-                            color = EmeraldPrimary
+                            color = ElectricBlue
                         )
                     }
 
@@ -698,7 +749,7 @@ private fun JunkCleanerTabContent(
                         Button(
                             onClick = onCleanSelected,
                             enabled = !isScanning && selectedBytes > 0L,
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -782,7 +833,7 @@ private fun JunkCleanerTabContent(
                                 text = "${item.category.displayName} • ${RuleBasedOptimizationPredictor.formatBytes(item.sizeBytes)}" +
                                     (if (item.sha256Hash != null) " • SHA256: ${item.sha256Hash}" else ""),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (item.requiresUserConfirmation) WarningAmber else EmeraldPrimary
+                                color = if (item.requiresUserConfirmation) WarningAmber else ElectricBlue
                             )
                             Text(
                                 text = item.absolutePath,
@@ -825,7 +876,7 @@ private fun JunkCleanerTabContent(
                                 Text(
                                     text = "+${RuleBasedOptimizationPredictor.formatBytes(rec.bytesRecovered)} (${rec.filesDeletedCount} files)",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = EmeraldPrimary,
+                                    color = ElectricBlue,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -964,7 +1015,7 @@ private fun RamManagerTabContent(
                         label = "Available",
                         value = RuleBasedOptimizationPredictor.formatBytes(ram.availableRamBytes),
                         sub = "${String.format(Locale.US, "%.1f%%", 100f - ram.usagePercent)} free",
-                        accent = EmeraldPrimary
+                        accent = ElectricBlue
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
@@ -977,7 +1028,7 @@ private fun RamManagerTabContent(
 
                 Button(
                     onClick = onOptimizeRam,
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Memory, contentDescription = null)
@@ -987,7 +1038,7 @@ private fun RamManagerTabContent(
             }
         }
 
-        // AdShield Pro Self-Memory Diagnostic Card
+        // TitanShield Max Self-Memory Diagnostic Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
@@ -995,12 +1046,12 @@ private fun RamManagerTabContent(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "AdShield Pro Internal Memory Footprint",
+                    text = "TitanShield Max Internal Memory Footprint",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Monitors AdShield Pro's own heap and DNS LRU cache so background protection stays ultra-light.",
+                    text = "Monitors TitanShield Max's own heap and DNS LRU cache so background protection stays ultra-light.",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1013,7 +1064,7 @@ private fun RamManagerTabContent(
                         label = "Java Heap",
                         value = RuleBasedOptimizationPredictor.formatBytes(ram.adShieldJavaHeapUsedBytes),
                         sub = "JVM Allocated",
-                        accent = EmeraldPrimary
+                        accent = ElectricBlue
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
@@ -1068,7 +1119,7 @@ private fun RamManagerTabContent(
                         text = "Last RAM Optimization Report",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                     ramResult.actionsTaken.forEach { act ->
                         Text("✓ $act", style = MaterialTheme.typography.bodyMedium)
@@ -1094,9 +1145,12 @@ private fun GameBoosterTabContent(
     battery: BatteryThermalSnapshot,
     games: List<GameAppInfo>,
     isDndGranted: Boolean,
+    turboSession: com.adshield.pro.engine.optimizer.GameTurboEngine.TurboSessionState,
     onToggleFavorite: (String, Boolean) -> Unit,
     onUpdateSettings: (GamingProfile, Boolean, Int) -> Unit,
-    onBoostAndLaunch: (String?, String?) -> Unit
+    onBoostAndLaunch: (String?, String?) -> Unit,
+    onActivateTurbo: (String, String) -> Unit,
+    onEndTurbo: () -> Unit
 ) {
     val context = LocalContext.current
     var showAllAppsFilter by remember { mutableStateOf(false) }
@@ -1111,6 +1165,43 @@ private fun GameBoosterTabContent(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // Active Turbo Session Banner
+        if (turboSession.isActive) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = ElectricBlue.copy(alpha = 0.15f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Bolt, contentDescription = null, tint = ElectricBlue)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "TURBO ACTIVE — zero-lag session running",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = ElectricBlue
+                            )
+                            Text(
+                                text = "Background processes trimmed • Sync paused • DNS cache warmed",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        TextButton(onClick = onEndTurbo) {
+                            Text("End", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
         // Gaming Dashboard Header Card
         item {
             Card(
@@ -1120,7 +1211,7 @@ private fun GameBoosterTabContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SportsEsports, contentDescription = null, tint = EmeraldPrimary)
+                        Icon(Icons.Default.SportsEsports, contentDescription = null, tint = ElectricBlue)
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
@@ -1152,7 +1243,7 @@ private fun GameBoosterTabContent(
                             label = "Temp",
                             value = String.format(Locale.US, "%.1f°C", battery.temperatureCelsius),
                             sub = battery.thermalStatusLabel,
-                            accent = if (battery.isOverheating) AlertRed else EmeraldPrimary
+                            accent = if (battery.isOverheating) AlertRed else ElectricBlue
                         )
                         MiniTelemetryPill(
                             modifier = Modifier.weight(1f),
@@ -1165,7 +1256,7 @@ private fun GameBoosterTabContent(
 
                     Button(
                         onClick = { onBoostAndLaunch(null, null) },
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Bolt, contentDescription = null)
@@ -1360,13 +1451,24 @@ private fun GameBoosterTabContent(
                         }
                     }
 
-                    Button(
-                        onClick = { onBoostAndLaunch(game.packageName, game.appName) },
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Boost & Play", maxLines = 1)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Button(
+                            onClick = { onBoostAndLaunch(game.packageName, game.appName) },
+                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Boost & Play", maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = { onActivateTurbo(game.packageName, game.appName) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp), tint = ElectricBlue)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("TURBO", maxLines = 1, fontWeight = FontWeight.Bold, color = ElectricBlue)
+                        }
                     }
                 }
             }
@@ -1379,7 +1481,9 @@ private fun BatteryThermalTabContent(
     settings: AppSettingsState,
     battery: BatteryThermalSnapshot,
     tempTrend: List<Float>,
-    onSelectBatteryMode: (BatteryMode) -> Unit
+    onSelectBatteryMode: (BatteryMode) -> Unit,
+    onRunExtremeBattery: () -> Unit,
+    onRestoreBalancedPower: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -1426,7 +1530,7 @@ private fun BatteryThermalTabContent(
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = EmeraldPrimary)
+                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, tint = ElectricBlue)
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
                         Text(
@@ -1451,7 +1555,7 @@ private fun BatteryThermalTabContent(
                         label = "Battery Level",
                         value = "${battery.batteryPercent}%",
                         sub = if (battery.isCharging) "Charging" else "Discharging",
-                        accent = if (battery.isLowBattery) AlertRed else EmeraldPrimary
+                        accent = if (battery.isLowBattery) AlertRed else ElectricBlue
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
@@ -1471,12 +1575,119 @@ private fun BatteryThermalTabContent(
 
                 Button(
                     onClick = { onSelectBatteryMode(settings.batteryMode) },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Thermostat, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Battery optimization", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // TitanShield Max Battery Intelligence Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Bolt, contentDescription = null, tint = ElectricBlue)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Battery Intelligence (Max)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Measured drain-rate modeling, cell health scoring, and extreme power saving",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MiniTelemetryPill(
+                        modifier = Modifier.weight(1f),
+                        label = "Drain Rate",
+                        value = if (battery.drainIsReliable) {
+                            String.format(Locale.US, "%.1f%%/h", battery.drainPercentPerHour)
+                        } else "Measuring…",
+                        sub = if (battery.drainIsReliable) {
+                            val h = battery.estimatedMinutesToEmpty?.div(60) ?: 0
+                            val m = battery.estimatedMinutesToEmpty?.rem(60) ?: 0
+                            "~${h}h ${m}m left"
+                        } else "needs 8+ min",
+                        accent = when {
+                            battery.drainPercentPerHour >= 20f && battery.drainIsReliable -> AlertRed
+                            battery.drainPercentPerHour >= 12f && battery.drainIsReliable -> WarningAmber
+                            else -> ElectricBlue
+                        }
+                    )
+                    MiniTelemetryPill(
+                        modifier = Modifier.weight(1f),
+                        label = "Cell Health",
+                        value = if (battery.batteryHealthScore > 0) "${battery.batteryHealthScore}/100" else "—",
+                        sub = battery.cycleCount?.let { "$it cycles" } ?: "good charging habits",
+                        accent = if (battery.batteryHealthScore in 1..49) AlertRed else ElectricBlue
+                    )
+                    MiniTelemetryPill(
+                        modifier = Modifier.weight(1f),
+                        label = "Capacity Used",
+                        value = if (battery.chargeCounterMilliAmpHours > 0) "${battery.chargeCounterMilliAmpHours} mAh" else "—",
+                        sub = "current charge",
+                        accent = CyberCyan
+                    )
+                }
+
+                Text(
+                    text = battery.batteryHealthSummary.ifBlank { "Battery telemetry is being collected — open this tab a few times for full analysis." },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.EnergySavingsLeaf, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Extreme Battery Saver",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Stretches background work to 72h, freezes maintenance scans, disables disk logging. VPN protection stays ON.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onRunExtremeBattery,
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Enable Extreme Saver", maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = onRestoreBalancedPower,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Restore Balanced", maxLines = 1)
+                    }
                 }
             }
         }
@@ -1498,7 +1709,7 @@ private fun BatteryThermalTabContent(
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = if (selected) {
-                            EmeraldPrimary.copy(alpha = 0.15f)
+                            ElectricBlue.copy(alpha = 0.15f)
                         } else {
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         },
@@ -1506,7 +1717,7 @@ private fun BatteryThermalTabContent(
                             .fillMaxWidth()
                             .border(
                                 width = if (selected) 1.5.dp else 0.dp,
-                                color = if (selected) EmeraldPrimary else Color.Transparent,
+                                color = if (selected) ElectricBlue else Color.Transparent,
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .clickable { onSelectBatteryMode(mode) }
@@ -1515,7 +1726,7 @@ private fun BatteryThermalTabContent(
                             Text(
                                 text = mode.title,
                                 style = MaterialTheme.typography.titleMedium,
-                                color = if (selected) EmeraldGlow else MaterialTheme.colorScheme.onSurface,
+                                color = if (selected) SkyBlueGlow else MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -1553,7 +1764,7 @@ private fun BatteryThermalTabContent(
                 Text(
                     text = "AdShield Background Impact: ${battery.adShieldBatteryImpactSummary}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = EmeraldPrimary
+                    color = ElectricBlue
                 )
             }
         }

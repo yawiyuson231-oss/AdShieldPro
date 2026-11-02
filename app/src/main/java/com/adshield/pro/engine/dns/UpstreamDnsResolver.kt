@@ -226,6 +226,23 @@ class UpstreamDnsResolver @Inject constructor() {
     }
 
     /**
+     * Game Turbo DNS prefetch: resolves the given hostnames ahead of game launch so the
+     * TTL cache serves them instantly when the game connects. Failures are ignored.
+     */
+    suspend fun prefetchHostnames(hostnames: List<String>, config: DnsResolverConfig): Int = withContext(Dispatchers.IO) {
+        var warmed = 0
+        for (host in hostnames) {
+            val clean = host.trim().lowercase().trimEnd('.')
+            if (clean.isEmpty() || clean.length > 253) continue
+            val queryBytes = runCatching { DnsPacketCodec.buildStandardQuery(clean, DnsPacketCodec.TYPE_A) }.getOrNull() ?: continue
+            val parsed = runCatching { DnsPacketCodec.parseQuery(queryBytes) }.getOrNull() ?: continue
+            val result = runCatching { resolve(parsed, config) }.getOrNull()
+            if (result != null && !result.protocolUsed.startsWith("SERVFAIL")) warmed++
+        }
+        warmed
+    }
+
+    /**
      * Executes an RFC 8484 DNS-over-HTTPS wireformat POST query.
      */
     fun queryDoh(rawDnsQuery: ByteArray, dohUrl: String): ByteArray {

@@ -151,7 +151,7 @@ class AdShieldVpnService : VpnService() {
                     builder.addDnsServer(VIRTUAL_IPV6_DNS)
                 }
 
-                // Always exclude AdShield Pro itself so upstream requests never loop
+                // Always exclude TitanShield Max itself so upstream requests never loop
                 runCatching { builder.addDisallowedApplication(packageName) }
 
                 // Apply per-app VPN exclusions configured by the user
@@ -527,9 +527,9 @@ class AdShieldVpnService : VpnService() {
         }
 
         val title = if (isPaused) {
-            "AdShield Pro — Protection Paused"
+            "TitanShield Max — Protection Paused"
         } else {
-            "AdShield Pro Active (${state.activeMode.title})"
+            "TitanShield Max Active (${state.activeMode.title})"
         }
 
         val content = "Blocked ${state.sessionBlockedQueries} of ${state.sessionTotalQueries} DNS queries • ${state.resolverConfig.protocol.name}"

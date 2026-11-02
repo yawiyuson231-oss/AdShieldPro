@@ -1,4 +1,4 @@
-# AdShield Pro v2.1 — APK & Signed AAB Release Build Instructions
+# TitanShield Max v2.1 — APK & Signed AAB Release Build Instructions
 
 ## 1. Environment Prerequisites
 
@@ -32,7 +32,7 @@ Run from `C:\Users\hillm\OneDrive\Desktop\PROJECT`:
 
 ### Step 1: Use the Existing Production Signing Keystore
 
-For an update to an already installed AdShield Pro app, use the original production keystore and credentials. Do not generate a replacement key: Android will reject the update if it is signed with a different key. If this is the first ever release, create and securely back up a keystore before publishing.
+For an update to an already installed TitanShield Max app, use the original production keystore and credentials. Do not generate a replacement key: Android will reject the update if it is signed with a different key. If this is the first ever release, create and securely back up a keystore before publishing.
 
 ### Step 2: Set Signing Environment Variables and Build `.aab`
 `app/build.gradle.kts` reads release credentials from environment variables or Gradle user properties (never hardcoded in source control). On Windows, you can keep them in `%USERPROFILE%\.gradle\gradle.properties`, outside this project:

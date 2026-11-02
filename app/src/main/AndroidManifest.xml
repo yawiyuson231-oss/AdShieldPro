@@ -11,9 +11,18 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Game Turbo: trim cached background processes for maximum game RAM headroom -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+    <!-- Game Turbo / Extreme Battery Saver: pause + restore account auto-sync -->
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- True Deep Cleaner: opt-in All-Files-Access so hidden/secret files across shared
+         storage can be found and cleaned. The user must explicitly grant this in Settings. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
 
     <application
         android:name=".AdShieldApplication"
@@ -43,7 +52,7 @@
         <activity
             android:name=".ui.UpdatePromptActivity"
             android:exported="false"
-            android:label="AdShield Pro update"
+            android:label="TitanShield Max update"
             android:theme="@style/Theme.AdShieldPro" />
 
         <provider

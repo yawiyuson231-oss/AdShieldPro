@@ -58,7 +58,7 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 
@@ -181,7 +181,7 @@ fun SettingsScreen(
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (selected) {
-                                EmeraldPrimary.copy(alpha = 0.14f)
+                                ElectricBlue.copy(alpha = 0.14f)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             },
@@ -200,7 +200,7 @@ fun SettingsScreen(
                                     Text(
                                         text = preset.displayName,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (selected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                        color = if (selected) ElectricBlue else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = preset.primaryIpv4,
@@ -299,7 +299,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Apps, contentDescription = null, tint = EmeraldPrimary)
+                        Icon(Icons.Default.Apps, contentDescription = null, tint = ElectricBlue)
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -357,7 +357,7 @@ fun SettingsScreen(
                                 .padding(end = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Power, contentDescription = null, tint = EmeraldPrimary)
+                            Icon(Icons.Default.Power, contentDescription = null, tint = ElectricBlue)
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
@@ -466,7 +466,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = EmeraldPrimary)
+                    Icon(Icons.Default.Info, contentDescription = null, tint = ElectricBlue)
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("About Us", style = MaterialTheme.typography.titleMedium)
@@ -614,11 +614,11 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "1. Local-Only VpnService Processing: AdShield Pro uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
+                        text = "1. Local-Only VpnService Processing: TitanShield Max uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "2. Zero HTTPS Interception or Root Certificates: AdShield Pro never installs a CA certificate and never decrypts or inspects HTTPS payloads.",
+                        text = "2. Zero HTTPS Interception or Root Certificates: TitanShield Max never installs a CA certificate and never decrypts or inspects HTTPS payloads.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(

@@ -57,7 +57,7 @@ import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 
@@ -120,7 +120,7 @@ fun RulesScreen(
 
                 Button(
                     onClick = { showAddDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
                 ) {
                     Icon(imageVector = Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
@@ -175,7 +175,7 @@ fun RulesScreen(
                             color = if (sandboxResult.isBlocked) {
                                 AlertRed.copy(alpha = 0.16f)
                             } else {
-                                EmeraldPrimary.copy(alpha = 0.16f)
+                                ElectricBlue.copy(alpha = 0.16f)
                             },
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -188,7 +188,7 @@ fun RulesScreen(
                                         "ALLOWED • ${sandboxResult.domain}"
                                     },
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (sandboxResult.isBlocked) AlertRed else EmeraldPrimary,
+                                    color = if (sandboxResult.isBlocked) AlertRed else ElectricBlue,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
@@ -361,7 +361,7 @@ fun RulesScreen(
                             Icon(
                                 imageVector = if (rule.ruleType == RuleType.BLOCK) Icons.Default.Block else Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = if (rule.ruleType == RuleType.BLOCK) AlertRed else EmeraldPrimary,
+                                tint = if (rule.ruleType == RuleType.BLOCK) AlertRed else ElectricBlue,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))

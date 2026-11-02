@@ -10,6 +10,6 @@ For each release:
 3. Build a signed release APK with the same keystore used for the installed production app.
 4. Publish a GitHub Release (not draft or prerelease) in your own configured repository.
 5. Attach one release APK asset and add user-facing notes in the release body. The app verifies the APK SHA-256 when GitHub provides it.
-6. User confirms installation in Android's package installer. Android 8+ may ask to allow installs from AdShield Pro.
+6. User confirms installation in Android's package installer. Android 8+ may ask to allow installs from TitanShield Max.
 
 Older installed app copies must first install an updater-enabled APK manually.

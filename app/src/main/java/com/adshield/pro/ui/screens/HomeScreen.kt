@@ -94,8 +94,8 @@ import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldGlow
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.SkyBlueGlow
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -134,7 +134,7 @@ fun HomeScreen(
 
     val shieldColor by animateColorAsState(
         targetValue = when (vpnState.status) {
-            VpnStatus.CONNECTED -> EmeraldPrimary
+            VpnStatus.CONNECTED -> ElectricBlue
             VpnStatus.PAUSED -> WarningAmber
             VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
             VpnStatus.ERROR -> AlertRed
@@ -223,13 +223,13 @@ fun HomeScreen(
             ) {
                 Image(
                     painter = painterResource(R.drawable.ic_adshield_mark),
-                    contentDescription = "AdShield Pro shield logo",
+                    contentDescription = "TitanShield Max shield logo",
                     modifier = Modifier.size(30.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "AdShield Pro",
+                        text = "TitanShield Max",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -252,7 +252,7 @@ fun HomeScreen(
                     onClick = onCheckForUpdates
                 ),
                 shape = RoundedCornerShape(50),
-                color = EmeraldPrimary.copy(alpha = 0.18f)
+                color = ElectricBlue.copy(alpha = 0.18f)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
@@ -261,7 +261,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.SystemUpdateAlt,
                         contentDescription = "Check for app updates",
-                        tint = EmeraldGlow,
+                        tint = SkyBlueGlow,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -269,7 +269,7 @@ fun HomeScreen(
                         text = if (isCheckingForUpdates) "Checking…" else "Check updates",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = EmeraldGlow,
+                        color = SkyBlueGlow,
                         maxLines = 1
                     )
                 }
@@ -344,7 +344,7 @@ fun HomeScreen(
                         if (isConnected) {
                             rotate(outerWireRotation.value, centerOffset) {
                                 drawArc(
-                                    color = EmeraldGlow.copy(alpha = 0.32f), startAngle = 0f, sweepAngle = 92f,
+                                    color = SkyBlueGlow.copy(alpha = 0.32f), startAngle = 0f, sweepAngle = 92f,
                                     useCenter = false,
                                     topLeft = Offset(centerOffset.x - outerRadius, centerOffset.y - outerRadius),
                                     size = Size(outerRadius * 2, outerRadius * 2),
@@ -360,7 +360,7 @@ fun HomeScreen(
                             }
                             rotate(innerWireRotation.value, centerOffset) {
                                 drawArc(
-                                    color = EmeraldGlow.copy(alpha = 0.30f), startAngle = 185f, sweepAngle = 74f,
+                                    color = SkyBlueGlow.copy(alpha = 0.30f), startAngle = 185f, sweepAngle = 74f,
                                     useCenter = false,
                                     topLeft = Offset(centerOffset.x - innerRadius, centerOffset.y - innerRadius),
                                     size = Size(innerRadius * 2, innerRadius * 2),
@@ -489,8 +489,8 @@ fun HomeScreen(
                         onCheckedChange = { onToggleVpn(it) },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
-                            checkedTrackColor = EmeraldPrimary,
-                            checkedBorderColor = EmeraldPrimary,
+                            checkedTrackColor = ElectricBlue,
+                            checkedBorderColor = ElectricBlue,
                             uncheckedThumbColor = Color(0xFF9AA4B2),
                             uncheckedTrackColor = Color(0xFF1E2636),
                             uncheckedBorderColor = Color(0xFF3A4558)
@@ -508,7 +508,7 @@ fun HomeScreen(
                             imageVector = if (isPaused) Icons.Default.PlayCircle else Icons.Default.PauseCircle,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
-                            tint = if (isPaused) WarningAmber else EmeraldPrimary
+                            tint = if (isPaused) WarningAmber else ElectricBlue
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -551,7 +551,7 @@ fun HomeScreen(
                 title = "Allowed Queries",
                 value = java.text.NumberFormat.getIntegerInstance().format(displayAllowed),
                 subtitle = "Cached: ${vpnState.sessionCachedQueries}",
-                accentColor = EmeraldPrimary
+                accentColor = ElectricBlue
             )
             DashboardStatCard(
                 modifier = Modifier.weight(1f),
@@ -611,14 +611,14 @@ fun HomeScreen(
                     }
 
                     Surface(
-                        color = EmeraldPrimary.copy(alpha = 0.16f),
+                        color = ElectricBlue.copy(alpha = 0.16f),
                         shape = RoundedCornerShape(50),
                         modifier = Modifier.clickable { onOpenOptimizerTab() }
                     ) {
                         Text(
                             text = "Score ${healthAssessment.readinessScore}/100",
                             style = MaterialTheme.typography.labelMedium,
-                            color = EmeraldGlow,
+                            color = SkyBlueGlow,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
@@ -628,7 +628,7 @@ fun HomeScreen(
                 Button(
                     onClick = onRunOptimizeNow,
                     enabled = !isRunningSmartBoost,
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Bolt, contentDescription = null)
@@ -643,7 +643,7 @@ fun HomeScreen(
                 if (isRunningSmartBoost) {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                 }
 
@@ -664,7 +664,7 @@ fun HomeScreen(
                                     "Optimization Summary (${RuleBasedOptimizationPredictor.formatBytes(smartBoostResult.bytesRecoveredAutomatically)} recovered)"
                                 },
                                 style = MaterialTheme.typography.titleMedium,
-                                color = EmeraldPrimary,
+                                color = ElectricBlue,
                                 fontWeight = FontWeight.Bold
                             )
                             smartBoostResult.actionsCompleted.forEach { act ->
@@ -713,7 +713,7 @@ fun HomeScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "Green = allowed • Red = blocked",
+                            text = "Blue = allowed • Red = blocked",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -756,7 +756,7 @@ fun HomeScreen(
                         Surface(
                             shape = RoundedCornerShape(14.dp),
                             color = if (isSelected) {
-                                EmeraldPrimary.copy(alpha = 0.15f)
+                                ElectricBlue.copy(alpha = 0.15f)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                             },
@@ -764,7 +764,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .border(
                                     width = if (isSelected) 1.5.dp else 0.dp,
-                                    color = if (isSelected) EmeraldPrimary else Color.Transparent,
+                                    color = if (isSelected) ElectricBlue else Color.Transparent,
                                     shape = RoundedCornerShape(14.dp)
                                 )
                                 .clickable { onSelectProtectionMode(mode) }
@@ -779,14 +779,14 @@ fun HomeScreen(
                                         Icon(
                                             imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.Security,
                                             contentDescription = null,
-                                            tint = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            tint = if (isSelected) ElectricBlue else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = mode.title,
                                             style = MaterialTheme.typography.titleMedium,
-                                            color = if (isSelected) EmeraldGlow else MaterialTheme.colorScheme.onSurface
+                                            color = if (isSelected) SkyBlueGlow else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
 
@@ -867,7 +867,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Sync Filter Lists",
-                            tint = EmeraldPrimary
+                            tint = ElectricBlue
                         )
                     }
                 }
@@ -875,7 +875,7 @@ fun HomeScreen(
                 if (isUpdatingFilters) {
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                 }
 
@@ -890,7 +890,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Default.Lock,
                         contentDescription = null,
-                        tint = EmeraldPrimary,
+                        tint = ElectricBlue,
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -929,7 +929,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "AdShield Pro blocks third-party ad SDKs, trackers, and malicious domains across games, utilities, news apps, and browsers without root or HTTPS decryption. Official YouTube, Facebook, TikTok, and some streaming apps deliver video ads from the same first-party servers as primary content and cannot be 100% blocked via DNS alone.",
+                        text = "TitanShield Max blocks third-party ad SDKs, trackers, and malicious domains across games, utilities, news apps, and browsers without root or HTTPS decryption. Official YouTube, Facebook, TikTok, and some streaming apps deliver video ads from the same first-party servers as primary content and cannot be 100% blocked via DNS alone.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1005,9 +1005,9 @@ fun RealTimeActivityBarChart(
                 val totalHeight = size.height * totalRatio
                 val blockedHeight = size.height * blockedRatio
 
-                // Allowed bar background (Emerald)
+                // Allowed bar background (Titan Blue)
                 drawRoundRect(
-                    color = EmeraldPrimary.copy(alpha = 0.45f),
+                    color = ElectricBlue.copy(alpha = 0.45f),
                     topLeft = Offset(left, size.height - totalHeight),
                     size = Size(barWidth, totalHeight),
                     cornerRadius = CornerRadius(8f, 8f)
