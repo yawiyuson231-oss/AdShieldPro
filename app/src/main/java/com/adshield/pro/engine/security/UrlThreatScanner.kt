@@ -36,7 +36,7 @@ class UrlThreatScanner {
     }
 
     /** Result provider hook: returns true when the host (or a parent domain) is on the active malware/phishing blocklist. */
-    funInterface KnownThreatHostLookup {
+    interface KnownThreatHostLookup {
         fun isKnownThreatHost(host: String): Boolean
     }
 
