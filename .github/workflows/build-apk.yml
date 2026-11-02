@@ -1,0 +1,93 @@
+name: Build TitanShield Max APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'arena/**'
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate CI release keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore "${{ github.workspace }}/ci-release.keystore" \
+            -storetype PKCS12 \
+            -alias titan-shield \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass titanshield30000 -keypass titanshield30000 \
+            -dname "CN=TitanShield Max, OU=CI, O=TitanShield, L=Manila, C=PH"
+
+      - name: Build debug + release APKs
+        env:
+          ADSHIELD_KEYSTORE_PATH: ${{ github.workspace }}/ci-release.keystore
+          ADSHIELD_KEYSTORE_PASSWORD: titanshield30000
+          ADSHIELD_KEY_ALIAS: titan-shield
+          ADSHIELD_KEY_PASSWORD: titanshield30000
+        run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p apk-out
+          find app/build/outputs -name "*.apk" -type f -exec cp {} apk-out/ \;
+          ls -la apk-out
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TitanShieldMax-APKs
+          path: apk-out/*.apk
+          if-no-files-found: error
+
+      - name: Upload CI keystore artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-release-keystore
+          path: ci-release.keystore
+
+      - name: Attach APKs to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="TitanShield Max v3.0.0 automated CI build.
+          Includes: bundled 367k-rule ad/malware filter engine, Security Center anti-virus,
+          Game Turbo, Battery Intelligence, True Deep Clean, Deep Ocean Blue UI.
+
+          Install: download TitanShieldMax-v3.0.0-release.apk (or the debug build for
+          side-by-side testing) and allow install-from-unknown-sources.
+
+          The release APK is signed with a CI-generated key (keystore attached;
+          store/key password: titanshield30000, alias: titan-shield). Keep it if you
+          want future CI builds to upgrade-install over this one."
+
+          gh release create ci-v3.0.0 apk-out/*.apk ci-release.keystore \
+            --target "$GITHUB_SHA" \
+            --title "TitanShield Max v3.0.0 — CI Build" \
+            --notes "$NOTES" \
+          || gh release upload ci-v3.0.0 apk-out/*.apk ci-release.keystore --clobber
+
+      - name: Run unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            app/build/reports/tests
+            app/build/reports/unitTests
+          if-no-files-found: ignore
