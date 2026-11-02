@@ -40,6 +40,11 @@ jobs:
       - name: Build debug + release APKs
         id: build
         continue-on-error: true
+        env:
+          ADSHIELD_KEYSTORE_PATH: ${{ github.workspace }}/ci-release.keystore
+          ADSHIELD_KEYSTORE_PASSWORD: titanshield30000
+          ADSHIELD_KEY_ALIAS: titan-shield
+          ADSHIELD_KEY_PASSWORD: titanshield30000
         run: |
           set -o pipefail
           ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease 2>&1 | tee build-output.log
