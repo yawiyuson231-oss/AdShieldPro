@@ -293,9 +293,6 @@ class BrowserContentBlocker @Inject constructor(
                 val isException: Boolean
             )
 
-            /** Compiled, immutable rule set (hot path — matched on every browser request). */
-            private val rules: List<NetworkRule> = buildRules()
-
             /** Hosts dedicated to advertising — blocked regardless of page context. */
             private val dedicatedAdHosts = setOf(
                 "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -333,6 +330,9 @@ class BrowserContentBlocker @Inject constructor(
                 "amung.us", "histats.com", "statcounter.com/count", "addthis.com",
                 "adriver.ru", "adfox.ru", "an.yandex.ru", "mc.yandex.ru/metrika"
             )
+
+            /** Compiled, immutable rule set (hot path — matched on every browser request). */
+            private val rules: List<NetworkRule> = buildRules()
 
             private fun buildRules(): List<NetworkRule> {
                 val list = ArrayList<NetworkRule>(256)
