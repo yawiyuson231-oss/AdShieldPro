@@ -127,6 +127,14 @@ android {
     }
 }
 
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events = setOf(org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED)
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showCauses = true
+    }
+}
+
 tasks.matching { it.name == "preReleaseBuild" }.configureEach {
     doFirst {
         val releaseSign = android.signingConfigs.getByName("releaseConfig")
