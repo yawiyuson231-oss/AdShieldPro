@@ -57,7 +57,8 @@ jobs:
         run: |
           git config user.name "ci-log-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -f build-output.log test-output.log 2>/dev/null || true
+          git add -f build-output.log || true
+          git add -f test-output.log || true
           git commit -m "CI logs (run ${{ github.run_id }})" || true
           git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/ci-logs" --force
 
