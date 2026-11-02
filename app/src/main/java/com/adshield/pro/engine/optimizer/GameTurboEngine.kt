@@ -170,7 +170,7 @@ class GameTurboEngine @Inject constructor(
     /**
      * Ends the turbo session and restores every deferred system setting.
      */
-    fun endTurbo(): List<String> {
+    suspend fun endTurbo(): List<String> {
         val steps = ArrayList<String>()
         if (activePackage.get() == null) return steps
 

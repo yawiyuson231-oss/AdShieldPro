@@ -456,9 +456,11 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun endGameTurbo() {
-        val steps = gameTurboEngine.endTurbo()
-        _turboSession.value = gameTurboEngine.getSessionState()
-        showFeedback(steps.firstOrNull() ?: "Turbo session ended.")
+        viewModelScope.launch(Dispatchers.IO) {
+            val steps = runCatching { gameTurboEngine.endTurbo() }.getOrDefault(emptyList())
+            _turboSession.value = gameTurboEngine.getSessionState()
+            showFeedback(steps.firstOrNull() ?: "Turbo session ended.")
+        }
     }
 
     fun refreshTurboSession() {

@@ -378,12 +378,12 @@ class SystemOptimizerEngine @Inject constructor(
         val drainAnalysis = com.adshield.pro.engine.battery.BatteryAnalytics.analyzeDrain(
             synchronized(batterySamples) { batterySamples.toList() }
         )
-        val chargeCounterMah = intent?.getIntExtra(BatteryManager.EXTRA_CHARGE_COUNTER, -1) ?: -1
+        val chargeCounterMah = runCatching {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER).takeIf { it > 0 }
+        }.getOrNull() ?: -1
         val cycleCount = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            runCatching {
-                val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CYCLE_COUNT).takeIf { it > 0 }
-            }.getOrNull()
+            intent?.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1)?.takeIf { it > 0 }
         } else null
 
         val tempHistory = synchronized(temperatureTrend) { temperatureTrend.toList() }
@@ -646,7 +646,8 @@ class SystemOptimizerEngine @Inject constructor(
                 )
             }
 
-            outer@ for (root in scanRoots) {
+            run outer@{
+            for (root in scanRoots) {
                 if (!root.exists() || !root.canRead()) continue
                 root.walkTopDown().maxDepth(if (hasAllFilesAccess()) 5 else 3).forEach { file ->
                     if (scannedFiles++ > MAX_DEEP_SCAN_FILES) return@outer
@@ -680,6 +681,7 @@ class SystemOptimizerEngine @Inject constructor(
                             addCandidate(file, JunkCategory.HIDDEN_TEMP_FILES)
                     }
                 }
+            }
             }
 
             // A folder only counts as orphaned when it is completely empty right now

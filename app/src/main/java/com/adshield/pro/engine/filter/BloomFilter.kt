@@ -33,7 +33,7 @@ class BloomFilter(
 
     fun add(element: String) {
         val bytes = element.toByteArray(Charsets.UTF_8)
-        val h1 = murmur3_32(bytes, seed = 0x9747b28c)
+        val h1 = murmur3_32(bytes, seed = 0x9747b28c.toInt())
         val h2 = murmur3_32(bytes, seed = 0x1b873593)
         var hash = h1.toLong() and 0xFFFFFFFFL
         val h2l = h2.toLong() and 0xFFFFFFFFL
@@ -49,7 +49,7 @@ class BloomFilter(
 
     fun mightContain(element: String): Boolean {
         val bytes = element.toByteArray(Charsets.UTF_8)
-        val h1 = murmur3_32(bytes, seed = 0x9747b28c)
+        val h1 = murmur3_32(bytes, seed = 0x9747b28c.toInt())
         val h2 = murmur3_32(bytes, seed = 0x1b873593)
         var hash = h1.toLong() and 0xFFFFFFFFL
         val h2l = h2.toLong() and 0xFFFFFFFFL
@@ -94,7 +94,7 @@ class BloomFilter(
                 k1 *= c2
                 h1 = h1 xor k1
                 h1 = Integer.rotateLeft(h1, 13)
-                h1 = h1 * 5 + 0xe6546b64
+                h1 = h1 * 5 + 0xe6546b64.toInt()
                 i += 4
             }
             var k1 = 0

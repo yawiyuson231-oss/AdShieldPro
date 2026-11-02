@@ -133,7 +133,10 @@ class SecurityEngine @Inject constructor(
             .getOrDefault(emptyList())
 
         apps.map { appInfo ->
-            val requested: List<String> = appInfo.requestedPermissions?.toList() ?: emptyList()
+            val requested: List<String> = runCatching {
+                pm.getPackageInfo(appInfo.packageName, PackageManager.GET_PERMISSIONS)
+                    .requestedPermissions?.toList()
+            }.getOrNull() ?: emptyList()
             val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 runCatching {
                     pm.getInstallSourceInfo(appInfo.packageName).installingPackageName
