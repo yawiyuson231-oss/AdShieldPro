@@ -46,12 +46,16 @@ object ProtectedDomainCatalog {
         )
 
         // --- Authentication, identity, OS infra ---
+        // NOTE: vendors like Microsoft/Apple also serve TELEMETRY from their main domains,
+        // so only genuine auth/update hosts are protected there — Strict telemetry blocking
+        // must keep working (verified in DnsFirewallCompatibilityTest + legacy suite).
         putGroup(
             ProtectionGroup.AUTH_IDENTITY,
             "google.com", "googleapis.com", "gstatic.com", "googleusercontent.com",
             "gvt1.com", "gvt2.com", "withgoogle.com",
-            "microsoft.com", "microsoftonline.com", "live.com", "live.net", "office.com", "outlook.com",
-            "apple.com", "icloud.com", "mzstatic.com",
+            "login.microsoftonline.com", "login.live.com", "live.com", "outlook.com",
+            "office.com", "windowsupdate.com", "wustat.windows.com", "do.dsp.mp.microsoft.com",
+            "appleid.apple.com", "icloud.com", "mesu.apple.com", "gs.apple.com", "mzstatic.com",
             "okta.com", "auth0.com", "onelogin.com",
             "twitter.com", "x.com", "twimg.com",
             "reddit.com", "redd.it", "redditmedia.com", "redditstatic.com",

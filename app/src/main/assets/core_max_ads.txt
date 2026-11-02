@@ -176124,3 +176124,10 @@
 ||zzzmjfixezere.site^
 ||zzzmxvoxooaat.site^
 ||zzzperform.com^
+
+# [CATEGORY:ADS] TitanShield Max baseline additions — bare infrastructural ad/tracker registrable domains absent upstream; verified by DnsFirewallCompatibilityTest CI gate
+||doubleclick.net^
+||scorecardresearch.com^
+||facebook.net^
+||criteo.com^
+||googletagmanager.com^

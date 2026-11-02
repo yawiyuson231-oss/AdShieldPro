@@ -8,7 +8,7 @@ TitanShield Max bundles the following third-party data assets inside `app/src/ma
 - **Source:** https://github.com/hagezi/dns-blocklists
 - **Author:** HaGeZi's Diversion and the HaGeZi community contributors.
 - **License:** GNU General Public License v3.0 (verified from the repository `LICENSE` file, SPDX `GPL-3.0`).
-- **Modifications:** The lists are consumed as-is (concatenated and de-duplicated at load time by the app's filter engine). Category header lines may be re-annotated by the parser in memory; the bundled files themselves are unmodified apart from concatenation of the official builds.
+- **Modifications:** The bundled files are the official builds plus a clearly-marked block of baseline additions at the end of `core_max_ads.txt` (5 bare infrastructural ad/tracker registrable domains, each verified by the CI compatibility gate `DnsFirewallCompatibilityTest`). Category header lines may be re-annotated by the parser in memory. Per GPLv3 the modified files and their source remain available.
 - **Source availability:** The original list files are publicly downloadable from the source repository above. Per GPLv3, the bundled copies and their source are provided free of charge and this entire project is distributed under a GPLv3-compatible license with full source availability.
 
 ## Other remote filter sources (downloaded on demand, not bundled)
