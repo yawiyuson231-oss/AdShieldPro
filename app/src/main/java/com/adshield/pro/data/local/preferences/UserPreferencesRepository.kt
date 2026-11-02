@@ -235,6 +235,7 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setDetailedDnsLogging(enabled: Boolean) {
         context.adShieldDataStore.edit { it[Keys.DETAILED_LOGGING] = enabled }
+    }
 
     suspend fun setShadowModeEnabled(enabled: Boolean) =
         context.adShieldDataStore.edit { it[Keys.SHADOW_MODE_ENABLED] = enabled }
@@ -248,7 +249,6 @@ class UserPreferencesRepository @Inject constructor(
         context.adShieldDataStore.edit {
             it[Keys.AUTO_RECOVERY_COUNT] = (it[Keys.AUTO_RECOVERY_COUNT] ?: 0) + 1
         }
-    }
 
     suspend fun setLogRetentionDays(days: Int) {
         context.adShieldDataStore.edit { it[Keys.LOG_RETENTION_DAYS] = days.coerceIn(1, 90) }

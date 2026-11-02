@@ -1,6 +1,7 @@
 package com.adshield.pro.engine.dns
 
 import com.adshield.pro.domain.model.DnsProtocol
+import com.adshield.pro.domain.model.DnsResolverConfig
 
 /**
  * TitanShield Max — DNS Leak & Exposure Assessment (Module 1/6).

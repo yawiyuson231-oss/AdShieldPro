@@ -431,8 +431,10 @@ class AdShieldVpnService : VpnService() {
                 kotlinx.coroutines.delay(if (safeModeActive) 60_000L else 30_000L)
                 if (vpnInterface == null || isPaused) continue
                 val probeOk = runCatching {
-                    val probe = DnsPacketCodec.buildStandardQuery(zeroBreakageProbeHost, 1)
-                    upstreamDnsResolver.resolve(probe, resolverConfig).responseBytes.isNotEmpty()
+                    val parsedProbe = DnsPacketCodec.parseQuery(
+                        DnsPacketCodec.buildStandardQuery(zeroBreakageProbeHost, 1)
+                    ) ?: error("probe query parse failed")
+                    upstreamDnsResolver.resolve(parsedProbe, resolverConfig).responseBytes.isNotEmpty()
                 }.getOrDefault(false)
                 when (zeroBreakageEngine.onProbeResult(probeOk)) {
                     com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.SAFE_MODE_FILTERING -> if (!safeModeActive) {

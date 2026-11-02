@@ -77,7 +77,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val viewModel: AdShieldViewModel = hiltViewModel()
             val settings by viewModel.settingsState.collectAsStateWithLifecycle()
-            val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
 
             AdShieldProTheme(themePreference = settings.darkThemeMode) {
                 AdShieldMainApp(viewModel = viewModel)
@@ -97,6 +96,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
 
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+    val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
