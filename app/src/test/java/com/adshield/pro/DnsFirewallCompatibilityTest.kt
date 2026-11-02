@@ -1,6 +1,7 @@
 package com.adshield.pro
 
 import com.adshield.pro.domain.model.DnsProtocol
+import com.adshield.pro.domain.model.FilterEvaluationResult
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RuleCategory
@@ -244,7 +245,7 @@ class DnsFirewallCompatibilityTest {
         assertTrue(engine.evaluate("ads.tracker.example").isBlocked)
 
         // Shadow ON: reported, allowed
-        val captured = ArrayList<Pair<String, FilterRuleEngine.FilterEvaluationResult>>()
+        val captured = ArrayList<Pair<String, FilterEvaluationResult>>()
         engine.shadowDecisionListener = { domain, result -> captured.add(domain to result) }
         engine.setShadowModeEnabled(true)
 
