@@ -546,7 +546,7 @@ class TitanShieldMaxEngineTestSuite {
 
     @Test
     fun testBrowserUrlPatternFilter_blocksVideoAdEndpoints() {
-        val f = BrowserContentBlocker(FilterRuleEngine()).UrlPatternFilter
+        val f = BrowserContentBlocker.Companion.UrlPatternFilter
         assertNotNull(f.match("https://pubads.g.doubleclick.net/gampad/ads?iu=/video", "pubads.g.doubleclick.net", true, "xmlhttprequest"))
         assertNull(f.match("https://cdn.mysite.com/video/episode1.mp4", "cdn.mysite.com", false, "media"))
         assertNotNull(f.match("https://cdn.vendor-cdn.com/prebid/6.2/pbjs.js", "cdn.vendor-cdn.com", true, "script"))
