@@ -423,7 +423,7 @@ class TitanShieldMaxEngineTestSuite {
             zip.write(axml)
             zip.closeEntry()
             zip.putNextEntry(ZipEntry("classes.dex"))
-            zip.write("dex\n035\x00".toByteArray() + ByteArray(256))
+            zip.write("dex\n035\u0000".toByteArray() + ByteArray(256))
             zip.closeEntry()
             zip.putNextEntry(ZipEntry("META-INF/CERT.RSA"))
             zip.write(ByteArray(64))
@@ -546,7 +546,7 @@ class TitanShieldMaxEngineTestSuite {
 
     @Test
     fun testBrowserUrlPatternFilter_blocksVideoAdEndpoints() {
-        val f = BrowserContentBlocker.UrlPatternFilter
+        val f = BrowserContentBlocker(FilterRuleEngine()).UrlPatternFilter
         assertNotNull(f.match("https://pubads.g.doubleclick.net/gampad/ads?iu=/video", "pubads.g.doubleclick.net", true, "xmlhttprequest"))
         assertNull(f.match("https://cdn.mysite.com/video/episode1.mp4", "cdn.mysite.com", false, "media"))
         assertNotNull(f.match("https://cdn.vendor-cdn.com/prebid/6.2/pbjs.js", "cdn.vendor-cdn.com", true, "script"))
