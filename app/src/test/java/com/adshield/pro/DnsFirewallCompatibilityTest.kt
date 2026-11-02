@@ -10,6 +10,7 @@ import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.zero.ZeroBreakageEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.fail
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -76,10 +77,19 @@ class DnsFirewallCompatibilityTest {
 
         private fun expectBlocked(host: String) {
             val result = sharedEngine.evaluate(host)
-            assertTrue(
-                "PROTECTION REGRESSION: '$host' must be blocked but was ALLOWED via '${result.sourceName}'",
-                result.isBlocked
-            )
+            if (!result.isBlocked) {
+                val snap = sharedEngine.getCurrentSnapshot()
+                val inSub = snap.filterListSubdomains.containsKey(host)
+                val inExact = snap.filterListExact.containsKey(host)
+                val parentIn = snap.filterListSubdomains.containsKey(host.substringAfter('.'))
+                fail(
+                    "PROTECTION REGRESSION: '$host' allowed via '${result.sourceName}' | " +
+                        "inSub=$inSub inExact=$inExact parentIn=$parentIn " +
+                        "totalRules=${snap.totalLoadedRules} subMap=${snap.filterListSubdomains.size} " +
+                        "exMap=${snap.filterListExact.size} bloomNull=${snap.blockedKeysBloom == null} " +
+                        "wildcards=${snap.hasAnyWildcardRules} mode=${snap.protectionMode}"
+                )
+            }
         }
     }
 
