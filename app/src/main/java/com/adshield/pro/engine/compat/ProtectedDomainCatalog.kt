@@ -105,7 +105,7 @@ object ProtectedDomainCatalog {
     /** Flat O(1) lookup set of every protected registrable domain. */
     val protectedDomains: Set<String> = catalog.keys
 
-    private fun MutableMap<String, ProtectionGroup>.putGroup(group: ProtectionGroup, domains: vararg String) {
+    private fun MutableMap<String, ProtectionGroup>.putGroup(group: ProtectionGroup, vararg domains: String) {
         for (d in domains) put(d, group)
     }
 

@@ -61,7 +61,7 @@ data class AppSettingsState(
     val gameBoosterTempWarningCelsius: Int = 41,
     val gameSessionRecords: List<GameSessionRecord> = emptyList(),
     val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC,
-    val lastSmartBoostEpochMs: Long = 0L
+    val lastSmartBoostEpochMs: Long = 0L,
     // --- Zero-Breakage Engine (Module 7) ---
     val shadowModeEnabled: Boolean = false,
     val falsePositiveReportCount: Int = 0,
