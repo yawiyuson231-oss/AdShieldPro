@@ -1,5 +1,7 @@
 package com.adshield.pro.engine.zero
 
+import javax.inject.Inject
+
 /**
  * TitanShield Max — Zero-Breakage Engine (Module 7).
  *
@@ -17,7 +19,7 @@ package com.adshield.pro.engine.zero
  * filtering when breakage is detected, and every relaxation is counted for the
  * dashboard and surfaced to the user via a toast + counters.
  */
-class ZeroBreakageEngine {
+class ZeroBreakageEngine @Inject constructor() {
 
     enum class WatchdogAction {
         NONE,
