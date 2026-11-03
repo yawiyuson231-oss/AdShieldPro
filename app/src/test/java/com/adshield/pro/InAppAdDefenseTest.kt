@@ -105,11 +105,17 @@ class InAppAdDefenseTest {
     /** Builds a minimal TLS ClientHello with an SNI extension. */
     private fun buildClientHello(sni: String): ByteArray {
         val sniBytes = sni.toByteArray(Charsets.US_ASCII)
-        val extData = byteArrayOf(
-            (sniBytes.size + 5 shr 8).toByte(), (sniBytes.size + 5).toByte(), // list length
-            0x00, // host_name type
+        val listBody = byteArrayOf(
+            (sniBytes.size + 5 shr 8).toByte(), (sniBytes.size + 5).toByte(), // server_name_list length
+            0x00, // host_name entry type
             (sniBytes.size shr 8).toByte(), sniBytes.size.toByte(), // name length
             *sniBytes
+        )
+        // Full extension entry: type 0x0000 (SNI) + extension length + list body
+        val extData = byteArrayOf(
+            0x00, 0x00, // extension type = server_name
+            (listBody.size shr 8).toByte(), listBody.size.toByte(), // extension length
+            *listBody
         )
         val body = java.io.ByteArrayOutputStream()
         body.write(0x03); body.write(0x03) // client version TLS1.2
