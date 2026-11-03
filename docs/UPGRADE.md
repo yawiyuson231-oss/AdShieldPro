@@ -102,14 +102,15 @@ Executed, in this order.
 
 ### 6.1 GitHub Actions (`.github/workflows/android-build.yml`) — full Gradle build
 
-Run [41625151162](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/41625151162) on
-`ubuntu-latest`, JDK 21 (Temurin), Android SDK `platforms;android-37.0`, Gradle 9.7.1:
+Run [41626061305](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/41626061305) on
+`ubuntu-latest`, JDK 21 (Temurin), Android SDK `platforms;android-37.0`, Gradle 9.7.1
+(4m 42s, every step green):
 
 | Step | Result |
 | --- | --- |
 | `./gradlew :app:compileDebugKotlin` | **BUILD SUCCESSFUL** (2m 2s) |
 | `./gradlew :app:assembleDebug` | **BUILD SUCCESSFUL** — APK packaged |
-| `./gradlew :app:assembleRelease` (R8 + `shrinkResources`, throwaway keystore) | see latest run |
+| `./gradlew :app:assembleRelease` (R8 + `shrinkResources`, throwaway keystore) | **BUILD SUCCESSFUL** — minified APK packaged |
 | `./gradlew :app:testDebugUnitTest` | **BUILD SUCCESSFUL** |
 | `./gradlew :app:lintDebug` | **0 errors** (lint is a hard CI gate) |
 | Assert 18 unit tests actually executed | **pass** (the step fails unless exactly 18 tests pass) |
