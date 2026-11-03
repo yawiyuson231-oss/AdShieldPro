@@ -27,12 +27,14 @@ jobs:
 
       - name: Publish to gh-pages branch
         run: |
+          rm -rf /tmp/site && mkdir -p /tmp/site
+          cp -r website/. /tmp/site/
+          cd /tmp/site
+          git init -q -b gh-pages
           git config user.name "omnishield-pages-bot"
           git config user.email "actions@users.noreply.github.com"
-          git checkout --orphan gh-pages-new
-          git rm -rf . --quiet
-          mv website/* website/.[!.]* . 2>/dev/null || mv website/* .
-          echo "omnishield-x.dev" > CNAME 2>/dev/null || true
           git add -A
-          git commit -m "OmniShield X web platform (run ${{ github.run_id }})"
-          git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/gh-pages" --force
+          git commit -q -m "OmniShield X web platform (run ${{ github.run_id }})"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push -q origin gh-pages --force
+          echo "Published $(find . -type f | wc -l) files to gh-pages"
