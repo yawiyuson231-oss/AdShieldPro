@@ -224,7 +224,7 @@ class BrowserContentBlocker @Inject constructor(
                 setInterval(function() {
                     try {
                         const skipSelectors = [
-                            '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern',
+                            '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern', '.ytp-ad-overlay-close-button',
                             '.videoAdUiSkipButton', '.skip-ad-button', 'button[class*=skip-ad]',
                             '.ad-skip-button'
                         ];
@@ -316,6 +316,15 @@ class BrowserContentBlocker @Inject constructor(
                 "atdmt.com", "histats.com", "adriver.ru", "adfox.ru"
             )
 
+            /**
+             * First-party video-ad beacons (YouTube): pure advertising telemetry —
+             * blocking them never touches video playback, so the $third-party gate
+             * is intentionally waived for this set only.
+             */
+            private val firstPartyVideoAdPatterns = listOf(
+                "api/stats/ads", "/ptracking", "/pcs/click", "youtube.com/pagead"
+            )
+
             /** Full-URL substring patterns for video-ad manifest & bidding endpoints. */
             private val urlSubstringRules = listOf(
                 "/vast", "/vmap", "/vmap.xml", "vastads", "vasttag", "vast_wrapper",
@@ -351,6 +360,10 @@ class BrowserContentBlocker @Inject constructor(
              */
             fun match(requestUrl: String, requestHost: String, isThirdParty: Boolean, resourceType: String): String? {
                 val url = requestUrl.lowercase()
+                // Ad-only telemetry beacons are safe to block even first-party (no playback impact)
+                for (pattern in firstPartyVideoAdPatterns) {
+                    if (url.contains(pattern)) return "video-ad beacon: $pattern"
+                }
                 // Cheap exception check for first-party analytics opt-outs
                 if (url.contains("pagead2.googlesyndication.com/pcs/activeview") &&
                     resourceType == "image"
@@ -406,6 +419,12 @@ class BrowserContentBlocker @Inject constructor(
             "iframe[src*=adnxs]",
             "iframe[src*=taboola]",
             // YouTube (web/mobile web) display & feed ad units
+            "#masthead-ad",
+            "#player-ads",
+            "ytd-promoted-video-renderer",
+            "ytd-compact-promoted-video-renderer",
+            "ytd-player-legacy-desktop-watch-ads-renderer",
+            ".ytp-ad-text-overlay",
             "ytd-display-ad-renderer",
             "ytd-ad-slot-renderer",
             "ytd-in-feed-ad-layout-renderer",

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -53,6 +54,7 @@ import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.HomeScreen
+import com.adshield.pro.ui.screens.LiveMonitorScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
 import com.adshield.pro.ui.screens.SecurityScreen
 import com.adshield.pro.ui.screens.SettingsScreen
@@ -62,6 +64,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
+    LIVE("Live", Icons.Default.Monitor),
     AD_BLOCKER("Ad Block", Icons.Default.Shield),
     SECURITY("Security", Icons.Default.Security),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
@@ -333,6 +336,16 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
                     onRunOptimizeNow = viewModel::runOneTapSmartBoost,
                     onOpenOptimizerTab = { currentTab = MainNavDestination.OPTIMIZER }
+                )
+
+                MainNavDestination.LIVE -> LiveMonitorScreen(
+                    vpnState = vpnState,
+                    recentLogs = recentLogs,
+                    allTimeTotal = allTimeTotal,
+                    allTimeBlocked = allTimeBlocked,
+                    allTimeAllowed = allTimeAllowed,
+                    aetherReport = aetherReport,
+                    onSelectProtectionMode = viewModel::setProtectionMode
                 )
 
                 MainNavDestination.AD_BLOCKER -> AdBlockerHubScreen(

@@ -176,3 +176,38 @@ class AetherInfinityTest {
         org.junit.Assert.assertNull(f.match("https://media.googlevideo.com/videoplayback?id=abc", "media.googlevideo.com", false, "media"))
     }
 }
+
+// --- Live Monitor feed mapping (Part 12) + first-party video-ad beacons (Part 3) ---
+
+@org.junit.Test
+fun liveFeed_lanesAndTags_classifyRealHosts() {
+    val m = com.adshield.pro.engine.aether.LiveFeedMapper
+    org.junit.Assert.assertEquals(m.Lane.VIDEO, m.laneFor("rr3---sn-npoe7ney.googlevideo.com"))
+    org.junit.Assert.assertEquals(m.Lane.GAME, m.laneFor("ylgdmirp.yleaflyrn.aena.ms"))
+    org.junit.Assert.assertEquals(m.Lane.SOCIAL, m.laneFor("web.whatsapp.com"))
+    org.junit.Assert.assertEquals(m.Lane.SYSTEM, m.laneFor("connectivitycheck.gstatic.com"))
+    org.junit.Assert.assertEquals(m.Lane.WEB, m.laneFor("my-blog.example.org"))
+
+    org.junit.Assert.assertEquals(m.TAG_AD, m.tagFor(com.adshield.pro.domain.model.RuleCategory.ADS))
+    org.junit.Assert.assertEquals(m.TAG_MALICIOUS, m.tagFor(com.adshield.pro.domain.model.RuleCategory.MALWARE))
+    org.junit.Assert.assertEquals(m.TAG_NOT_LISTED, m.tagFor(null))
+}
+
+@org.junit.Test
+fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
+    val f = BrowserContentBlocker.Companion.UrlPatternFilter
+    // Ad-only telemetry beacons on YouTube itself (first-party) — blocked
+    org.junit.Assert.assertNotNull(
+        f.match("https://www.youtube.com/api/stats/ads?event=adview", "www.youtube.com", false, "image")
+    )
+    org.junit.Assert.assertNotNull(
+        f.match("https://www.youtube.com/ptracking?pltype=adhost", "www.youtube.com", false, "xmlhttprequest")
+    )
+    // The watch page and playback MUST pass untouched
+    org.junit.Assert.assertNull(
+        f.match("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "www.youtube.com", false, "document")
+    )
+    org.junit.Assert.assertNull(
+        f.match("https://r1---sn-x.googlevideo.com/videoplayback?id=abc", "r1---sn-x.googlevideo.com", false, "media")
+    )
+}
