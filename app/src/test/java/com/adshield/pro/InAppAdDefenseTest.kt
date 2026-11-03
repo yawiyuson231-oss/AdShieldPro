@@ -114,21 +114,21 @@ class InAppAdDefenseTest {
         val body = java.io.ByteArrayOutputStream()
         body.write(0x03); body.write(0x03) // client version TLS1.2
         val random = ByteArray(32); java.util.Random(7).nextBytes(random)
-        body.write(random)
+        body.write(random, 0, random.size)
         body.write(0x00) // session id len
         body.write(0x00); body.write(0x02); body.write(0x13); body.write(0x01) // cipher suites len + 1 suite
         body.write(0x01); body.write(0x00) // compression methods
-        body.write((extData.size shr 8).toByte()); body.write(extData.size) // extensions len
+        body.write((extData.size shr 8).toInt()); body.write(extData.size) // extensions len
         body.write(extData)
 
         val handshake = java.io.ByteArrayOutputStream()
         handshake.write(0x01) // ClientHello
-        handshake.write((body.size() shr 16).toByte()); handshake.write((body.size() shr 8).toByte()); handshake.write(body.size())
+        handshake.write((body.size() shr 16).toInt()); handshake.write((body.size() shr 8).toInt()); handshake.write(body.size())
         handshake.write(body.toByteArray())
 
         val record = java.io.ByteArrayOutputStream()
         record.write(0x16); record.write(0x03); record.write(0x01)
-        record.write((handshake.size() shr 8).toByte()); record.write(handshake.size())
+        record.write((handshake.size() shr 8).toInt()); record.write(handshake.size())
         record.write(handshake.toByteArray())
         return record.toByteArray()
     }
