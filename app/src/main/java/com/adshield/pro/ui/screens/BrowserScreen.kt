@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Message
-import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -65,7 +64,7 @@ import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -98,14 +97,7 @@ fun BrowserScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            // Tear the WebView down with the composition. Leaving it alive keeps the Activity
-            // context, its clients and any running page timers reachable, which is a leak.
-            webViewRef.value?.let { webView ->
-                webView.stopLoading()
-                (webView.parent as? ViewGroup)?.removeView(webView)
-                webView.destroy()
-            }
-            webViewRef.value = null
+            webViewRef.value?.stopLoading()
         }
     }
 
@@ -136,7 +128,7 @@ fun BrowserScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = if (currentPageUrl.startsWith("https://")) EmeraldPrimary else WarningAmber,
+                                tint = if (currentPageUrl.startsWith("https://")) ElectricBlue else WarningAmber,
                                 modifier = Modifier.size(16.dp)
                             )
                         },
@@ -160,7 +152,7 @@ fun BrowserScreen(
                         Icon(
                             imageVector = Icons.Default.Tune,
                             contentDescription = "Browser Shield Controls",
-                            tint = EmeraldPrimary
+                            tint = ElectricBlue
                         )
                     }
                 }
@@ -194,13 +186,13 @@ fun BrowserScreen(
 
                     if (currentHost.isNotEmpty()) {
                         Surface(
-                            color = if (isCurrentSiteAllowlisted) WarningAmber.copy(alpha = 0.2f) else EmeraldPrimary.copy(alpha = 0.16f),
+                            color = if (isCurrentSiteAllowlisted) WarningAmber.copy(alpha = 0.2f) else ElectricBlue.copy(alpha = 0.16f),
                             shape = RoundedCornerShape(50)
                         ) {
                             Text(
                                 text = if (isCurrentSiteAllowlisted) "Site Allowlisted" else "Cosmetic Shield ON",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = if (isCurrentSiteAllowlisted) WarningAmber else EmeraldPrimary,
+                                color = if (isCurrentSiteAllowlisted) WarningAmber else ElectricBlue,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                             )
                         }
@@ -212,7 +204,7 @@ fun BrowserScreen(
                     LinearProgressIndicator(
                         progress = { pageLoadProgress / 100f },
                         modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                 }
             }
@@ -342,7 +334,7 @@ fun BrowserScreen(
             onDismissRequest = { showBrowserShieldSheet = false },
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Security, contentDescription = null, tint = EmeraldPrimary)
+                    Icon(Icons.Default.Security, contentDescription = null, tint = ElectricBlue)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Browser protection settings")
                 }
@@ -350,7 +342,7 @@ fun BrowserScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Built-in WebView protections apply to pages opened inside AdShield Pro Browser. (Note: Non-root Android apps cannot inject cosmetic CSS into external third-party browsers.)",
+                        text = "Built-in WebView protections apply to pages opened inside TitanShield Max Browser. (Note: Non-root Android apps cannot inject cosmetic CSS into external third-party browsers.)",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

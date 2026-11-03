@@ -49,6 +49,26 @@ object DnsPacketCodec {
     }
 
     /**
+     * Builds a standard RFC 1035 recursive DNS query for a hostname (used by Game Turbo
+     * DNS prefetching to pre-warm the resolver cache before a game connects).
+     */
+    fun buildStandardQuery(domain: String, qType: Int): ByteArray {
+        val out = ByteArrayOutputStream(64)
+        val transactionId = (0..0xFFFF).random()
+        // RD = 1 (Recursion Desired)
+        writeU16(out, transactionId)
+        writeU16(out, 0x0100)
+        writeU16(out, 1) // QDCOUNT
+        writeU16(out, 0) // ANCOUNT
+        writeU16(out, 0) // NSCOUNT
+        writeU16(out, 0) // ARCOUNT
+        writeDomainLabels(out, domain.trim('.').lowercase())
+        writeU16(out, qType)
+        writeU16(out, CLASS_IN)
+        return out.toByteArray()
+    }
+
+    /**
      * Parses a raw DNS query packet (without TCP 2-byte length prefix).
      * Returns null if the packet is malformed, truncated, or is already a response (QR == 1).
      */
@@ -245,60 +265,6 @@ object DnsPacketCodec {
             out.write(query.rawPayload, 12, qSectionLen)
         }
         return out.toByteArray()
-    }
-
-    /**
-     * Returns a response that is guaranteed to fit inside a single UDP datagram of
-     * [maxPayloadBytes] bytes.
-     *
-     * DNS answers fetched over DoH/DoT can be several kilobytes (DNSSEC, many A records,
-     * EDNS0). Writing such a packet straight back to the TUN interface exceeds the interface
-     * MTU, the write fails and the requesting app only sees a DNS timeout. Instead we return
-     * the upstream message untouched when it fits, and otherwise synthesize a standards
-     * compliant truncated answer:
-     *  - transaction ID, QR, RD, RA and RCODE are preserved from the upstream response,
-     *  - the TC (truncated, 0x0200) bit is set so the stub resolver retries over TCP,
-     *  - the original question section is preserved and every record section is dropped
-     *    (RFC 1035 §4.2.1, RFC 2181 §9).
-     */
-    fun fitResponseToUdpLimit(
-        query: ParsedDnsQuery,
-        responseBytes: ByteArray,
-        maxPayloadBytes: Int
-    ): ByteArray {
-        if (responseBytes.size < 12) return buildServFailResponse(query)
-        val limit = maxPayloadBytes.coerceAtLeast(12)
-        if (responseBytes.size <= limit) return responseBytes
-
-        val txId = ((responseBytes[0].toInt() and 0xFF) shl 8) or (responseBytes[1].toInt() and 0xFF)
-        val upstreamFlags = ((responseBytes[2].toInt() and 0xFF) shl 8) or (responseBytes[3].toInt() and 0xFF)
-        val truncatedFlags = (upstreamFlags or 0x8000 or 0x0200) and 0xFFFF
-
-        fun build(includeQuestion: Boolean): ByteArray {
-            val out = ByteArrayOutputStream(limit)
-            writeU16(out, txId)
-            writeU16(out, truncatedFlags)
-            writeU16(out, if (includeQuestion) 1 else 0) // QDCOUNT
-            writeU16(out, 0) // ANCOUNT
-            writeU16(out, 0) // NSCOUNT
-            writeU16(out, 0) // ARCOUNT
-            if (includeQuestion) {
-                val qSectionLen = (query.questionSectionEndOffset - 12).coerceAtLeast(0)
-                if (qSectionLen > 0 && 12 + qSectionLen <= query.rawPayload.size) {
-                    out.write(query.rawPayload, 12, qSectionLen)
-                } else {
-                    writeDomainLabels(out, query.questionDomain)
-                    writeU16(out, query.qType)
-                    writeU16(out, query.qClass)
-                }
-            }
-            return out.toByteArray()
-        }
-
-        val withQuestion = build(true)
-        if (withQuestion.size <= limit) return withQuestion
-        // Pathologically small limit: keep the header only so the client still learns about TC.
-        return build(false)
     }
 
     /**

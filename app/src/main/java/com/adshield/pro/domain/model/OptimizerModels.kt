@@ -14,7 +14,7 @@ enum class JunkCleanMode(val title: String, val subtitle: String) {
     ),
     SCHEDULED_CLEAN(
         title = "Scheduled Clean",
-        subtitle = "Automatic background cleanup of safe AdShield Pro temporary files via WorkManager."
+        subtitle = "Automatic background cleanup of safe TitanShield Max temporary files via WorkManager."
     ),
     CUSTOM_CLEAN(
         title = "Custom Clean",
@@ -34,7 +34,7 @@ enum class JunkCategory(
         autoDeleteSafe = true
     ),
     ADSHIELD_TEMP_STAGING(
-        displayName = "AdShield Temp & Staging",
+        displayName = "TitanShield Temp & Staging",
         description = "Residual blocklist download staging files and expired diagnostic cache.",
         autoDeleteSafe = true
     ),
@@ -57,6 +57,26 @@ enum class JunkCategory(
         displayName = "Large Files (>10 MB)",
         description = "Large accessible files consuming significant storage space (requires confirmation).",
         autoDeleteSafe = false
+    ),
+    HIDDEN_TEMP_FILES(
+        displayName = "Hidden & Secret Temp Files",
+        description = "Invisible dot-files, orphaned partial downloads, and hidden cache droppings across shared storage (requires confirmation).",
+        autoDeleteSafe = false
+    ),
+    CRASH_LOGS(
+        displayName = "Crash & Debug Logs",
+        description = "Leftover .log, .trace, and .tombstone crash dumps from apps and games (requires confirmation).",
+        autoDeleteSafe = false
+    ),
+    EMPTY_FOLDERS(
+        displayName = "Empty Leftover Folders",
+        description = "Empty directories orphaned by uninstalled apps (requires confirmation).",
+        autoDeleteSafe = false
+    ),
+    THUMBNAIL_CACHE(
+        displayName = "Media Thumbnail Cache",
+        description = "Regenerable DCIM/.thumbnails preview caches — safe to delete, rebuilt automatically.",
+        autoDeleteSafe = true
     )
 }
 
@@ -146,6 +166,13 @@ enum class GamingProfile(
         pauseBackgroundSync = true,
         minimizeDiskLogging = true
     ),
+    TURBO(
+        title = "Turbo (Zero-Lag)",
+        subtitle = "Maximum RAM + cache headroom, all background work frozen, DNS prefetch warmed before launch.",
+        dnsCacheMaxEntries = 8192,
+        pauseBackgroundSync = true,
+        minimizeDiskLogging = true
+    ),
     BATTERY_SAVER(
         title = "Battery Saver",
         subtitle = "Reduces background wakeups and thermal load during extended gaming sessions.",
@@ -220,6 +247,14 @@ data class BatteryThermalSnapshot(
     val isLowBattery: Boolean,
     val adShieldBatteryImpactSummary: String,
     val recommendations: List<String>,
+    // --- TitanShield Max Battery Intelligence ---
+    val chargeCounterMilliAmpHours: Int = -1,
+    val cycleCount: Int? = null,
+    val drainPercentPerHour: Float = 0f,
+    val drainIsReliable: Boolean = false,
+    val estimatedMinutesToEmpty: Int? = null,
+    val batteryHealthScore: Int = -1,
+    val batteryHealthSummary: String = "",
     val timestampEpochMs: Long = System.currentTimeMillis()
 )
 

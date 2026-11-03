@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -28,7 +31,9 @@ import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -58,7 +63,8 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.AlertRed
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
 
@@ -75,7 +81,18 @@ fun SettingsScreen(
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
-    onRestoreBackupJson: (String) -> Unit
+    onRestoreBackupJson: (String) -> Unit,
+    shadowVerdicts: List<String> = emptyList(),
+    onToggleShadowMode: (Boolean) -> Unit = {},
+    onReportFalsePositive: (String) -> Unit = {},
+    onToggleInAppAdSkip: (Boolean) -> Unit = {},
+    onSaveAdSkipExtraPackages: (String) -> Unit = {},
+    onToggleEncryptedDnsBypass: (Boolean) -> Unit = {},
+    onToggleHeuristicShield: (Boolean) -> Unit = {},
+    onToggleCheckNewDomains: (Boolean) -> Unit = {},
+    onToggleInAppAdSkipUniversal: (Boolean) -> Unit = {},
+    onToggleResolverAutoTune: (Boolean) -> Unit = {},
+    dnsSpeedStats: String? = null
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -181,7 +198,7 @@ fun SettingsScreen(
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = if (selected) {
-                                EmeraldPrimary.copy(alpha = 0.14f)
+                                ElectricBlue.copy(alpha = 0.14f)
                             } else {
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             },
@@ -200,7 +217,7 @@ fun SettingsScreen(
                                     Text(
                                         text = preset.displayName,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (selected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                        color = if (selected) ElectricBlue else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = preset.primaryIpv4,
@@ -299,7 +316,7 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Apps, contentDescription = null, tint = EmeraldPrimary)
+                        Icon(Icons.Default.Apps, contentDescription = null, tint = ElectricBlue)
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -357,7 +374,7 @@ fun SettingsScreen(
                                 .padding(end = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Power, contentDescription = null, tint = EmeraldPrimary)
+                            Icon(Icons.Default.Power, contentDescription = null, tint = ElectricBlue)
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
@@ -409,6 +426,207 @@ fun SettingsScreen(
             }
         }
 
+        item {
+            // --- Zero-Breakage Engine (Module 7) ---
+            var falsePositiveInput by remember { mutableStateOf("") }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.HealthAndSafety, contentDescription = null, tint = ElectricBlue)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Zero-Breakage Engine", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Connectivity watchdog suspends filter lists automatically if breakage is detected and restores them when the internet is healthy again. Custom rules and video/banking protection always stay on.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Shadow Mode", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Report risky list rules instead of enforcing them. Validate, then allowlist what you need.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.shadowModeEnabled, onCheckedChange = onToggleShadowMode)
+                    }
+                    if (shadowVerdicts.isNotEmpty()) {
+                        Text("Latest shadow reports:", style = MaterialTheme.typography.labelSmall)
+                        shadowVerdicts.take(3).forEach { line ->
+                            Text("• $line", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    HorizontalDivider()
+                    Text("Site or app broken? Report it — the domain is allowlisted instantly.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = falsePositiveInput,
+                            onValueChange = { falsePositiveInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("broken-domain.example") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(
+                            onClick = {
+                                onReportFalsePositive(falsePositiveInput)
+                                falsePositiveInput = ""
+                            },
+                            enabled = falsePositiveInput.isNotBlank()
+                        ) { Text("Fix") }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Universal video ad-skip (any app)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Applies the same strict skip rules to every app on the device, not just YouTube. Bare buttons like Skip/✕/Close without ad evidence are never tapped, ad buttons (Download, Shop now) are never tapped, and system UIs (dialer, keyboard, launcher, settings) are excluded entirely.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.inAppAdSkipUniversal, onCheckedChange = onToggleInAppAdSkipUniversal)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Speed mode (auto-fastest resolver)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Every 15 minutes, the fastest RELIABLE resolver is chosen from your real measured query latencies — only switches if 25%+ faster with 90%+ success. Never touches a custom resolver, never sends synthetic traffic.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.resolverAutoTune, onCheckedChange = onToggleResolverAutoTune)
+                    }
+                    if (dnsSpeedStats != null) {
+                        Text(
+                            dnsSpeedStats,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Strict Heuristic Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "In Strict mode, blocks random-looking names (DGA), lookalike brand domains, and (opt-in) domains registered in the last 30 days. Balanced mode only observes these. A blocked site is one tap to allow and report.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockHeuristicThreats, onCheckedChange = onToggleHeuristicShield)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Check new domains (Strict)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Looks up domain registration age via RDAP when Strict mode is on (2s cap, cached 6h). Domains with unknown age are never blocked. Uses network only when enabled.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.checkNewDomains, onCheckedChange = onToggleCheckNewDomains)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("DNSSEC — what happens", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Learn more: your chosen resolver (Cloudflare, Google, Quad9, AdGuard) validates DNSSEC signatures before answering, and OmniShield passes the validated answer through untouched. Tampered answers from non-validating paths are rejected upstream. OmniShield does not re-validate signatures itself — it relies on the encrypted, validating resolver you select.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Encrypted-DNS Bypass Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Sinks DoH provider bootstraps (Chrome Secure DNS, Firefox DoH, SDK resolvers) so apps fall back to the filtered system DNS. Your own selected provider is never blocked.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockEncryptedDnsBypass, onCheckedChange = onToggleEncryptedDnsBypass)
+                    }
+                    Text(
+                        "False positives reported: ${settings.falsePositiveReportCount}  •  Auto-recoveries: ${settings.autoRecoveryCount}",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+        item {
+            // --- In-App Ad Defense (works beyond DNS) ---
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var serviceGranted by remember {
+                mutableStateOf(com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context))
+            }
+            var extraPkgsInput by remember(settings.adSkipExtraPackages) {
+                mutableStateOf(settings.adSkipExtraPackages.joinToString(", "))
+            }
+            val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+            androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+                val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                        serviceGranted = com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context)
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(obs)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Block, contentDescription = null, tint = AlertRed)
+                        Spacer(Modifier.width(8.dp))
+                        Text("In-App Ad Defense", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Skips and closes video ads INSIDE apps (YouTube apps by default) — the only non-root way to touch in-app ads. Websites are covered by the built-in browser engine. OmniShield taps ONLY ad buttons (Skip/Close) — never play, links, or downloads.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-skip in apps", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (serviceGranted) "Accessibility service: ACTIVE" else "Accessibility service: not enabled — required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (serviceGranted) androidx.compose.ui.graphics.Color(0xFF34D399) else WarningAmber
+                            )
+                        }
+                        Switch(
+                            checked = settings.inAppAdSkipEnabled,
+                            onCheckedChange = { enabled ->
+                                onToggleInAppAdSkip(enabled)
+                                if (enabled && !serviceGranted) {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    HorizontalDivider()
+                    Text("Add more video apps (package names, comma-separated):", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = extraPkgsInput,
+                            onValueChange = { extraPkgsInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("com.example.video, tv.example.app") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(onClick = { onSaveAdSkipExtraPackages(extraPkgsInput) }) { Text("Save") }
+                    }
+                    Text(
+                        "Ads skipped so far: ${settings.inAppAdsSkippedCount} • Engine only taps buttons a human could — nothing is modified, typed, or opened.",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
         // Backup & Restore + Privacy Policy Disclosures Card
         item {
             Card(
@@ -466,7 +684,7 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Info, contentDescription = null, tint = EmeraldPrimary)
+                    Icon(Icons.Default.Info, contentDescription = null, tint = ElectricBlue)
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("About Us", style = MaterialTheme.typography.titleMedium)
@@ -476,7 +694,7 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Open About Us", tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Open About Us", tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -614,11 +832,11 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "1. Local-Only VpnService Processing: AdShield Pro uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
+                        text = "1. Local-Only VpnService Processing: TitanShield Max uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "2. Zero HTTPS Interception or Root Certificates: AdShield Pro never installs a CA certificate and never decrypts or inspects HTTPS payloads.",
+                        text = "2. Zero HTTPS Interception or Root Certificates: TitanShield Max never installs a CA certificate and never decrypts or inspects HTTPS payloads.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(

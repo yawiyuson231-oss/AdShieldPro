@@ -1,11 +1,11 @@
-# AdShield Pro Next-Generation Upgrade Plan
+# TitanShield Max Next-Generation Upgrade Plan
 
 **Audit date:** 2026-10-24  
-**Scope:** AdShield Pro v2.1.0 and the public BlockAds Android reference
+**Scope:** TitanShield Max v2.1.0 and the public BlockAds Android reference
 
 ## Current architecture and reference review
 
-AdShield Pro already uses Kotlin, Jetpack Compose/Material 3, MVVM, Hilt, Room, DataStore, WorkManager, and Android `VpnService`. Its local TUN interface routes DNS to an on-device filter; it supports filter sources and custom rules, DoH/DoT/UDP selection, per-app VPN exclusions, IPv6 configuration, local query history, an embedded browser, and JSON configuration export/restore. The current app already has a midnight navy and emerald visual identity and a substantial protection dashboard. This means the next step is to improve correctness and clarity around those real capabilities, not add simulated analytics.
+TitanShield Max already uses Kotlin, Jetpack Compose/Material 3, MVVM, Hilt, Room, DataStore, WorkManager, and Android `VpnService`. Its local TUN interface routes DNS to an on-device filter; it supports filter sources and custom rules, DoH/DoT/UDP selection, per-app VPN exclusions, IPv6 configuration, local query history, an embedded browser, and JSON configuration export/restore. The current app already has a midnight navy and emerald visual identity and a substantial protection dashboard. This means the next step is to improve correctness and clarity around those real capabilities, not add simulated analytics.
 
 The public [BlockAds Android repository](https://github.com/pass-with-high-score/blockads-android) provides a broader feature set for comparison: DNS/VPN filtering, optional root proxy, optional browser HTTPS filtering with a local CA, Quick Settings and widget controls, regional filter defaults, and more language coverage. Those features have additional device, certificate, VPN coexistence, and compatibility tradeoffs. The repository is GPL-3.0; this audit does not copy or port its source. Any future reuse or distribution of a derivative must be reviewed against GPL-3.0 source, notice, and installation-information terms.
 
@@ -14,7 +14,7 @@ The public [BlockAds Android repository](https://github.com/pass-with-high-score
 - The IPv6 tunnel literals contained an invalid hexadecimal character, and setup errors were swallowed. The addresses are now valid ULA literals; setup failures reach the existing VPN error path instead of being silently ignored.
 - DoH and DoT previously fell back to plaintext DNS after an upstream failure. The resolver now returns SERVFAIL for that request and keeps using the protocol the user selected. Explicit UDP/TCP mode remains available and is disclosed as unencrypted.
 - Android backup was enabled for app-private data, including local settings and query history. Platform cloud backup and device-transfer backup are now disabled; users can still use the app's explicit JSON configuration export/restore.
-- Release signing previously fell back to the debug key. Release builds now require a real signing keystore. AdShield Pro is free, so the purchase screen, billing SDK, and verifier requirement have been removed.
+- Release signing previously fell back to the debug key. Release builds now require a real signing keystore. TitanShield Max is free, so the purchase screen, billing SDK, and verifier requirement have been removed.
 - Google Play now requires API 36 for new submissions and updates. The project is set to compile/target API 36 and uses the minimum compatible AGP 8.9.3 / Gradle 8.11.1 pair.
 
 ## Capability assessment
@@ -46,12 +46,6 @@ The public [BlockAds Android repository](https://github.com/pass-with-high-score
 1. **Correctness and privacy (done in this update):** repair IPv6 setup, prevent encrypted DNS downgrade, disable automatic app-data backup, correct privacy disclosures.
 2. **Release integrity (done in source; credentials remain operator-provided):** update target/tooling baseline; refuse debug-signed release; require production verifier URL.
 3. **Build and regression validation (partly verified):** `testDebugUnitTest`, `assembleDebug`, and `lintDebug` passed on AGP 8.9.3 / API 36; API 36 was installed by the build tool. No Android device is attached (`adb devices` is empty), so physical install/upgrade, IPv4-only/dual-stack, network-switch, battery, and memory checks remain pending. No performance superiority claim without a reproducible comparison against the reference.
-> **Status (2.3.0):** the compatibility pass described in item 4 has been done — AGP 9.4.1 /
-> Gradle 9.7.1 / Kotlin 2.4.21 / `compileSdk 37` and the full AndroidX + Compose 2026.09.00
-> generation are in place, together with the new adaptive launcher icon and the repository
-> fixes listed in `docs/UPGRADE.md`. See that document for what was executed and what still
-> needs a machine with an Android SDK.
-
 4. **Product follow-up:** complete a screen-by-screen UX refresh; audit optimizer copy against actual Android APIs; improve resolver/VPN diagnostics; add accessibility/navigation checks; then prioritize search, Quick Settings tile/widget, and Filipino strings. Lint reports newer versions for 21 AndroidX/Test libraries plus AGP 9.4.1; update those in a separate compatibility pass because the larger upgrades need migration and regression checks.
 5. **Store readiness:** finish VPN and special-use foreground-service declarations, privacy/data-safety answers, signed AAB, and user testing. Do not submit until these external items are complete.
 

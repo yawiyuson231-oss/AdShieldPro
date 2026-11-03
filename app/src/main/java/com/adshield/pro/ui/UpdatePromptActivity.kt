@@ -45,7 +45,7 @@ class UpdatePromptActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         val item = release
         if (item != null && (Build.VERSION.SDK_INT < 26 || packageManager.canRequestPackageInstalls())) download(item)
-        else if (item != null) status = "Allow AdShield Pro to install apps from this source in Settings, then try again."
+        else if (item != null) status = "Allow TitanShield Max to install apps from this source in Settings, then try again."
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,7 +70,7 @@ class UpdatePromptActivity : ComponentActivity() {
                     title = { Text("Update available") },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("AdShield Pro " + item.name)
+                            Text("TitanShield Max " + item.name)
                             Text(item.notes, style = MaterialTheme.typography.bodyMedium)
                             status?.let { Spacer(Modifier.height(4.dp)); Text(it, color = MaterialTheme.colorScheme.error) }
                             if (downloading) { CircularProgressIndicator(modifier = Modifier.size(28.dp)); Text("Downloading and verifying…") }

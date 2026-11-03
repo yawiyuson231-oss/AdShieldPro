@@ -37,6 +37,7 @@ import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -76,10 +77,102 @@ class AdShieldViewModel @Inject constructor(
     private val filterRuleEngine: FilterRuleEngine,
     private val upstreamDnsResolver: UpstreamDnsResolver,
     val browserContentBlocker: BrowserContentBlocker,
-    private val optimizerEngine: SystemOptimizerEngine
+    private val optimizerEngine: SystemOptimizerEngine,
+    private val securityEngine: com.adshield.pro.engine.security.SecurityEngine,
+    private val gameTurboEngine: com.adshield.pro.engine.optimizer.GameTurboEngine,
+    val aetherCore: com.adshield.pro.engine.aether.AetherGodCore
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
+
+    // --- Zero-Breakage Engine (Module 7) ---
+    private val _shadowVerdicts = MutableStateFlow<List<String>>(emptyList())
+    val shadowVerdicts: StateFlow<List<String>> = _shadowVerdicts.asStateFlow()
+
+    // --- AETHER GodCore Control Center (Part 12): live, real metrics only ---
+    private val _aetherReport = MutableStateFlow(
+        com.adshield.pro.engine.aether.ControlCenterReport(
+            totalAgents = 15, agentsOnline = 0, dnsObserved = 0, blockedConfirmed = 0,
+            anomaliesObserved = 0, verificationOverrides = 0, rebindingBlocked = 0,
+            protectedOverrides = 0, safeModeActive = false, autoRecoveries = 0,
+            bestResolverLabel = null, bestResolverLatencyMs = null,
+            topObservedDomains = emptyList(), recentAudit = emptyList(),
+            updatedAtEpochMs = 0L
+        )
+    )
+    val aetherReport: StateFlow<com.adshield.pro.engine.aether.ControlCenterReport> = _aetherReport.asStateFlow()
+
+    // --- DNS bypass diagnostics (real system state, refreshed live) ---
+    private val _dnsBypassWarning = MutableStateFlow<String?>(null)
+    val dnsBypassWarning: StateFlow<String?> = _dnsBypassWarning.asStateFlow()
+
+    val dnsFallbackActive: StateFlow<Boolean> = repository.dnsFallbackActive
+
+    /** Honest speed stat: blocked lookups answered instantly (no upstream round-trip). */
+    val dnsTimeSavedEstimate: StateFlow<String?> = kotlinx.coroutines.flow.combine(
+        repository.blockedLoggedCountFlow,
+        repository.avgAllowedLatencyFlow
+    ) { blocked, avgMs ->
+        if (blocked > 0L && avgMs != null && avgMs > 0.0) {
+            val savedMs = blocked.toDouble() * avgMs
+            val label = if (savedMs >= 60_000.0) String.format("%.1f minutes", savedMs / 60_000.0)
+                        else String.format("%.0f seconds", savedMs / 1000.0)
+            "$blocked ad/tracker lookups answered instantly — about $label of lookup time avoided (estimate: blocked × your measured average lookup time)."
+        } else null
+    }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
+
+    
+
+    init {
+        // Shadow verdicts recorded from the filter engine (never blocking — report only).
+        filterRuleEngine.shadowDecisionListener = { domain, result ->
+            _shadowVerdicts.value =
+                (listOf("$domain :: ${result.sourceName.take(80)}") + _shadowVerdicts.value).take(25)
+        }
+        viewModelScope.launch {
+            filterRuleEngine.setShadowModeEnabled(preferencesRepository.getSettingsSnapshot().shadowModeEnabled)
+        }
+        viewModelScope.launch {
+            val settings = preferencesRepository.getSettingsSnapshot()
+            aetherCore.upstreamEncrypted = settings.resolverConfig.protocol != com.adshield.pro.domain.model.DnsProtocol.UDP_TCP
+            aetherCore.detailedLoggingEnabled = settings.detailedDnsLoggingEnabled
+        }
+        // Live Control Center refresh while the dashboard is open (real counters, no simulation)
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10_000L)
+                val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
+                // AETHER self-audit: feed REAL blocked events into the false-positive radar
+                val radar = com.adshield.pro.engine.aether.AetherSelfAudit.possibleFalsePositives(
+                    recentLogs.value.filter { it.isBlocked }.map { it.domain to it.sourceList }
+                )
+                _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong(), radar)
+                refreshDnsBypassWarning()
+            }
+        }
+    }
+
+    /** Reads the REAL Android Private DNS state — strict mode silently bypasses any DNS VPN. */
+    fun refreshDnsBypassWarning() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val assessment = runCatching {
+                val resolver = appContext.contentResolver
+                val mode = android.provider.Settings.Global.getString(resolver, "private_dns_mode")
+                val host = android.provider.Settings.Global.getString(resolver, "private_dns_provider_hostname")
+                com.adshield.pro.engine.aether.PrivateDnsGuard.parse(mode, host)
+            }.getOrElse {
+                com.adshield.pro.engine.aether.PrivateDnsGuard.parse(null, null)
+            }
+            _dnsBypassWarning.value = assessment.userGuidance
+        }
+    }
+
+    fun refreshAetherReportNow() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
+            _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong())
+        }
+    }
 
     val settingsState: StateFlow<AppSettingsState> = repository.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettingsState())
@@ -178,6 +271,47 @@ class AdShieldViewModel @Inject constructor(
     private val _isDndPolicyGranted = MutableStateFlow(optimizerEngine.isDoNotDisturbAccessGranted())
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
+    // --- TitanShield Max Security Center state ---
+    val malwareBlocks: StateFlow<Long> = repository.malwareBlocksFlow.stateIn(
+        viewModelScope, SharingStarted.Eagerly, 0L
+    )
+
+    private val _securityPosture = MutableStateFlow(
+        com.adshield.pro.engine.security.SecurityPosture(
+            protectionScore = if (repository.vpnRuntimeState.value.status == VpnStatus.CONNECTED) 60 else 0,
+            highRiskApps = 0,
+            threatSignatures = 0,
+            webProtectionActive = false
+        )
+    )
+    val securityPosture: StateFlow<com.adshield.pro.engine.security.SecurityPosture> = _securityPosture.asStateFlow()
+
+    private val _appAudits = MutableStateFlow<List<com.adshield.pro.engine.security.AppRiskAuditor.AppRiskAudit>>(emptyList())
+    val appAudits: StateFlow<List<com.adshield.pro.engine.security.AppRiskAuditor.AppRiskAudit>> = _appAudits.asStateFlow()
+
+    private val _isAuditingApps = MutableStateFlow(false)
+    val isAuditingApps: StateFlow<Boolean> = _isAuditingApps.asStateFlow()
+
+    private val _urlScanResult = MutableStateFlow<com.adshield.pro.engine.security.UrlThreatScanner.UrlVerdict?>(null)
+    val urlScanResult: StateFlow<com.adshield.pro.engine.security.UrlThreatScanner.UrlVerdict?> = _urlScanResult.asStateFlow()
+
+    private val _fileScanResult = MutableStateFlow<com.adshield.pro.engine.security.SecurityScanRecord?>(null)
+    val fileScanResult: StateFlow<com.adshield.pro.engine.security.SecurityScanRecord?> = _fileScanResult.asStateFlow()
+
+    private val _isScanningSecurity = MutableStateFlow(false)
+    val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
+
+    private val _securityHistory = MutableStateFlow<List<com.adshield.pro.engine.security.SecurityScanRecord>>(emptyList())
+    val securityHistory: StateFlow<List<com.adshield.pro.engine.security.SecurityScanRecord>> = _securityHistory.asStateFlow()
+
+    // --- TitanShield Max Game Turbo state ---
+    private val _turboSession = MutableStateFlow(gameTurboEngine.getSessionState())
+    val turboSession: StateFlow<com.adshield.pro.engine.optimizer.GameTurboEngine.TurboSessionState> = _turboSession.asStateFlow()
+
+    // --- TitanShield Max battery saver state ---
+    private val _extremeBatteryActions = MutableStateFlow<List<String>>(emptyList())
+    val extremeBatteryActions: StateFlow<List<String>> = _extremeBatteryActions.asStateFlow()
+
     init {
         viewModelScope.launch {
             customRules.collect {
@@ -211,7 +345,7 @@ class AdShieldViewModel @Inject constructor(
                 val release = withContext(Dispatchers.IO) { GitHubReleaseClient.latest() }
                 when {
                     release == null -> showFeedback("Couldn't check for updates. Check your internet connection and try again.")
-                    release.code <= BuildConfig.VERSION_CODE -> showFeedback("AdShield Pro is up to date.")
+                    release.code <= BuildConfig.VERSION_CODE -> showFeedback("TitanShield Max is up to date.")
                     else -> {
                         val intent = Intent(appContext, UpdatePromptActivity::class.java).apply {
                             putExtra(UpdatePromptActivity.TAG, release.tag)
@@ -391,6 +525,167 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    // --- TitanShield Max Game Turbo (Zero-Lag Mode) ---
+
+    fun activateGameTurboAndLaunch(packageName: String, appName: String) {
+        viewModelScope.launch {
+            val report = gameTurboEngine.activateTurboAndLaunch(
+                gamePackage = packageName,
+                gameName = appName,
+                resolverConfig = settingsState.value.resolverConfig,
+                suppressNotifications = settingsState.value.gameBoosterSuppressNotifications
+            )
+            _turboSession.value = gameTurboEngine.getSessionState()
+            refreshSystemTelemetry()
+            optimizerEngine.applyGameBoostAndLaunch(packageName, appName)
+            showFeedback(
+                "TURBO engaged for ${report.gameName}: ${report.stepsExecuted.size} optimizations " +
+                    "(~${report.ramFreedEstimateMb} MB RAM headroom, ${report.dnsCacheWarmedEntries} servers pre-resolved)."
+            )
+        }
+    }
+
+    fun endGameTurbo() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val steps = runCatching { gameTurboEngine.endTurbo() }.getOrDefault(emptyList())
+            _turboSession.value = gameTurboEngine.getSessionState()
+            showFeedback(steps.firstOrNull() ?: "Turbo session ended.")
+        }
+    }
+
+    fun refreshTurboSession() {
+        if (_turboSession.value.isActive && !gameTurboEngine.isTurboActive()) {
+            endGameTurbo()
+        } else {
+            _turboSession.value = gameTurboEngine.getSessionState()
+        }
+    }
+
+    fun thermalGuardSummary(): String = gameTurboEngine.thermalGuardSummary()
+
+    // --- TitanShield Max Security Center ---
+
+    fun scanUrl(rawUrl: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isScanningSecurity.value = true
+            val verdict = securityEngine.scanUrl(rawUrl)
+            _urlScanResult.value = verdict
+            val record = com.adshield.pro.engine.security.SecurityScanRecord(
+                id = System.currentTimeMillis(),
+                kind = com.adshield.pro.engine.security.ScanKind.URL,
+                target = rawUrl.take(120),
+                threatLevel = when (verdict.threatLevel) {
+                    com.adshield.pro.engine.security.UrlThreatScanner.ThreatLevel.DANGEROUS ->
+                        com.adshield.pro.engine.security.SecurityLevel.DANGEROUS
+                    com.adshield.pro.engine.security.UrlThreatScanner.ThreatLevel.SUSPICIOUS ->
+                        com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS
+                    else -> com.adshield.pro.engine.security.SecurityLevel.CLEAN
+                },
+                riskScore = verdict.riskScore,
+                threatName = verdict.findings.firstOrNull(),
+                findings = verdict.findings,
+                recommendation = verdict.recommendation,
+                timestampEpochMs = System.currentTimeMillis()
+            )
+            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            _isScanningSecurity.value = false
+        }
+    }
+
+    fun scanFile(file: java.io.File) {
+        viewModelScope.launch {
+            _isScanningSecurity.value = true
+            val record = securityEngine.scanFile(file)
+            _fileScanResult.value = record
+            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            refreshSecurityPosture()
+            _isScanningSecurity.value = false
+            showFeedback(
+                when (record.threatLevel) {
+                    com.adshield.pro.engine.security.SecurityLevel.DANGEROUS ->
+                        "THREAT: ${record.threatName ?: record.target} — do not open or install."
+                    com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS ->
+                        "Suspicious file: ${record.findings.firstOrNull() ?: "risk indicators found"}."
+                    else -> "File is clean: no signatures or structural threats found."
+                }
+            )
+        }
+    }
+
+    fun scanUri(uri: android.net.Uri, displayName: String) {
+        viewModelScope.launch {
+            _isScanningSecurity.value = true
+            val record = securityEngine.scanUriContent(uri, displayName)
+            if (record != null) {
+                _fileScanResult.value = record
+                _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+                showFeedback(
+                    when (record.threatLevel) {
+                        com.adshield.pro.engine.security.SecurityLevel.DANGEROUS ->
+                            "THREAT: ${record.threatName ?: displayName} — do not open or install."
+                        com.adshield.pro.engine.security.SecurityLevel.SUSPICIOUS ->
+                            "Suspicious file: ${record.findings.firstOrNull() ?: "risk indicators found"}."
+                        else -> "File is clean: no signatures or structural threats found."
+                    }
+                )
+            } else {
+                showFeedback("Could not read the selected file for scanning.")
+            }
+            _isScanningSecurity.value = false
+        }
+    }
+
+    fun auditInstalledApps() {
+        if (_isAuditingApps.value) return
+        viewModelScope.launch {
+            _isAuditingApps.value = true
+            val audits = securityEngine.auditInstalledApps()
+            _appAudits.value = audits
+            refreshSecurityPosture(highRisk = audits.count { it.riskLevel == com.adshield.pro.engine.security.AppRiskAuditor.RiskLevel.HIGH })
+            _isAuditingApps.value = false
+            val flagged = audits.count { it.riskLevel == com.adshield.pro.engine.security.AppRiskAuditor.RiskLevel.HIGH }
+            showFeedback(
+                if (flagged > 0) "Full app audit complete: $flagged high-risk app(s) found — review them in Security."
+                else "Full app audit complete: no high-risk apps detected."
+            )
+        }
+    }
+
+    fun refreshSecurityPosture(highRisk: Int? = null) {
+        val riskApps = highRisk ?: _securityPosture.value.highRiskApps
+        val vpnActive = repository.vpnRuntimeState.value.status == VpnStatus.CONNECTED
+        val signatures = securityEngine.activeThreatSignatureCount()
+        _securityPosture.value = com.adshield.pro.engine.security.SecurityEngine.buildSecurityPosture(
+            highRiskApps = riskApps,
+            threatSignatures = signatures,
+            vpnActive = vpnActive
+        )
+    }
+
+    // --- TitanShield Max Extreme Battery Saver ---
+
+    fun runExtremeBatterySaver() {
+        viewModelScope.launch {
+            val actions = optimizerEngine.runExtremeBatterySaver()
+            _extremeBatteryActions.value = actions
+            refreshSystemTelemetry()
+            showFeedback("Extreme Battery Saver active — background power use minimized, protection unchanged.")
+        }
+    }
+
+    fun restoreBalancedPower() {
+        viewModelScope.launch {
+            val actions = optimizerEngine.restoreBalancedPower()
+            _extremeBatteryActions.value = actions
+            refreshSystemTelemetry()
+            showFeedback("Balanced power restored.")
+        }
+    }
+
+    fun isAllFilesAccessGranted(): Boolean = optimizerEngine.hasAllFilesAccess()
+
+    fun createAllFilesAccessIntent(): android.content.Intent? = optimizerEngine.createAllFilesAccessIntent()
+
     fun selectAndApplyBatteryMode(mode: BatteryMode) {
         viewModelScope.launch {
             val actions = optimizerEngine.runAutoBatteryOptimize(mode)
@@ -510,6 +805,124 @@ class AdShieldViewModel @Inject constructor(
             showFeedback(
                 if (enabled) "Automatic filter updates scheduled every $intervalHours hours."
                 else "Automatic filter updates paused."
+            )
+        }
+    }
+
+    // --- Zero-Breakage user actions ---
+
+    fun toggleShadowMode(enabled: Boolean) {
+        viewModelScope.launch {
+            filterRuleEngine.setShadowModeEnabled(enabled)
+            preferencesRepository.setShadowModeEnabled(enabled)
+            showFeedback(if (enabled) "Shadow Mode ON: risky list rules are reported, not enforced. Validate them, then allowlist or keep."
+                else "Shadow Mode OFF: full filtering enforced.")
+        }
+    }
+
+    fun reportFalsePositive(rawDomain: String) {
+        val domain = rawDomain.trim().lowercase().removePrefix("http://").removePrefix("https://").substringBefore('/')
+        if (domain.isBlank() || !domain.contains('.')) {
+            showFeedback("Enter a valid domain that broke, e.g. cdn.example.com")
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                repository.addCustomRule("@@||$domain^", RuleType.ALLOW, RuleMatchType.SUBDOMAIN, "Zero-Breakage false-positive report")
+                preferencesRepository.incrementFalsePositiveReports()
+                showFeedback("$domain allowlisted — it will never be blocked by filter lists again.")
+            }
+        }
+    }
+
+    // --- In-App Ad Defense (non-DNS) ---
+
+    fun toggleInAppAdSkip(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setInAppAdSkipEnabled(enabled)
+            showFeedback(
+                if (enabled) "In-App Ad Skip enabled — now activate the Accessibility service when Android asks."
+                else "In-App Ad Skip disabled."
+            )
+        }
+    }
+
+    fun toggleHeuristicShield(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBlockHeuristicThreats(enabled)
+            showFeedback(
+                if (enabled) "Strict Heuristic Shield ON: in Strict mode, random-looking, lookalike and new domains can be blocked (one tap to allow any false positive)."
+                else "Strict Heuristic Shield OFF: heuristic signals are only observed, never blocked."
+            )
+        }
+    }
+
+    fun toggleResolverAutoTune(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setResolverAutoTune(enabled)
+            showFeedback(
+                if (enabled) "Speed mode ON: every 15 minutes the fastest RELIABLE resolver is chosen from your real measured query latencies (only if 25%+ faster, 90%+ success). Custom resolvers are never touched."
+                else "Speed mode OFF."
+            )
+        }
+    }
+
+    /** Universal in-app ad skip: ANY video app, same strict ad-evidence rules. */
+    fun toggleInAppAdSkipUniversal(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setInAppAdSkipUniversal(enabled)
+            showFeedback(
+                if (enabled) "Universal video ad-skip ON: every app gets the same strict ad-skip rules. System UIs (dialer, keyboard, launcher) are never touched."
+                else "Universal video ad-skip OFF: only YouTube apps and your added packages are managed."
+            )
+        }
+    }
+
+    fun toggleCheckNewDomains(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setCheckNewDomains(enabled)
+            showFeedback(
+                if (enabled) "New-domain check ON: Strict mode may look up registration age via RDAP (2s cap, cached). Unknown ages are never blocked."
+                else "New-domain check OFF."
+            )
+        }
+    }
+
+    /** Platform spec pause options: 5, 15, or 60 minutes with automatic resume. */
+    fun pauseVpnFor(minutes: Int) {
+        val intent = android.content.Intent(appContext, com.adshield.pro.service.AdShieldVpnService::class.java).apply {
+            action = com.adshield.pro.service.AdShieldVpnService.ACTION_PAUSE_VPN
+            putExtra(com.adshield.pro.service.AdShieldVpnService.EXTRA_PAUSE_MINUTES, minutes)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            appContext.startForegroundService(intent)
+        } else {
+            appContext.startService(intent)
+        }
+        showFeedback(if (minutes > 0) "Filtering paused — resumes automatically in $minutes min." else "Filtering paused.")
+    }
+
+    fun toggleEncryptedDnsBypass(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBlockEncryptedDnsBypass(enabled)
+            showFeedback(
+                if (enabled) "Encrypted-DNS Bypass Shield ON: apps with private secure DNS fall back to the filtered system resolver."
+                else "Encrypted-DNS Bypass Shield OFF: apps may bypass filtering with their own DoH."
+            )
+            runCatching { repository.restoreFullFilterListsAfterSafeMode() }
+        }
+    }
+
+    fun saveAdSkipExtraPackages(raw: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val pkgs = raw.split(',', ';', ' ')
+                .map { it.trim() }
+                .filter { it.matches(Regex("[A-Za-z0-9._]+")) }
+                .toSet()
+            preferencesRepository.setAdSkipExtraPackages(pkgs)
+            showFeedback(
+                if (pkgs.isEmpty()) "Default targets only (YouTube apps)."
+                else "Ad-skip active for ${pkgs.size + 2} apps (YouTube + ${pkgs.size} added)."
             )
         }
     }

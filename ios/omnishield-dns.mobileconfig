@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>DNSSettings</key>
+			<dict>
+				<key>DNSProtocol</key>
+				<string>HTTPS</string>
+				<key>DoHServerURL</key>
+				<string>https://dns.adguard-dns.com/dns-query</string>
+			</dict>
+			<key>PayloadDescription</key>
+			<string>Routes all iPhone DNS through encrypted DNS-over-HTTPS with ad and tracker blocking (AdGuard DNS). Covers all apps on Wi-Fi and cellular. Per-app exclusion is not possible with this profile.</string>
+			<key>PayloadDisplayName</key>
+			<string>OmniShield X Encrypted DNS</string>
+			<key>PayloadIdentifier</key>
+			<string>com.apple.dnsSettings.managed.9a48ba5e-91a4-4fb5-b84f-cc9f42c0fedc</string>
+			<key>PayloadType</key>
+			<string>com.apple.dnsSettings.managed</string>
+			<key>PayloadUUID</key>
+			<string>9C1AA191-949B-4F93-BF05-7B398F05850F</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>ProhibitDisablement</key>
+			<false/>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>OmniShield X system-wide encrypted DNS (DoH, ad-blocking). Install, then verify under Settings &gt; General &gt; VPN &amp; Device Management. Remove anytime from the same place.</string>
+	<key>PayloadDisplayName</key>
+	<string>OmniShield X — Encrypted DNS</string>
+	<key>PayloadIdentifier</key>
+	<string>pro.omnishield.x.dns</string>
+	<key>PayloadOrganization</key>
+	<string>OmniShield X</string>
+	<key>PayloadRemovalDisallowed</key>
+	<false/>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>E15E2633-E0AC-4C76-B454-BB82311CFE70</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+</dict>
+</plist>

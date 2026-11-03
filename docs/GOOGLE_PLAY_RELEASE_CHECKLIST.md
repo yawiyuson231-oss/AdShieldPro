@@ -1,4 +1,4 @@
-# AdShield Pro v2.3 — Google Play Console Release Checklist
+# TitanShield Max v2.1 — Google Play Console Release Checklist
 
 Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to Google Play Production or Closed Testing tracks.
 
@@ -18,7 +18,7 @@ Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to G
 
 - [x] Manifest declares `android.permission.FOREGROUND_SERVICE` and `android.permission.FOREGROUND_SERVICE_SPECIAL_USE`.
 - [x] `<service android:name=".service.AdShieldVpnService" android:foregroundServiceType="specialUse">` includes `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="local_dns_ad_and_tracker_filtering_vpn" />`.
-- [ ] In Play Console **App Content -> Foreground Service Permissions**, submit the video walk-through showing the persistent notification ("AdShield Pro Active") and how the user can Pause or Stop the VPN directly from the notification or main dashboard.
+- [ ] In Play Console **App Content -> Foreground Service Permissions**, submit the video walk-through showing the persistent notification ("TitanShield Max Active") and how the user can Pause or Stop the VPN directly from the notification or main dashboard.
 
 ---
 
@@ -32,7 +32,7 @@ Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to G
 
 ## 4. Free App Pricing
 
-- [x] AdShield Pro is free and has no in-app purchases, subscriptions, or billing verifier.
+- [x] TitanShield Max is free and has no in-app purchases, subscriptions, or billing verifier.
 
 ---
 
