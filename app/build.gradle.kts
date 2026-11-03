@@ -129,7 +129,7 @@ android {
 }
 
 // AGP 9 built-in Kotlin: `android.kotlinOptions {}` is gone, compiler options are configured
-// on the ` kotlin ` extension that AGP registers (see developer.android.com/build/migrate-to-built-in-kotlin).
+// on the `kotlin` extension registered by AGP (see developer.android.com/build/migrate-to-built-in-kotlin).
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
