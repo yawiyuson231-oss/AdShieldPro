@@ -37,6 +37,19 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
 - **Check for app updates:** Check GitHub Releases from Home or receive a background update notification when Android runs scheduled work. The app downloads the signed APK and opens Android's installer; users approve installation themselves.
 - **Keep settings on the device:** Settings, custom rules, and activity history are stored locally. Allowed DNS lookups are sent to the upstream DNS provider selected in the app, and that provider's privacy terms apply.
 
+## Building and testing
+
+```bash
+./gradlew :app:assembleDebug        # debug APK
+./gradlew :app:testDebugUnitTest    # JVM unit test suite
+```
+
+The JVM suite (`app/src/test/java/com/adshield/pro/AdShieldEngineTestSuite.kt`) covers DNS wire-format
+parsing, UDP/TCP packet framing and checksums, upstream response validation and cache policy, UDP
+truncation and TCP segmentation limits, the filter rule engine and the browser blocker.
+See [docs/TESTING.md](docs/TESTING.md) for the full matrix, signing requirements and the on-device
+smoke test checklist.
+
 ## Download and project links
 
 - [Source code](https://github.com/hillman3948-cyber/AdShieldPro)
