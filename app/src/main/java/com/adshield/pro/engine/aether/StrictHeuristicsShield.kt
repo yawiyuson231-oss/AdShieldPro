@@ -54,30 +54,29 @@ object StrictHeuristicsShield {
      * NOT the real brand and NOT a legit subdomain = candidate impostor.
      */
     fun lookalikeBrandHit(domain: String): String? {
-        val rawBase = domain.lowercase().trimEnd('.').split('.').let { parts ->
-            when {
-                parts.size >= 3 && parts[parts.size - 2].length <= 3 -> parts[parts.size - 3]
-                parts.size >= 2 -> parts[parts.size - 2]
-                else -> parts.first()
-            }
-        }
-        val label = homoglyphFold(rawBase)
-        if (label.isEmpty()) return null
-        // Mixed-script impostor: "gооgle.com" (Cyrillic о) folds to exactly "google".
-        // The real brand never needs folding, so any fold that CHANGES the label and
-        // lands on a brand is an impostor.
-        if (label != rawBase && label in PROTECTED_BRANDS) return label
-        // Exact brand inside a legit registrable domain (google.com, mail.google.com) is fine;
-        // impostors usually append/remove tokens: "google-secure", "1google", "goog1e".
+        val d = domain.lowercase().trimEnd('.')
+        val parts = d.split('.')
+        if (parts.size < 2) return null
+        val rawLeftmost = parts.first()
+        val leftmost = homoglyphFold(rawLeftmost)
+        if (leftmost.isEmpty()) return null
+        // Mixed-script impostor ("gооgle.com"): folding lands exactly on a brand the
+        // real brand never needs — always an impostor.
+        if (leftmost != rawLeftmost && leftmost in PROTECTED_BRANDS) return leftmost
+        // If the brand appears as its own label elsewhere ("*.google.com"), the domain
+        // is brand-owned; never flag it.
+        if (parts.drop(1).any { homoglyphFold(it) in PROTECTED_BRANDS }) return null
+        val suspicious = setOf(
+            "secure", "login", "log-in", "signin", "sign-in", "verify", "verification",
+            "account", "accounts", "billing", "update", "support", "wallet", "refund"
+        )
         for (brand in PROTECTED_BRANDS) {
-            if (label == brand) return null // real brand, not a lookalike
+            if (leftmost == brand) return null // the real brand apex/subdomain label
             val maxDistance = if (brand.length >= 8) 2 else 1
-            if (damerauLevenshtein(label, brand) in 1..maxDistance) return brand
-            // Brand with separators: "secure-google-login"
-            val stripped = label.replace(Regex("[-_.]"), "")
-            if (stripped != brand && stripped.contains(brand) &&
-                damerauLevenshtein(stripped, brand) in 1..maxDistance
-            ) return brand
+            if (damerauLevenshtein(leftmost, brand) in 1..maxDistance) return brand
+            // Compound token trick: "google-secure-login.com", "netflix-billing.top"
+            val tokens = leftmost.split('-', '_', '.').filter { it.isNotBlank() }
+            if (brand in tokens && tokens.any { it in suspicious }) return brand
         }
         return null
     }

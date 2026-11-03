@@ -175,8 +175,19 @@ class PlatformSpecAcceptanceTest {
         assertEquals(null, NewDomainAgeChecker.parseAgeDaysFromRdap("""{"ldhName":"example.com"}""", epoch))
 
         NewDomainAgeChecker.clearCache()
+        // ageDays() uses the real clock by design — build the event date relative to it
+        val now = System.currentTimeMillis()
+        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
+        cal.timeInMillis = now - 10L * 86_400_000L
+        val iso10d = String.format(
+            "%04d-%02d-%02dT%02d:%02d:%02dZ",
+            cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH), cal.get(java.util.Calendar.HOUR_OF_DAY),
+            cal.get(java.util.Calendar.MINUTE), cal.get(java.util.Calendar.SECOND)
+        )
+        val freshJson = """{"events":[{"eventAction":"registration","eventDate":"$iso10d"}]}"""
         val age = runBlocking {
-            NewDomainAgeChecker.ageDays("fresh-example.net") { json }
+            NewDomainAgeChecker.ageDays("fresh-example.net") { freshJson }
         }
         assertEquals(10, age)
         // Unknown age must be reported as null (never blocked on unknown data)
