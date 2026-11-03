@@ -339,25 +339,27 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onOpenOptimizerTab = { currentTab = MainNavDestination.OPTIMIZER }
                 )
 
-                MainNavDestination.LIVE -> LiveMonitorScreen(
-                    dnsBypassWarning = dnsBypassWarning,
-                    onOpenPrivateDnsSettings = {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        val privateDns = android.content.Intent("android.settings.PRIVATE_DNS_SETTINGS")
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        val fallback = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        runCatching { context.startActivity(privateDns) }
-                            .onFailure { runCatching { context.startActivity(fallback) } }
-                    },
+                MainNavDestination.LIVE -> {
+                    val activityContext = androidx.compose.ui.platform.LocalContext.current
+                    LiveMonitorScreen(
+                        dnsBypassWarning = dnsBypassWarning,
+                        onOpenPrivateDnsSettings = {
+                            val privateDns = android.content.Intent("android.settings.PRIVATE_DNS_SETTINGS")
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            val fallback = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            runCatching { activityContext.startActivity(privateDns) }
+                                .onFailure { runCatching { activityContext.startActivity(fallback) } }
+                        },
                     vpnState = vpnState,
                     recentLogs = recentLogs,
                     allTimeTotal = allTimeTotal,
                     allTimeBlocked = allTimeBlocked,
                     allTimeAllowed = allTimeAllowed,
                     aetherReport = aetherReport,
-                    onSelectProtectionMode = viewModel::setProtectionMode
-                )
+                        onSelectProtectionMode = viewModel::setProtectionMode
+                    )
+                }
 
                 MainNavDestination.AD_BLOCKER -> AdBlockerHubScreen(
                     sources = filterSources,
