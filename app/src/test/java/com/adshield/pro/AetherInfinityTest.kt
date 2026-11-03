@@ -69,7 +69,7 @@ class AetherInfinityTest {
         // Internal namespaces legitimately answer private — never flagged
         assertFalse(DnsAnomalyAnalyzer.isRebindingAttempt("myrouter.local", listOf("192.168.1.1")))
         // Public IPs are fine
-        val pub = DnsAnomalyAnalyzer.extractAnswerIps(buildDnsResponse("cloud.example.com", byteArrayOf(93, 184, 216, 34)))
+        val pub = DnsAnomalyAnalyzer.extractAnswerIps(buildDnsResponse("cloud.example.com", byteArrayOf(93, 184.toByte(), 216.toByte(), 34)))
         assertFalse(DnsAnomalyAnalyzer.isRebindingAttempt("cloud.example.com", pub))
         // Garbage bytes never crash
         assertEquals(emptyList<String>(), DnsAnomalyAnalyzer.extractAnswerIps(byteArrayOf(1, 2, 3)))
