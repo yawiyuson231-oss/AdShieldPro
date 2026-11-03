@@ -18,6 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,53 +33,65 @@ jobs:
 
       - name: Install Android SDK platform 37
         run: |
+          mkdir -p .ci
           SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMGR" ]; then SDKMGR=sdkmanager; fi
-          yes | "$SDKMGR" --licenses > /dev/null || true
-          "$SDKMGR" --install "platforms;android-37" "platform-tools" > /dev/null
-          "$SDKMGR" --install "build-tools;36.0.0" > /dev/null || true
-          echo "--- installed ---"
-          "$SDKMGR" --list_installed | grep -E "android-37|build-tools|platform-tools" || true
+          {
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            echo "sdkmanager=$SDKMGR"
+            "$SDKMGR" --version 2>&1 | head -3
+            echo "--- preinstalled platforms ---"
+            ls "$ANDROID_HOME/platforms" 2>/dev/null
+            echo "--- repo lookup for android-37 ---"
+            "$SDKMGR" --list 2>/dev/null | grep -E "platforms;android-3[5-9]" | head -10
+            yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+            if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
+              echo "--- installing platforms;android-37 (stable channel) ---"
+              "$SDKMGR" --install "platforms;android-37" 2>&1 | tail -15 || true
+            fi
+            if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
+              echo "--- retry on preview channel ---"
+              "$SDKMGR" --channel=3 --install "platforms;android-37" 2>&1 | tail -15 || true
+            fi
+            "$SDKMGR" --install "platform-tools" 2>&1 | tail -3 || true
+            "$SDKMGR" --install "build-tools;36.0.0" 2>&1 | tail -3 || true
+            echo "--- platforms after install ---"
+            ls "$ANDROID_HOME/platforms" 2>/dev/null
+            echo "--- build-tools after install ---"
+            ls "$ANDROID_HOME/build-tools" 2>/dev/null
+          } 2>&1 | tee .ci/sdk.log
+          test -d "$ANDROID_HOME/platforms/android-37" || { echo "::error::platforms;android-37 is not installable from this SDK channel"; exit 1; }
 
       - name: Gradle & JDK versions
         run: |
           chmod +x gradlew
-          ./gradlew --version
+          ./gradlew --version 2>&1 | tee .ci/gradle-version.log
 
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |
           set -o pipefail
-          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee compile.log
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee .ci/compile.log
 
       - name: Assemble debug APK
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee assemble.log
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee .ci/assemble.log
 
       - name: JVM unit tests
         run: |
           set -o pipefail
-          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee test.log
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee .ci/test.log
 
       - name: Android lint (informational)
         continue-on-error: true
         run: |
           set -o pipefail
-          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>&1 | tee lint.log
-
-      - name: Summarise results
-        if: always()
-        run: |
-          echo "### Build summary" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          grep -hE "BUILD (SUCCESSFUL|FAILED) in|tests? completed" *.log 2>/dev/null | tail -20 >> "$GITHUB_STEP_SUMMARY" || true
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          ls -l app/build/outputs/apk/debug/*.apk 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>&1 | tee .ci/lint.log
 
       - name: Surface Gradle errors as annotations
         if: failure()
         run: |
-          cat compile.log assemble.log test.log lint.log 2>/dev/null \
+          cat .ci/*.log 2>/dev/null \
             | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
             | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true
 
@@ -89,14 +103,29 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      - name: Upload reports and logs
+      - name: Upload reports
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: gradle-reports
           path: |
-            *.log
+            .ci/**
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.*
             app/build/test-results/**
           if-no-files-found: ignore
+
+      # The Actions log endpoint is not reachable from every environment, so the
+      # raw logs are mirrored into this branch under .ci/ as well.
+      - name: Mirror logs into the branch
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
+        run: |
+          git config user.name "AdShield CI"
+          git config user.email "ci@adshield.local"
+          git add -f .ci || exit 0
+          git diff --cached --quiet && exit 0
+          git commit -m "CI logs [skip ci]"
+          git pull --rebase --autostash origin "$GITHUB_REF_NAME" || true
+          git push origin "HEAD:$GITHUB_REF_NAME" || true
