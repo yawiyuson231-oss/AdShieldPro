@@ -28,7 +28,7 @@ env:
   VERSION_NAME: '4.7.1'
   VERSION_CODE: '40701'
   RELEASE_TAG: 'v4.7.1'
-  EXPECTED_TESTS: '78'
+  EXPECTED_TESTS: '84'
 
 jobs:
   certify:
@@ -107,7 +107,19 @@ jobs:
               '/tmp/adshield_pro_build/app/test-results',
               os.path.join(os.environ.get('HOME', ''), 'adshield_pro_build/app/test-results'),
           ]
-          files = sorted({p for root in roots if root for p in glob.glob(os.path.join(root, '*', 'TEST-*.xml'))})
+          # Several roots can hold the same class report (the Gradle build mirrors
+          # app/build/test-results from the external build dir), so keep one file per
+          # class name and prefer the workspace copy instead of double-counting.
+          by_class = {}
+          for root in roots:
+              if not root:
+                  continue
+              for path in glob.glob(os.path.join(root, '*', 'TEST-*.xml')):
+                  name = os.path.basename(path)
+                  preferred = 'app/build/test-results' in path.replace(os.sep, '/')
+                  if name not in by_class or (preferred and not by_class[name][1]):
+                      by_class[name] = (path, preferred)
+          files = [path for path, _ in (by_class[k] for k in sorted(by_class))]
           searched = ', '.join(r for r in roots if r)
           if not files:
               print('::error::no JUnit XML under any of: ' + searched)
@@ -133,6 +145,8 @@ jobs:
               print('::error::' + message)
               sys.exit(message)
           print('UNIT TEST CONTRACT OK: %d/%d passing' % (total, expected))
+          print(f'::notice::unit tests {total}/{expected} passing, {len(files)} classes, '
+                f'failures={failures} errors={errors} skipped={skipped}')
           EOF
 
       - name: Android lint (advisory)
