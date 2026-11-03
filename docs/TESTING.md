@@ -6,10 +6,12 @@ This document describes how AdShield Pro is built and how its automated tests ar
 
 | Tool | Version used by the project |
 | --- | --- |
-| JDK | 17 (21 also works) |
-| Android SDK Platform | 36 (`compileSdk = 36`) |
-| Android build-tools | installed automatically by AGP 8.9.3 |
-| Gradle | via the committed wrapper (`./gradlew`) |
+| JDK | 17 or newer (build tested with JDK 21 toolchain config) |
+| Android SDK Platform | 37 (`compileSdk = 37`, `targetSdk = 36`) |
+| Android build-tools | installed automatically by AGP 9.4.1 |
+| Gradle | 9.7.1 via the committed wrapper (`./gradlew`) |
+| Android Gradle plugin | 9.4.1 (built-in Kotlin, no `kotlin-android` plugin) |
+| Kotlin / KSP | 2.4.21 / 2.3.13 |
 
 Set `ANDROID_HOME` (or add an `sdk.dir` line to `local.properties`) before building.
 

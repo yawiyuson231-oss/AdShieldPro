@@ -551,7 +551,7 @@ class AdShieldVpnService : VpnService() {
         val content = "Blocked ${state.sessionBlockedQueries} of ${state.sessionTotalQueries} DNS queries • ${state.resolverConfig.protocol.name}"
 
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_shield_logo)
+            .setSmallIcon(R.drawable.ic_notification_shield)
             .setContentTitle(title)
             .setContentText(content)
             .setOngoing(true)
