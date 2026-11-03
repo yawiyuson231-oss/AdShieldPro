@@ -111,7 +111,7 @@ class InAppAdDefenseTest {
             (sniBytes.size shr 8).toByte(), sniBytes.size.toByte(), // name length
             *sniBytes
         )
-        val body = ByteArrayOutputStream()
+        val body = java.io.ByteArrayOutputStream()
         body.write(0x03); body.write(0x03) // client version TLS1.2
         val random = ByteArray(32); java.util.Random(7).nextBytes(random)
         body.write(random)
@@ -121,21 +121,16 @@ class InAppAdDefenseTest {
         body.write((extData.size shr 8).toByte()); body.write(extData.size) // extensions len
         body.write(extData)
 
-        val handshake = ByteArrayOutputStream()
+        val handshake = java.io.ByteArrayOutputStream()
         handshake.write(0x01) // ClientHello
         handshake.write((body.size() shr 16).toByte()); handshake.write((body.size() shr 8).toByte()); handshake.write(body.size())
         handshake.write(body.toByteArray())
 
-        val record = ByteArrayOutputStream()
+        val record = java.io.ByteArrayOutputStream()
         record.write(0x16); record.write(0x03); record.write(0x01)
         record.write((handshake.size() shr 8).toByte()); record.write(handshake.size())
         record.write(handshake.toByteArray())
         return record.toByteArray()
-    }
-
-    private class ByteArrayOutputStream : java.io.ByteArrayOutputStream() {
-        fun write(b: Int) = super.write(b)
-        fun write(b: ByteArray) = super.write(b, 0, b.size)
     }
 
     @Test
