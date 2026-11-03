@@ -3,6 +3,7 @@ package com.adshield.pro
 import com.adshield.pro.engine.aether.AetherGodCore
 import com.adshield.pro.engine.aether.AetherVerdict
 import com.adshield.pro.engine.aether.DnsAnomalyAnalyzer
+import com.adshield.pro.engine.aether.LiveFeedMapper
 import com.adshield.pro.engine.aether.RuleDigitalTwin
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.dns.ResolverHealthMonitor
@@ -182,11 +183,11 @@ class AetherInfinityTest {
 @org.junit.Test
 fun liveFeed_lanesAndTags_classifyRealHosts() {
     val m = com.adshield.pro.engine.aether.LiveFeedMapper
-    org.junit.Assert.assertEquals(m.Lane.VIDEO, m.laneFor("rr3---sn-npoe7ney.googlevideo.com"))
-    org.junit.Assert.assertEquals(m.Lane.GAME, m.laneFor("ylgdmirp.yleaflyrn.aena.ms"))
-    org.junit.Assert.assertEquals(m.Lane.SOCIAL, m.laneFor("web.whatsapp.com"))
-    org.junit.Assert.assertEquals(m.Lane.SYSTEM, m.laneFor("connectivitycheck.gstatic.com"))
-    org.junit.Assert.assertEquals(m.Lane.WEB, m.laneFor("my-blog.example.org"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.VIDEO, m.laneFor("rr3---sn-npoe7ney.googlevideo.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.GAME, m.laneFor("ylgdmirp.yleaflyrn.aena.ms"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.SOCIAL, m.laneFor("web.whatsapp.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.SYSTEM, m.laneFor("connectivitycheck.gstatic.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.WEB, m.laneFor("my-blog.example.org"))
 
     org.junit.Assert.assertEquals(m.TAG_AD, m.tagFor(com.adshield.pro.domain.model.RuleCategory.ADS))
     org.junit.Assert.assertEquals(m.TAG_MALICIOUS, m.tagFor(com.adshield.pro.domain.model.RuleCategory.MALWARE))
