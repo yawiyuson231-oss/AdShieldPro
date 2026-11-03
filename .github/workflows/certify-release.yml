@@ -246,17 +246,20 @@ jobs:
           over this one; replace it with your own Play/release key before shipping to users.
           MD
 
+          # Publish once: the release stays bound to the commit that certified it, so a
+          # later docs-only commit can never silently replace an already-verified APK.
+          # To ship new binaries, bump versionName in app/build.gradle.kts and RELEASE_TAG here.
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "release $RELEASE_TAG exists, updating assets"
-            gh release upload "$RELEASE_TAG" dist/* --clobber
-            gh release edit "$RELEASE_TAG" --title "OmniShield X ${VERSION_NAME} — Certified Build" --notes-file notes.md --latest
-          else
-            gh release create "$RELEASE_TAG" dist/* \
-              --target "$GITHUB_SHA" \
-              --title "OmniShield X ${VERSION_NAME} — Certified Build" \
-              --notes-file notes.md \
-              --latest
+            echo "release $RELEASE_TAG already published; keeping the certified assets as they are."
+            gh release view "$RELEASE_TAG" --json tagName,publishedAt,assets \
+              --jq '"  " + .tagName + " published " + .publishedAt + " with " + ([.assets[].name]|join(", "))'
+            exit 0
           fi
+          gh release create "$RELEASE_TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "OmniShield X ${VERSION_NAME} — Certified Build" \
+            --notes-file notes.md \
+            --latest
           echo "published: https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG"
 
       - name: Surface Gradle errors as annotations
