@@ -785,18 +785,18 @@ class AdShieldVpnService : VpnService() {
                 kotlinx.coroutines.delay(15 * 60_000L)
                 runCatching {
                     val settings = preferencesRepository.getSettingsSnapshot()
-                    if (!settings.resolverAutoTune) continue
+                    if (!settings.resolverAutoTune) return@runCatching
                     val config = settings.resolverConfig
-                    if (config.preset == com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) continue
-                    val current = resolverHealthMonitor.statsFor(config.preset.name) ?: continue
-                    if (current.probes < 10L) continue
-                    val best = resolverHealthMonitor.bestMeasuredResolver(config.preset.name) ?: continue
+                    if (config.preset == com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) return@runCatching
+                    val current = resolverHealthMonitor.statsFor(config.preset.name) ?: return@runCatching
+                    if (current.probes < 10L) return@runCatching
+                    val best = resolverHealthMonitor.bestMeasuredResolver(config.preset.name) ?: return@runCatching
                     val newPreset = runCatching {
                         com.adshield.pro.domain.model.DnsProviderPreset.valueOf(best.key)
-                    }.getOrNull() ?: continue
-                    if (newPreset == config.preset) continue
+                    }.getOrNull() ?: return@runCatching
+                    if (newPreset == config.preset) return@runCatching
                     // require >=25% faster
-                    if (best.avgLatencyMs * 4 > current.avgLatencyMs * 3) continue
+                    if (best.avgLatencyMs * 4 > current.avgLatencyMs * 3) return@runCatching
                     val newConfig = config.copy(preset = newPreset)
                     preferencesRepository.updateResolverConfig(newConfig)
                     repository.syncRuntimeModeAndResolver(
