@@ -55,18 +55,18 @@ jobs:
 
       - name: Gradle & JDK versions
         run: |
-          chmod +x gradlew
+          chmod +x gradlew tools/gradle-ci.sh
           ./gradlew --version 2>&1 | tee .ci/gradle-version.log
 
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |
           set -o pipefail
-          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee .ci/compile.log
+          tools/gradle-ci.sh .ci/compile.log :app:compileDebugKotlin
 
       - name: Assemble debug APK
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee .ci/assemble.log
+          tools/gradle-ci.sh .ci/assemble.log :app:assembleDebug
 
       - name: Release build with R8 + resource shrinking (throwaway keystore)
         run: |
@@ -78,7 +78,7 @@ jobs:
           export ADSHIELD_KEYSTORE_PASSWORD=cionly123
           export ADSHIELD_KEY_ALIAS=ci
           export ADSHIELD_KEY_PASSWORD=cionly123
-          ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee .ci/release.log
+          tools/gradle-ci.sh .ci/release.log :app:assembleRelease
           APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
           test -s "$APK"
           unzip -l "$APK" | grep -q 'AndroidManifest.xml'
@@ -90,12 +90,12 @@ jobs:
       - name: JVM unit tests
         run: |
           set -o pipefail
-          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee .ci/test.log
+          tools/gradle-ci.sh .ci/test.log :app:testDebugUnitTest
 
       - name: Android lint
         run: |
           set -o pipefail
-          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>&1 | tee .ci/lint.log
+          tools/gradle-ci.sh .ci/lint.log :app:lintDebug
 
       - name: Assert unit tests actually ran (18 cases)
         run: |
