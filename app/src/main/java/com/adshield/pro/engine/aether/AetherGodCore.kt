@@ -1,7 +1,6 @@
 package com.adshield.pro.engine.aether
 
 import com.adshield.pro.engine.compat.ProtectedDomainCatalog
-import com.adshield.pro.engine.dns.DnsAnomalyAnalyzer
 import com.adshield.pro.engine.dns.ResolverHealthMonitor
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.zero.ZeroBreakageEngine
