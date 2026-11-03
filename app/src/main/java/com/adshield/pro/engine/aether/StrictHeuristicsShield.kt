@@ -74,11 +74,43 @@ object StrictHeuristicsShield {
             if (leftmost == brand) return null // the real brand apex/subdomain label
             val maxDistance = if (brand.length >= 8) 2 else 1
             if (damerauLevenshtein(leftmost, brand) in 1..maxDistance) return brand
+            // Adjacent-key typo: "goohle.com" (h sits next to g on qwerty)
+            if (keyboardTypoMatch(leftmost, brand)) return brand
             // Compound token trick: "google-secure-login.com", "netflix-billing.top"
             val tokens = leftmost.split('-', '_', '.').filter { it.isNotBlank() }
             if (brand in tokens && tokens.any { it in suspicious }) return brand
         }
         return null
+    }
+
+    /** QWERTY neighbors for adjacent-key typo detection ("goohle" → google). */
+    val QWERTY_NEIGHBORS: Map<Char, Set<Char>> = mapOf(
+        'q' to setOf('w', 'a'), 'w' to setOf('q', 'e', 's', 'a'), 'e' to setOf('w', 'r', 's', 'd'),
+        'r' to setOf('e', 't', 'd', 'f'), 't' to setOf('r', 'y', 'f', 'g'), 'y' to setOf('t', 'u', 'g', 'h'),
+        'u' to setOf('y', 'i', 'h', 'j'), 'i' to setOf('u', 'o', 'j', 'k'), 'o' to setOf('i', 'p', 'k', 'l'),
+        'p' to setOf('o', 'l'), 'a' to setOf('q', 's', 'z', 'w'), 's' to setOf('a', 'd', 'z', 'x', 'w', 'e'),
+        'd' to setOf('s', 'f', 'x', 'c', 'e', 'r'), 'f' to setOf('d', 'g', 'c', 'v', 'r', 't'),
+        'g' to setOf('f', 'h', 'v', 'b', 't', 'y'), 'h' to setOf('g', 'j', 'b', 'n', 'y', 'u'),
+        'j' to setOf('h', 'k', 'n', 'm', 'u', 'i'), 'k' to setOf('j', 'l', 'm', 'o', 'i'),
+        'l' to setOf('k', 'p', 'o'), 'z' to setOf('a', 'x', 's'), 'x' to setOf('z', 'c', 's', 'd'),
+        'c' to setOf('x', 'v', 'd', 'f'), 'v' to setOf('c', 'b', 'f', 'g'), 'b' to setOf('v', 'n', 'g', 'h'),
+        'n' to setOf('b', 'm', 'h', 'j'), 'm' to setOf('n', 'k', 'l', 'j')
+    )
+
+    /** Same length, exactly one substitution, and the swapped keys are qwerty-adjacent. */
+    fun keyboardTypoMatch(label: String, brand: String): Boolean {
+        if (label.length != brand.length) return false
+        var diffIdx = -1
+        var diffs = 0
+        for (i in label.indices) {
+            if (label[i] != brand[i]) {
+                diffs++
+                diffIdx = i
+                if (diffs > 1) return false
+            }
+        }
+        if (diffs != 1) return false
+        return QWERTY_NEIGHBORS[brand[diffIdx]]?.contains(label[diffIdx]) == true
     }
 
     fun damerauLevenshtein(a: String, b: String): Int {
@@ -118,15 +150,21 @@ object StrictHeuristicsShield {
         newDomainAgeDays: Int?,
         checkNewDomains: Boolean
     ): Verdict {
-        val signals = ArrayList<String>()
-        if (dgaLike) signals.add("random-looking name (high entropy)")
         val look = lookalikeBrand ?: lookalikeBrandHit(domain)
+        val ageDays = if (checkNewDomains) newDomainAgeDays else null
+        val result = ThreatScoringModel.score(domain, dgaLike, look, ageDays)
+
+        val signals = ArrayList<String>()
+        if (result.dgaComponent > 0) signals.add("random-looking name (high entropy)")
         if (look != null) signals.add("lookalike of '$look'")
-        if (checkNewDomains && newDomainAgeDays != null && newDomainAgeDays <= 30) {
+        if (ageDays != null && newDomainAgeDays != null && newDomainAgeDays <= 30) {
             signals.add("registered $newDomainAgeDays days ago (≤30)")
         }
         if (signals.isEmpty()) return Verdict(block = false, signal = null, detail = null)
-        val detail = signals.joinToString("; ")
-        return Verdict(block = strictMode, signal = signals.first(), detail = detail)
+        val detail = signals.joinToString("; ") +
+            " — risk ${result.score}/${ThreatScoringModel.BLOCK_THRESHOLD}"
+        // Model-gated: Strict-only blocking, and only when fused score clears the bar
+        val block = strictMode && result.action == ThreatScoringModel.Action.BLOCKABLE_IN_STRICT
+        return Verdict(block = block, signal = signals.first(), detail = detail)
     }
 }

@@ -1,5 +1,14 @@
 # Changelog — OmniShield X (formerly TitanShield Max)
 
+## 4.7.0 — Advanced Threat Scoring Model + Feature Flags
+
+- **ThreatScoringModel (deterministic, auditable):** fused multi-signal scoring — DGA (entropy + English-bigram rarity, 40 pts), lookalike brand (35 pts), new-domain age (25 pts, ≤30d full / ≤90d half). Verdict bands: ≥60 blockable (Strict only, toggle-gated), 30–59 observe, <30 allow+observe. Every weight is a documented constant; no cloud, no black box.
+- **Keyboard-adjacency typosquat detection:** "goohle.com"/"gootle.com" (one adjacent-key substitution vs a protected brand) now flagged alongside homoglyph and edit-distance detection.
+- **FeatureFlags:** single source of truth for defaults — new protections ship off by default (new-domain RDAP check, resolver auto-tune), established shields on. DataStore defaults now read from flags.
+- Risk score is shown in heuristic verdict detail ("risk 91/60").
+- All prior semantics preserved: Balanced never blocks heuristics; one-tap allow unchanged.
+
+
 ## 4.6.0 — AETHER agent upgrade + WiFi low-latency + fastest-resolver speed mode
 
 - **AETHER self-audit (false-positive radar):** the agent now reviews its OWN blocking from real query logs — any domain blocked 3+ times that came from a heuristic shield or belongs to the protected auth/payment catalog surfaces in the Control Center for one-tap review. Detection only; it never auto-unblocks (tested).

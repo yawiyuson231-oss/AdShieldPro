@@ -98,7 +98,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="OmniShield X v4.6.0 automated CI build.
+          NOTES="OmniShield X v4.7.0 automated CI build.
           Includes: bundled 367k-rule ad/malware filter engine, Security Center anti-virus,
           Game Turbo, Battery Intelligence, True Deep Clean, Deep Ocean Blue UI.
 
@@ -109,8 +109,8 @@ jobs:
           store/key password: titanshield30000, alias: titan-shield). Keep it if you
           want future CI builds to upgrade-install over this one."
 
-          gh release create ci-v4.6.0 apk-out/*.apk ci-release.keystore \
+          gh release create ci-v4.7.0 apk-out/*.apk ci-release.keystore \
             --target "$GITHUB_SHA" \
-            --title "OmniShield X v4.6.0 — CI Build" \
+            --title "OmniShield X v4.7.0 — CI Build" \
             --notes "$NOTES" \
-          || gh release upload ci-v4.6.0 apk-out/*.apk ci-release.keystore --clobber
+          || gh release upload ci-v4.7.0 apk-out/*.apk ci-release.keystore --clobber
