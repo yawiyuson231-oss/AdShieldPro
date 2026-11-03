@@ -328,13 +328,13 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onCheckForUpdates = viewModel::checkForUpdates,
                     onToggleVpn = handleToggleVpn,
                     onPauseResumeVpn = {
-                    onPauseFor = viewModel::pauseVpnFor,
                         if (vpnState.status == VpnStatus.PAUSED) {
                             viewModel.resumeVpnService()
                         } else {
                             viewModel.pauseVpnService()
                         }
                     },
+                    onPauseFor = viewModel::pauseVpnFor,
                     onSelectProtectionMode = viewModel::setProtectionMode,
                     onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
                     onRunOptimizeNow = viewModel::runOneTapSmartBoost,
