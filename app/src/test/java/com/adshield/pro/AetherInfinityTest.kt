@@ -50,7 +50,7 @@ class AetherInfinityTest {
         out.write(0)
         u16(1); u16(1) // QTYPE=A, QCLASS=IN
         out.write(0xC0); out.write(0x0C) // pointer to QNAME (12)
-        u16(1); u16(1); u16(60); u16(4) // A, IN, TTL, RDLENGTH
+        u16(1); u16(1); u16(0); u16(60); u16(4) // A, IN, TTL(32-bit), RDLENGTH
         out.write(ip)
         return out.toByteArray()
     }
@@ -132,10 +132,14 @@ class AetherInfinityTest {
     @Test
     fun digitalTwin_rejectsCandidateThatBreaksVideo_andAcceptsCleanCandidate() {
         val engine = FilterRuleEngine()
-        val breaking = engine.parseFilterListContent("||googlevideo.com^\n||netflix.com^", RuleCategory.ADS, "Bad").getOrThrow()
+        val breaking = engine.parseFilterListContent(
+            "||googlevideo.com^\n||discord.gg^", RuleCategory.ADS, "Bad"
+        ).getOrThrow()
         val badReport = RuleDigitalTwin.simulateCandidate(breaking.subdomainRules, breaking.exactRules, breaking.wildcardRules)
-        assertFalse("Twin must catch playback-breaking candidates", badReport.passed)
-        assertTrue(badReport.conflicts.any { it.contains("googlevideo.com") })
+        assertFalse("Twin must catch real playback-breaking candidates", badReport.passed)
+        assertTrue(badReport.conflicts.any { it.contains("discord.gg") })
+        // googlevideo is shielded at runtime — the twin still flags the overbroad rule
+        assertTrue(badReport.coveredByCriticalProtection.any { it.contains("googlevideo.com") })
 
         val clean = engine.parseFilterListContent("||doubleclick.net^\n||adnxs.com^", RuleCategory.ADS, "Good").getOrThrow()
         val goodReport = RuleDigitalTwin.simulateCandidate(clean.subdomainRules, clean.exactRules, clean.wildcardRules)

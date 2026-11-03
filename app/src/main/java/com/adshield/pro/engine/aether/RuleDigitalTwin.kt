@@ -33,7 +33,10 @@ object RuleDigitalTwin {
     data class SimulationReport(
         val candidateRuleCount: Int,
         val testedDomains: Int,
+        /** Non-catalog must-work domains the candidate would break in production. */
         val conflicts: List<String>,
+        /** Catalog-protected domains the candidate WOULD block — shielded at runtime, but the rule is overbroad. */
+        val coveredByCriticalProtection: List<String>,
         val passed: Boolean
     )
 
@@ -57,17 +60,22 @@ object RuleDigitalTwin {
         twin.updateProtectionMode(mode)
 
         val conflicts = ArrayList<String>()
+        val covered = ArrayList<String>()
         val corpus = MUST_WORK_CORPUS + ProtectedDomainCatalog.protectedDomains
         for (host in corpus) {
             val result = twin.evaluate(host)
             if (result.isBlocked) {
                 conflicts.add("$host <- '${result.matchedRule}' (${result.sourceName})")
+            } else if (result.sourceName.contains("Critical Protection")) {
+                // The candidate rule targets this host but the Critical Protection layer shields it.
+                covered.add("$host <- '${result.matchedRule}'")
             }
         }
         return SimulationReport(
             candidateRuleCount = subdomainRules.size + exactRules.size + wildcardRules.size,
             testedDomains = corpus.size,
             conflicts = conflicts,
+            coveredByCriticalProtection = covered,
             passed = conflicts.isEmpty()
         )
     }
