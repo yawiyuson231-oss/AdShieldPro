@@ -8,20 +8,11 @@ on:
       - main
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
+  contents: write
 
 jobs:
-  test-and-deploy:
+  test-and-publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,16 +23,16 @@ jobs:
       - name: Package browser extension
         run: |
           cd extension && zip -q -r ../website/omnishield-x-extension.zip . && cd ..
-          ls -la website/
+          echo "Extension zip:" && ls -la website/omnishield-x-extension.zip
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: website
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages branch
+        run: |
+          git config user.name "omnishield-pages-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan gh-pages-new
+          git rm -rf . --quiet
+          mv website/* website/.[!.]* . 2>/dev/null || mv website/* .
+          echo "omnishield-x.dev" > CNAME 2>/dev/null || true
+          git add -A
+          git commit -m "OmniShield X web platform (run ${{ github.run_id }})"
+          git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/gh-pages" --force
