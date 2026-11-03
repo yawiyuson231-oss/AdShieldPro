@@ -96,14 +96,22 @@ jobs:
           python3 - <<'EOF'
           import glob, os, sys, xml.etree.ElementTree as ET
 
-          patterns = [
-              'app/build/test-results/testDebugUnitTest/TEST-*.xml',
-              '/tmp/adshield_pro_build/app/test-results/testDebugUnitTest/TEST-*.xml',
-              os.path.expanduser('~/.adshield_pro_build/app/test-results/testDebugUnitTest/TEST-*.xml'),
+          # app/build.gradle.kts redirects layout.buildDirectory to
+          # $TMPDIR/adshield_pro_build/app (OneDrive workaround) and mirrors results
+          # back into app/build/test-results. TMPDIR is not /tmp on CI runners, so
+          # search every plausible root instead of hard-coding one path.
+          roots = [
+              'app/build/test-results',
+              os.path.join(os.environ.get('TMPDIR', ''), 'adshield_pro_build/app/test-results'),
+              os.path.join(os.environ.get('RUNNER_TEMP', ''), 'adshield_pro_build/app/test-results'),
+              '/tmp/adshield_pro_build/app/test-results',
+              os.path.join(os.environ.get('HOME', ''), 'adshield_pro_build/app/test-results'),
           ]
-          files = sorted({p for pattern in patterns for p in glob.glob(pattern)})
+          files = sorted({p for root in roots if root for p in glob.glob(os.path.join(root, '*', 'TEST-*.xml'))})
+          searched = ', '.join(r for r in roots if r)
           if not files:
-              sys.exit('no JUnit XML produced: the test task did not run any tests')
+              print('::error::no JUnit XML under any of: ' + searched)
+              sys.exit('no JUnit XML produced: the test task did not run any tests (searched: %s)' % searched)
 
           total = failures = errors = skipped = 0
           for path in files:
@@ -119,8 +127,11 @@ jobs:
           expected = int(os.environ.get('EXPECTED_TESTS', '0'))
           print(f'tests={total} failures={failures} errors={errors} skipped={skipped} expected={expected}')
           if total != expected or failures or errors or skipped:
-              sys.exit(f'unit-test contract violated: expected {expected} passing, got total={total} '
-                       f'failures={failures} errors={errors} skipped={skipped}')
+              message = (f'unit-test contract violated: expected {expected} passing, got total={total} '
+                         f'failures={failures} errors={errors} skipped={skipped} '
+                         f'(xml files: {", ".join(os.path.basename(f) for f in files)})')
+              print('::error::' + message)
+              sys.exit(message)
           print('UNIT TEST CONTRACT OK: %d/%d passing' % (total, expected))
           EOF
 

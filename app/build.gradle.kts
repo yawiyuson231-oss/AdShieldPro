@@ -45,6 +45,14 @@ tasks.matching {
             val dstReports = File(projectDir, "build/reports")
             srcReports.copyRecursively(dstReports, overwrite = true)
         }
+        // JUnit XML lives in the external build directory too; mirror it so CI and
+        // local runs always find the results under app/build/test-results (the same
+        // layout a normal Gradle project has).
+        val srcTestResults = File(externalBuildDir, "test-results")
+        if (srcTestResults.exists()) {
+            val dstTestResults = File(projectDir, "build/test-results")
+            srcTestResults.copyRecursively(dstTestResults, overwrite = true)
+        }
     }
 }
 
