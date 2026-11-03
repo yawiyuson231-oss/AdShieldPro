@@ -68,6 +68,25 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee .ci/assemble.log
 
+      - name: Release build with R8 + resource shrinking (throwaway keystore)
+        run: |
+          set -o pipefail
+          keytool -genkeypair -v -keystore /tmp/ci-release.jks -storepass cionly123 \
+            -alias ci -keypass cionly123 -keyalg RSA -keysize 2048 -validity 30 \
+            -dname "CN=AdShield CI, OU=CI, O=AdShield, C=PH" > /dev/null 2>&1
+          export ADSHIELD_KEYSTORE_PATH=/tmp/ci-release.jks
+          export ADSHIELD_KEYSTORE_PASSWORD=cionly123
+          export ADSHIELD_KEY_ALIAS=ci
+          export ADSHIELD_KEY_PASSWORD=cionly123
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace 2>&1 | tee .ci/release.log
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+          unzip -l "$APK" | grep -qE 'classes[0-9]*\.dex'
+          echo "release APK: $APK"
+          ls -l "$APK"
+          sha256sum "$APK"
+
       - name: JVM unit tests
         run: |
           set -o pipefail

@@ -96,45 +96,65 @@ changes that cannot be smoke-tested in this environment. Raise it after an on-de
   instead of only calling `stopLoading()`, which leaked the Activity context.
 - Deprecated `Icons.Default.ArrowBack` / `ChevronRight` replaced with their `AutoMirrored` forms.
 
-## 6. Verification performed (and not performed)
+## 6. Verification
 
-Executed in this environment, against the working tree that was committed:
+Executed, in this order.
+
+### 6.1 GitHub Actions (`.github/workflows/android-build.yml`) — full Gradle build
+
+Run [41625151162](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/41625151162) on
+`ubuntu-latest`, JDK 21 (Temurin), Android SDK `platforms;android-37.0`, Gradle 9.7.1:
+
+| Step | Result |
+| --- | --- |
+| `./gradlew :app:compileDebugKotlin` | **BUILD SUCCESSFUL** (2m 2s) |
+| `./gradlew :app:assembleDebug` | **BUILD SUCCESSFUL** — APK packaged |
+| `./gradlew :app:assembleRelease` (R8 + `shrinkResources`, throwaway keystore) | see latest run |
+| `./gradlew :app:testDebugUnitTest` | **BUILD SUCCESSFUL** |
+| `./gradlew :app:lintDebug` | **0 errors** (lint is a hard CI gate) |
+| Assert 18 unit tests actually executed | **pass** (the step fails unless exactly 18 tests pass) |
+| Assert the APK contains `AndroidManifest.xml`, `classes*.dex`, `resources.arsc` | **pass** |
+
+The APK is uploaded as the `adshield-pro-2.3.0-debug-apk` workflow artifact.
+
+Note on the SDK: API 37 is published as **minor platforms** (`platforms;android-37.0/37.1/37.2`);
+the package name `platforms;android-37` does not exist. `compileSdk = 37` resolves against the
+installed `android-37.x` platform.
+
+### 6.2 Local, in the authoring sandbox (no Android SDK there)
 
 | Check | Result |
 | --- | --- |
-| Repository JVM suite `AdShieldEngineTestSuite` (DNS codec, IP framing, rule engine, browser blocker, optimizer predictor, migrations) | **18 / 18 pass** |
-| Independent harness suite (same engine + extra truncation/cache/upstream cases) | **27 / 27 pass** |
-| `kotlinc 2.4.21` compile of every `app/src/main` + `app/src/test` Kotlin file, filtered for syntax-class diagnostics | **0 syntax errors** (remaining diagnostics are missing-Android/Compose dependencies on this machine) |
-| Existence + stability of every upgraded artifact version (Google Maven / Maven Central metadata) | verified |
+| Repository JVM suite `AdShieldEngineTestSuite` | **18 / 18 pass** |
+| Independent harness suite (extra truncation/cache/upstream cases) | **27 / 27 pass** |
+| `kotlinc 2.4.21` over every `app/src/main` + `app/src/test` file | no syntax-class diagnostics |
 
-**Not performed here — no Android SDK, no Gradle distribution and no network route to the
-plugin repositories in this sandbox:**
+### 6.3 Still not covered
 
-- `./gradlew` itself (so: no `assembleDebug`, no `bundleRelease`, no `lintDebug`).
-- APK/AAB assembly and release signing.
-- Installed-device or emulator testing.
+- Installation and runtime behaviour on a physical device or emulator (no device is attached).
+- Play Console upload / review.
+- Release signing with the real keystore (`assembleRelease` in CI uses a throwaway key).
 
-That means the dependency graph and the Kotlin sources are verified, but the Gradle build has not
-been executed. Do not treat this change as "build verified" until the commands below have run
-green on a machine with an Android SDK.
-
-## 7. First run on a build machine
+## 7. Rebuilding it yourself
 
 ```bash
-# JDK 17+ and Android SDK Platform 37 installed, ANDROID_HOME set
+# JDK 17+, Android SDK Platform 37.x, ANDROID_HOME set
 ./gradlew --version                     # expect Gradle 9.7.1
 ./gradlew :app:testDebugUnitTest        # JVM suite (18 tests)
 ./gradlew :app:assembleDebug            # debug APK
-./gradlew :app:lintDebug                # lint
+./gradlew :app:lintDebug                # must stay at 0 errors
 ./gradlew :app:bundleRelease            # signed AAB (see BUILD_AND_SIGNING_GUIDE.md)
 ```
 
-If the Dart-like source-set guard fires with *"Using kotlin.sourceSets DSL to add Kotlin sources
-is not allowed with built-in Kotlin"* (a KSP/AGP interaction that older KSP releases hit), add
-`android.disallowKotlinSourceSets=false` to `gradle.properties`. KSP 2.3.13 should not need it.
+CI runs the same commands on every push and pull request, so a regression shows up without a
+local Android SDK.
+
+If the source-set guard fires with *"Using kotlin.sourceSets DSL to add Kotlin sources is not
+allowed with built-in Kotlin"* (a KSP/AGP interaction that older KSP releases hit), add
+`android.disallowKotlinSourceSets=false` to `gradle.properties`. KSP 2.3.13 does not need it.
 
 If AGP 9.4.1 misbehaves, the documented fallback pair is **AGP 9.3.3 + Gradle 9.5.0** (same
-`compileSdk = 37`), which is the newest combination with a known-good Gradle mapping.
+`compileSdk = 37`).
 
 ## 8. Rollback
 

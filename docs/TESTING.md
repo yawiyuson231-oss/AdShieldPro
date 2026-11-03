@@ -33,6 +33,19 @@ export ADSHIELD_KEY_ALIAS=…
 export ADSHIELD_KEY_PASSWORD=…
 ```
 
+## Continuous integration
+
+`.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
+requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
+
+1. `:app:compileDebugKotlin` — fails fast on toolchain problems
+2. `:app:assembleDebug` — APK packaging
+3. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore)
+4. `:app:testDebugUnitTest` — then asserts that exactly 18 tests executed and passed
+5. `:app:lintDebug` — hard gate, the build fails on any lint error
+
+The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
+
 ## Unit tests
 
 ```bash
