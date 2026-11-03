@@ -485,7 +485,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleShadowMode = viewModel::toggleShadowMode,
                     onReportFalsePositive = viewModel::reportFalsePositive,
                     onToggleInAppAdSkip = viewModel::toggleInAppAdSkip,
-                    onSaveAdSkipExtraPackages = viewModel::saveAdSkipExtraPackages
+                    onSaveAdSkipExtraPackages = viewModel::saveAdSkipExtraPackages,
+                    onToggleEncryptedDnsBypass = viewModel::toggleEncryptedDnsBypass
                 )
             }
         }

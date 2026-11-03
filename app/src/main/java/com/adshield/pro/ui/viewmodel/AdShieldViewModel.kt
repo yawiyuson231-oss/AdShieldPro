@@ -828,6 +828,17 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun toggleEncryptedDnsBypass(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBlockEncryptedDnsBypass(enabled)
+            showFeedback(
+                if (enabled) "Encrypted-DNS Bypass Shield ON: apps with private secure DNS fall back to the filtered system resolver."
+                else "Encrypted-DNS Bypass Shield OFF: apps may bypass filtering with their own DoH."
+            )
+            runCatching { repository.restoreFullFilterListsAfterSafeMode() }
+        }
+    }
+
     fun saveAdSkipExtraPackages(raw: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val pkgs = raw.split(',', ';', ' ')

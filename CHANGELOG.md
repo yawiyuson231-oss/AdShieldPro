@@ -1,5 +1,13 @@
 # Changelog — OmniShield X (formerly TitanShield Max)
 
+## 4.4.0 — Encrypted-DNS Bypass Shield ("working DNS in any app or website")
+
+- Browsers/apps that hardcode their own DNS-over-HTTPS (Chrome "Secure DNS", Firefox DoH, SDK resolvers) previously bypassed any DNS firewall. Their clients must first resolve the provider's bootstrap hostname via system DNS — this release **sinkholes those bootstrap hostnames** (Cloudflare/Google/Quad9/AdGuard/OpenDNS/CleanBrowsing + `use-application-dns.net`), forcing fallback to the filtered system resolver. Browsing continues; only the bypass is cut.
+- The user's own selected DoH provider is never sunk (merge-time exclusion, unit-tested).
+- CUSTOM category is active in every protection mode — the shield holds in Balanced/Strict/Privacy/Custom (unit-tested).
+- Toggle: Settings → Zero-Breakage card → "Encrypted-DNS Bypass Shield" (default ON). Turning it on/off re-syncs the engine instantly.
+
+
 ## 4.0.0 — AETHER Infinity (OmniShield X)
 
 ### Part 1 — AETHER Neural GodCore

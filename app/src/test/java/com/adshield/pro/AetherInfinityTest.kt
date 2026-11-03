@@ -251,3 +251,61 @@ class LiveFeedAndVideoBeaconTest {
     )
 }
 }
+
+/**
+ * Encrypted-DNS Bypass Shield (v4.4.0): DoH bootstrap sinkholing semantics.
+ */
+class EncryptedDnsBypassShieldTest {
+
+    @org.junit.Test
+    fun bootstrapHosts_blockedAsCustomCategory_whenInjected() {
+        val engine = FilterRuleEngine()
+        val shield = com.adshield.pro.engine.filter.EncryptedDnsBypassShield
+        val subs = HashMap<String, FilterRuleEngine.FilterListEntry>()
+        for (host in shield.BOOTSTRAP_HOSTS) {
+            subs[host] = FilterRuleEngine.FilterListEntry(
+                com.adshield.pro.domain.model.RuleCategory.CUSTOM,
+                shield.SOURCE_NAME,
+                com.adshield.pro.domain.model.RuleMatchType.SUBDOMAIN
+            )
+        }
+        engine.updateFilterListRules(subs, emptyMap(), emptyList())
+        engine.updateProtectionMode(ProtectionMode.STANDARD)
+
+        // CUSTOM category is active in EVERY protection mode — verify two modes
+        for (mode in listOf(ProtectionMode.STANDARD, ProtectionMode.STRICT)) {
+            engine.updateProtectionMode(mode)
+            for (host in shield.BOOTSTRAP_HOSTS) {
+                val verdict = engine.evaluate(host)
+                org.junit.Assert.assertTrue("$host must be blocked in $mode", verdict.isBlocked)
+                org.junit.Assert.assertEquals(shield.SOURCE_NAME, verdict.sourceName)
+            }
+        }
+        // Normal traffic unaffected
+        org.junit.Assert.assertFalse(engine.evaluate("www.youtube.com").isBlocked)
+    }
+
+    @org.junit.Test
+    fun ownProviderHostname_extracted_andExcludedFromList() {
+        val shield = com.adshield.pro.engine.filter.EncryptedDnsBypassShield
+        val cfg = com.adshield.pro.domain.model.DnsResolverConfig() // Cloudflare default
+        assertEquals("cloudflare-dns.com", shield.ownProviderHostname(cfg))
+        val custom = com.adshield.pro.domain.model.DnsResolverConfig(
+            preset = com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM,
+            customDohUrl = "https://my.own.doh.example.net/dns-query"
+        )
+        assertEquals("my.own.doh.example.net", shield.ownProviderHostname(custom))
+        // Merge-time rule: own host is never in the sink set to apply
+        val own = shield.ownProviderHostname(cfg)!!
+        val toSink = shield.BOOTSTRAP_HOSTS.filter { it != own }
+        org.junit.Assert.assertTrue(toSink.size == shield.BOOTSTRAP_HOSTS.size - 1)
+        org.junit.Assert.assertFalse(toSink.contains(own))
+    }
+
+    @org.junit.Test
+    fun bootstrapHosts_areValidNormalizedDomains() {
+        for (host in com.adshield.pro.engine.filter.EncryptedDnsBypassShield.BOOTSTRAP_HOSTS) {
+            assertEquals(host, com.adshield.pro.engine.filter.FilterRuleEngine.normalizeDomain(host))
+        }
+    }
+}

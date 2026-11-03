@@ -86,7 +86,8 @@ fun SettingsScreen(
     onToggleShadowMode: (Boolean) -> Unit = {},
     onReportFalsePositive: (String) -> Unit = {},
     onToggleInAppAdSkip: (Boolean) -> Unit = {},
-    onSaveAdSkipExtraPackages: (String) -> Unit = {}
+    onSaveAdSkipExtraPackages: (String) -> Unit = {},
+    onToggleEncryptedDnsBypass: (Boolean) -> Unit = {}
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -469,6 +470,17 @@ fun SettingsScreen(
                             },
                             enabled = falsePositiveInput.isNotBlank()
                         ) { Text("Fix") }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Encrypted-DNS Bypass Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Sinks DoH provider bootstraps (Chrome Secure DNS, Firefox DoH, SDK resolvers) so apps fall back to the filtered system DNS. Your own selected provider is never blocked.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockEncryptedDnsBypass, onCheckedChange = onToggleEncryptedDnsBypass)
                     }
                     Text(
                         "False positives reported: ${settings.falsePositiveReportCount}  •  Auto-recoveries: ${settings.autoRecoveryCount}",

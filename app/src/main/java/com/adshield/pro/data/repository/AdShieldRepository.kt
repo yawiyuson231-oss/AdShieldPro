@@ -176,7 +176,7 @@ class AdShieldRepository @Inject constructor(
             val customRules = dao.getAllCustomRulesNow().map { it.toDomain() }
             filterEngine.updateCustomRules(customRules)
 
-            rebuildActiveFilterListsLocked(sources)
+            rebuildActiveFilterListsLocked(sources, prefs.getSettingsSnapshot())
             refreshRuntimeRuleCount()
         }
     }
@@ -481,7 +481,7 @@ class AdShieldRepository @Inject constructor(
         filterMutex.withLock {
             dao.upsertFilterSource(source.copy(isEnabled = enabled).toEntity())
             val allSources = dao.getAllFilterSourcesNow()
-            rebuildActiveFilterListsLocked(allSources)
+            rebuildActiveFilterListsLocked(allSources, prefs.getSettingsSnapshot())
             refreshRuntimeRuleCount()
         }
     }
@@ -526,7 +526,7 @@ class AdShieldRepository @Inject constructor(
             File(filterCacheDir, "$id.txt").delete()
             File(filterCacheDir, "$id.bak").delete()
             val allSources = dao.getAllFilterSourcesNow()
-            rebuildActiveFilterListsLocked(allSources)
+            rebuildActiveFilterListsLocked(allSources, prefs.getSettingsSnapshot())
             refreshRuntimeRuleCount()
         }
     }
@@ -643,7 +643,7 @@ class AdShieldRepository @Inject constructor(
             // Atomically rebuild and swap engine snapshot; rollback to previousSnapshot if anything fails
             val rebuildRes = runCatching {
                 val refreshedSources = dao.getAllFilterSourcesNow()
-                rebuildActiveFilterListsLocked(refreshedSources)
+                rebuildActiveFilterListsLocked(refreshedSources, prefs.getSettingsSnapshot())
             }
             if (rebuildRes.isFailure) {
                 filterEngine.restoreSnapshot(previousSnapshot)
@@ -667,10 +667,10 @@ class AdShieldRepository @Inject constructor(
 
     /** Rebuilds the full merged lists from the on-device source database (also used after safe mode). */
     suspend fun restoreFullFilterListsAfterSafeMode() = withContext(Dispatchers.IO) {
-        rebuildActiveFilterListsLocked(dao.getAllFilterSourcesNow())
+        rebuildActiveFilterListsLocked(dao.getAllFilterSourcesNow(), prefs.getSettingsSnapshot())
     }
 
-    private fun rebuildActiveFilterListsLocked(sources: List<FilterSourceEntity>) {
+    private fun rebuildActiveFilterListsLocked(sources: List<FilterSourceEntity>, settings: com.adshield.pro.data.local.preferences.AppSettingsState) {
         val mergedSubdomains = HashMap<String, FilterRuleEngine.FilterListEntry>(4096)
         val mergedExact = HashMap<String, FilterRuleEngine.FilterListEntry>()
         val mergedWildcards = ArrayList<FilterRuleEngine.WildcardEntry>()
@@ -722,6 +722,20 @@ class AdShieldRepository @Inject constructor(
                         }
                     }
                 }
+            }
+        }
+
+        // Encrypted-DNS Bypass Shield: sink DoH bootstrap hosts so apps/browsers with
+        // their own secure DNS fall back to the filtered system resolver. The user's
+        // own selected provider is never sunk.
+        if (settings.blockEncryptedDnsBypass) {
+            val ownHost = com.adshield.pro.engine.filter.EncryptedDnsBypassShield.ownProviderHostname(settings.resolverConfig)
+            for (host in com.adshield.pro.engine.filter.EncryptedDnsBypassShield.BOOTSTRAP_HOSTS) {
+                if (host == ownHost) continue
+                mergedSubdomains.putIfAbsent(
+                    host,
+                    FilterRuleEngine.FilterListEntry(RuleCategory.CUSTOM, com.adshield.pro.engine.filter.EncryptedDnsBypassShield.SOURCE_NAME, RuleMatchType.SUBDOMAIN)
+                )
             }
         }
 
