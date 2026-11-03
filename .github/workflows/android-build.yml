@@ -1,0 +1,102 @@
+name: Android build & test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/dfe56e37-adshieldpro
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Install Android SDK platform 37
+        run: |
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then SDKMGR=sdkmanager; fi
+          yes | "$SDKMGR" --licenses > /dev/null || true
+          "$SDKMGR" --install "platforms;android-37" "platform-tools" > /dev/null
+          "$SDKMGR" --install "build-tools;36.0.0" > /dev/null || true
+          echo "--- installed ---"
+          "$SDKMGR" --list_installed | grep -E "android-37|build-tools|platform-tools" || true
+
+      - name: Gradle & JDK versions
+        run: |
+          chmod +x gradlew
+          ./gradlew --version
+
+      - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
+        run: |
+          set -o pipefail
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace 2>&1 | tee compile.log
+
+      - name: Assemble debug APK
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee assemble.log
+
+      - name: JVM unit tests
+        run: |
+          set -o pipefail
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee test.log
+
+      - name: Android lint (informational)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew :app:lintDebug --no-daemon --stacktrace 2>&1 | tee lint.log
+
+      - name: Summarise results
+        if: always()
+        run: |
+          echo "### Build summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          grep -hE "BUILD (SUCCESSFUL|FAILED) in|tests? completed" *.log 2>/dev/null | tail -20 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ls -l app/build/outputs/apk/debug/*.apk 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Surface Gradle errors as annotations
+        if: failure()
+        run: |
+          cat compile.log assemble.log test.log lint.log 2>/dev/null \
+            | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
+            | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adshield-pro-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-reports
+          path: |
+            *.log
+            app/build/reports/tests/**
+            app/build/reports/lint-results-debug.*
+            app/build/test-results/**
+          if-no-files-found: ignore
