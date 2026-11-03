@@ -125,6 +125,12 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Print every JVM test case in CI logs instead of a bare "BUILD SUCCESSFUL".
+        unitTests.all { test ->
+            test.testLogging {
+                events("passed", "failed", "skipped")
+            }
+        }
     }
 }
 

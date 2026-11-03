@@ -73,8 +73,7 @@ jobs:
           set -o pipefail
           ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace 2>&1 | tee .ci/test.log
 
-      - name: Android lint (informational)
-        continue-on-error: true
+      - name: Android lint
         run: |
           set -o pipefail
           ./gradlew :app:lintDebug --no-daemon --stacktrace 2>&1 | tee .ci/lint.log
@@ -109,8 +108,8 @@ jobs:
 
       # The Actions log endpoint is not reachable from every environment, so the
       # raw logs are mirrored into this branch under .ci/ as well.
-      - name: Mirror logs into the branch
-        if: always() && github.event_name != 'pull_request'
+      - name: Mirror logs into the branch (only when something failed)
+        if: failure() && github.event_name != 'pull_request'
         continue-on-error: true
         run: |
           git config user.name "AdShield CI"
