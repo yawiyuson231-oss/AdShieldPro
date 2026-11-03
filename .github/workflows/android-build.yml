@@ -31,36 +31,27 @@ jobs:
           java-version: '21'
           cache: gradle
 
-      - name: Install Android SDK platform 37
+      - name: Install Android SDK (API 37 ships as 37.0 / 37.1 / 37.2)
         run: |
           mkdir -p .ci
           SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -x "$SDKMGR" ]; then SDKMGR=sdkmanager; fi
           {
             echo "ANDROID_HOME=$ANDROID_HOME"
-            echo "sdkmanager=$SDKMGR"
             "$SDKMGR" --version 2>&1 | head -3
-            echo "--- preinstalled platforms ---"
-            ls "$ANDROID_HOME/platforms" 2>/dev/null
-            echo "--- repo lookup for android-37 ---"
-            "$SDKMGR" --list 2>/dev/null | grep -E "platforms;android-3[5-9]" | head -10
+            echo "--- available API 37 platforms in the repository ---"
+            "$SDKMGR" --list 2>/dev/null | grep -E "platforms;android-3[6-9]\.[0-9]" | head -10
             yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
-            if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
-              echo "--- installing platforms;android-37 (stable channel) ---"
-              "$SDKMGR" --install "platforms;android-37" 2>&1 | tail -15 || true
-            fi
-            if [ ! -d "$ANDROID_HOME/platforms/android-37" ]; then
-              echo "--- retry on preview channel ---"
-              "$SDKMGR" --channel=3 --install "platforms;android-37" 2>&1 | tail -15 || true
-            fi
-            "$SDKMGR" --install "platform-tools" 2>&1 | tail -3 || true
-            "$SDKMGR" --install "build-tools;36.0.0" 2>&1 | tail -3 || true
-            echo "--- platforms after install ---"
-            ls "$ANDROID_HOME/platforms" 2>/dev/null
-            echo "--- build-tools after install ---"
+            for pkg in "platforms;android-37.0" "platforms;android-37.2" "build-tools;36.0.0" "platform-tools"; do
+              echo "--- installing $pkg ---"
+              "$SDKMGR" --install "$pkg" 2>&1 | tail -4 || true
+            done
+            echo "--- platforms ---"
+            ls "$ANDROID_HOME/platforms" 2>/dev/null | grep -E "^android-3[5-9]" || ls "$ANDROID_HOME/platforms"
+            echo "--- build-tools ---"
             ls "$ANDROID_HOME/build-tools" 2>/dev/null
           } 2>&1 | tee .ci/sdk.log
-          test -d "$ANDROID_HOME/platforms/android-37" || { echo "::error::platforms;android-37 is not installable from this SDK channel"; exit 1; }
+          ls "$ANDROID_HOME/platforms" | grep -qE "^android-37" || { echo "::error::no API 37 platform available"; exit 1; }
 
       - name: Gradle & JDK versions
         run: |
