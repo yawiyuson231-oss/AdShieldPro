@@ -70,7 +70,10 @@ data class AppSettingsState(
     val inAppAdSkipEnabled: Boolean = false,
     val adSkipExtraPackages: Set<String> = emptySet(),
     val inAppAdsSkippedCount: Int = 0,
-    val blockEncryptedDnsBypass: Boolean = true
+    val blockEncryptedDnsBypass: Boolean = true,
+    val blockHeuristicThreats: Boolean = true,
+    val checkNewDomains: Boolean = false,
+    val inAppAdSkipUniversal: Boolean = true
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -108,6 +111,9 @@ class UserPreferencesRepository @Inject constructor(
         val AD_SKIP_EXTRA_PACKAGES = stringSetPreferencesKey("ad_skip_extra_packages")
         val IN_APP_ADS_SKIPPED = intPreferencesKey("in_app_ads_skipped_count")
         val BLOCK_ENCRYPTED_DNS_BYPASS = booleanPreferencesKey("block_encrypted_dns_bypass")
+        val BLOCK_HEURISTIC_THREATS = booleanPreferencesKey("block_heuristic_threats_strict")
+        val CHECK_NEW_DOMAINS = booleanPreferencesKey("check_new_domain_age")
+        val IN_APP_AD_SKIP_UNIVERSAL = booleanPreferencesKey("in_app_ad_skip_universal")
         val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
         val AUTO_UPDATE_FILTERS = booleanPreferencesKey("auto_update_filters")
         val UPDATE_INTERVAL_HOURS = intPreferencesKey("update_interval_hours")
@@ -190,6 +196,9 @@ class UserPreferencesRepository @Inject constructor(
             adSkipExtraPackages = prefs[Keys.AD_SKIP_EXTRA_PACKAGES] ?: emptySet(),
             inAppAdsSkippedCount = prefs[Keys.IN_APP_ADS_SKIPPED] ?: 0,
             blockEncryptedDnsBypass = prefs[Keys.BLOCK_ENCRYPTED_DNS_BYPASS] ?: true,
+            blockHeuristicThreats = prefs[Keys.BLOCK_HEURISTIC_THREATS] ?: true,
+            checkNewDomains = prefs[Keys.CHECK_NEW_DOMAINS] ?: false,
+            inAppAdSkipUniversal = prefs[Keys.IN_APP_AD_SKIP_UNIVERSAL] ?: true,
             logRetentionDays = prefs[Keys.LOG_RETENTION_DAYS] ?: 7,
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
             updateIntervalHours = prefs[Keys.UPDATE_INTERVAL_HOURS] ?: 24,
@@ -273,6 +282,15 @@ class UserPreferencesRepository @Inject constructor(
         context.adShieldDataStore.edit {
             it[Keys.IN_APP_ADS_SKIPPED] = ((it[Keys.IN_APP_ADS_SKIPPED] ?: 0) + 1).coerceAtMost(9_999_999)
         }
+
+    suspend fun setBlockHeuristicThreats(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.BLOCK_HEURISTIC_THREATS] = enabled }
+
+    suspend fun setInAppAdSkipUniversal(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.IN_APP_AD_SKIP_UNIVERSAL] = enabled }
+
+    suspend fun setCheckNewDomains(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.CHECK_NEW_DOMAINS] = enabled }
 
     suspend fun setBlockEncryptedDnsBypass(enabled: Boolean) =
         context.adShieldDataStore.edit { it[Keys.BLOCK_ENCRYPTED_DNS_BYPASS] = enabled }

@@ -40,7 +40,8 @@ class UpstreamDnsResolver @Inject constructor() {
         val responseBytes: ByteArray,
         val protocolUsed: String,
         val fromCache: Boolean,
-        val latencyMs: Int
+        val latencyMs: Int,
+        val fallbackUsed: Boolean = false
     )
 
     private data class CachedDnsEntry(
@@ -173,13 +174,22 @@ class UpstreamDnsResolver @Inject constructor() {
 
         // 2. Use only the protocol selected by the user. Encrypted DNS must never silently
         // downgrade to plaintext UDP/TCP when its upstream is unavailable.
+        var fallbackUsed = false
         val (responseBytes, protocolUsed) = when (config.protocol) {
             DnsProtocol.DOH -> {
                 val dohRes = runCatching { queryDoh(query.rawPayload, config.activeDohUrl) }.getOrNull()
                 if (dohRes != null) {
                     dohRes to "DoH (${config.preset.displayName})"
                 } else {
-                    DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoH unavailable)"
+                    // Platform spec: never silently cut connectivity. Fall back to the
+                    // device's normal DNS path and MARK the response so the UI warns.
+                    val udpFallback = runCatching { queryUdpOrTcp(query, config) }.getOrNull()
+                    if (udpFallback != null) {
+                        fallbackUsed = true
+                        udpFallback to "FALLBACK plain DNS (DoH unreachable)"
+                    } else {
+                        DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoH unavailable)"
+                    }
                 }
             }
             DnsProtocol.DOT -> {
@@ -187,7 +197,13 @@ class UpstreamDnsResolver @Inject constructor() {
                 if (dotRes != null) {
                     dotRes to "DoT (${config.activeDotHost})"
                 } else {
-                    DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoT unavailable)"
+                    val udpFallback = runCatching { queryUdpOrTcp(query, config) }.getOrNull()
+                    if (udpFallback != null) {
+                        fallbackUsed = true
+                        udpFallback to "FALLBACK plain DNS (DoT unreachable)"
+                    } else {
+                        DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoT unavailable)"
+                    }
                 }
             }
             DnsProtocol.UDP_TCP -> {
@@ -221,7 +237,8 @@ class UpstreamDnsResolver @Inject constructor() {
             responseBytes = responseBytes,
             protocolUsed = protocolUsed,
             fromCache = false,
-            latencyMs = latency
+            latencyMs = latency,
+            fallbackUsed = fallbackUsed
         )
     }
 

@@ -106,6 +106,8 @@ class AdShieldViewModel @Inject constructor(
     private val _dnsBypassWarning = MutableStateFlow<String?>(null)
     val dnsBypassWarning: StateFlow<String?> = _dnsBypassWarning.asStateFlow()
 
+    val dnsFallbackActive: StateFlow<Boolean> = repository.dnsFallbackActive
+
     
 
     init {
@@ -826,6 +828,51 @@ class AdShieldViewModel @Inject constructor(
                 else "In-App Ad Skip disabled."
             )
         }
+    }
+
+    fun toggleHeuristicShield(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBlockHeuristicThreats(enabled)
+            showFeedback(
+                if (enabled) "Strict Heuristic Shield ON: in Strict mode, random-looking, lookalike and new domains can be blocked (one tap to allow any false positive)."
+                else "Strict Heuristic Shield OFF: heuristic signals are only observed, never blocked."
+            )
+        }
+    }
+
+    /** Universal in-app ad skip: ANY video app, same strict ad-evidence rules. */
+    fun toggleInAppAdSkipUniversal(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setInAppAdSkipUniversal(enabled)
+            showFeedback(
+                if (enabled) "Universal video ad-skip ON: every app gets the same strict ad-skip rules. System UIs (dialer, keyboard, launcher) are never touched."
+                else "Universal video ad-skip OFF: only YouTube apps and your added packages are managed."
+            )
+        }
+    }
+
+    fun toggleCheckNewDomains(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setCheckNewDomains(enabled)
+            showFeedback(
+                if (enabled) "New-domain check ON: Strict mode may look up registration age via RDAP (2s cap, cached). Unknown ages are never blocked."
+                else "New-domain check OFF."
+            )
+        }
+    }
+
+    /** Platform spec pause options: 5, 15, or 60 minutes with automatic resume. */
+    fun pauseVpnFor(minutes: Int) {
+        val intent = android.content.Intent(appContext, com.adshield.pro.service.AdShieldVpnService::class.java).apply {
+            action = com.adshield.pro.service.AdShieldVpnService.ACTION_PAUSE_VPN
+            putExtra(com.adshield.pro.service.AdShieldVpnService.EXTRA_PAUSE_MINUTES, minutes)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            appContext.startForegroundService(intent)
+        } else {
+            appContext.startService(intent)
+        }
+        showFeedback(if (minutes > 0) "Filtering paused — resumes automatically in $minutes min." else "Filtering paused.")
     }
 
     fun toggleEncryptedDnsBypass(enabled: Boolean) {

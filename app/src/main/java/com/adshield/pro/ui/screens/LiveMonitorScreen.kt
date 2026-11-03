@@ -78,9 +78,17 @@ fun LiveMonitorScreen(
     aetherReport: ControlCenterReport,
     dnsBypassWarning: String?,
     onOpenPrivateDnsSettings: () -> Unit,
+    dnsFallbackActive: Boolean = false,
     onSelectProtectionMode: (ProtectionMode) -> Unit
 ) {
     val now = System.currentTimeMillis()
+    val nowMs = System.currentTimeMillis()
+    val blockedLastHour = remember(recentLogs) {
+        recentLogs.filter { it.isBlocked && nowMs - it.timestampEpochMs <= 3_600_000L }
+    }
+    val topBlockedLastHour = remember(recentLogs) {
+        blockedLastHour.groupingBy { it.domain }.eachCount().entries.sortedByDescending { it.value }.take(5)
+    }
     val sessionBlocked = remember(recentLogs) { recentLogs.count { it.isBlocked } }
     val sessionAllowed = remember(recentLogs) { recentLogs.size - sessionBlocked }
     val perMinute = remember(recentLogs) {
@@ -114,6 +122,40 @@ fun LiveMonitorScreen(
                         Text(dnsBypassWarning, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                     androidx.compose.material3.TextButton(onClick = onOpenPrivateDnsSettings) { Text("Open") }
+                }
+            }
+        }
+
+        // --- Encrypted-resolver fallback warning (spec: never silently cut connectivity) ---
+        if (dnsFallbackActive) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = WarningAmber.copy(alpha = 0.14f))
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = WarningAmber, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Encrypted resolver unreachable — using fallback normal DNS so the internet keeps working. Filtering is still active; check Settings to fix the resolver.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+
+        // --- Blocked in the last hour (spec: recent blocks + allow any domain one tap) ---
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Blocked in the last 60 minutes: ${blockedLastHour.size}", style = MaterialTheme.typography.titleSmall)
+                if (topBlockedLastHour.isEmpty()) {
+                    Text("Nothing blocked in this window yet.", style = MaterialTheme.typography.bodySmall)
+                } else {
+                    for ((domain, count) in topBlockedLastHour) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(domain, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Text("$count×", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         }

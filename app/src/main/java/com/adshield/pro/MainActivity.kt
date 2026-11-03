@@ -102,6 +102,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
     val aetherReport by viewModel.aetherReport.collectAsStateWithLifecycle()
     val dnsBypassWarning by viewModel.dnsBypassWarning.collectAsStateWithLifecycle()
+    val dnsFallbackActive by viewModel.dnsFallbackActive.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
@@ -327,6 +328,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onCheckForUpdates = viewModel::checkForUpdates,
                     onToggleVpn = handleToggleVpn,
                     onPauseResumeVpn = {
+                    onPauseFor = viewModel::pauseVpnFor,
                         if (vpnState.status == VpnStatus.PAUSED) {
                             viewModel.resumeVpnService()
                         } else {
@@ -357,6 +359,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     allTimeBlocked = allTimeBlocked,
                     allTimeAllowed = allTimeAllowed,
                     aetherReport = aetherReport,
+                        dnsFallbackActive = dnsFallbackActive,
                         onSelectProtectionMode = viewModel::setProtectionMode
                     )
                 }
@@ -486,7 +489,10 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onReportFalsePositive = viewModel::reportFalsePositive,
                     onToggleInAppAdSkip = viewModel::toggleInAppAdSkip,
                     onSaveAdSkipExtraPackages = viewModel::saveAdSkipExtraPackages,
-                    onToggleEncryptedDnsBypass = viewModel::toggleEncryptedDnsBypass
+                    onToggleEncryptedDnsBypass = viewModel::toggleEncryptedDnsBypass,
+                    onToggleHeuristicShield = viewModel::toggleHeuristicShield,
+                    onToggleCheckNewDomains = viewModel::toggleCheckNewDomains,
+                    onToggleInAppAdSkipUniversal = viewModel::toggleInAppAdSkipUniversal
                 )
             }
         }

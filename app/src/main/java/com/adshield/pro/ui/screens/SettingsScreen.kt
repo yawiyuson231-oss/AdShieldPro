@@ -87,7 +87,10 @@ fun SettingsScreen(
     onReportFalsePositive: (String) -> Unit = {},
     onToggleInAppAdSkip: (Boolean) -> Unit = {},
     onSaveAdSkipExtraPackages: (String) -> Unit = {},
-    onToggleEncryptedDnsBypass: (Boolean) -> Unit = {}
+    onToggleEncryptedDnsBypass: (Boolean) -> Unit = {},
+    onToggleHeuristicShield: (Boolean) -> Unit = {},
+    onToggleCheckNewDomains: (Boolean) -> Unit = {},
+    onToggleInAppAdSkipUniversal: (Boolean) -> Unit = {}
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -470,6 +473,48 @@ fun SettingsScreen(
                             },
                             enabled = falsePositiveInput.isNotBlank()
                         ) { Text("Fix") }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Universal video ad-skip (any app)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Applies the same strict skip rules to every app on the device, not just YouTube. Bare buttons like Skip/✕/Close without ad evidence are never tapped, ad buttons (Download, Shop now) are never tapped, and system UIs (dialer, keyboard, launcher, settings) are excluded entirely.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.inAppAdSkipUniversal, onCheckedChange = onToggleInAppAdSkipUniversal)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Strict Heuristic Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "In Strict mode, blocks random-looking names (DGA), lookalike brand domains, and (opt-in) domains registered in the last 30 days. Balanced mode only observes these. A blocked site is one tap to allow and report.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockHeuristicThreats, onCheckedChange = onToggleHeuristicShield)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Check new domains (Strict)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Looks up domain registration age via RDAP when Strict mode is on (2s cap, cached 6h). Domains with unknown age are never blocked. Uses network only when enabled.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.checkNewDomains, onCheckedChange = onToggleCheckNewDomains)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("DNSSEC — what happens", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Learn more: your chosen resolver (Cloudflare, Google, Quad9, AdGuard) validates DNSSEC signatures before answering, and OmniShield passes the validated answer through untouched. Tampered answers from non-validating paths are rejected upstream. OmniShield does not re-validate signatures itself — it relies on the encrypted, validating resolver you select.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                     HorizontalDivider()
                     Row(verticalAlignment = Alignment.CenterVertically) {

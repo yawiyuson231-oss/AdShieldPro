@@ -124,6 +124,7 @@ fun HomeScreen(
     onCheckForUpdates: () -> Unit,
     onToggleVpn: (Boolean) -> Unit,
     onPauseResumeVpn: () -> Unit,
+    onPauseFor: (Int) -> Unit = {},
     onSelectProtectionMode: (ProtectionMode) -> Unit,
     onTriggerFilterSync: () -> Unit,
     onRunOptimizeNow: () -> Unit,
@@ -571,6 +572,18 @@ fun HomeScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+            }
+        }
+
+        // Platform spec pause options: 5 / 15 / 60 minutes (auto-resume)
+        if (isConnected) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(5 to "Pause 5m", 15 to "Pause 15m", 60 to "Pause 60m").forEach { (mins, label) ->
+                    OutlinedButton(
+                        onClick = { onPauseFor(mins) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) }
                 }
             }
         }

@@ -1,5 +1,18 @@
 # Changelog — OmniShield X (formerly TitanShield Max)
 
+## 4.5.0 — Platform-spec hardening + UNIVERSAL video ad-skip
+
+- **Universal in-app ad-skip (any video app):** the Accessibility skip engine now offers a universal mode (default ON) that applies the same strict ad-evidence rules to EVERY app — third-party video players, games, browsers — while system UIs (SystemUI, launchers, dialer, keyboard, messaging, settings) are hard-excluded in all modes. IMA-SDK skip ids added. Bare "Skip"/"✕"/"Close" and ad CTAs remain untappable (tested).
+- **Strict Heuristic Shield:** random-looking (DGA) + lookalike brand domains (homoglyph fold + Damerau-Levenshtein, 30 protected brands incl. PH banks/GCash) observed in Balanced, blockable in Strict (toggle). One-tap reversal preserved.
+- **New-domain (≤30d) check:** opt-in RDAP lookup (2s cap, 6h cache); unknown age NEVER blocked. Plain-language DNSSEC explainer in Settings.
+- **Never cut connectivity:** DoH/DoT failure now falls back to the device's normal DNS with an amber LIVE banner — no silent outage.
+- **Pause 5/15/60 minutes** with automatic resume (never left unprotected silently).
+- **"Blocked in the last 60 minutes"** top-list on the LIVE tab.
+- **PC agent** (pc-agent/omnishield_proxy.py): real local DNS proxy, same ladder, DoH-only upstream, self-test passing.
+- **iOS profile** (ios/omnishield-dns.mobileconfig): system-wide encrypted ad-blocking DoH for iPhone; per-app exclusion honestly declared impossible.
+- **Top-100 app domains acceptance test** against the real 367k-rule lists in Balanced AND Strict.
+
+
 ## 4.4.0 — Encrypted-DNS Bypass Shield ("working DNS in any app or website")
 
 - Browsers/apps that hardcode their own DNS-over-HTTPS (Chrome "Secure DNS", Firefox DoH, SDK resolvers) previously bypassed any DNS firewall. Their clients must first resolve the provider's bootstrap hostname via system DNS — this release **sinkholes those bootstrap hostnames** (Cloudflare/Google/Quad9/AdGuard/OpenDNS/CleanBrowsing + `use-application-dns.net`), forcing fallback to the filtered system resolver. Browsing continues; only the bypass is cut.

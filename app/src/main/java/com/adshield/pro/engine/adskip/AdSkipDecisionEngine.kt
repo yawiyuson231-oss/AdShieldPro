@@ -14,14 +14,33 @@ package com.adshield.pro.engine.adskip
  */
 object AdSkipDecisionEngine {
 
-    /** Packages the engine may ever act on (belt to the service config's own filter). */
+    /** Packages the engine acts on in default (non-universal) mode. */
     val TARGET_PACKAGES = setOf(
         "com.google.android.youtube",
         "com.google.android.apps.youtube.music"
     )
 
+    /**
+     * System-critical UIs that are NEVER touched in any mode — universal must not
+     * mean reckless. Fragments matched case-insensitively against the package name.
+     */
+    val PROTECTED_PACKAGE_FRAGMENTS = listOf(
+        "systemui", "launcher", "com.android.settings", "dialer", "telecom",
+        "incall", "mms", "messaging", "inputmethod", ".ime", "keyboard",
+        "android.quicksearchbox", "emergency", "nfc", "bluetooth", "vr"
+    )
+
+    fun isProtectedPackage(pkg: String): Boolean {
+        val p = pkg.lowercase()
+        return PROTECTED_PACKAGE_FRAGMENTS.any { p.contains(it) }
+    }
+
     /** Skip-button resource-id fragments (YouTube app id names across versions). */
-    private val SKIP_ID_TOKENS = listOf("skip_ad", "skip_ad_button", "skip_button")
+    private val SKIP_ID_TOKENS = listOf(
+        "skip_ad", "skip_ad_button", "skip_button",
+        // Google IMA SDK ids ship inside MANY third-party video apps
+        "ima_skip", "ad_skip", "btn_skip_ad"
+    )
 
     /** Close/collapse controls for overlay & banner ads. */
     private val CLOSE_ID_TOKENS = listOf(
@@ -49,8 +68,20 @@ object AdSkipDecisionEngine {
     )
 
     /** Decides what (if anything) should be done for one node. Deterministic. */
-    fun decide(node: NodeInfo, pkg: String, allowedPackages: Set<String> = TARGET_PACKAGES): Action {
-        if (pkg !in allowedPackages) return Action(ActionType.NONE, "package not managed")
+    fun decide(
+        node: NodeInfo,
+        pkg: String,
+        allowedPackages: Set<String> = TARGET_PACKAGES,
+        universalMode: Boolean = false
+    ): Action {
+        // Protected system UIs are untouchable in EVERY mode (never-break guarantee).
+        if (isProtectedPackage(pkg)) return Action(ActionType.NONE, "protected package")
+        if (universalMode) {
+            // UNIVERSAL: any app, same strict ad evidence — bare "Skip"/"✕"/"Close"
+            // and ad CTAs are still never tapped, so unknown UIs are never mis-clicked.
+        } else if (pkg !in allowedPackages) {
+            return Action(ActionType.NONE, "package not managed")
+        }
         val id = node.viewIdResourceName?.lowercase().orEmpty()
         val text = node.text.orEmpty().lowercase()
         val desc = node.contentDescription.orEmpty().lowercase()

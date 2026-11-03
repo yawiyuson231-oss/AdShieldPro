@@ -65,6 +65,7 @@ class AdShieldVpnService : VpnService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
     private var tunnelJob: Job? = null
+    private var autoResumeJob: kotlinx.coroutines.Job? = null
     private val tunWriteLock = Any()
     private data class AppAttribution(val packageName: String, val label: String)
     private val appAttributionByUid = ConcurrentHashMap<Int, AppAttribution>()
@@ -99,9 +100,12 @@ class AdShieldVpnService : VpnService() {
                 isPaused = true
                 repository.updateVpnStatus(VpnStatus.PAUSED)
                 updateForegroundNotification()
+                schedulePauseAutoResume(intent.getIntExtra(EXTRA_PAUSE_MINUTES, 0))
                 return START_STICKY
             }
             ACTION_RESUME_VPN -> {
+                autoResumeJob?.cancel()
+                autoResumeJob = null
                 isPaused = false
                 if (vpnInterface != null && tunnelJob?.isActive == true) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED)
@@ -412,9 +416,52 @@ class AdShieldVpnService : VpnService() {
             return blockedBytes
         }
 
+        // Strict-mode Heuristic Shield: random-looking (DGA), lookalike brand, and
+        // (opt-in) newly-registered domains. Balanced = observe only; Strict = block
+        // when the user toggle is on. User custom allow rules always win.
+        if (currentSettings.blockHeuristicThreats &&
+            evaluation.sourceName != "User Custom Rule" &&
+            filterRuleEngine.getCurrentSnapshot().protectionMode == com.adshield.pro.domain.model.ProtectionMode.STRICT
+        ) {
+            val dgaLike = com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.looksDgaGenerated(query.questionDomain)
+            val newAge = if (currentSettings.checkNewDomains) {
+                com.adshield.pro.engine.aether.NewDomainAgeChecker.ageDays(query.questionDomain) { d ->
+                    fetchRdapAge(d)
+                }
+            } else null
+            val verdict = com.adshield.pro.engine.aether.StrictHeuristicsShield.evaluate(
+                domain = query.questionDomain,
+                strictMode = true,
+                dgaLike = dgaLike,
+                lookalikeBrand = null,
+                newDomainAgeDays = newAge,
+                checkNewDomains = currentSettings.checkNewDomains
+            )
+            if (verdict.block) {
+                val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
+                repository.recordDnsQueryEvent(
+                    domain = query.questionDomain,
+                    queryType = query.qTypeName,
+                    isBlocked = true,
+                    category = null,
+                    matchedRule = verdict.signal,
+                    sourceList = com.adshield.pro.engine.aether.StrictHeuristicsShield.SOURCE_NAME,
+                    latencyMs = 0,
+                    protocolUsed = "Strict Heuristic Sinkhole",
+                    fromCache = false,
+                    appPackageName = app?.packageName,
+                    appName = app?.label
+                )
+                maybeRefreshNotificationCounter()
+                aetherCore.observeDnsQuery(query.questionDomain, true, com.adshield.pro.engine.aether.StrictHeuristicsShield.SOURCE_NAME, null)
+                return DnsPacketCodec.buildBlockedResponse(query = query, sinkholeZeroIp = mode.blockSinkholeZeroIp)
+            }
+        }
+
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
         resolverHealthMonitor.record(currentSettings.resolverConfig.preset.name, upstreamResult.latencyMs, upstreamResult.responseBytes.isNotEmpty())
+        repository.setDnsFallbackActive(upstreamResult.fallbackUsed)
 
         // AETHER DNS rebinding guard (Part 5): public domains must never answer with private IPs
         val answerIps = com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.extractAnswerIps(upstreamResult.responseBytes)
@@ -685,6 +732,7 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        autoResumeJob?.cancel()
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
         }
@@ -694,9 +742,53 @@ class AdShieldVpnService : VpnService() {
         super.onDestroy()
     }
 
+    /**
+     * Platform spec pause options (5/15/60 min): auto-resume filtering after the
+     * chosen window so protection is never left off silently. 0 = manual pause.
+     */
+    private fun schedulePauseAutoResume(minutes: Int) {
+        autoResumeJob?.cancel()
+        autoResumeJob = null
+        if (minutes <= 0) return
+        autoResumeJob = serviceScope.launch {
+            kotlinx.coroutines.delay(minutes * 60_000L)
+            if (isPaused) {
+                isPaused = false
+                if (vpnInterface != null && tunnelJob?.isActive == true) {
+                    repository.updateVpnStatus(VpnStatus.CONNECTED)
+                    updateForegroundNotification()
+                } else {
+                    startVpnTunnel()
+                }
+            }
+        }
+    }
+
+    /**
+     * RDAP lookup for domain age (Strict-mode new-domain check). Opt-in; 2s timeout;
+     * null on any failure — never blocks on unknown data.
+     */
+    private suspend fun fetchRdapAge(domain: String): String? = withContext(Dispatchers.IO) {
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val req = okhttp3.Request.Builder()
+            .url("https://rdap.org/domain/$domain")
+            .header("Accept", "application/rdap+json")
+            .build()
+        runCatching {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) null else resp.body?.string()
+            }
+        }.getOrNull()
+    }
+
     companion object {
         const val ACTION_START_VPN = "com.adshield.pro.action.START_VPN"
         const val ACTION_STOP_VPN = "com.adshield.pro.action.STOP_VPN"
+        const val EXTRA_PAUSE_MINUTES = "com.adshield.pro.extra.PAUSE_MINUTES"
+
         const val ACTION_PAUSE_VPN = "com.adshield.pro.action.PAUSE_VPN"
         const val ACTION_RESUME_VPN = "com.adshield.pro.action.RESUME_VPN"
         const val ACTION_RELOAD_TUNNEL_CONFIG = "com.adshield.pro.action.RELOAD_TUNNEL_CONFIG"

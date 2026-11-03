@@ -92,6 +92,14 @@ class AdShieldRepository @Inject constructor(
 
     val settingsFlow: Flow<AppSettingsState> = prefs.settingsFlow
 
+    private val _dnsFallbackActive = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val dnsFallbackActive: kotlinx.coroutines.flow.StateFlow<Boolean> = _dnsFallbackActive.asStateFlow()
+
+    /** True while the encrypted upstream is down and normal DNS is the live fallback path. */
+    fun setDnsFallbackActive(active: Boolean) {
+        _dnsFallbackActive.value = active
+    }
+
     val recentLogsFlow: Flow<List<DnsActivityRecord>> = dao.observeRecentLogs(250).map { list ->
         list.map { entity ->
             DnsActivityRecord(

@@ -39,6 +39,7 @@ class InAppAdSkipService : AccessibilityService() {
 
     @Volatile private var enabled = false
     @Volatile private var extraPackages: Set<String> = emptySet()
+    @Volatile private var universalMode: Boolean = true
 
     companion object {
         const val COMPONENT_ID = "com.adshield.pro/.service.InAppAdSkipService"
@@ -75,13 +76,15 @@ class InAppAdSkipService : AccessibilityService() {
             val settings = prefs.getSettingsSnapshot()
             enabled = settings.inAppAdSkipEnabled
             extraPackages = settings.adSkipExtraPackages
+            universalMode = settings.inAppAdSkipUniversal
         }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!enabled || event == null) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg !in (AdSkipDecisionEngine.TARGET_PACKAGES + extraPackages)) return
+        if (!universalMode && pkg !in (AdSkipDecisionEngine.TARGET_PACKAGES + extraPackages)) return
+        if (AdSkipDecisionEngine.isProtectedPackage(pkg)) return
         scanAndAct(rootInActiveWindow, pkg)
     }
 
@@ -99,7 +102,7 @@ class InAppAdSkipService : AccessibilityService() {
      */
     private fun scanAndAct(root: AccessibilityNodeInfo?, pkg: String) {
         if (root == null) return
-        val allowed = AdSkipDecisionEngine.TARGET_PACKAGES + extraPackages
+        val allowed = AdSkipDecisionEngine.TARGET_PACKAGES + extraPackages // used only in non-universal mode
         val candidates = ArrayList<Triple<AdSkipDecisionEngine.Action, AdSkipDecisionEngine.NodeInfo, AccessibilityNodeInfo>>(4)
 
         val queue = ArrayDeque<AccessibilityNodeInfo>()
@@ -115,7 +118,7 @@ class InAppAdSkipService : AccessibilityService() {
                 isClickable = runCatching { node.isClickable }.getOrDefault(false),
                 packageName = pkg
             )
-            val decision = AdSkipDecisionEngine.decide(info, pkg, allowed)
+            val decision = AdSkipDecisionEngine.decide(info, pkg, allowed, universalMode = universalMode)
             if (decision.type != AdSkipDecisionEngine.ActionType.NONE) {
                 candidates.add(Triple(decision, info, node))
             }
