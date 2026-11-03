@@ -44,7 +44,7 @@ object TlsSniInspector {
         if (off + 2 > payload.size) return null
         val extensionsLen = ((payload[off].toInt() and 0xFF) shl 8) or (payload[off + 1].toInt() and 0xFF)
         off += 2
-        val extensionsEnd = off + extensionsLen
+        var extensionsEnd = off + extensionsLen
         if (extensionsEnd > payload.size) extensionsEnd = payload.size
 
         while (off + 4 <= extensionsEnd) {
