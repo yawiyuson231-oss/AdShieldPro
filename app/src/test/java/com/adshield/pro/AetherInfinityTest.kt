@@ -6,6 +6,7 @@ import com.adshield.pro.engine.aether.DnsAnomalyAnalyzer
 import com.adshield.pro.engine.aether.LiveFeedMapper
 import com.adshield.pro.engine.aether.RuleDigitalTwin
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.engine.dns.ResolverHealthMonitor
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.zero.ZeroBreakageEngine
