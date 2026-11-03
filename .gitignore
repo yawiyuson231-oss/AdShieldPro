@@ -24,3 +24,7 @@ node_modules/
 npm-debug.log*
 
 website/omnishield-x-extension.zip
+
+# Python bytecode from the local tools
+__pycache__/
+*.pyc

@@ -1,5 +1,23 @@
 # Changelog — OmniShield X (formerly TitanShield Max)
 
+## 4.7.1 — Certified Build (updater correctness)
+
+- **Self-updater no longer points at a foreign repository.** `GITHUB_UPDATE_REPOSITORY` defaulted to
+  `hillman3948-cyber/AdShieldPro`, so in-app update checks queried someone else's releases (its latest
+  is v2.2.5) and could have offered an APK signed outside this project. The default is now
+  `yawiyuson231-oss/AdShieldPro`, matching where this project publishes releases. The About screen and
+  the website footer/CTA links were corrected the same way.
+- **Self-updater can no longer select the debug APK.** Every CI release lists `app-debug.apk` before
+  `app-release.apk`; the updater took the first `.apk` asset, which carries a `.debug` applicationId
+  suffix and a different signing key and therefore cannot update an installed app. Asset selection now
+  skips debug and non-APK assets (`UpdateAssetSelection`, regression-tested), and releases publish only
+  the release-signed APK.
+- **One gated CI pipeline.** `build-apk.yml` (which published a release on every push with a
+  hard-coded version and did not verify that tests ran) is replaced by `certify-release.yml`: static
+  checks → compile → debug + R8 release APKs → 78 JVM unit tests with an exact-count assertion
+  (0 failures / 0 errors / 0 skipped) → packaging assertions → signed release publication.
+- No behavioural change to filtering, protection modes or the UI beyond the two updater fixes.
+
 ## 4.7.0 — Advanced Threat Scoring Model + Feature Flags
 
 - **ThreatScoringModel (deterministic, auditable):** fused multi-signal scoring — DGA (entropy + English-bigram rarity, 40 pts), lookalike brand (35 pts), new-domain age (25 pts, ≤30d full / ≤90d half). Verdict bands: ≥60 blockable (Strict only, toggle-gated), 30–59 observe, <30 allow+observe. Every weight is a documented constant; no cloud, no black box.

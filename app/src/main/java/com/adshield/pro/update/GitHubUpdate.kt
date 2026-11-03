@@ -53,7 +53,9 @@ object GitHubReleaseClient {
             var digest: String? = null
             for (i in 0 until assets.length()) {
                 val asset = assets.optJSONObject(i) ?: continue
-                if (asset.optString("name").endsWith(".apk", true)) {
+                // Only ever offer a release-signed APK: the debug build has a different
+                // applicationId suffix and signature, so it cannot update an installed app.
+                if (UpdateAssetSelection.isInstallableReleaseApk(asset.optString("name"))) {
                     apk = asset.optString("browser_download_url")
                     digest = asset.optString("digest").takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
                     break

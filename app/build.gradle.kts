@@ -9,7 +9,7 @@ plugins {
 
 val githubUpdateRepository = providers.gradleProperty("githubUpdateRepository")
     .orElse(providers.environmentVariable("GITHUB_UPDATE_REPOSITORY"))
-    .orElse("hillman3948-cyber/AdShieldPro")
+    .orElse("yawiyuson231-oss/AdShieldPro")
     .get()
 val escapedGithubUpdateRepository = githubUpdateRepository.replace("\\", "\\\\").replace("\"", "\\\"")
 val releaseKeystorePath = providers.gradleProperty("adshieldKeystorePath")
@@ -56,8 +56,8 @@ android {
         applicationId = "com.adshield.pro"
         minSdk = 29
         targetSdk = 36
-        versionCode = 40700
-        versionName = "4.7.0"
+        versionCode = 40701
+        versionName = "4.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
