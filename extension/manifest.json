@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "OmniShield X — Ad & Tracker Shield",
+  "version": "4.2.0",
+  "description": "Blocks ads and trackers using the same intelligence core as the OmniShield X Android app. Local-only, no servers, no analytics.",
+  "permissions": ["declarativeNetRequest", "storage"],
+  "background": { "service_worker": "background.js" },
+  "icons": { "128": "icon.png" },
+  "action": { "default_popup": "popup.html" },
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "ads_1", "enabled": true, "path": "rules-1.json" },
+      { "id": "ads_2", "enabled": true, "path": "rules-2.json" }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ]
+}

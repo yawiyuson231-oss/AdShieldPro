@@ -103,6 +103,13 @@ app/src/test/java/com/adshield/pro/ (AdShieldEngineTestSuite, TitanShieldMaxEngi
 ./gradlew assembleRelease        # requires signing env vars (see docs/BUILD_AND_SIGNING_GUIDE.md)
 ```
 
+## Two platforms, one core (OmniShield X)
+
+- **Android app** — this repository's APK (DNS VPN firewall, Security Center, in-app ad skip, optimizer).
+- **Web platform** — `website/` (GitHub Pages): live Domain Checker running the real rule file with the same evaluation ladder (CI-tested), Policy Sync via the app's backup JSON, extension distribution. Everything runs locally in the browser.
+- **Browser extension** — `extension/` (Manifest V3): 50,000 DNR block rules generated from the same bundled feed + cosmetic filtering. Load unpacked via developer mode.
+- **No fake cloud**: there are no OmniShield servers or accounts; the platforms share rule assets, engine semantics, and the config schema offline. See `docs/OMNISHIELD_X_PLATFORMS.md`.
+
 ## Package identity
 
 Display name: **TitanShield Max** · applicationId `com.adshield.pro` (kept for in-place update compatibility from AdShield Pro 2.x installs).
