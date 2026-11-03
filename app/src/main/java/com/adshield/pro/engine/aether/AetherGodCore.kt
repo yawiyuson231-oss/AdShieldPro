@@ -142,7 +142,10 @@ class AetherGodCore @Inject constructor(
     }
 
     /** Real Control Center snapshot — every value measured, none fabricated. */
-    fun controlCenterReport(autoRecoveries: Long = 0L): ControlCenterReport {
+    fun controlCenterReport(
+        autoRecoveries: Long = 0L,
+        possibleFalsePositives: List<String> = emptyList()
+    ): ControlCenterReport {
         synchronized(lock) {
             val best = resolverHealth.bestMeasuredResolver("__none__")
             return ControlCenterReport(
@@ -163,7 +166,8 @@ class AetherGodCore @Inject constructor(
                     .take(5)
                     .map { "${it.key} ×${it.value}" },
                 recentAudit = auditLog.takeLast(5).toList(),
-                updatedAtEpochMs = System.currentTimeMillis()
+                updatedAtEpochMs = System.currentTimeMillis(),
+                possibleFalsePositives = possibleFalsePositives
             )
         }
     }

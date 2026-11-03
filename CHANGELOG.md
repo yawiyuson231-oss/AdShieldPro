@@ -1,5 +1,15 @@
 # Changelog — OmniShield X (formerly TitanShield Max)
 
+## 4.6.0 — AETHER agent upgrade + WiFi low-latency + fastest-resolver speed mode
+
+- **AETHER self-audit (false-positive radar):** the agent now reviews its OWN blocking from real query logs — any domain blocked 3+ times that came from a heuristic shield or belongs to the protected auth/payment catalog surfaces in the Control Center for one-tap review. Detection only; it never auto-unblocks (tested).
+- **AETHER explainer:** plain-language, facts-only reason for every verdict (domain, type, detection source, rule) — no invented threat claims (tested).
+- **WiFi low-latency lock:** while filtering is active, holds Android's LOW_LATENCY WifiLock (API 29+, high-perf fallback) to cut radio power-save jitter for gaming/streaming while the screen is on. Honest: reduces jitter/latency spikes; cannot increase ISP bandwidth.
+- **Speed mode (opt-in, Settings):** every 15 minutes the fastest RELIABLE resolver is selected from REAL measured query latencies (switch only if ≥25% faster at ≥90% success, ≥10 probes; custom resolvers never touched; no synthetic traffic).
+- **Time-saved stat (real math):** blocked lookups answered locally — estimated lookup time avoided = blocked count × your measured average allowed-lookup latency, shown in Settings.
+- Universal ad-skip evidence widened: "Skip all ads", "Skip this ad", "Hide ad(s)" texts.
+
+
 ## 4.5.0 — Platform-spec hardening + UNIVERSAL video ad-skip
 
 - **Universal in-app ad-skip (any video app):** the Accessibility skip engine now offers a universal mode (default ON) that applies the same strict ad-evidence rules to EVERY app — third-party video players, games, browsers — while system UIs (SystemUI, launchers, dialer, keyboard, messaging, settings) are hard-excluded in all modes. IMA-SDK skip ids added. Bare "Skip"/"✕"/"Close" and ad CTAs remain untappable (tested).

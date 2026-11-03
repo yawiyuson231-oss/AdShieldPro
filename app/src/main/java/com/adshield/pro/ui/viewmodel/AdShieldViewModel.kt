@@ -108,6 +108,19 @@ class AdShieldViewModel @Inject constructor(
 
     val dnsFallbackActive: StateFlow<Boolean> = repository.dnsFallbackActive
 
+    /** Honest speed stat: blocked lookups answered instantly (no upstream round-trip). */
+    val dnsTimeSavedEstimate: StateFlow<String?> = kotlinx.coroutines.flow.combine(
+        repository.blockedLoggedCountFlow,
+        repository.avgAllowedLatencyFlow
+    ) { blocked, avgMs ->
+        if (blocked > 0L && avgMs != null && avgMs > 0.0) {
+            val savedMs = blocked.toDouble() * avgMs
+            val label = if (savedMs >= 60_000.0) String.format("%.1f minutes", savedMs / 60_000.0)
+                        else String.format("%.0f seconds", savedMs / 1000.0)
+            "$blocked ad/tracker lookups answered instantly — about $label of lookup time avoided (estimate: blocked × your measured average lookup time)."
+        } else null
+    }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
+
     
 
     init {
@@ -129,7 +142,11 @@ class AdShieldViewModel @Inject constructor(
             while (true) {
                 kotlinx.coroutines.delay(10_000L)
                 val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
-                _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong())
+                // AETHER self-audit: feed REAL blocked events into the false-positive radar
+                val radar = com.adshield.pro.engine.aether.AetherSelfAudit.possibleFalsePositives(
+                    recentLogs.value.filter { it.isBlocked }.map { it.domain to it.sourceList }
+                )
+                _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong(), radar)
                 refreshDnsBypassWarning()
             }
         }
@@ -836,6 +853,16 @@ class AdShieldViewModel @Inject constructor(
             showFeedback(
                 if (enabled) "Strict Heuristic Shield ON: in Strict mode, random-looking, lookalike and new domains can be blocked (one tap to allow any false positive)."
                 else "Strict Heuristic Shield OFF: heuristic signals are only observed, never blocked."
+            )
+        }
+    }
+
+    fun toggleResolverAutoTune(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setResolverAutoTune(enabled)
+            showFeedback(
+                if (enabled) "Speed mode ON: every 15 minutes the fastest RELIABLE resolver is chosen from your real measured query latencies (only if 25%+ faster, 90%+ success). Custom resolvers are never touched."
+                else "Speed mode OFF."
             )
         }
     }

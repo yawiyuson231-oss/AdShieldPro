@@ -243,6 +243,12 @@ fun HomeScreen(
                     "Verification overrides: ${aetherReport.verificationOverrides} • Auto-recoveries: ${aetherReport.autoRecoveries}",
                     style = MaterialTheme.typography.bodySmall
                 )
+                if (aetherReport.possibleFalsePositives.isNotEmpty()) {
+                    Text("AETHER self-audit — possible over-blocking (review, one tap to allow on Live tab):", style = MaterialTheme.typography.labelMedium)
+                    aetherReport.possibleFalsePositives.forEach { entry ->
+                        Text("• $entry", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 if (aetherReport.bestResolverLabel != null) {
                     Text(
                         "Best resolver: ${aetherReport.bestResolverLabel} (${aetherReport.bestResolverLatencyMs}ms avg)",

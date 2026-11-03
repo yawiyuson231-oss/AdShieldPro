@@ -90,7 +90,9 @@ fun SettingsScreen(
     onToggleEncryptedDnsBypass: (Boolean) -> Unit = {},
     onToggleHeuristicShield: (Boolean) -> Unit = {},
     onToggleCheckNewDomains: (Boolean) -> Unit = {},
-    onToggleInAppAdSkipUniversal: (Boolean) -> Unit = {}
+    onToggleInAppAdSkipUniversal: (Boolean) -> Unit = {},
+    onToggleResolverAutoTune: (Boolean) -> Unit = {},
+    dnsSpeedStats: String? = null
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -484,6 +486,23 @@ fun SettingsScreen(
                             )
                         }
                         Switch(checked = settings.inAppAdSkipUniversal, onCheckedChange = onToggleInAppAdSkipUniversal)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Speed mode (auto-fastest resolver)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Every 15 minutes, the fastest RELIABLE resolver is chosen from your real measured query latencies — only switches if 25%+ faster with 90%+ success. Never touches a custom resolver, never sends synthetic traffic.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.resolverAutoTune, onCheckedChange = onToggleResolverAutoTune)
+                    }
+                    if (dnsSpeedStats != null) {
+                        Text(
+                            dnsSpeedStats,
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                     HorizontalDivider()
                     Row(verticalAlignment = Alignment.CenterVertically) {

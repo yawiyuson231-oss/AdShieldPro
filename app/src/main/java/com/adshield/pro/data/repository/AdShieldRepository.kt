@@ -100,6 +100,15 @@ class AdShieldRepository @Inject constructor(
         _dnsFallbackActive.value = active
     }
 
+    /** Count of blocked events in the on-device log (real DB query). */
+    val blockedLoggedCountFlow: kotlinx.coroutines.flow.Flow<Long> = dao.observeBlockedLoggedCount()
+
+    /** Average measured upstream latency of ALLOWED lookups (real DB data, last 250). */
+    val avgAllowedLatencyFlow: kotlinx.coroutines.flow.Flow<Double?> = dao.observeRecentLogs(250).map { list ->
+        val allowed = list.filter { !it.isBlocked && it.latencyMs > 0 }
+        if (allowed.isEmpty()) null else allowed.sumOf { it.latencyMs }.toDouble() / allowed.size
+    }
+
     val recentLogsFlow: Flow<List<DnsActivityRecord>> = dao.observeRecentLogs(250).map { list ->
         list.map { entity ->
             DnsActivityRecord(

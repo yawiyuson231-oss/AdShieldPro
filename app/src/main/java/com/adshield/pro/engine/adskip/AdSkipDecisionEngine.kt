@@ -52,8 +52,8 @@ object AdSkipDecisionEngine {
     // or "Close" (dialogs) are NOT ads. Both tokens ("skip"+"ad" / "close"+"ad")
     // must appear, so unknown apps can never be mis-clicked.
     private const val AD_TOKEN = "ad"
-    private val SKIP_TEXTS = listOf("skip ad", "skip ads", "skip the ad", "skip in")
-    private val CLOSE_TEXTS = listOf("close ad", "close ads", "remove ad", "close overlay")
+    private val SKIP_TEXTS = listOf("skip ad", "skip ads", "skip the ad", "skip in", "skip all ads", "skip this ad")
+    private val CLOSE_TEXTS = listOf("close ad", "close ads", "remove ad", "close overlay", "hide ad", "hide ads")
 
     enum class ActionType { CLICK_SKIP, CLICK_CLOSE, NONE }
 

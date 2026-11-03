@@ -92,5 +92,6 @@ data class ControlCenterReport(
     val bestResolverLatencyMs: Int?,
     val topObservedDomains: List<String>,
     val recentAudit: List<String>,
-    val updatedAtEpochMs: Long
+    val updatedAtEpochMs: Long,
+    val possibleFalsePositives: List<String> = emptyList()
 )

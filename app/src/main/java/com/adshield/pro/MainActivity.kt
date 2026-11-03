@@ -103,6 +103,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val aetherReport by viewModel.aetherReport.collectAsStateWithLifecycle()
     val dnsBypassWarning by viewModel.dnsBypassWarning.collectAsStateWithLifecycle()
     val dnsFallbackActive by viewModel.dnsFallbackActive.collectAsStateWithLifecycle()
+    val dnsSpeedStats by viewModel.dnsTimeSavedEstimate.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
@@ -492,7 +493,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleEncryptedDnsBypass = viewModel::toggleEncryptedDnsBypass,
                     onToggleHeuristicShield = viewModel::toggleHeuristicShield,
                     onToggleCheckNewDomains = viewModel::toggleCheckNewDomains,
-                    onToggleInAppAdSkipUniversal = viewModel::toggleInAppAdSkipUniversal
+                    onToggleInAppAdSkipUniversal = viewModel::toggleInAppAdSkipUniversal,
+                    onToggleResolverAutoTune = viewModel::toggleResolverAutoTune,
+                    dnsSpeedStats = dnsSpeedStats
                 )
             }
         }

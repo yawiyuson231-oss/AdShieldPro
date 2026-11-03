@@ -67,6 +67,7 @@ class AdShieldVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var tunnelJob: Job? = null
     private var autoResumeJob: kotlinx.coroutines.Job? = null
+    private var resolverTunerJob: kotlinx.coroutines.Job? = null
     private val tunWriteLock = Any()
     private data class AppAttribution(val packageName: String, val label: String)
     private val appAttributionByUid = ConcurrentHashMap<Int, AppAttribution>()
@@ -99,6 +100,7 @@ class AdShieldVpnService : VpnService() {
             }
             ACTION_PAUSE_VPN -> {
                 isPaused = true
+                WifiLowLatencyManager.release()
                 repository.updateVpnStatus(VpnStatus.PAUSED)
                 updateForegroundNotification()
                 schedulePauseAutoResume(intent.getIntExtra(EXTRA_PAUSE_MINUTES, 0))
@@ -108,6 +110,7 @@ class AdShieldVpnService : VpnService() {
                 autoResumeJob?.cancel()
                 autoResumeJob = null
                 isPaused = false
+                WifiLowLatencyManager.acquire(this@AdShieldVpnService)
                 if (vpnInterface != null && tunnelJob?.isActive == true) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED)
                     updateForegroundNotification()
@@ -138,6 +141,7 @@ class AdShieldVpnService : VpnService() {
         repository.updateVpnStatus(VpnStatus.STARTING)
 
         tunnelJob = serviceScope.launch {
+            startResolverAutoTuner()
             try {
                 val settings = preferencesRepository.getSettingsSnapshot()
                 preferencesRepository.setVpnShouldRemainActive(true)
@@ -212,6 +216,7 @@ class AdShieldVpnService : VpnService() {
 
                 vpnInterface = establishedPfd
                 isPaused = false
+                WifiLowLatencyManager.acquire(this@AdShieldVpnService)
                 repository.updateVpnStatus(
                     status = VpnStatus.CONNECTED,
                     networkLabel = detectCurrentNetworkLabel()
@@ -733,6 +738,8 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        WifiLowLatencyManager.release()
+        resolverTunerJob?.cancel()
         autoResumeJob?.cancel()
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
@@ -760,6 +767,43 @@ class AdShieldVpnService : VpnService() {
                     updateForegroundNotification()
                 } else {
                     startVpnTunnel()
+                }
+            }
+        }
+    }
+
+    /**
+     * Speed mode: auto-fastest resolver. Opt-in. Every 15 minutes, from REAL measured
+     * query latencies only: switches presets only when a measured alternative is
+     * >=25%% faster with >=90%% success and the current preset has >=10 probes.
+     * Never touches a CUSTOM resolver. No synthetic traffic is generated.
+     */
+    private fun startResolverAutoTuner() {
+        if (resolverTunerJob?.isActive == true) return
+        resolverTunerJob = serviceScope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(15 * 60_000L)
+                runCatching {
+                    val settings = preferencesRepository.getSettingsSnapshot()
+                    if (!settings.resolverAutoTune) continue
+                    val config = settings.resolverConfig
+                    if (config.preset == com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) continue
+                    val current = resolverHealthMonitor.statsFor(config.preset.name) ?: continue
+                    if (current.probes < 10L) continue
+                    val best = resolverHealthMonitor.bestMeasuredResolver(config.preset.name) ?: continue
+                    val newPreset = runCatching {
+                        com.adshield.pro.domain.model.DnsProviderPreset.valueOf(best.key)
+                    }.getOrNull() ?: continue
+                    if (newPreset == config.preset) continue
+                    // require >=25% faster
+                    if (best.avgLatencyMs * 4 > current.avgLatencyMs * 3) continue
+                    val newConfig = config.copy(preset = newPreset)
+                    preferencesRepository.updateResolverConfig(newConfig)
+                    repository.syncRuntimeModeAndResolver(
+                        settings.protectionMode,
+                        settings.copy(resolverConfig = newConfig)
+                    )
+                    upstreamDnsResolver.clearCache()
                 }
             }
         }

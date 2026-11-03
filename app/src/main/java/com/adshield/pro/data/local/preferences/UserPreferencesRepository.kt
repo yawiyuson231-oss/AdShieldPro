@@ -73,7 +73,8 @@ data class AppSettingsState(
     val blockEncryptedDnsBypass: Boolean = true,
     val blockHeuristicThreats: Boolean = true,
     val checkNewDomains: Boolean = false,
-    val inAppAdSkipUniversal: Boolean = true
+    val inAppAdSkipUniversal: Boolean = true,
+    val resolverAutoTune: Boolean = false
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -114,6 +115,7 @@ class UserPreferencesRepository @Inject constructor(
         val BLOCK_HEURISTIC_THREATS = booleanPreferencesKey("block_heuristic_threats_strict")
         val CHECK_NEW_DOMAINS = booleanPreferencesKey("check_new_domain_age")
         val IN_APP_AD_SKIP_UNIVERSAL = booleanPreferencesKey("in_app_ad_skip_universal")
+        val RESOLVER_AUTO_TUNE = booleanPreferencesKey("resolver_auto_tune")
         val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
         val AUTO_UPDATE_FILTERS = booleanPreferencesKey("auto_update_filters")
         val UPDATE_INTERVAL_HOURS = intPreferencesKey("update_interval_hours")
@@ -199,6 +201,7 @@ class UserPreferencesRepository @Inject constructor(
             blockHeuristicThreats = prefs[Keys.BLOCK_HEURISTIC_THREATS] ?: true,
             checkNewDomains = prefs[Keys.CHECK_NEW_DOMAINS] ?: false,
             inAppAdSkipUniversal = prefs[Keys.IN_APP_AD_SKIP_UNIVERSAL] ?: true,
+            resolverAutoTune = prefs[Keys.RESOLVER_AUTO_TUNE] ?: false,
             logRetentionDays = prefs[Keys.LOG_RETENTION_DAYS] ?: 7,
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
             updateIntervalHours = prefs[Keys.UPDATE_INTERVAL_HOURS] ?: 24,
@@ -285,6 +288,9 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setBlockHeuristicThreats(enabled: Boolean) =
         context.adShieldDataStore.edit { it[Keys.BLOCK_HEURISTIC_THREATS] = enabled }
+
+    suspend fun setResolverAutoTune(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.RESOLVER_AUTO_TUNE] = enabled }
 
     suspend fun setInAppAdSkipUniversal(enabled: Boolean) =
         context.adShieldDataStore.edit { it[Keys.IN_APP_AD_SKIP_UNIVERSAL] = enabled }
