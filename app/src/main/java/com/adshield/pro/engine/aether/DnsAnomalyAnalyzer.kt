@@ -18,7 +18,7 @@ object DnsAnomalyAnalyzer {
         val freq = HashMap<Char, Int>()
         for (c in label) freq.merge(c, 1, Int::plus)
         var entropy = 0.0
-        val n = label.size.toDouble()
+        val n = label.length.toDouble()
         for (count in freq.values) {
             val p = count / n
             entropy -= p * (Math.log(p) / Math.log(2.0))
