@@ -156,7 +156,7 @@ class AetherGodCore @Inject constructor(
                 rebindingBlocked = rebindingBlocked,
                 protectedOverrides = protectedOverrides,
                 safeModeActive = zeroBreakageEngine.isSafeModeActive(),
-                autoRecoveries = autoRecoveries
+                autoRecoveries = autoRecoveries,
                 bestResolverLabel = best?.key,
                 bestResolverLatencyMs = best?.avgLatencyMs,
                 topObservedDomains = blockedFrequency.entries
