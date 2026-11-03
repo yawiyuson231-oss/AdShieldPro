@@ -150,10 +150,31 @@ class AdShieldVpnService : VpnService() {
                     .addRoute(VIRTUAL_IPV4_DNS, 32)
                     .addDnsServer(VIRTUAL_IPV4_DNS)
 
-                if (settings.resolverConfig.enableIpv6) {
-                    builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
-                    builder.addRoute(VIRTUAL_IPV6_DNS, 128)
-                    builder.addDnsServer(VIRTUAL_IPV6_DNS)
+                // ALWAYS capture IPv6 DNS as well — leaving it out lets IPv6 DNS leak
+                // around the filter on dual-stack networks (the #1 silent bypass).
+                builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
+                builder.addRoute(VIRTUAL_IPV6_DNS, 128)
+                builder.addDnsServer(VIRTUAL_IPV6_DNS)
+
+                // BYPASS CAPTURE: apps that ignore the system resolver (hardcoded DNS)
+                // query the network's DNS servers or known public resolvers directly.
+                // Those IPs are NOT routed by the /32 virtual-DNS route, so their DNS
+                // never reached the filter. Add explicit /32 + /128 routes for them so
+                // ALL plaintext DNS is filtered.
+                val bypassDnsIps = LinkedHashSet<String>()
+                runCatching {
+                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    val link = cm?.activeNetwork?.let { cm.getLinkProperties(it) }
+                    for (server in link?.dnsServers.orEmpty()) {
+                        server.hostAddress?.takeIf { it.isNotBlank() }?.let { bypassDnsIps.add(it) }
+                    }
+                }
+                bypassDnsIps.addAll(KNOWN_PUBLIC_RESOLVER_ROUTES.keys)
+
+                for (ip in bypassDnsIps) {
+                    val isIpv6 = ip.contains(':')
+                    val prefix = if (isIpv6) 128 else 32
+                    runCatching { builder.addRoute(ip, prefix) }
                 }
 
                 // Always exclude TitanShield Max itself so upstream requests never loop
@@ -688,6 +709,21 @@ class AdShieldVpnService : VpnService() {
 
         const val VIRTUAL_IPV4_CLIENT = "10.215.173.1"
         const val VIRTUAL_IPV4_DNS = "10.215.173.2"
+
+        /**
+         * Public resolver IPs routed into the tunnel so apps with hardcoded DNS
+         * (8.8.8.8 etc.) are still filtered. Values are literals — never resolved.
+         */
+        val KNOWN_PUBLIC_RESOLVER_ROUTES: Map<String, String> = mapOf(
+            "8.8.8.8" to "Google", "8.8.4.4" to "Google",
+            "1.1.1.1" to "Cloudflare", "1.0.0.1" to "Cloudflare",
+            "9.9.9.9" to "Quad9", "149.112.112.112" to "Quad9",
+            "208.67.222.222" to "OpenDNS", "208.67.220.220" to "OpenDNS",
+            "114.114.114.114" to "114DNS", "223.5.5.5" to "AliDNS",
+            "2001:4860:4860::8888" to "Google v6", "2001:4860:4860::8844" to "Google v6",
+            "2606:4700:4700::1111" to "Cloudflare v6", "2606:4700:4700::1001" to "Cloudflare v6",
+            "2620:fe::fe" to "Quad9 v6", "2620:fe::9" to "Quad9 v6"
+        )
         const val VIRTUAL_IPV6_CLIENT = "fd00:ad5:1e1d::1"
         const val VIRTUAL_IPV6_DNS = "fd00:ad5:1e1d::2"
     }

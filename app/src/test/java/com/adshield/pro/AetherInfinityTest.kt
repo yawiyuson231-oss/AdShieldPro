@@ -201,6 +201,38 @@ class LiveFeedAndVideoBeaconTest {
 }
 
     @org.junit.Test
+    fun privateDnsGuard_strictModeDetectedAsBypass_offAndAutoPass() {
+        val g = com.adshield.pro.engine.aether.PrivateDnsGuard
+        val strict = g.parse("hostname", "dns.adguard.com")
+        org.junit.Assert.assertTrue(strict.bypassesLocalVpn)
+        org.junit.Assert.assertTrue(strict.userGuidance!!.contains("dns.adguard.com"))
+        org.junit.Assert.assertTrue(strict.userGuidance!!.contains("Private DNS"))
+
+        val strictNoHost = g.parse("hostname", null)
+        org.junit.Assert.assertTrue(strictNoHost.bypassesLocalVpn)
+
+        val off = g.parse("off", null)
+        org.junit.Assert.assertFalse(off.bypassesLocalVpn)
+        org.junit.Assert.assertNull(off.userGuidance)
+
+        val auto = g.parse("opportunistic", null)
+        org.junit.Assert.assertFalse(auto.bypassesLocalVpn)
+
+        val nulled = g.parse(null, null)
+        org.junit.Assert.assertFalse(nulled.bypassesLocalVpn)
+    }
+
+    @org.junit.Test
+    fun publicResolverRoutes_areValidLiteralIps() {
+        val regex = Regex("""^([0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-f:]+$""")
+        for ((ip, _) in com.adshield.pro.service.AdShieldVpnService.KNOWN_PUBLIC_RESOLVER_ROUTES) {
+            org.junit.Assert.assertTrue("Invalid route literal: $ip", regex.matches(ip))
+            org.junit.Assert.assertFalse(ip.endsWith("."))
+        }
+        org.junit.Assert.assertTrue(com.adshield.pro.service.AdShieldVpnService.KNOWN_PUBLIC_RESOLVER_ROUTES.containsKey("8.8.8.8"))
+    }
+
+    @org.junit.Test
     fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
     val f = BrowserContentBlocker.Companion.UrlPatternFilter
     // Ad-only telemetry beacons on YouTube itself (first-party) — blocked

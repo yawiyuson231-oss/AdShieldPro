@@ -102,6 +102,10 @@ class AdShieldViewModel @Inject constructor(
     )
     val aetherReport: StateFlow<com.adshield.pro.engine.aether.ControlCenterReport> = _aetherReport.asStateFlow()
 
+    // --- DNS bypass diagnostics (real system state, refreshed live) ---
+    private val _dnsBypassWarning = MutableStateFlow<String?>(null)
+    val dnsBypassWarning: StateFlow<String?> = _dnsBypassWarning.asStateFlow()
+
     
 
     init {
@@ -124,7 +128,23 @@ class AdShieldViewModel @Inject constructor(
                 kotlinx.coroutines.delay(10_000L)
                 val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
                 _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong())
+                refreshDnsBypassWarning()
             }
+        }
+    }
+
+    /** Reads the REAL Android Private DNS state — strict mode silently bypasses any DNS VPN. */
+    fun refreshDnsBypassWarning() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val assessment = runCatching {
+                val resolver = appContext.contentResolver
+                val mode = android.provider.Settings.Global.getString(resolver, "private_dns_mode")
+                val host = android.provider.Settings.Global.getString(resolver, "private_dns_provider_hostname")
+                com.adshield.pro.engine.aether.PrivateDnsGuard.parse(mode, host)
+            }.getOrElse {
+                com.adshield.pro.engine.aether.PrivateDnsGuard.parse(null, null)
+            }
+            _dnsBypassWarning.value = assessment.userGuidance
         }
     }
 

@@ -76,6 +76,8 @@ fun LiveMonitorScreen(
     allTimeBlocked: Long,
     allTimeAllowed: Long,
     aetherReport: ControlCenterReport,
+    dnsBypassWarning: String?,
+    onOpenPrivateDnsSettings: () -> Unit,
     onSelectProtectionMode: (ProtectionMode) -> Unit
 ) {
     val now = System.currentTimeMillis()
@@ -98,6 +100,24 @@ fun LiveMonitorScreen(
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // --- Private DNS bypass warning (REAL system state — the #1 "blocker not working" cause) ---
+        if (dnsBypassWarning != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = AlertRed.copy(alpha = 0.12f))
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Warning, contentDescription = null, tint = AlertRed, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("DNS BYPASS DETECTED", style = MaterialTheme.typography.labelMedium, color = AlertRed, fontWeight = FontWeight.Bold)
+                        Text(dnsBypassWarning, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    }
+                    androidx.compose.material3.TextButton(onClick = onOpenPrivateDnsSettings) { Text("Open") }
+                }
+            }
+        }
+
         // --- Mode chips + live status ---
         Row(verticalAlignment = Alignment.CenterVertically) {
             ModeChip("Balanced", vpnState.activeMode == ProtectionMode.STANDARD) { onSelectProtectionMode(ProtectionMode.STANDARD) }

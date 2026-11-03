@@ -101,6 +101,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
     val aetherReport by viewModel.aetherReport.collectAsStateWithLifecycle()
+    val dnsBypassWarning by viewModel.dnsBypassWarning.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
@@ -339,6 +340,14 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 )
 
                 MainNavDestination.LIVE -> LiveMonitorScreen(
+                    dnsBypassWarning = dnsBypassWarning,
+                    onOpenPrivateDnsSettings = {
+                        runCatching {
+                            startActivity(android.content.Intent("android.settings.PRIVATE_DNS_SETTINGS"))
+                        }.onFailure {
+                            runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) }
+                        }
+                    },
                     vpnState = vpnState,
                     recentLogs = recentLogs,
                     allTimeTotal = allTimeTotal,
