@@ -1,4 +1,33 @@
-# Changelog — TitanShield Max
+# Changelog — OmniShield X (formerly TitanShield Max)
+
+## 4.0.0 — AETHER Infinity (OmniShield X)
+
+### Part 1 — AETHER Neural GodCore
+- Central orchestration engine (`engine/aether/`) with **15 specialized agents** (X-AD, X-Video, X-DNS, X-Tracker, X-Malware, X-Domain DNA, X-App, X-Network, X-Privacy Auditor, X-Predictive Defense, X-Self-Healing, X-Verification, X-Global Learning, X-Digital Twin, X-Failsafe).
+- Every agent has a defined responsibility, real performance counters, and evidence-backed findings. Blocking remains the exclusive job of the deterministic filter engine — AETHER observes, verifies (independent re-check against the Critical Protection catalog), measures, and audits. Honest label: heuristic evidence engine, NOT a neural network; nothing simulated.
+
+### Parts 4/5 — DNS hardening
+- **DNS rebinding guard** in the VPN answer path: public domains answering with private/loopback/ULA IPs are sinkholed (wire-format A/AAAA extractor, RFC 1035 compression-aware).
+- **Resolver Health Monitor**: real per-resolver success/latency ranking from live traffic + watchdog probes; best-resolver surfaced on the dashboard.
+
+### Parts 6 — Predictive defense (honest)
+- DGA-style entropy detection and DNS-tunneling structure detection run in **OBSERVE mode only** — they report anomalies on the dashboard and never block on weak predictions.
+
+### Part 7 — Digital Twin
+- `RuleDigitalTwin` simulates candidate rule sets against the must-work corpus (video/auth/payments/games/messaging) in a throwaway engine and reports exact conflicts. CI runs it against the real bundled lists.
+
+### Part 3 — Video AI
+- Extended video-ad endpoint patterns in the browser URL filter (Google IMA `/ima/ads`, `videoads`, `securepubads`, `videoplaza`, …); playback domains remain protected.
+
+### Part 12 — Control Center
+- New AETHER Control Center card on Home: agents online, DNS analyzed, blocked confirmed, anomalies observed, rebinding stopped, verification overrides, auto-recoveries, best resolver, top blocked domains, safe-mode state — every number from real events.
+
+### Brand / version
+- OmniShield X (display name), versionCode 40000, versionName 4.0.0. applicationId and all engines unchanged.
+
+### Still honest limitations (unchanged)
+- No cloud/global backend network exists (Part 9 is NOT shipped — no servers are claimed). No DoQ/DNSSEC validation. No in-app YouTube/FB/TikTok ad removal (server-side). AETHER is deterministic heuristics, not an LLM/neural net.
+
 
 ## 3.1.0 — Global DNS Firewall hardening (Modules 1/3/4/5/6/7/11/12)
 

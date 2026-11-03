@@ -59,6 +59,8 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
     @Inject lateinit var zeroBreakageEngine: com.adshield.pro.engine.zero.ZeroBreakageEngine
+    @Inject lateinit var aetherCore: com.adshield.pro.engine.aether.AetherGodCore
+    @Inject lateinit var resolverHealthMonitor: com.adshield.pro.engine.dns.ResolverHealthMonitor
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -385,11 +387,36 @@ class AdShieldVpnService : VpnService() {
                 appName = app?.label
             )
             maybeRefreshNotificationCounter()
+            aetherCore.observeDnsQuery(query.questionDomain, true, evaluation.sourceName, evaluation.matchedCategory?.name)
             return blockedBytes
         }
 
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
+        resolverHealthMonitor.record(currentSettings.resolverConfig.preset.name, upstreamResult.latencyMs, upstreamResult.responseBytes.isNotEmpty())
+
+        // AETHER DNS rebinding guard (Part 5): public domains must never answer with private IPs
+        val answerIps = com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.extractAnswerIps(upstreamResult.responseBytes)
+        if (com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.isRebindingAttempt(query.questionDomain, answerIps)) {
+            val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
+            aetherCore.recordRebindingBlocked(query.questionDomain, answerIps)
+            repository.recordDnsQueryEvent(
+                domain = query.questionDomain,
+                queryType = query.qTypeName,
+                isBlocked = true,
+                category = evaluation.matchedCategory,
+                matchedRule = "rebinding-guard",
+                sourceList = "OmniShield X Rebinding Guard",
+                latencyMs = upstreamResult.latencyMs,
+                protocolUsed = "Rebinding Sinkhole",
+                fromCache = upstreamResult.fromCache,
+                appPackageName = app?.packageName,
+                appName = app?.label
+            )
+            maybeRefreshNotificationCounter()
+            return DnsPacketCodec.buildBlockedResponse(query = query, sinkholeZeroIp = mode.blockSinkholeZeroIp)
+        }
+        aetherCore.observeDnsQuery(query.questionDomain, false, evaluation.sourceName, evaluation.matchedCategory?.name, answerIps, upstreamResult.latencyMs)
         repository.recordDnsQueryEvent(
             domain = query.questionDomain,
             queryType = query.qTypeName,
@@ -430,12 +457,16 @@ class AdShieldVpnService : VpnService() {
             while (isActive) {
                 kotlinx.coroutines.delay(if (safeModeActive) 60_000L else 30_000L)
                 if (vpnInterface == null || isPaused) continue
-                val probeOk = runCatching {
+                val probeOutcome = runCatching {
                     val parsedProbe = DnsPacketCodec.parseQuery(
                         DnsPacketCodec.buildStandardQuery(zeroBreakageProbeHost, 1)
                     ) ?: error("probe query parse failed")
-                    upstreamDnsResolver.resolve(parsedProbe, resolverConfig).responseBytes.isNotEmpty()
-                }.getOrDefault(false)
+                    val result = upstreamDnsResolver.resolve(parsedProbe, resolverConfig)
+                    resolverHealthMonitor.record(resolverConfig.preset.name, result.latencyMs, result.responseBytes.isNotEmpty())
+                    result.responseBytes.isNotEmpty() to result.latencyMs
+                }.getOrDefault(false to 0)
+                val probeOk = probeOutcome.first
+                aetherCore.lastResolverSummary = resolverHealthMonitor.summaryLine(resolverConfig.preset.name)
                 when (zeroBreakageEngine.onProbeResult(probeOk)) {
                     com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.SAFE_MODE_FILTERING -> if (!safeModeActive) {
                         safeModeActive = true

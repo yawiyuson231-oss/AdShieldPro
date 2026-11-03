@@ -326,6 +326,7 @@ class BrowserContentBlocker @Inject constructor(
                 "/gpt.js", "/pubads_impl", "pagead/ads", "pagead/js", "/adsbygoogle",
                 "apstag.js", "prebid", "pbjs", "headerbid", "/bid/bid?", "/openrtb",
                 "/rtb/", "/rtb2/auction", "/imp?", "/adv/", "popunder", "pop-under",
+                "/ima/ads", "videoads", "/ads/video", "videoplaza", "ima3", "securepubads",
                 "interstitial?", "interstitial.js", "adinterax", "atgsvcs", "atdmt.com",
                 "amung.us", "histats.com", "statcounter.com/count", "addthis.com",
                 "adriver.ru", "adfox.ru", "an.yandex.ru", "mc.yandex.ru/metrika"

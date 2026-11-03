@@ -79,7 +79,8 @@ class AdShieldViewModel @Inject constructor(
     val browserContentBlocker: BrowserContentBlocker,
     private val optimizerEngine: SystemOptimizerEngine,
     private val securityEngine: com.adshield.pro.engine.security.SecurityEngine,
-    private val gameTurboEngine: com.adshield.pro.engine.optimizer.GameTurboEngine
+    private val gameTurboEngine: com.adshield.pro.engine.optimizer.GameTurboEngine,
+    val aetherCore: com.adshield.pro.engine.aether.AetherGodCore
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -87,6 +88,21 @@ class AdShieldViewModel @Inject constructor(
     // --- Zero-Breakage Engine (Module 7) ---
     private val _shadowVerdicts = MutableStateFlow<List<String>>(emptyList())
     val shadowVerdicts: StateFlow<List<String>> = _shadowVerdicts.asStateFlow()
+
+    // --- AETHER GodCore Control Center (Part 12): live, real metrics only ---
+    private val _aetherReport = MutableStateFlow(
+        com.adshield.pro.engine.aether.ControlCenterReport(
+            totalAgents = 15, agentsOnline = 0, dnsObserved = 0, blockedConfirmed = 0,
+            anomaliesObserved = 0, verificationOverrides = 0, rebindingBlocked = 0,
+            protectedOverrides = 0, safeModeActive = false, autoRecoveries = 0,
+            bestResolverLabel = null, bestResolverLatencyMs = null,
+            topObservedDomains = emptyList(), recentAudit = emptyList(),
+            updatedAtEpochMs = 0L
+        )
+    )
+    val aetherReport: StateFlow<com.adshield.pro.engine.aether.ControlCenterReport> = _aetherReport.asStateFlow()
+
+    
 
     init {
         // Shadow verdicts recorded from the filter engine (never blocking — report only).
@@ -96,6 +112,26 @@ class AdShieldViewModel @Inject constructor(
         }
         viewModelScope.launch {
             filterRuleEngine.setShadowModeEnabled(preferencesRepository.getSettingsSnapshot().shadowModeEnabled)
+        }
+        viewModelScope.launch {
+            val settings = preferencesRepository.getSettingsSnapshot()
+            aetherCore.upstreamEncrypted = settings.resolverConfig.protocol != com.adshield.pro.domain.model.DnsProtocol.UDP_TCP
+            aetherCore.detailedLoggingEnabled = settings.detailedDnsLoggingEnabled
+        }
+        // Live Control Center refresh while the dashboard is open (real counters, no simulation)
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10_000L)
+                val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
+                _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong())
+            }
+        }
+    }
+
+    fun refreshAetherReportNow() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val recoveries = preferencesRepository.getSettingsSnapshot().autoRecoveryCount
+            _aetherReport.value = aetherCore.controlCenterReport(recoveries.toLong())
         }
     }
 

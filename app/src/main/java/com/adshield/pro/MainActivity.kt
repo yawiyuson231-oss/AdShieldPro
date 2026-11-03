@@ -97,6 +97,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val shadowVerdicts by viewModel.shadowVerdicts.collectAsStateWithLifecycle()
+    val aetherReport by viewModel.aetherReport.collectAsStateWithLifecycle()
     val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
     val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
@@ -304,6 +305,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
         ) {
             when (currentTab) {
                 MainNavDestination.HOME -> HomeScreen(
+                    aetherReport = aetherReport,
                     vpnState = vpnState,
                     settings = settings,
                     allTimeTotal = allTimeTotal,

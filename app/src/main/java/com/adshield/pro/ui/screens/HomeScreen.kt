@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
@@ -126,7 +127,14 @@ fun HomeScreen(
     onSelectProtectionMode: (ProtectionMode) -> Unit,
     onTriggerFilterSync: () -> Unit,
     onRunOptimizeNow: () -> Unit,
-    onOpenOptimizerTab: () -> Unit
+    onOpenOptimizerTab: () -> Unit,
+    aetherReport: com.adshield.pro.engine.aether.ControlCenterReport = com.adshield.pro.engine.aether.ControlCenterReport(
+        totalAgents = 15, agentsOnline = 0, dnsObserved = 0, blockedConfirmed = 0,
+        anomaliesObserved = 0, verificationOverrides = 0, rebindingBlocked = 0,
+        protectedOverrides = 0, safeModeActive = false, autoRecoveries = 0,
+        bestResolverLabel = null, bestResolverLatencyMs = null,
+        topObservedDomains = emptyList(), recentAudit = emptyList(), updatedAtEpochMs = 0L
+    )
 ) {
     val isConnected = vpnState.status == VpnStatus.CONNECTED
     val isPaused = vpnState.status == VpnStatus.PAUSED
@@ -209,6 +217,52 @@ fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // --- OMNISHIELD X AETHER Control Center (Part 12) — real measured metrics only ---
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = ElectricBlue)
+                    Spacer(Modifier.width(8.dp))
+                    Text("AETHER Control Center", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        if (aetherReport.safeModeActive) "SAFE MODE" else "ONLINE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (aetherReport.safeModeActive) WarningAmber else CyberCyan
+                    )
+                }
+                Text(
+                    "${aetherReport.agentsOnline}/${aetherReport.totalAgents} agents active • ${aetherReport.dnsObserved} DNS queries analyzed",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "Blocked: ${aetherReport.blockedConfirmed} • Anomalies observed: ${aetherReport.anomaliesObserved} • Rebinding stopped: ${aetherReport.rebindingBlocked}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Text(
+                    "Verification overrides: ${aetherReport.verificationOverrides} • Auto-recoveries: ${aetherReport.autoRecoveries}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                if (aetherReport.bestResolverLabel != null) {
+                    Text(
+                        "Best resolver: ${aetherReport.bestResolverLabel} (${aetherReport.bestResolverLatencyMs}ms avg)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                if (aetherReport.topObservedDomains.isNotEmpty()) {
+                    Text(
+                        "Top blocked: " + aetherReport.topObservedDomains.joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    "Heuristic evidence engine — decisions are auditable, never simulated.",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+
         // Top Header Bar
         Row(
             modifier = Modifier.fillMaxWidth(),

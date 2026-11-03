@@ -52,7 +52,7 @@
         <activity
             android:name=".ui.UpdatePromptActivity"
             android:exported="false"
-            android:label="TitanShield Max update"
+            android:label="OmniShield X update"
             android:theme="@style/Theme.AdShieldPro" />
 
         <provider

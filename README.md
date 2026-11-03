@@ -1,6 +1,6 @@
-# TitanShield Max 3.0 — Ultimate Ad Block, Anti-Virus, Game Booster & Device Suite for Android
+# OmniShield X 4.0 (formerly TitanShield Max) — AI-Orchestrated DNS Firewall, Ad Block, Anti-Virus & Device Suite for Android
 
-TitanShield Max (formerly AdShield Pro) is a non-root Android all-in-one protection suite: device-wide DNS ad/tracker/malware filtering through a local VPN, an on-device anti-virus Security Center (files, links, apps, APKs), a zero-lag Game Turbo engine, battery intelligence, a true deep storage cleaner, and a built-in privacy browser with video-ad URL filtering. Built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+OmniShield X (formerly TitanShield Max, originally AdShield Pro) is a non-root Android all-in-one protection suite: device-wide DNS ad/tracker/malware filtering through a local VPN, an on-device anti-virus Security Center (files, links, apps, APKs), a zero-lag Game Turbo engine, battery intelligence, a true deep storage cleaner, and a built-in privacy browser with video-ad URL filtering. Built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
 
 ## What's new in v3.0.0
 
