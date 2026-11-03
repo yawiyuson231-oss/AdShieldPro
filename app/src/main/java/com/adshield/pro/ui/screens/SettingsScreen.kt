@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Backup
@@ -62,6 +63,7 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.ui.theme.CyberCyan
+import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
@@ -82,7 +84,9 @@ fun SettingsScreen(
     onRestoreBackupJson: (String) -> Unit,
     shadowVerdicts: List<String> = emptyList(),
     onToggleShadowMode: (Boolean) -> Unit = {},
-    onReportFalsePositive: (String) -> Unit = {}
+    onReportFalsePositive: (String) -> Unit = {},
+    onToggleInAppAdSkip: (Boolean) -> Unit = {},
+    onSaveAdSkipExtraPackages: (String) -> Unit = {}
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -468,6 +472,80 @@ fun SettingsScreen(
                     }
                     Text(
                         "False positives reported: ${settings.falsePositiveReportCount}  •  Auto-recoveries: ${settings.autoRecoveryCount}",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+        item {
+            // --- In-App Ad Defense (works beyond DNS) ---
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var serviceGranted by remember {
+                mutableStateOf(com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context))
+            }
+            var extraPkgsInput by remember(settings.adSkipExtraPackages) {
+                mutableStateOf(settings.adSkipExtraPackages.joinToString(", "))
+            }
+            val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+            androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+                val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                        serviceGranted = com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context)
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(obs)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Block, contentDescription = null, tint = AlertRed)
+                        Spacer(Modifier.width(8.dp))
+                        Text("In-App Ad Defense", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Skips and closes video ads INSIDE apps (YouTube apps by default) — the only non-root way to touch in-app ads. Websites are covered by the built-in browser engine. OmniShield taps ONLY ad buttons (Skip/Close) — never play, links, or downloads.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-skip in apps", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (serviceGranted) "Accessibility service: ACTIVE" else "Accessibility service: not enabled — required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (serviceGranted) androidx.compose.ui.graphics.Color(0xFF34D399) else WarningAmber
+                            )
+                        }
+                        Switch(
+                            checked = settings.inAppAdSkipEnabled,
+                            onCheckedChange = { enabled ->
+                                onToggleInAppAdSkip(enabled)
+                                if (enabled && !serviceGranted) {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    HorizontalDivider()
+                    Text("Add more video apps (package names, comma-separated):", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = extraPkgsInput,
+                            onValueChange = { extraPkgsInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("com.example.video, tv.example.app") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(onClick = { onSaveAdSkipExtraPackages(extraPkgsInput) }) { Text("Save") }
+                    }
+                    Text(
+                        "Ads skipped so far: ${settings.inAppAdsSkippedCount} • Engine only taps buttons a human could — nothing is modified, typed, or opened.",
                         style = MaterialTheme.typography.labelSmall
                     )
                 }

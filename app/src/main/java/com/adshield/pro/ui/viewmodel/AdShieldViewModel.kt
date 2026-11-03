@@ -796,6 +796,32 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    // --- In-App Ad Defense (non-DNS) ---
+
+    fun toggleInAppAdSkip(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setInAppAdSkipEnabled(enabled)
+            showFeedback(
+                if (enabled) "In-App Ad Skip enabled — now activate the Accessibility service when Android asks."
+                else "In-App Ad Skip disabled."
+            )
+        }
+    }
+
+    fun saveAdSkipExtraPackages(raw: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val pkgs = raw.split(',', ';', ' ')
+                .map { it.trim() }
+                .filter { it.matches(Regex("[A-Za-z0-9._]+")) }
+                .toSet()
+            preferencesRepository.setAdSkipExtraPackages(pkgs)
+            showFeedback(
+                if (pkgs.isEmpty()) "Default targets only (YouTube apps)."
+                else "Ad-skip active for ${pkgs.size + 2} apps (YouTube + ${pkgs.size} added)."
+            )
+        }
+    }
+
     // --- Custom Rules Management ---
 
     fun addCustomRule(

@@ -65,7 +65,11 @@ data class AppSettingsState(
     // --- Zero-Breakage Engine (Module 7) ---
     val shadowModeEnabled: Boolean = false,
     val falsePositiveReportCount: Int = 0,
-    val autoRecoveryCount: Int = 0
+    val autoRecoveryCount: Int = 0,
+    // --- In-App Ad Defense (non-DNS mechanisms) ---
+    val inAppAdSkipEnabled: Boolean = false,
+    val adSkipExtraPackages: Set<String> = emptySet(),
+    val inAppAdsSkippedCount: Int = 0
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -99,6 +103,9 @@ class UserPreferencesRepository @Inject constructor(
         val SHADOW_MODE_ENABLED = booleanPreferencesKey("shadow_mode_enabled")
         val FALSE_POSITIVE_REPORTS = intPreferencesKey("false_positive_report_count")
         val AUTO_RECOVERY_COUNT = intPreferencesKey("auto_recovery_count")
+        val IN_APP_AD_SKIP_ENABLED = booleanPreferencesKey("in_app_ad_skip_enabled")
+        val AD_SKIP_EXTRA_PACKAGES = stringSetPreferencesKey("ad_skip_extra_packages")
+        val IN_APP_ADS_SKIPPED = intPreferencesKey("in_app_ads_skipped_count")
         val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
         val AUTO_UPDATE_FILTERS = booleanPreferencesKey("auto_update_filters")
         val UPDATE_INTERVAL_HOURS = intPreferencesKey("update_interval_hours")
@@ -177,6 +184,9 @@ class UserPreferencesRepository @Inject constructor(
             shadowModeEnabled = prefs[Keys.SHADOW_MODE_ENABLED] ?: false,
             falsePositiveReportCount = prefs[Keys.FALSE_POSITIVE_REPORTS] ?: 0,
             autoRecoveryCount = prefs[Keys.AUTO_RECOVERY_COUNT] ?: 0,
+            inAppAdSkipEnabled = prefs[Keys.IN_APP_AD_SKIP_ENABLED] ?: false,
+            adSkipExtraPackages = prefs[Keys.AD_SKIP_EXTRA_PACKAGES] ?: emptySet(),
+            inAppAdsSkippedCount = prefs[Keys.IN_APP_ADS_SKIPPED] ?: 0,
             logRetentionDays = prefs[Keys.LOG_RETENTION_DAYS] ?: 7,
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
             updateIntervalHours = prefs[Keys.UPDATE_INTERVAL_HOURS] ?: 24,
@@ -248,6 +258,17 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun incrementAutoRecoveryCount() =
         context.adShieldDataStore.edit {
             it[Keys.AUTO_RECOVERY_COUNT] = (it[Keys.AUTO_RECOVERY_COUNT] ?: 0) + 1
+        }
+
+    suspend fun setInAppAdSkipEnabled(enabled: Boolean) =
+        context.adShieldDataStore.edit { it[Keys.IN_APP_AD_SKIP_ENABLED] = enabled }
+
+    suspend fun setAdSkipExtraPackages(packages: Set<String>) =
+        context.adShieldDataStore.edit { it[Keys.AD_SKIP_EXTRA_PACKAGES] = packages }
+
+    suspend fun incrementInAppAdsSkipped() =
+        context.adShieldDataStore.edit {
+            it[Keys.IN_APP_ADS_SKIPPED] = ((it[Keys.IN_APP_ADS_SKIPPED] ?: 0) + 1).coerceAtMost(9_999_999)
         }
 
     suspend fun setLogRetentionDays(days: Int) {

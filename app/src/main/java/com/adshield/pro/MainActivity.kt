@@ -470,7 +470,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onRestoreBackupJson = viewModel::restoreFullBackupJson,
                     shadowVerdicts = shadowVerdicts,
                     onToggleShadowMode = viewModel::toggleShadowMode,
-                    onReportFalsePositive = viewModel::reportFalsePositive
+                    onReportFalsePositive = viewModel::reportFalsePositive,
+                    onToggleInAppAdSkip = viewModel::toggleInAppAdSkip,
+                    onSaveAdSkipExtraPackages = viewModel::saveAdSkipExtraPackages
                 )
             }
         }
