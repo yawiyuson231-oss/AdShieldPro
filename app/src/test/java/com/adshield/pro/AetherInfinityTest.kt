@@ -49,7 +49,7 @@ class AetherInfinityTest {
         for (label in domain.split('.')) { out.write(label.length); out.write(label.toByteArray()); }
         out.write(0)
         u16(1); u16(1) // QTYPE=A, QCLASS=IN
-        out.write(0xC0); out.write(12) // pointer to QNAME
+        out.write(0xC0); out.write(0x0C) // pointer to QNAME (12)
         u16(1); u16(1); u16(60); u16(4) // A, IN, TTL, RDLENGTH
         out.write(ip)
         return out.toByteArray()
