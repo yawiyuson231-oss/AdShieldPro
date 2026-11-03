@@ -342,11 +342,13 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.LIVE -> LiveMonitorScreen(
                     dnsBypassWarning = dnsBypassWarning,
                     onOpenPrivateDnsSettings = {
-                        runCatching {
-                            startActivity(android.content.Intent("android.settings.PRIVATE_DNS_SETTINGS"))
-                        }.onFailure {
-                            runCatching { startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS)) }
-                        }
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val privateDns = android.content.Intent("android.settings.PRIVATE_DNS_SETTINGS")
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        val fallback = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        runCatching { context.startActivity(privateDns) }
+                            .onFailure { runCatching { context.startActivity(fallback) } }
                     },
                     vpnState = vpnState,
                     recentLogs = recentLogs,
