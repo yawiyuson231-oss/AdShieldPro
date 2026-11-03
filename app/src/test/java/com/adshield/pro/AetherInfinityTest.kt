@@ -180,8 +180,14 @@ class AetherInfinityTest {
 
 // --- Live Monitor feed mapping (Part 12) + first-party video-ad beacons (Part 3) ---
 
-@org.junit.Test
-fun liveFeed_lanesAndTags_classifyRealHosts() {
+/**
+ * JUnit requires test methods inside a class — top-level @Test functions
+ * are not discovered (initializationError), so these live here.
+ */
+class LiveFeedAndVideoBeaconTest {
+
+    @org.junit.Test
+    fun liveFeed_lanesAndTags_classifyRealHosts() {
     val m = com.adshield.pro.engine.aether.LiveFeedMapper
     org.junit.Assert.assertEquals(LiveFeedMapper.Lane.VIDEO, m.laneFor("rr3---sn-npoe7ney.googlevideo.com"))
     org.junit.Assert.assertEquals(LiveFeedMapper.Lane.GAME, m.laneFor("ylgdmirp.yleaflyrn.aena.ms"))
@@ -194,8 +200,8 @@ fun liveFeed_lanesAndTags_classifyRealHosts() {
     org.junit.Assert.assertEquals(m.TAG_NOT_LISTED, m.tagFor(null))
 }
 
-@org.junit.Test
-fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
+    @org.junit.Test
+    fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
     val f = BrowserContentBlocker.Companion.UrlPatternFilter
     // Ad-only telemetry beacons on YouTube itself (first-party) — blocked
     org.junit.Assert.assertNotNull(
@@ -211,4 +217,5 @@ fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
     org.junit.Assert.assertNull(
         f.match("https://r1---sn-x.googlevideo.com/videoplayback?id=abc", "r1---sn-x.googlevideo.com", false, "media")
     )
+}
 }
