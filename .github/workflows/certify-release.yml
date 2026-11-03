@@ -1,0 +1,270 @@
+name: Certify & release
+
+# Single gated pipeline for the shipped product. It replaces build-apk.yml, which
+# published a release on every push with a hard-coded version string and did not
+# assert that the unit tests actually ran.
+#
+# Order matters: static checks fail fast (seconds), then the Android build, then the
+# JVM suite, then packaging assertions, and only a fully green run is published.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/0d12249c-adshieldpro
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: certify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_NAME: '4.7.1'
+  VERSION_CODE: '40701'
+  RELEASE_TAG: 'v4.7.1'
+  EXPECTED_TESTS: '84'
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Gradle wrapper
+        run: chmod +x gradlew
+
+      # Pure-JVM / node / python checks. These need no Android SDK, so they run first.
+      - name: Static checks (web engine, PC agent, Kotlin balance)
+        run: |
+          set -euo pipefail
+          echo '--- web engine tests (real 79k-rule assets, real rule ladder) ---'
+          node website/engine.test.mjs
+          echo '--- PC agent DNS ladder self-test ---'
+          python3 pc-agent/omnishield_proxy.py --selftest
+          echo '--- Kotlin source balance check ---'
+          python3 tools/check_kotlin_syntax.py app/src
+          echo '--- extension / website JSON + JS syntax ---'
+          for f in $(find website extension -name '*.js' -o -name '*.mjs' | sort); do node --check "$f"; done
+          for f in $(find . -name '*.json' -not -path './.git/*' -not -path './app/schemas/*' | sort); do
+            python3 -c "import json,sys; json.load(open('$f'))"
+          done
+          echo 'all static checks passed'
+
+      - name: Generate CI release keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/ci-release.keystore" \
+            -storetype PKCS12 \
+            -alias titan-shield \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass titanshield30000 -keypass titanshield30000 \
+            -dname "CN=OmniShield X, OU=Release, O=OmniShield, L=Manila, C=PH"
+
+      - name: Compile and build debug + release APKs
+        env:
+          ADSHIELD_KEYSTORE_PATH: ${{ github.workspace }}/ci-release.keystore
+          ADSHIELD_KEYSTORE_PASSWORD: titanshield30000
+          ADSHIELD_KEY_ALIAS: titan-shield
+          ADSHIELD_KEY_PASSWORD: titanshield30000
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain --stacktrace \
+            :app:compileDebugKotlin :app:assembleDebug :app:assembleRelease 2>&1 | tee build.log
+
+      - name: JVM unit tests
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain --stacktrace :app:testDebugUnitTest 2>&1 | tee test.log
+
+      - name: Assert every unit test ran and passed
+        run: |
+          python3 - <<'EOF'
+          import glob, os, sys, xml.etree.ElementTree as ET
+
+          # app/build.gradle.kts redirects layout.buildDirectory to
+          # $TMPDIR/adshield_pro_build/app (OneDrive workaround) and mirrors results
+          # back into app/build/test-results. TMPDIR is not /tmp on CI runners, so
+          # search every plausible root instead of hard-coding one path.
+          roots = [
+              'app/build/test-results',
+              os.path.join(os.environ.get('TMPDIR', ''), 'adshield_pro_build/app/test-results'),
+              os.path.join(os.environ.get('RUNNER_TEMP', ''), 'adshield_pro_build/app/test-results'),
+              '/tmp/adshield_pro_build/app/test-results',
+              os.path.join(os.environ.get('HOME', ''), 'adshield_pro_build/app/test-results'),
+          ]
+          # Several roots can hold the same class report (the Gradle build mirrors
+          # app/build/test-results from the external build dir), so keep one file per
+          # class name and prefer the workspace copy instead of double-counting.
+          by_class = {}
+          for root in roots:
+              if not root:
+                  continue
+              for path in glob.glob(os.path.join(root, '*', 'TEST-*.xml')):
+                  name = os.path.basename(path)
+                  preferred = 'app/build/test-results' in path.replace(os.sep, '/')
+                  if name not in by_class or (preferred and not by_class[name][1]):
+                      by_class[name] = (path, preferred)
+          files = [path for path, _ in (by_class[k] for k in sorted(by_class))]
+          searched = ', '.join(r for r in roots if r)
+          if not files:
+              print('::error::no JUnit XML under any of: ' + searched)
+              sys.exit('no JUnit XML produced: the test task did not run any tests (searched: %s)' % searched)
+
+          total = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              total += int(root.get('tests', 0))
+              failures += int(root.get('failures', 0))
+              errors += int(root.get('errors', 0))
+              skipped += int(root.get('skipped', 0))
+              for case in root.iter('testcase'):
+                  bad = case.findall('failure') + case.findall('error') + case.findall('skipped')
+                  print(('  FAIL ' if bad else '  PASS ') + f"{os.path.basename(path)[5:-4]}.{case.get('name')}")
+
+          expected = int(os.environ.get('EXPECTED_TESTS', '0'))
+          print(f'tests={total} failures={failures} errors={errors} skipped={skipped} expected={expected}')
+          if total != expected or failures or errors or skipped:
+              message = (f'unit-test contract violated: expected {expected} passing, got total={total} '
+                         f'failures={failures} errors={errors} skipped={skipped} '
+                         f'(xml files: {", ".join(os.path.basename(f) for f in files)})')
+              print('::error::' + message)
+              sys.exit(message)
+          print('UNIT TEST CONTRACT OK: %d/%d passing' % (total, expected))
+          print(f'::notice::unit tests {total}/{expected} passing, {len(files)} classes, '
+                f'failures={failures} errors={errors} skipped={skipped}')
+          EOF
+
+      - name: Android lint (advisory)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --console=plain :app:lintDebug 2>&1 | tee lint.log
+
+      - name: Assert the APKs are real, installable packages
+        run: |
+          set -euo pipefail
+          for BT in debug release; do
+            APK="$(ls app/build/outputs/apk/$BT/*.apk | head -1)"
+            test -s "$APK"
+            unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+            unzip -l "$APK" | grep -qE 'classes[0-9]*\.dex'
+            unzip -l "$APK" | grep -q 'resources.arsc'
+            echo "$BT APK: $APK"; ls -l "$APK"
+            sha256sum "$APK"
+          done
+          # The bundled offline rule sets must actually ship inside the release APK.
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          unzip -l "$APK" | grep -q 'assets/core_max_ads.txt'
+          unzip -l "$APK" | grep -q 'assets/core_max_threats.txt'
+          echo 'release APK contains the bundled rule sets'
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "$(ls app/build/outputs/apk/release/*.apk | head -1)" "dist/OmniShieldX-${VERSION_NAME}-release.apk"
+          cp ci-release.keystore dist/ci-release.keystore
+          ( cd dist && sha256sum ./*.apk > "OmniShieldX-${VERSION_NAME}-release.apk.sha256" )
+          cat "dist/OmniShieldX-${VERSION_NAME}-release.apk.sha256"
+          ls -l dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnishield-x-${{ env.VERSION_NAME }}-apks
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            dist/*.apk
+            dist/*.sha256
+            dist/ci-release.keystore
+          if-no-files-found: error
+
+      - name: Upload reports and logs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: certify-reports
+          path: |
+            build.log
+            test.log
+            lint.log
+            app/build/reports/**
+            app/build/test-results/**
+            /tmp/adshield_pro_build/app/reports/**
+            /tmp/adshield_pro_build/app/test-results/**
+          if-no-files-found: ignore
+
+      - name: Publish signed release
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<MD
+          # OmniShield X ${VERSION_NAME}
+
+          Certified build of the OmniShield X 4.x line (formerly TitanShield Max, originally AdShield Pro).
+          Every gate below passed for commit \`${GITHUB_SHA}\` before this release was published.
+
+          ## Fixes in this build
+          - **Self-updater pointed at the wrong repository.** The app and the site linked
+            \`hillman3948-cyber/AdShieldPro\`; both now use \`yawiyuson231-oss/AdShieldPro\`, so update
+            checks and release links resolve to this project's own releases.
+          - **Self-updater could download the debug APK.** Releases list \`app-debug.apk\` first; asset
+            selection now skips any debug/non-APK asset (regression-tested), and this release ships
+            only the release-signed APK.
+
+          ## What ships
+          - 367k+ offline ad/tracker/malware rules bundled in the APK (HaGeZi Multi Pro + TIF, Lite fallback)
+          - Security Center (URL, file, APK scanning), Game Turbo, Battery Intelligence, True Deep Clean
+          - DNS firewall engine, Bloom-filter fast path, Deep Ocean Blue Material 3 UI
+
+          ## Verified gates
+          - ${EXPECTED_TESTS} JVM unit tests, 0 failures / 0 errors / 0 skipped
+          - web engine test against the real 79k-rule assets, PC-agent self-test, Kotlin balance check
+          - debug APK, R8-minified + resource-shrunk release APK, both unpacked and inspected
+
+          ## Signature
+          Signed with the CI keystore attached below (\`ci-release.keystore\`, alias \`titan-shield\`,
+          store/key password \`titanshield30000\`). Keep it if you want future builds to upgrade-install
+          over this one; replace it with your own Play/release key before shipping to users.
+          MD
+
+          # Publish once: the release stays bound to the commit that certified it, so a
+          # later docs-only commit can never silently replace an already-verified APK.
+          # To ship new binaries, bump versionName in app/build.gradle.kts and RELEASE_TAG here.
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release $RELEASE_TAG already published; keeping the certified assets as they are."
+            gh release view "$RELEASE_TAG" --json tagName,publishedAt,assets \
+              --jq '"  " + .tagName + " published " + .publishedAt + " with " + ([.assets[].name]|join(", "))'
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "OmniShield X ${VERSION_NAME} — Certified Build" \
+            --notes-file notes.md \
+            --latest
+          echo "published: https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG"
+
+      - name: Surface Gradle errors as annotations
+        if: failure()
+        run: |
+          cat build.log test.log 2>/dev/null \
+            | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
+            | head -25 | while IFS= read -r line; do echo "::error::$line"; done || true

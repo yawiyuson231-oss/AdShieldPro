@@ -122,7 +122,7 @@ class SmartOptimizationWorker @AssistedInject constructor(
         }
 
         val notification = NotificationCompat.Builder(appContext, OPTIMIZER_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setSmallIcon(R.drawable.ic_shield_logo)
             .setContentTitle("AdShield Smart Optimizer")
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_LOW)

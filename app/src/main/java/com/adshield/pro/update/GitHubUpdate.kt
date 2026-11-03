@@ -53,7 +53,9 @@ object GitHubReleaseClient {
             var digest: String? = null
             for (i in 0 until assets.length()) {
                 val asset = assets.optJSONObject(i) ?: continue
-                if (asset.optString("name").endsWith(".apk", true)) {
+                // Only ever offer a release-signed APK: the debug build has a different
+                // applicationId suffix and signature, so it cannot update an installed app.
+                if (UpdateAssetSelection.isInstallableReleaseApk(asset.optString("name"))) {
                     apk = asset.optString("browser_download_url")
                     digest = asset.optString("digest").takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
                     break
@@ -98,8 +100,8 @@ class GitHubUpdateWorker @AssistedInject constructor(
             }
             val pending = PendingIntent.getActivity(applicationContext, release.code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             notifications.notify(ID, NotificationCompat.Builder(applicationContext, CHANNEL)
-                .setSmallIcon(R.drawable.ic_notification_shield)
-                .setContentTitle("AdShield Pro " + release.name + " is available")
+                .setSmallIcon(R.drawable.ic_shield_logo)
+                .setContentTitle("TitanShield Max " + release.name + " is available")
                 .setContentText("Tap to review the update and release notes.")
                 .setContentIntent(pending).setAutoCancel(true).build())
             prefs.edit().putInt("notified_code", release.code).apply()

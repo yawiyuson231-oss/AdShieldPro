@@ -1,0 +1,312 @@
+package com.adshield.pro
+
+import com.adshield.pro.engine.aether.AetherGodCore
+import com.adshield.pro.engine.aether.AetherVerdict
+import com.adshield.pro.engine.aether.DnsAnomalyAnalyzer
+import com.adshield.pro.engine.aether.LiveFeedMapper
+import com.adshield.pro.engine.aether.RuleDigitalTwin
+import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.domain.model.ProtectionMode
+import com.adshield.pro.engine.dns.ResolverHealthMonitor
+import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.zero.ZeroBreakageEngine
+import com.adshield.pro.domain.model.RuleCategory
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * OmniShield X — AETHER Infinity test suite (Parts 1, 4, 5, 6, 7).
+ * Every component is tested against real engine behavior — no mocks, no fakes.
+ */
+class AetherInfinityTest {
+
+    // --- DNS anomaly analysis (Parts 4/5/6) ---
+
+    @Test
+    fun dnsAnomaly_dgaDetection_highEntropyLabel() {
+        assertTrue(DnsAnomalyAnalyzer.looksDgaGenerated("xkqjvbmzpqowierutasl.example.net"))
+        // Ordinary words must NOT trip the detector
+        assertFalse(DnsAnomalyAnalyzer.looksDgaGenerated("www.google.com"))
+        assertFalse(DnsAnomalyAnalyzer.looksDgaGenerated("calendar-management-portal.example.org"))
+    }
+
+    @Test
+    fun dnsAnomaly_tunnelingStructure_detectedButNotPunished() {
+        // 8 labels
+        assertTrue(DnsAnomalyAnalyzer.looksTunnelingPattern("a.b.c.d.e.f.g.h.example.net"))
+        // oversized label
+        assertTrue(DnsAnomalyAnalyzer.looksTunnelingPattern("${"a".repeat(55)}.example.net"))
+        // ordinary CDN host with dashes/digits stays clean
+        assertFalse(DnsAnomalyAnalyzer.looksTunnelingPattern("r1---sn-ab5l6ne7.googlevideo.com"))
+    }
+
+    /** Builds a minimal DNS response with one A answer using name compression. */
+    private fun buildDnsResponse(domain: String, ip: ByteArray): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        fun u16(v: Int) { out.write((v shr 8) and 0xFF); out.write(v and 0xFF) }
+        u16(0x1234); u16(0x8180); u16(1); u16(1); u16(0); u16(0) // header
+        for (label in domain.split('.')) { out.write(label.length); out.write(label.toByteArray()); }
+        out.write(0)
+        u16(1); u16(1) // QTYPE=A, QCLASS=IN
+        out.write(0xC0); out.write(0x0C) // pointer to QNAME (12)
+        u16(1); u16(1); u16(0); u16(60); u16(4) // A, IN, TTL(32-bit), RDLENGTH
+        out.write(ip)
+        return out.toByteArray()
+    }
+
+    @Test
+    fun rebindingGuard_extractsIpsAndBlocksPrivateAnswersForPublicDomains() {
+        val response = buildDnsResponse("evil-example.com", byteArrayOf(10, 0, 0, 5))
+        val ips = DnsAnomalyAnalyzer.extractAnswerIps(response)
+        assertEquals(listOf("10.0.0.5"), ips)
+        assertTrue(DnsAnomalyAnalyzer.isRebindingAttempt("evil-example.com", ips))
+
+        // Loopback and IPv6 ULA also caught
+        val loopback = DnsAnomalyAnalyzer.extractAnswerIps(buildDnsResponse("evil2.net", byteArrayOf(127, 0, 0, 1)))
+        assertTrue(DnsAnomalyAnalyzer.isRebindingAttempt("evil2.net", loopback))
+
+        // Internal namespaces legitimately answer private — never flagged
+        assertFalse(DnsAnomalyAnalyzer.isRebindingAttempt("myrouter.local", listOf("192.168.1.1")))
+        // Public IPs are fine
+        val pub = DnsAnomalyAnalyzer.extractAnswerIps(buildDnsResponse("cloud.example.com", byteArrayOf(93, 184.toByte(), 216.toByte(), 34)))
+        assertFalse(DnsAnomalyAnalyzer.isRebindingAttempt("cloud.example.com", pub))
+        // Garbage bytes never crash
+        assertEquals(emptyList<String>(), DnsAnomalyAnalyzer.extractAnswerIps(byteArrayOf(1, 2, 3)))
+    }
+
+    // --- GodCore orchestration (Part 1) ---
+
+    private fun newCore(): AetherGodCore =
+        AetherGodCore(FilterRuleEngine(), ZeroBreakageEngine(), ResolverHealthMonitor())
+
+    @Test
+    fun godcore_blockedAdQuery_producesEvidenceAndCounters() {
+        val core = newCore()
+        val decision = core.observeDnsQuery("ads.doubleclick.net", true, "||doubleclick.net^", "ADS")
+        assertEquals(AetherVerdict.BLOCK_EVIDENCE, decision.finalVerdict)
+        assertTrue(decision.findings.isNotEmpty())
+        assertTrue(decision.findings.all { it.evidence.isNotEmpty() }) // every finding carries evidence
+
+        val report = core.controlCenterReport(0)
+        assertEquals(1L, report.dnsObserved)
+        assertEquals(1L, report.blockedConfirmed)
+        assertTrue(report.agentsOnline > 0)
+        assertTrue(report.recentAudit.first().contains("ads.doubleclick.net"))
+        // Agent health is real, not decorative
+        val health = core.agentHealthSnapshot()
+        assertTrue(health.any { it.evaluations > 0 && it.avgEvalMicros >= 0 })
+    }
+
+    @Test
+    fun godcore_protectedDomainBlock_verificationOverrides_and_flags() {
+        val core = newCore()
+        // Engine mistakenly blocks a protected streaming domain → X-Verification + X-Video flag it
+        val decision = core.observeDnsQuery("r2---sn-x.googlevideo.com", true, "||googlevideo.com^", "ADS")
+        assertEquals(AetherVerdict.OVERRIDE_SAFE, decision.finalVerdict)
+        val report = core.controlCenterReport(0)
+        assertEquals(1L, report.verificationOverrides)
+        assertEquals(1L, report.protectedOverrides)
+    }
+
+    @Test
+    fun godcore_predictiveAgent_observesButNeverBlocks() {
+        val core = newCore()
+        val decision = core.observeDnsQuery("xkqjvbmzpqowierutasl.suspicious.example", false, null, null)
+        assertEquals(AetherVerdict.OBSERVE, decision.finalVerdict)
+        // Crucially: nothing was blocked — observation mode only
+        assertFalse(decision.engineBlocked)
+        assertEquals(1L, core.controlCenterReport(0).anomaliesObserved)
+    }
+
+    @Test
+    fun godcore_rebinding_events_counted() {
+        val core = newCore()
+        core.recordRebindingBlocked("router-hijack.example", listOf("192.168.1.1"))
+        val report = core.controlCenterReport(0)
+        assertEquals(1L, report.rebindingBlocked)
+    }
+
+    // --- Digital Twin (Part 7) ---
+
+    @Test
+    fun digitalTwin_rejectsCandidateThatBreaksVideo_andAcceptsCleanCandidate() {
+        val engine = FilterRuleEngine()
+        val breaking = engine.parseFilterListContent(
+            "||googlevideo.com^\n||discord.gg^", RuleCategory.ADS, "Bad"
+        ).getOrThrow()
+        val badReport = RuleDigitalTwin.simulateCandidate(breaking.subdomainRules, breaking.exactRules, breaking.wildcardRules)
+        assertFalse("Twin must catch real playback-breaking candidates", badReport.passed)
+        assertTrue(badReport.conflicts.any { it.contains("discord.gg") })
+        // googlevideo is shielded at runtime — the twin still flags the overbroad rule
+        assertTrue(badReport.coveredByCriticalProtection.any { it.contains("googlevideo.com") })
+
+        val clean = engine.parseFilterListContent("||doubleclick.net^\n||adnxs.com^", RuleCategory.ADS, "Good").getOrThrow()
+        val goodReport = RuleDigitalTwin.simulateCandidate(clean.subdomainRules, clean.exactRules, clean.wildcardRules)
+        assertTrue(goodReport.passed)
+        assertEquals(0, goodReport.conflicts.size)
+    }
+
+    // --- Resolver health (Parts 4/8) ---
+
+    @Test
+    fun resolverHealth_ranksBySuccessThenLatency() {
+        val monitor = ResolverHealthMonitor()
+        repeat(5) { monitor.record("CLOUDFLARE", 20, true) }
+        repeat(5) { monitor.record("GOOGLE", 45, true) }
+        repeat(4) { monitor.record("QUAD9", 30, true) }
+        monitor.record("QUAD9", 30, false)
+
+        val best = monitor.bestMeasuredResolver("__none__")
+        assertNotNull(best)
+        assertEquals("CLOUDFLARE", best!!.key) // 100% success + fastest
+
+        val summary = monitor.summaryLine("QUAD9")
+        assertTrue(summary.contains("80% success"))
+    }
+
+    // --- Video ad signals (Part 3) ---
+
+    @Test
+    fun videoAdEndpoints_blockedByPatternFilter() {
+        val f = BrowserContentBlocker.Companion.UrlPatternFilter
+        assertNotNull(f.match("https://pubads.g.doubleclick.net/ima/ads?cust=1", "pubads.g.doubleclick.net", true, "xmlhttprequest"))
+        assertNotNull(f.match("https://media.vendor1.com/videoads/preroll.m3u8", "media.vendor1.com", true, "media"))
+        // Playback must never be touched
+        org.junit.Assert.assertNull(f.match("https://media.googlevideo.com/videoplayback?id=abc", "media.googlevideo.com", false, "media"))
+    }
+}
+
+// --- Live Monitor feed mapping (Part 12) + first-party video-ad beacons (Part 3) ---
+
+/**
+ * JUnit requires test methods inside a class — top-level @Test functions
+ * are not discovered (initializationError), so these live here.
+ */
+class LiveFeedAndVideoBeaconTest {
+
+    @org.junit.Test
+    fun liveFeed_lanesAndTags_classifyRealHosts() {
+    val m = com.adshield.pro.engine.aether.LiveFeedMapper
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.VIDEO, m.laneFor("rr3---sn-npoe7ney.googlevideo.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.GAME, m.laneFor("ylgdmirp.yleaflyrn.aena.ms"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.SOCIAL, m.laneFor("web.whatsapp.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.SYSTEM, m.laneFor("connectivitycheck.gstatic.com"))
+    org.junit.Assert.assertEquals(LiveFeedMapper.Lane.WEB, m.laneFor("my-blog.example.org"))
+
+    org.junit.Assert.assertEquals(m.TAG_AD, m.tagFor(com.adshield.pro.domain.model.RuleCategory.ADS))
+    org.junit.Assert.assertEquals(m.TAG_MALICIOUS, m.tagFor(com.adshield.pro.domain.model.RuleCategory.MALWARE))
+    org.junit.Assert.assertEquals(m.TAG_NOT_LISTED, m.tagFor(null))
+}
+
+    @org.junit.Test
+    fun privateDnsGuard_strictModeDetectedAsBypass_offAndAutoPass() {
+        val g = com.adshield.pro.engine.aether.PrivateDnsGuard
+        val strict = g.parse("hostname", "dns.adguard.com")
+        org.junit.Assert.assertTrue(strict.bypassesLocalVpn)
+        org.junit.Assert.assertTrue(strict.userGuidance!!.contains("dns.adguard.com"))
+        org.junit.Assert.assertTrue(strict.userGuidance!!.contains("Private DNS"))
+
+        val strictNoHost = g.parse("hostname", null)
+        org.junit.Assert.assertTrue(strictNoHost.bypassesLocalVpn)
+
+        val off = g.parse("off", null)
+        org.junit.Assert.assertFalse(off.bypassesLocalVpn)
+        org.junit.Assert.assertNull(off.userGuidance)
+
+        val auto = g.parse("opportunistic", null)
+        org.junit.Assert.assertFalse(auto.bypassesLocalVpn)
+
+        val nulled = g.parse(null, null)
+        org.junit.Assert.assertFalse(nulled.bypassesLocalVpn)
+    }
+
+    @org.junit.Test
+    fun publicResolverRoutes_areValidLiteralIps() {
+        val regex = Regex("""^([0-9]{1,3}\.){3}[0-9]{1,3}$|^[0-9a-f:]+$""")
+        for ((ip, _) in com.adshield.pro.service.AdShieldVpnService.KNOWN_PUBLIC_RESOLVER_ROUTES) {
+            org.junit.Assert.assertTrue("Invalid route literal: $ip", regex.matches(ip))
+            org.junit.Assert.assertFalse(ip.endsWith("."))
+        }
+        org.junit.Assert.assertTrue(com.adshield.pro.service.AdShieldVpnService.KNOWN_PUBLIC_RESOLVER_ROUTES.containsKey("8.8.8.8"))
+    }
+
+    @org.junit.Test
+    fun videoAdBeacons_blockedEvenFirstParty_playbackNeverTouched() {
+    val f = BrowserContentBlocker.Companion.UrlPatternFilter
+    // Ad-only telemetry beacons on YouTube itself (first-party) — blocked
+    org.junit.Assert.assertNotNull(
+        f.match("https://www.youtube.com/api/stats/ads?event=adview", "www.youtube.com", false, "image")
+    )
+    org.junit.Assert.assertNotNull(
+        f.match("https://www.youtube.com/ptracking?pltype=adhost", "www.youtube.com", false, "xmlhttprequest")
+    )
+    // The watch page and playback MUST pass untouched
+    org.junit.Assert.assertNull(
+        f.match("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "www.youtube.com", false, "document")
+    )
+    org.junit.Assert.assertNull(
+        f.match("https://r1---sn-x.googlevideo.com/videoplayback?id=abc", "r1---sn-x.googlevideo.com", false, "media")
+    )
+}
+}
+
+/**
+ * Encrypted-DNS Bypass Shield (v4.4.0): DoH bootstrap sinkholing semantics.
+ */
+class EncryptedDnsBypassShieldTest {
+
+    @org.junit.Test
+    fun bootstrapHosts_blockedAsCustomCategory_whenInjected() {
+        val engine = FilterRuleEngine()
+        val shield = com.adshield.pro.engine.filter.EncryptedDnsBypassShield
+        val subs = HashMap<String, FilterRuleEngine.FilterListEntry>()
+        for (host in shield.BOOTSTRAP_HOSTS) {
+            subs[host] = FilterRuleEngine.FilterListEntry(
+                com.adshield.pro.domain.model.RuleCategory.CUSTOM,
+                shield.SOURCE_NAME,
+                com.adshield.pro.domain.model.RuleMatchType.SUBDOMAIN
+            )
+        }
+        engine.updateFilterListRules(subs, emptyMap(), emptyList())
+        engine.updateProtectionMode(ProtectionMode.STANDARD)
+
+        // CUSTOM category is active in EVERY protection mode — verify two modes
+        for (mode in listOf(ProtectionMode.STANDARD, ProtectionMode.STRICT)) {
+            engine.updateProtectionMode(mode)
+            for (host in shield.BOOTSTRAP_HOSTS) {
+                val verdict = engine.evaluate(host)
+                org.junit.Assert.assertTrue("$host must be blocked in $mode", verdict.isBlocked)
+                org.junit.Assert.assertEquals(shield.SOURCE_NAME, verdict.sourceName)
+            }
+        }
+        // Normal traffic unaffected
+        org.junit.Assert.assertFalse(engine.evaluate("www.youtube.com").isBlocked)
+    }
+
+    @org.junit.Test
+    fun ownProviderHostname_extracted_andExcludedFromList() {
+        val shield = com.adshield.pro.engine.filter.EncryptedDnsBypassShield
+        val cfg = com.adshield.pro.domain.model.DnsResolverConfig() // Cloudflare default
+        assertEquals("cloudflare-dns.com", shield.ownProviderHostname(cfg))
+        val custom = com.adshield.pro.domain.model.DnsResolverConfig(
+            preset = com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM,
+            customDohUrl = "https://my.own.doh.example.net/dns-query"
+        )
+        assertEquals("my.own.doh.example.net", shield.ownProviderHostname(custom))
+        // Merge-time rule: own host is never in the sink set to apply
+        val own = shield.ownProviderHostname(cfg)!!
+        val toSink = shield.BOOTSTRAP_HOSTS.filter { it != own }
+        org.junit.Assert.assertTrue(toSink.size == shield.BOOTSTRAP_HOSTS.size - 1)
+        org.junit.Assert.assertFalse(toSink.contains(own))
+    }
+
+    @org.junit.Test
+    fun bootstrapHosts_areValidNormalizedDomains() {
+        for (host in com.adshield.pro.engine.filter.EncryptedDnsBypassShield.BOOTSTRAP_HOSTS) {
+            assertEquals(host, com.adshield.pro.engine.filter.FilterRuleEngine.normalizeDomain(host))
+        }
+    }
+}

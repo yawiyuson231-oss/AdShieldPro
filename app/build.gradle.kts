@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
-    // AGP 9 compiles Kotlin itself; org.jetbrains.kotlin.android must not be applied.
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -9,7 +9,7 @@ plugins {
 
 val githubUpdateRepository = providers.gradleProperty("githubUpdateRepository")
     .orElse(providers.environmentVariable("GITHUB_UPDATE_REPOSITORY"))
-    .orElse("hillman3948-cyber/AdShieldPro")
+    .orElse("yawiyuson231-oss/AdShieldPro")
     .get()
 val escapedGithubUpdateRepository = githubUpdateRepository.replace("\\", "\\\\").replace("\"", "\\\"")
 val releaseKeystorePath = providers.gradleProperty("adshieldKeystorePath")
@@ -24,45 +24,48 @@ val releaseKeyAlias = providers.gradleProperty("adshieldKeyAlias")
 val releaseKeyPassword = providers.gradleProperty("adshieldKeyPassword")
     .orElse(providers.environmentVariable("ADSHIELD_KEY_PASSWORD"))
     .orNull
-// On Windows, keep intermediate build artifacts outside OneDrive to prevent OneDrive
-// cloud-filter file locking (AccessDeniedException on R.jar), and mirror the outputs
-// (APKs, AABs, test reports) back into $projectDir/build/...
-// Everywhere else (Linux, macOS, CI) the standard Gradle build directory is used.
-val oneDriveSafeBuildDir = System.getenv("LOCALAPPDATA")
-    ?.takeIf { it.isNotBlank() }
-    ?.let { localAppData -> file("$localAppData/adshield_pro_build/app") }
-if (oneDriveSafeBuildDir != null) {
-    layout.buildDirectory.set(oneDriveSafeBuildDir)
-    tasks.matching {
-        it.name.startsWith("assemble") || it.name.startsWith("bundle") || it.name.startsWith("test")
-    }.configureEach {
-        doLast {
-            val outputs = oneDriveSafeBuildDir.resolve("outputs")
-            if (outputs.exists()) {
-                outputs.copyRecursively(File(projectDir, "build/outputs"), overwrite = true)
-            }
-            val reports = oneDriveSafeBuildDir.resolve("reports")
-            if (reports.exists()) {
-                reports.copyRecursively(File(projectDir, "build/reports"), overwrite = true)
-            }
+// Keep intermediate build artifacts outside OneDrive to prevent Windows OneDrive cloud-filter
+// file locking (AccessDeniedException on R.jar during javac), and automatically mirror outputs
+// (APKs, AABs, and test reports) into $projectDir/build/outputs.
+val externalBuildRoot = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
+val externalBuildDir = file("$externalBuildRoot/adshield_pro_build/app")
+layout.buildDirectory.set(externalBuildDir)
+
+tasks.matching {
+    it.name.startsWith("assemble") || it.name.startsWith("bundle") || it.name.startsWith("test")
+}.configureEach {
+    doLast {
+        val srcOutputs = File(externalBuildDir, "outputs")
+        if (srcOutputs.exists()) {
+            val dstOutputs = File(projectDir, "build/outputs")
+            srcOutputs.copyRecursively(dstOutputs, overwrite = true)
+        }
+        val srcReports = File(externalBuildDir, "reports")
+        if (srcReports.exists()) {
+            val dstReports = File(projectDir, "build/reports")
+            srcReports.copyRecursively(dstReports, overwrite = true)
+        }
+        // JUnit XML lives in the external build directory too; mirror it so CI and
+        // local runs always find the results under app/build/test-results (the same
+        // layout a normal Gradle project has).
+        val srcTestResults = File(externalBuildDir, "test-results")
+        if (srcTestResults.exists()) {
+            val dstTestResults = File(projectDir, "build/test-results")
+            srcTestResults.copyRecursively(dstTestResults, overwrite = true)
         }
     }
 }
 
 android {
     namespace = "com.adshield.pro"
-    // compileSdk 37 is required by core-ktx 1.19, Compose 1.12 and hilt-navigation-compose 1.4.
-    // targetSdk deliberately stays at 36: the app is not exercised on an Android 17 device
-    // here, so opt-in runtime behaviour changes are not taken blind. Raise it once the app
-    // has been smoke-tested on API 37 (see docs/UPGRADE.md).
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.adshield.pro"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20206
-        versionName = "2.3.0"
+        versionCode = 40701
+        versionName = "4.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -112,6 +115,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -125,20 +132,14 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
-        // Print every JVM test case in CI logs instead of a bare "BUILD SUCCESSFUL".
-        unitTests.all { test ->
-            test.testLogging {
-                events("passed", "failed", "skipped")
-            }
-        }
     }
 }
 
-// AGP 9 built-in Kotlin: `android.kotlinOptions {}` is gone, compiler options are configured
-// on the `kotlin` extension registered by AGP (see developer.android.com/build/migrate-to-built-in-kotlin).
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events = setOf(org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED)
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showCauses = true
     }
 }
 

@@ -2,6 +2,7 @@ package com.adshield.pro.engine.filter
 
 import com.adshield.pro.domain.model.CustomRule
 import com.adshield.pro.domain.model.FilterEvaluationResult
+import com.adshield.pro.engine.compat.ProtectedDomainCatalog
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
@@ -47,7 +48,14 @@ class FilterRuleEngine @Inject constructor() {
         val builtInAllowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST,
         val filterListSubdomains: Map<String, FilterListEntry> = emptyMap(),
         val filterListExact: Map<String, FilterListEntry> = emptyMap(),
-        val filterListWildcards: List<WildcardEntry> = emptyList()
+        val filterListWildcards: List<WildcardEntry> = emptyList(),
+        /**
+         * O(1) negative fast-path over every blocking key. Null when disabled (oversized lists).
+         * If no suffix of the queried domain is possibly present, the lookup short-circuits to
+         * ALLOWED without touching the hash maps — the hot path for clean traffic.
+         */
+        val blockedKeysBloom: BloomFilter? = null,
+        val hasAnyWildcardRules: Boolean = false
     ) {
         val totalLoadedRules: Int
             get() = customAllowExact.size +
@@ -62,6 +70,22 @@ class FilterRuleEngine @Inject constructor() {
     }
 
     private val snapshotRef = AtomicReference(FilterSnapshot())
+
+    // --- Zero-Breakage Shadow Mode (Module 3/7) ---
+    // When enabled, FILTER-LIST blocks (priority <= 50) are recorded and converted to
+    // allows; user custom rules (priority >= 90) always apply for real. Nothing is ever
+    // silently blocked by AI/shadow logic — shadow only RELAXES and REPORTS.
+    @Volatile
+    private var shadowModeEnabled: Boolean = false
+
+    @Volatile
+    var shadowDecisionListener: ((String, FilterEvaluationResult) -> Unit)? = null
+
+    fun setShadowModeEnabled(enabled: Boolean) {
+        shadowModeEnabled = enabled
+    }
+
+    fun isShadowModeEnabled(): Boolean = shadowModeEnabled
 
     fun getCurrentSnapshot(): FilterSnapshot = snapshotRef.get()
 
@@ -121,7 +145,14 @@ class FilterRuleEngine @Inject constructor() {
                 customAllowSubdomain = allowSubdomain,
                 customBlockExact = blockExact,
                 customBlockSubdomain = blockSubdomain,
-                customWildcards = wildcards
+                customWildcards = wildcards,
+                blockedKeysBloom = buildBlockedKeysBloom(
+                    blockExact.keys.asSequence() +
+                        blockSubdomain.keys.asSequence() +
+                        current.filterListSubdomains.keys.asSequence() +
+                        current.filterListExact.keys.asSequence()
+                ),
+                hasAnyWildcardRules = wildcards.isNotEmpty() || current.filterListWildcards.isNotEmpty()
             )
         }
     }
@@ -136,14 +167,20 @@ class FilterRuleEngine @Inject constructor() {
         allowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST
     ): FilterSnapshot {
         val previous = snapshotRef.get()
-        snapshotRef.set(
-            previous.copy(
-                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
-                filterListSubdomains = subdomainRules,
-                filterListExact = exactRules,
-                filterListWildcards = wildcardRules
-            )
+        val updated = previous.copy(
+            builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
+            filterListSubdomains = subdomainRules,
+            filterListExact = exactRules,
+            filterListWildcards = wildcardRules,
+            blockedKeysBloom = buildBlockedKeysBloom(
+                previous.customBlockExact.keys.asSequence() +
+                    previous.customBlockSubdomain.keys.asSequence() +
+                    subdomainRules.keys.asSequence() +
+                    exactRules.keys.asSequence()
+            ),
+            hasAnyWildcardRules = previous.customWildcards.isNotEmpty() || wildcardRules.isNotEmpty()
         )
+        snapshotRef.set(updated)
         return previous
     }
 
@@ -158,7 +195,7 @@ class FilterRuleEngine @Inject constructor() {
      * 3. Built-in Safety Allowlist (Priority 80)
      * 4. Active Filter Lists filtered by current ProtectionMode categories (Priority 50)
      */
-    fun evaluate(rawDomain: String): FilterEvaluationResult {
+    private fun evaluateInternal(rawDomain: String): FilterEvaluationResult {
         val startNs = System.nanoTime()
         val domain = normalizeDomain(rawDomain)
         if (domain.isEmpty()) {
@@ -176,6 +213,23 @@ class FilterRuleEngine @Inject constructor() {
 
         val snap = snapshotRef.get()
         val suffixes = extractDomainSuffixes(domain)
+
+        // 0. Bloom-filter fast path: when no wildcard rules exist and no suffix of this domain
+        //    is possibly present in any blocklist key set, the domain is definitely allowed.
+        //    This is the hot path for clean traffic — one hash probe per suffix, zero map walks.
+        val bloom = snap.blockedKeysBloom
+        if (bloom != null && !snap.hasAnyWildcardRules) {
+            var possiblyBlocked = false
+            for (suffix in suffixes) {
+                if (bloom.mightContain(suffix)) {
+                    possiblyBlocked = true
+                    break
+                }
+            }
+            if (!possiblyBlocked) {
+                return buildResult(domain, false, null, null, null, "Allowed (Bloom Fast-Path)", 0, startNs)
+            }
+        }
 
         // 1. User Custom Allow (Exact)
         snap.customAllowExact[domain]?.let { rule ->
@@ -206,6 +260,16 @@ class FilterRuleEngine @Inject constructor() {
         for (suffix in suffixes) {
             snap.customBlockSubdomain[suffix]?.let { rule ->
                 return buildResult(domain, true, rule.rawPattern, rule.category, RuleMatchType.SUBDOMAIN, "User Blocklist", rule.priority, startNs)
+            }
+        }
+
+        // 5.5 Critical Content & Auth Protection (Modules 4/5): shared video/streaming CDNs,
+        //     authentication, payments, app stores, game servers and messaging are NEVER
+        //     blocked by filter lists in any mode. Explicit user custom rules above win.
+        for (suffix in suffixes) {
+            val label = ProtectedDomainCatalog.protectionLabelFor(suffix)
+            if (label != null) {
+                return buildResult(domain, false, "@@||$suffix^", null, RuleMatchType.SUBDOMAIN, label, 85, startNs)
             }
         }
 
@@ -241,6 +305,24 @@ class FilterRuleEngine @Inject constructor() {
         }
 
         return buildResult(domain, false, null, null, null, "Allowed", 0, startNs)
+    }
+
+    fun evaluate(rawDomain: String): FilterEvaluationResult {
+        val result = evaluateInternal(rawDomain)
+        if (shadowModeEnabled && result.isBlocked && result.priority <= 50) {
+            shadowDecisionListener?.invoke(rawDomain, result)
+            return FilterEvaluationResult(
+                domain = result.domain,
+                isBlocked = false,
+                matchedRule = result.matchedRule,
+                matchedCategory = result.matchedCategory,
+                matchType = result.matchType,
+                sourceName = "Shadow Mode (would block by ${result.sourceName})",
+                priority = result.priority,
+                evaluationTimeMicros = result.evaluationTimeMicros
+            )
+        }
+        return result
     }
 
     private fun buildResult(
@@ -603,6 +685,27 @@ class FilterRuleEngine @Inject constructor() {
         private val WHITESPACE_REGEX = Regex("\\s+")
         private val IPV4_LITERAL_REGEX = Regex("^(\\d{1,3}\\.){3}\\d{1,3}$")
         private val DOMAIN_LABEL_REGEX = Regex("^[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?$")
+
+        /** Memory guard: beyond this key count the bloom fast-path is disabled. */
+        private const val BLOOM_MAX_KEYS = 3_000_000
+
+        fun buildBlockedKeysBloom(keys: Sequence<String>): BloomFilter? {
+            return runCatching {
+                val buffer = ArrayList<String>(1 shl 16)
+                for (key in keys) {
+                    if (key.isEmpty()) continue
+                    buffer.add(key)
+                    if (buffer.size > BLOOM_MAX_KEYS) return null
+                }
+                if (buffer.isEmpty()) {
+                    null
+                } else {
+                    val bloom = BloomFilter(buffer.size.coerceAtLeast(1024), 0.001)
+                    for (key in buffer) bloom.add(key)
+                    bloom
+                }
+            }.getOrNull()
+        }
 
         private val IGNORED_LOCALHOSTS = setOf(
             "localhost",

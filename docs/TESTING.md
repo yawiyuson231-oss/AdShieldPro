@@ -1,87 +1,71 @@
-# Build & Test Guide
+# Test & certification guide
 
-This document describes how AdShield Pro is built and how its automated tests are run.
+Everything in this project that can be verified without a physical device is verified
+automatically by `.github/workflows/certify-release.yml`. That pipeline is the single gate:
+if it is green, the release is published; if it is red, nothing ships.
 
-## Requirements
+## What runs, and where
 
-| Tool | Version used by the project |
+| Layer | Command | Runs locally? | Runs in CI? |
+| --- | --- | --- | --- |
+| Kotlin / JVM unit tests (84 cases) | `./gradlew :app:testDebugUnitTest` | needs JDK 17 + Android SDK | yes |
+| Web engine ladder vs. the real 79k-rule assets | `node website/engine.test.mjs` | yes | yes |
+| PC agent DNS ladder / packet builders | `python3 pc-agent/omnishield_proxy.py --selftest` | yes | yes |
+| Kotlin source balance check | `python3 tools/check_kotlin_syntax.py app/src` | yes | yes |
+| JS syntax of the site + extension | `node --check <file>` | yes | yes |
+| JSON validity (extension manifest, rule packs) | `python3 -c "import json; json.load(open(f))"` | yes | yes |
+
+## The Kotlin suite
+
+`app/src/test/java/com/adshield/pro/` holds 9 source files that compile into 11 test
+classes — **84 test cases**, asserted by exact count in CI (not just "zero failures"),
+so a suite that silently stops running fails the build.
+
+| Suite | Covers |
 | --- | --- |
-| JDK | 17 or newer (build tested with JDK 21 toolchain config) |
-| Android SDK Platform | 37 (`compileSdk = 37`, `targetSdk = 36`) |
-| Android build-tools | installed automatically by AGP 9.4.1 |
-| Gradle | 9.7.1 via the committed wrapper (`./gradlew`) |
-| Android Gradle plugin | 9.4.1 (built-in Kotlin, no `kotlin-android` plugin) |
-| Kotlin / KSP | 2.4.21 / 2.3.13 |
+| `AdShieldEngineTestSuite` | DNS wire format, sinkhole synthesis, UDP/TCP framing, filter precedence, blocklist parsing safety |
+| `TitanShieldMaxEngineTestSuite` | 3.0 engines: Bloom filter, Game Turbo, battery analytics, deep clean, security scanners |
+| `AetherInfinityTest` / `AetherThreatModelTest` / `AetherAgentUpgradeTest` | AETHER agent: threat scoring weights, DGA/lookalike/age fusion, self-audit false-positive radar, explainer text |
+| `DnsFirewallCompatibilityTest` | resolver compatibility, protected-domain catalog, leak guard |
+| `InAppAdDefenseTest` | in-app ad-skip decision engine and notification classifier |
+| `PlatformSpecAcceptanceTest` | the "must-work" domain list and protection-mode acceptance |
+| `UpdateAssetSelectionTest` | the self-updater never picks a debug or non-APK release asset |
 
-Set `ANDROID_HOME` (or add an `sdk.dir` line to `local.properties`) before building.
+Android-framework behaviour (`VpnService` tunnel, WebView, notifications, WorkManager,
+Room migrations on a real upgrade path) still needs an on-device smoke test — see the
+manual checklist in the release guide.
 
-## Build
+## Release certification
 
-```bash
-./gradlew :app:assembleDebug          # installable debug APK
-./gradlew :app:assembleRelease        # signed release APK (needs the keystore env vars below)
-./gradlew :app:bundleRelease          # Play Store AAB
-```
+CI builds both APKs, unpacks each one and checks it actually contains `AndroidManifest.xml`,
+a `classes*.dex` and `resources.arsc`, and that the release APK ships the bundled rule sets
+(`assets/core_max_ads.txt`, `assets/core_max_threats.txt`). Only then is the signed release
+published, once per version:
 
-Release signing is configured through environment variables or Gradle properties
-(see `docs/BUILD_AND_SIGNING_GUIDE.md`):
+- tag `vX.Y.Z`, title `OmniShield X X.Y.Z — Certified Build`
+- assets: `OmniShieldX-X.Y.Z-release.apk`, its `.sha256`, and `ci-release.keystore`
+- publishing is **publish-once** — an existing tag is never overwritten, so a later
+  docs-only commit cannot replace an already-certified APK. Bump `versionName` in
+  `app/build.gradle.kts` and `RELEASE_TAG` in the workflow to ship new binaries.
 
-```bash
-export ADSHIELD_KEYSTORE_PATH=/path/to/release.jks
-export ADSHIELD_KEYSTORE_PASSWORD=…
-export ADSHIELD_KEY_ALIAS=…
-export ADSHIELD_KEY_PASSWORD=…
-```
+The CI keystore is generated per build (`alias titan-shield`, store password
+`titanshield30000`) and is attached to the release so later builds can upgrade-install over
+an earlier one. Replace it with a real release key (via repository secrets) before
+distributing to users.
 
-## Continuous integration
+## In-app updates
 
-`.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
-requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
+`GitHubReleaseClient` reads `BuildConfig.GITHUB_UPDATE_REPOSITORY`
+(default `yawiyuson231-oss/AdShieldPro`, overridable with `-PgithubUpdateRepository` or the
+`GITHUB_UPDATE_REPOSITORY` env var) and only accepts an asset that
+`UpdateAssetSelection.isInstallableReleaseApk` approves: an `.apk` whose name does not
+contain `debug`, from `https://github.com/**/releases/download/**`.
 
-1. `:app:compileDebugKotlin` — fails fast on toolchain problems
-2. `:app:assembleDebug` — APK packaging
-3. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore)
-4. `:app:testDebugUnitTest` — then asserts that exactly 18 tests executed and passed
-5. `:app:lintDebug` — hard gate, the build fails on any lint error
+## Running the JVM suite when the build directory is redirected
 
-The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
-
-## Unit tests
-
-```bash
-./gradlew :app:testDebugUnitTest          # runs app/src/test/**
-./gradlew :app:testDebugUnitTest --tests 'com.adshield.pro.AdShieldEngineTestSuite'
-```
-
-HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
-
-`AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
-device-independent engine code directly, which is where all DNS, filtering and scoring
-logic lives:
-
-| Area | Covered behaviour |
-| --- | --- |
-| `DnsPacketCodec` | RFC 1035 parsing of A/AAAA questions, compression pointers, malformed/cyclic packets, NXDOMAIN and `0.0.0.0`/`::` sinkhole synthesis, SERVFAIL synthesis, transaction-ID rewriting, TTL extraction |
-| UDP delivery limits | `fitResponseToUdpLimit` preserves ID/RCODE/question and sets TC=1 when an upstream answer cannot fit a single tunnel datagram; `udpPayloadCapacity` per IP version |
-| `IpPacketFraming` | IPv4/IPv6 UDP and TCP parsing, IPv4 header options, TCP options, fragmentation rejection, RFC 1071 / RFC 8200 checksums (verified to recompute to zero), and segmentation of large TCP DNS answers so no packet exceeds the tunnel MTU |
-| `UpstreamDnsResolver` | Upstream answers are only accepted when they are responses carrying the query's transaction ID; only NOERROR/NXDOMAIN answers are cacheable; cache keys are scoped to the active resolver endpoint; IPv6 fallback server list |
-| `FilterRuleEngine` | Protection-mode category gating, custom allow/block precedence, wildcards, hosts/Adblock list parsing, duplicate counting, HTML/binary rejection, conflict analysis, snapshot rollback, concurrent evaluation |
-| `BrowserContentBlocker` | Tracking-parameter stripping, request blocking, site allowlists, cosmetic script generation, DNS-label-boundary third-party detection |
-| `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
-
-Instrumentation (`androidTest`) and manual on-device checks are still required for anything
-that touches Android framework services — `VpnService` tunnel establishment, the WebView
-browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
-Those cannot be exercised by JVM unit tests.
-
-## Manual smoke test (device / emulator, API 29+)
-
-1. Install the debug APK, open the app, tap the shield and accept the VPN consent dialog.
-2. Open a browser and load a page; verify `Blocked` counters increase on the Home screen.
-3. Open **Statistics** and confirm queries appear in real time (requires detailed logging).
-4. Add a custom block rule (`||example.com^`) in **Ad Blocker → Rules** and confirm the domain
-   is blocked immediately without restarting protection.
-5. Switch protection modes and confirm blocking changes take effect without a tunnel restart.
-6. Reboot the device with protection enabled to verify the boot receiver restores the tunnel.
-7. If the release build is used, confirm R8 did not strip Room/serialization metadata by
-   opening **Statistics** and **Optimizer** (both read from Room/DataStore).
+`app/build.gradle.kts` moves `layout.buildDirectory` to
+`$TMPDIR/adshield_pro_build/app` (a OneDrive file-locking workaround) and mirrors
+`outputs`, `reports` and `test-results` back into `app/build/`. On CI `TMPDIR` is not
+`/tmp`, which is why the certification step discovers JUnit XML by searching
+`app/build/test-results`, `$TMPDIR`, `$RUNNER_TEMP`, `/tmp` and `$HOME` rather than
+hard-coding a path.

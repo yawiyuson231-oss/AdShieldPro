@@ -1,16 +1,16 @@
-# AdShield Pro v2.3 — APK & Signed AAB Release Build Instructions
+# TitanShield Max v2.1 — APK & Signed AAB Release Build Instructions
 
 ## 1. Environment Prerequisites
 
-- **JDK:** Java 17 or Java 21 (AGP 9.4 requires JDK 17+)
-- **Android SDK:** API 37 (`compileSdk = 37`, `targetSdk = 36`, `minSdk = 29`); install with `sdkmanager "platforms;android-37"` if missing.
-- **Gradle:** Gradle 9.7.1 Wrapper (`.\gradlew.bat`), AGP 9.4.1, Kotlin 2.4.21
+- **JDK:** Java 17 or Java 21
+- **Android SDK:** API 36 (`compileSdk = 36`, `targetSdk = 36`, `minSdk = 29`); install with `sdkmanager "platforms;android-36"` if missing.
+- **Gradle:** Gradle 8.11.1 Wrapper (`.\gradlew.bat`)
 
 ---
 
 ## 2. Building Debug & Release APKs (Deliverable 15)
 
-Run from the repository root (where `gradlew.bat` and `settings.gradle.kts` live):
+Run from `C:\Users\hillm\OneDrive\Desktop\PROJECT`:
 
 ### Build Debug APK
 ```powershell
@@ -32,7 +32,7 @@ Run from the repository root (where `gradlew.bat` and `settings.gradle.kts` live
 
 ### Step 1: Use the Existing Production Signing Keystore
 
-For an update to an already installed AdShield Pro app, use the original production keystore and credentials. Do not generate a replacement key: Android will reject the update if it is signed with a different key. If this is the first ever release, create and securely back up a keystore before publishing.
+For an update to an already installed TitanShield Max app, use the original production keystore and credentials. Do not generate a replacement key: Android will reject the update if it is signed with a different key. If this is the first ever release, create and securely back up a keystore before publishing.
 
 ### Step 2: Set Signing Environment Variables and Build `.aab`
 `app/build.gradle.kts` reads release credentials from environment variables or Gradle user properties (never hardcoded in source control). On Windows, you can keep them in `%USERPROFILE%\.gradle\gradle.properties`, outside this project:
