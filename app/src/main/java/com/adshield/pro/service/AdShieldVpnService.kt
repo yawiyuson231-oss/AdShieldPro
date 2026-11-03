@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
@@ -58,10 +59,15 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var zeroBreakageEngine: com.adshield.pro.engine.zero.ZeroBreakageEngine
+    @Inject lateinit var aetherCore: com.adshield.pro.engine.aether.AetherGodCore
+    @Inject lateinit var resolverHealthMonitor: com.adshield.pro.engine.dns.ResolverHealthMonitor
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
     private var tunnelJob: Job? = null
+    private var autoResumeJob: kotlinx.coroutines.Job? = null
+    private var resolverTunerJob: kotlinx.coroutines.Job? = null
     private val tunWriteLock = Any()
     private data class AppAttribution(val packageName: String, val label: String)
     private val appAttributionByUid = ConcurrentHashMap<Int, AppAttribution>()
@@ -94,12 +100,17 @@ class AdShieldVpnService : VpnService() {
             }
             ACTION_PAUSE_VPN -> {
                 isPaused = true
+                WifiLowLatencyManager.release()
                 repository.updateVpnStatus(VpnStatus.PAUSED)
                 updateForegroundNotification()
+                schedulePauseAutoResume(intent.getIntExtra(EXTRA_PAUSE_MINUTES, 0))
                 return START_STICKY
             }
             ACTION_RESUME_VPN -> {
+                autoResumeJob?.cancel()
+                autoResumeJob = null
                 isPaused = false
+                WifiLowLatencyManager.acquire(this@AdShieldVpnService)
                 if (vpnInterface != null && tunnelJob?.isActive == true) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED)
                     updateForegroundNotification()
@@ -130,11 +141,14 @@ class AdShieldVpnService : VpnService() {
         repository.updateVpnStatus(VpnStatus.STARTING)
 
         tunnelJob = serviceScope.launch {
+            startResolverAutoTuner()
             try {
                 val settings = preferencesRepository.getSettingsSnapshot()
                 preferencesRepository.setVpnShouldRemainActive(true)
                 filterRuleEngine.updateProtectionMode(settings.protectionMode)
                 repository.syncRuntimeModeAndResolver(settings.protectionMode, settings)
+                filterRuleEngine.setShadowModeEnabled(settings.shadowModeEnabled)
+                startZeroBreakageWatchdog(settings.resolverConfig)
 
                 val builder = Builder()
                     .setSession(getString(R.string.vpn_session_name))
@@ -145,13 +159,34 @@ class AdShieldVpnService : VpnService() {
                     .addRoute(VIRTUAL_IPV4_DNS, 32)
                     .addDnsServer(VIRTUAL_IPV4_DNS)
 
-                if (settings.resolverConfig.enableIpv6) {
-                    builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
-                    builder.addRoute(VIRTUAL_IPV6_DNS, 128)
-                    builder.addDnsServer(VIRTUAL_IPV6_DNS)
+                // ALWAYS capture IPv6 DNS as well — leaving it out lets IPv6 DNS leak
+                // around the filter on dual-stack networks (the #1 silent bypass).
+                builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
+                builder.addRoute(VIRTUAL_IPV6_DNS, 128)
+                builder.addDnsServer(VIRTUAL_IPV6_DNS)
+
+                // BYPASS CAPTURE: apps that ignore the system resolver (hardcoded DNS)
+                // query the network's DNS servers or known public resolvers directly.
+                // Those IPs are NOT routed by the /32 virtual-DNS route, so their DNS
+                // never reached the filter. Add explicit /32 + /128 routes for them so
+                // ALL plaintext DNS is filtered.
+                val bypassDnsIps = LinkedHashSet<String>()
+                runCatching {
+                    val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    val link = cm?.activeNetwork?.let { cm.getLinkProperties(it) }
+                    for (server in link?.dnsServers.orEmpty()) {
+                        server.hostAddress?.takeIf { it.isNotBlank() }?.let { bypassDnsIps.add(it) }
+                    }
+                }
+                bypassDnsIps.addAll(KNOWN_PUBLIC_RESOLVER_ROUTES.keys)
+
+                for (ip in bypassDnsIps) {
+                    val isIpv6 = ip.contains(':')
+                    val prefix = if (isIpv6) 128 else 32
+                    runCatching { builder.addRoute(ip, prefix) }
                 }
 
-                // Always exclude AdShield Pro itself so upstream requests never loop
+                // Always exclude TitanShield Max itself so upstream requests never loop
                 runCatching { builder.addDisallowedApplication(packageName) }
 
                 // Apply per-app VPN exclusions configured by the user
@@ -181,6 +216,7 @@ class AdShieldVpnService : VpnService() {
 
                 vpnInterface = establishedPfd
                 isPaused = false
+                WifiLowLatencyManager.acquire(this@AdShieldVpnService)
                 repository.updateVpnStatus(
                     status = VpnStatus.CONNECTED,
                     networkLabel = detectCurrentNetworkLabel()
@@ -382,11 +418,79 @@ class AdShieldVpnService : VpnService() {
                 appName = app?.label
             )
             maybeRefreshNotificationCounter()
+            aetherCore.observeDnsQuery(query.questionDomain, true, evaluation.sourceName, evaluation.matchedCategory?.name)
             return blockedBytes
+        }
+
+        // Strict-mode Heuristic Shield: random-looking (DGA), lookalike brand, and
+        // (opt-in) newly-registered domains. Balanced = observe only; Strict = block
+        // when the user toggle is on. User custom allow rules always win.
+        if (currentSettings.blockHeuristicThreats &&
+            evaluation.sourceName != "User Custom Rule" &&
+            filterRuleEngine.getCurrentSnapshot().protectionMode == com.adshield.pro.domain.model.ProtectionMode.STRICT
+        ) {
+            val dgaLike = com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.looksDgaGenerated(query.questionDomain)
+            val newAge = if (currentSettings.checkNewDomains) {
+                com.adshield.pro.engine.aether.NewDomainAgeChecker.ageDays(query.questionDomain) { d ->
+                    fetchRdapAge(d)
+                }
+            } else null
+            val verdict = com.adshield.pro.engine.aether.StrictHeuristicsShield.evaluate(
+                domain = query.questionDomain,
+                strictMode = true,
+                dgaLike = dgaLike,
+                lookalikeBrand = null,
+                newDomainAgeDays = newAge,
+                checkNewDomains = currentSettings.checkNewDomains
+            )
+            if (verdict.block) {
+                val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
+                repository.recordDnsQueryEvent(
+                    domain = query.questionDomain,
+                    queryType = query.qTypeName,
+                    isBlocked = true,
+                    category = null,
+                    matchedRule = verdict.signal,
+                    sourceList = com.adshield.pro.engine.aether.StrictHeuristicsShield.SOURCE_NAME,
+                    latencyMs = 0,
+                    protocolUsed = "Strict Heuristic Sinkhole",
+                    fromCache = false,
+                    appPackageName = app?.packageName,
+                    appName = app?.label
+                )
+                maybeRefreshNotificationCounter()
+                aetherCore.observeDnsQuery(query.questionDomain, true, com.adshield.pro.engine.aether.StrictHeuristicsShield.SOURCE_NAME, null)
+                return DnsPacketCodec.buildBlockedResponse(query = query, sinkholeZeroIp = mode.blockSinkholeZeroIp)
+            }
         }
 
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
+        resolverHealthMonitor.record(currentSettings.resolverConfig.preset.name, upstreamResult.latencyMs, upstreamResult.responseBytes.isNotEmpty())
+        repository.setDnsFallbackActive(upstreamResult.fallbackUsed)
+
+        // AETHER DNS rebinding guard (Part 5): public domains must never answer with private IPs
+        val answerIps = com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.extractAnswerIps(upstreamResult.responseBytes)
+        if (com.adshield.pro.engine.aether.DnsAnomalyAnalyzer.isRebindingAttempt(query.questionDomain, answerIps)) {
+            val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
+            aetherCore.recordRebindingBlocked(query.questionDomain, answerIps)
+            repository.recordDnsQueryEvent(
+                domain = query.questionDomain,
+                queryType = query.qTypeName,
+                isBlocked = true,
+                category = evaluation.matchedCategory,
+                matchedRule = "rebinding-guard",
+                sourceList = "OmniShield X Rebinding Guard",
+                latencyMs = upstreamResult.latencyMs,
+                protocolUsed = "Rebinding Sinkhole",
+                fromCache = upstreamResult.fromCache,
+                appPackageName = app?.packageName,
+                appName = app?.label
+            )
+            maybeRefreshNotificationCounter()
+            return DnsPacketCodec.buildBlockedResponse(query = query, sinkholeZeroIp = mode.blockSinkholeZeroIp)
+        }
+        aetherCore.observeDnsQuery(query.questionDomain, false, evaluation.sourceName, evaluation.matchedCategory?.name, answerIps, upstreamResult.latencyMs)
         repository.recordDnsQueryEvent(
             domain = query.questionDomain,
             queryType = query.qTypeName,
@@ -409,6 +513,56 @@ class AdShieldVpnService : VpnService() {
             runCatching {
                 outputStream.write(packetBytes)
                 outputStream.flush()
+            }
+        }
+    }
+
+    private val zeroBreakageProbeHost = "connectivitycheck.gstatic.com"
+
+    /**
+     * Zero-Breakage watchdog (Module 7): probes real connectivity through the filtered
+     * resolver; 3 consecutive failures drop filter lists automatically (custom rules +
+     * Critical Protection stay active), first stable probe restores them. Never blocks
+     * anything on its own — it only relaxes filtering to keep the internet working.
+     */
+    private fun startZeroBreakageWatchdog(resolverConfig: com.adshield.pro.domain.model.DnsResolverConfig) {
+        serviceScope.launch {
+            var safeModeActive = false
+            while (isActive) {
+                kotlinx.coroutines.delay(if (safeModeActive) 60_000L else 30_000L)
+                if (vpnInterface == null || isPaused) continue
+                val probeOutcome = runCatching {
+                    val parsedProbe = DnsPacketCodec.parseQuery(
+                        DnsPacketCodec.buildStandardQuery(zeroBreakageProbeHost, 1)
+                    ) ?: error("probe query parse failed")
+                    val result = upstreamDnsResolver.resolve(parsedProbe, resolverConfig)
+                    resolverHealthMonitor.record(resolverConfig.preset.name, result.latencyMs, result.responseBytes.isNotEmpty())
+                    result.responseBytes.isNotEmpty() to result.latencyMs
+                }.getOrDefault(false to 0)
+                val probeOk = probeOutcome.first
+                aetherCore.lastResolverSummary = resolverHealthMonitor.summaryLine(resolverConfig.preset.name)
+                when (zeroBreakageEngine.onProbeResult(probeOk)) {
+                    com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.SAFE_MODE_FILTERING -> if (!safeModeActive) {
+                        safeModeActive = true
+                        repository.applyZeroBreakageSafeMode()
+                        preferencesRepository.incrementAutoRecoveryCount()
+                        notifyZeroBreakage("Zero-Breakage: connectivity guard suspended filter lists (possible false-positive storm). Your custom rules stay active.")
+                    }
+                    com.adshield.pro.engine.zero.ZeroBreakageEngine.WatchdogAction.RESTORE_FULL_FILTERING -> if (safeModeActive) {
+                        safeModeActive = false
+                        repository.restoreFullFilterListsAfterSafeMode()
+                        notifyZeroBreakage("Zero-Breakage: connectivity verified — full ad/malware filter lists restored.")
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    private fun notifyZeroBreakage(message: String) {
+        runCatching {
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(applicationContext, message, android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -527,9 +681,9 @@ class AdShieldVpnService : VpnService() {
         }
 
         val title = if (isPaused) {
-            "AdShield Pro — Protection Paused"
+            "TitanShield Max — Protection Paused"
         } else {
-            "AdShield Pro Active (${state.activeMode.title})"
+            "TitanShield Max Active (${state.activeMode.title})"
         }
 
         val content = "Blocked ${state.sessionBlockedQueries} of ${state.sessionTotalQueries} DNS queries • ${state.resolverConfig.protocol.name}"
@@ -584,6 +738,9 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        WifiLowLatencyManager.release()
+        resolverTunerJob?.cancel()
+        autoResumeJob?.cancel()
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
         }
@@ -593,9 +750,90 @@ class AdShieldVpnService : VpnService() {
         super.onDestroy()
     }
 
+    /**
+     * Platform spec pause options (5/15/60 min): auto-resume filtering after the
+     * chosen window so protection is never left off silently. 0 = manual pause.
+     */
+    private fun schedulePauseAutoResume(minutes: Int) {
+        autoResumeJob?.cancel()
+        autoResumeJob = null
+        if (minutes <= 0) return
+        autoResumeJob = serviceScope.launch {
+            kotlinx.coroutines.delay(minutes * 60_000L)
+            if (isPaused) {
+                isPaused = false
+                if (vpnInterface != null && tunnelJob?.isActive == true) {
+                    repository.updateVpnStatus(VpnStatus.CONNECTED)
+                    updateForegroundNotification()
+                } else {
+                    startVpnTunnel()
+                }
+            }
+        }
+    }
+
+    /**
+     * Speed mode: auto-fastest resolver. Opt-in. Every 15 minutes, from REAL measured
+     * query latencies only: switches presets only when a measured alternative is
+     * >=25%% faster with >=90%% success and the current preset has >=10 probes.
+     * Never touches a CUSTOM resolver. No synthetic traffic is generated.
+     */
+    private fun startResolverAutoTuner() {
+        if (resolverTunerJob?.isActive == true) return
+        resolverTunerJob = serviceScope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(15 * 60_000L)
+                runCatching {
+                    val settings = preferencesRepository.getSettingsSnapshot()
+                    if (!settings.resolverAutoTune) return@runCatching
+                    val config = settings.resolverConfig
+                    if (config.preset == com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) return@runCatching
+                    val current = resolverHealthMonitor.statsFor(config.preset.name) ?: return@runCatching
+                    if (current.probes < 10L) return@runCatching
+                    val best = resolverHealthMonitor.bestMeasuredResolver(config.preset.name) ?: return@runCatching
+                    val newPreset = runCatching {
+                        com.adshield.pro.domain.model.DnsProviderPreset.valueOf(best.key)
+                    }.getOrNull() ?: return@runCatching
+                    if (newPreset == config.preset) return@runCatching
+                    // require >=25% faster
+                    if (best.avgLatencyMs * 4 > current.avgLatencyMs * 3) return@runCatching
+                    val newConfig = config.copy(preset = newPreset)
+                    preferencesRepository.updateResolverConfig(newConfig)
+                    repository.syncRuntimeModeAndResolver(
+                        settings.protectionMode,
+                        settings.copy(resolverConfig = newConfig)
+                    )
+                    upstreamDnsResolver.clearCache()
+                }
+            }
+        }
+    }
+
+    /**
+     * RDAP lookup for domain age (Strict-mode new-domain check). Opt-in; 2s timeout;
+     * null on any failure — never blocks on unknown data.
+     */
+    private suspend fun fetchRdapAge(domain: String): String? = withContext(Dispatchers.IO) {
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(2, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val req = okhttp3.Request.Builder()
+            .url("https://rdap.org/domain/$domain")
+            .header("Accept", "application/rdap+json")
+            .build()
+        runCatching {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) null else resp.body?.string()
+            }
+        }.getOrNull()
+    }
+
     companion object {
         const val ACTION_START_VPN = "com.adshield.pro.action.START_VPN"
         const val ACTION_STOP_VPN = "com.adshield.pro.action.STOP_VPN"
+        const val EXTRA_PAUSE_MINUTES = "com.adshield.pro.extra.PAUSE_MINUTES"
+
         const val ACTION_PAUSE_VPN = "com.adshield.pro.action.PAUSE_VPN"
         const val ACTION_RESUME_VPN = "com.adshield.pro.action.RESUME_VPN"
         const val ACTION_RELOAD_TUNNEL_CONFIG = "com.adshield.pro.action.RELOAD_TUNNEL_CONFIG"
@@ -608,6 +846,21 @@ class AdShieldVpnService : VpnService() {
 
         const val VIRTUAL_IPV4_CLIENT = "10.215.173.1"
         const val VIRTUAL_IPV4_DNS = "10.215.173.2"
+
+        /**
+         * Public resolver IPs routed into the tunnel so apps with hardcoded DNS
+         * (8.8.8.8 etc.) are still filtered. Values are literals — never resolved.
+         */
+        val KNOWN_PUBLIC_RESOLVER_ROUTES: Map<String, String> = mapOf(
+            "8.8.8.8" to "Google", "8.8.4.4" to "Google",
+            "1.1.1.1" to "Cloudflare", "1.0.0.1" to "Cloudflare",
+            "9.9.9.9" to "Quad9", "149.112.112.112" to "Quad9",
+            "208.67.222.222" to "OpenDNS", "208.67.220.220" to "OpenDNS",
+            "114.114.114.114" to "114DNS", "223.5.5.5" to "AliDNS",
+            "2001:4860:4860::8888" to "Google v6", "2001:4860:4860::8844" to "Google v6",
+            "2606:4700:4700::1111" to "Cloudflare v6", "2606:4700:4700::1001" to "Cloudflare v6",
+            "2620:fe::fe" to "Quad9 v6", "2620:fe::9" to "Quad9 v6"
+        )
         const val VIRTUAL_IPV6_CLIENT = "fd00:ad5:1e1d::1"
         const val VIRTUAL_IPV6_DNS = "fd00:ad5:1e1d::2"
     }

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniShield X — Web Platform</title>
+<style>
+  :root {
+    --bg: #060d1a; --surface: #0b1730; --surface2: #132547; --line: #1d3a6e;
+    --blue: #2e7dff; --glow: #5aa2ff; --cyan: #22d3ee; --ok: #34d399;
+    --red: #ff5470; --amber: #ffb020; --text: #e8f0ff; --dim: #93a8c8;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text); min-height: 100vh;
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 22px clamp(16px, 5vw, 48px); display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #0a1428, var(--bg));
+    flex-wrap: wrap;
+  }
+  .shield {
+    width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+    background: radial-gradient(circle at 30% 25%, var(--glow), var(--blue));
+    font-size: 22px; box-shadow: 0 0 24px #2e7dff55;
+  }
+  h1 { font-size: 20px; letter-spacing: .4px; }
+  h1 small { display: block; color: var(--dim); font-weight: 400; font-size: 12px; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px clamp(16px, 5vw, 48px); border-bottom: 1px solid var(--line); }
+  nav button {
+    background: none; border: 1px solid var(--line); color: var(--dim); padding: 8px 16px;
+    border-radius: 999px; cursor: pointer; font-size: 14px;
+  }
+  nav button.active { color: #fff; border-color: var(--blue); background: #2e7dff22; }
+  main { padding: clamp(16px, 4vw, 40px); max-width: 1080px; margin: 0 auto; }
+  .page { display: grid; gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px;
+  }
+  .card h2 { font-size: 16px; margin-bottom: 8px; color: var(--glow); }
+  .card p, .card li { color: var(--dim); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .kpi b { display: block; font-size: 26px; color: var(--glow); }
+  .kpi span { color: var(--dim); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { color: var(--dim); font-weight: 500; }
+  code, .mono { font-family: ui-monospace, Consolas, monospace; color: var(--cyan); }
+  input[type=text], input[type=file], button.act {
+    background: var(--surface2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; font-size: 14px;
+  }
+  button.act { background: var(--blue); border: none; font-weight: 600; cursor: pointer; }
+  button.act:disabled { opacity: .45; cursor: default; }
+  .verdict { margin-top: 12px; padding: 12px 14px; border-radius: 10px; display: none; }
+  .verdict.blocked { display: block; background: #ff547018; border: 1px solid var(--red); }
+  .verdict.allowed { display: block; background: #34d39915; border: 1px solid var(--ok); }
+  .status { font-size: 13px; color: var(--dim); margin-top: 8px; }
+  .status.ok { color: var(--ok); } .status.warn { color: var(--amber); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); color: var(--dim); }
+  .yes { color: var(--ok); } .no { color: var(--red); } .part { color: var(--amber); }
+  footer { padding: 26px; text-align: center; color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); }
+  ul { padding-left: 20px; }
+  @media (max-width: 640px) { .kpi b { font-size: 21px; } main { padding: 14px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="shield">🛡</div>
+  <h1>OmniShield X <small>AETHER Infinity · Web Platform · v4.2.0 core</small></h1>
+</header>
+
+<nav>
+  <button data-page="dashboard" class="active">Dashboard</button>
+  <button data-page="checker">Domain Checker</button>
+  <button data-page="sync">Policy Sync</button>
+  <button data-page="extension">Extension</button>
+  <button data-page="account">Account &amp; Security</button>
+</nav>
+
+<main>
+  <section class="page" id="page-dashboard">
+    <div class="grid">
+      <div class="kpi"><b id="stat-rules">–</b><span>live rules loaded in this browser (real file)</span></div>
+      <div class="kpi"><b>367,000+</b><span>rules bundled in the Android APK</span></div>
+      <div class="kpi"><b>15</b><span>AETHER agents (on-device)</span></div>
+      <div class="kpi"><b>2</b><span>platforms · one shared intelligence core</span></div>
+    </div>
+    <div class="card">
+      <h2>Bundled intelligence (same files as the Android app)</h2>
+      <table>
+        <thead><tr><th>Asset</th><th>Feed</th><th>Rules</th><th>License</th></tr></thead>
+        <tbody id="assets-body"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Unified core, two independent clients</h2>
+      <p>The Android APK (DNS VPN firewall, Security Center, optimizer, in-app ad skip) and this website
+      (policy management, domain intelligence, extension ecosystem) share the <b>same rule files</b>,
+      the <b>same evaluation ladder</b> (ported 1:1, CI-tested on both platforms), and the
+      <b>same configuration format</b> — so policies move between devices without any server.</p>
+      <p style="margin-top:8px"><span class="badge">Honest disclosure</span> There is <b>no cloud backend or user-account system yet</b>.
+      Everything on this site runs locally in your browser. Sync is file-based (export → transfer → import).</p>
+    </div>
+  </section>
+
+  <section class="page" id="page-checker" hidden>
+    <div class="card">
+      <h2>Test any domain against the real production filter</h2>
+      <p>This is not a mock: the page loads the actual <code>core_lite_ads.txt</code> shipped in the APK
+      and evaluates it with the same priority ladder as the Android engine.</p>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+        <input type="text" id="check-input" placeholder="e.g. ads.doubleclick.net or www.youtube.com" style="flex:1; min-width:240px">
+        <button class="act" id="check-btn">Check</button>
+      </div>
+      <div class="status" id="checker-status"></div>
+      <div class="verdict" id="check-result"></div>
+    </div>
+  </section>
+
+  <section class="page" id="page-sync" hidden>
+    <div class="card">
+      <h2>Policy Sync — Android ⇄ Web (file-based)</h2>
+      <p>Export a backup from the Android app (<i>Settings → Configuration Backup</i>), import it here to
+      view and audit every custom rule, then export it back and import on any device. Same JSON schema both ways.</p>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items:center">
+        <input type="file" id="import-file" accept=".json,application/json">
+        <button class="act" id="import-btn">Import</button>
+        <button class="act" id="export-btn" disabled>Export</button>
+      </div>
+      <div class="status" id="sync-status"></div>
+      <div id="sync-table-wrap" hidden style="margin-top:14px; overflow-x:auto">
+        <table>
+          <thead><tr><th>Rule</th><th>Type</th><th>Match</th><th>Enabled</th><th>Comment</th></tr></thead>
+          <tbody id="rules-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="page-extension" hidden>
+    <div class="card">
+      <h2>OmniShield X Browser Extension (Chrome / Edge / Brave, Manifest V3)</h2>
+      <p>A real, working extension generated from the same intelligence core: ~50,000 declarative-net-request
+      block rules from the bundled ad/tracker feeds plus cosmetic ad hiding on top sites.</p>
+      <ul>
+        <li>Download <code>omnishield-x-extension.zip</code> from this site's root (or <code>/extension</code> in the repo) and unzip.</li>
+        <li>Open <code>chrome://extensions</code> → enable <b>Developer mode</b> → <b>Load unpacked</b> → select the folder.</li>
+        <li>Pin the 🛡 icon — the popup shows real per-tab block counts.</li>
+      </ul>
+      <p style="margin-top:8px"><span class="badge">Privacy</span> The extension has no servers, no analytics, no accounts. Rules are local.</p>
+    </div>
+  </section>
+
+  <section class="page" id="page-account" hidden>
+    <div class="card">
+      <h2>Account &amp; Security — honest status</h2>
+      <ul>
+        <li><span class="no">No accounts / cloud yet</span> — there are no OmniShield servers. When the backend ships it will be announced here with signed updates and this page will grow real login + device management.</li>
+        <li><span class="yes">Local-first by design</span> — DNS history, security scans and policies never leave your device.</li>
+        <li><span class="yes">Encrypted upstream DNS</span> — DoH/DoT to the resolver you choose; the VPN captures and filters all app DNS locally.</li>
+        <li><span class="yes">No certificate interception</span> — ever.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>OmniShield X · GPL-compatible open baseline · rule feeds by HaGeZi (GPLv3) · site processes everything locally</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

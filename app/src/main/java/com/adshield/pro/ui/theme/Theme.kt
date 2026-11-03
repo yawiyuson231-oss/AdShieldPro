@@ -13,33 +13,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 
-// Brand Colors — Deep Navy & Emerald Protection Palette
-val DeepNavyBackground = Color(0xFF07101E)
-val NavySurface = Color(0xFF0E1B30)
-val NavySurfaceVariant = Color(0xFF152642)
-val NavyBorder = Color(0xFF1E3558)
+// Brand Colors — TitanShield Max Deep Ocean Blue Palette
+val DeepNavyBackground = Color(0xFF060D1A)
+val NavySurface = Color(0xFF0B1730)
+val NavySurfaceVariant = Color(0xFF132547)
+val NavyBorder = Color(0xFF1D3A6E)
 
-val EmeraldPrimary = Color(0xFF10B981)
-val EmeraldGlow = Color(0xFF34D399)
-val EmeraldDark = Color(0xFF059669)
+val ElectricBlue = Color(0xFF2E7DFF)
+val SkyBlueGlow = Color(0xFF5AA2FF)
+val DeepBlue = Color(0xFF1A5CE0)
 
 val AlertRed = Color(0xFFEF4444)
 val WarningAmber = Color(0xFFF59E0B)
-val CyberCyan = Color(0xFF06B6D4)
-val PurpleAccent = Color(0xFF8B5CF6)
+val CyberCyan = Color(0xFF22D3EE)
+val PurpleAccent = Color(0xFF6D8DFF)
 
 val TextPrimaryDark = Color(0xFFF8FAFC)
-val TextSecondaryDark = Color(0xFF94A3B8)
+val TextSecondaryDark = Color(0xFF94A9C9)
 
 private val AdShieldDarkColorScheme = darkColorScheme(
-    primary = EmeraldPrimary,
-    onPrimary = Color(0xFF022C22),
-    primaryContainer = Color(0xFF064E3B),
-    onPrimaryContainer = Color(0xFFA7F3D0),
+    primary = ElectricBlue,
+    onPrimary = Color(0xFF04122B),
+    primaryContainer = Color(0xFF17458F),
+    onPrimaryContainer = Color(0xFFCCE0FF),
     secondary = CyberCyan,
-    onSecondary = Color(0xFF083344),
-    secondaryContainer = Color(0xFF164E63),
-    onSecondaryContainer = Color(0xFFCFFAFE),
+    onSecondary = Color(0xFF062E35),
+    secondaryContainer = Color(0xFF155059),
+    onSecondaryContainer = Color(0xFFCBFAFF),
     tertiary = PurpleAccent,
     background = DeepNavyBackground,
     onBackground = TextPrimaryDark,
@@ -52,21 +52,21 @@ private val AdShieldDarkColorScheme = darkColorScheme(
 )
 
 private val AdShieldLightColorScheme = lightColorScheme(
-    primary = Color(0xFF059669),
+    primary = Color(0xFF1A5CE0),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD1FAE5),
-    onPrimaryContainer = Color(0xFF064E3B),
-    secondary = Color(0xFF0284C7),
+    primaryContainer = Color(0xFFD6E5FF),
+    onPrimaryContainer = Color(0xFF0B3B9E),
+    secondary = Color(0xFF0891B2),
     onSecondary = Color.White,
-    tertiary = Color(0xFF7C3AED),
-    background = Color(0xFFF1F5F9),
-    onBackground = Color(0xFF0F172A),
+    tertiary = Color(0xFF4F6BE0),
+    background = Color(0xFFF2F6FD),
+    onBackground = Color(0xFF0C1830),
     surface = Color.White,
-    onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFE2E8F0),
-    onSurfaceVariant = Color(0xFF475569),
+    onSurface = Color(0xFF0C1830),
+    surfaceVariant = Color(0xFFDEE7F5),
+    onSurfaceVariant = Color(0xFF44557A),
     error = Color(0xFFDC2626),
-    outline = Color(0xFFCBD5E1)
+    outline = Color(0xFFC4D2E8)
 )
 
 val AdShieldTypography = Typography(

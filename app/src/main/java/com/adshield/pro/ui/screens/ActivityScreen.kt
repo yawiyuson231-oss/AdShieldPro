@@ -64,7 +64,7 @@ import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import com.adshield.pro.ui.viewmodel.StatsChartRange
 import java.text.SimpleDateFormat
@@ -314,7 +314,7 @@ fun ActivityScreen(
                                     Text(
                                         text = "${eff.blockedCount} blocked",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = EmeraldPrimary,
+                                        color = ElectricBlue,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -393,7 +393,7 @@ fun ActivityScreen(
                     Icon(
                         imageVector = Icons.Default.History,
                         contentDescription = null,
-                        tint = EmeraldPrimary
+                        tint = ElectricBlue
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -468,7 +468,7 @@ fun ActivityScreen(
                             Icon(
                                 imageVector = if (record.isBlocked) Icons.Default.Block else Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = if (record.isBlocked) AlertRed else EmeraldPrimary,
+                                tint = if (record.isBlocked) AlertRed else ElectricBlue,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
@@ -496,7 +496,7 @@ fun ActivityScreen(
                         ) {
                             Text(
                                 text = if (record.isBlocked) "Allow" else "Block",
-                                color = if (record.isBlocked) EmeraldPrimary else AlertRed,
+                                color = if (record.isBlocked) ElectricBlue else AlertRed,
                                 fontWeight = FontWeight.Bold
                             )
                         }

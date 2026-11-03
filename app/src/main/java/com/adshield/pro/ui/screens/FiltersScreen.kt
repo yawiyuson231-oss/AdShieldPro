@@ -50,7 +50,7 @@ import com.adshield.pro.domain.model.FilterListSource
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.WarningAmber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -100,7 +100,7 @@ fun FiltersScreen(
                 Button(
                     onClick = onSyncAllNow,
                     enabled = !isUpdating,
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CloudSync,
@@ -119,12 +119,12 @@ fun FiltersScreen(
                     Text(
                         text = "Checking enabled filter lists and saving a verified update…",
                         style = MaterialTheme.typography.labelMedium,
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
+                        color = ElectricBlue
                     )
                 }
             }
@@ -281,7 +281,7 @@ fun FiltersScreen(
                             Text(
                                 text = "License: ${source.licenseName} • ${source.lastStatusMessage}",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = EmeraldPrimary
+                                color = ElectricBlue
                             )
                             val updatedText = if (source.lastUpdatedEpochMs > 0L) {
                                 "Updated ${dateFormat.format(Date(source.lastUpdatedEpochMs))}"

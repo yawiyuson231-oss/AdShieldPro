@@ -1,135 +1,119 @@
-# AdShield Pro 2.2.5 — Android DNS Ad & Tracker Protection
+# OmniShield X 4.0 (formerly TitanShield Max) — AI-Orchestrated DNS Firewall, Ad Block, Anti-Virus & Device Suite for Android
 
-AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
-## Website and downloads
+OmniShield X (formerly TitanShield Max, originally AdShield Pro) is a non-root Android all-in-one protection suite: device-wide DNS ad/tracker/malware filtering through a local VPN, an on-device anti-virus Security Center (files, links, apps, APKs), a zero-lag Game Turbo engine, battery intelligence, a true deep storage cleaner, and a built-in privacy browser with video-ad URL filtering. Built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
 
-- **Project website:** [https://adshieldpro-docs.vercel.app](https://adshieldpro-docs.vercel.app/)
-- **Direct APK download — v2.2.5:** [AdShield-Pro-2.2.5.apk](https://github.com/hillman3948-cyber/AdShieldPro/releases/download/v2.2.5/AdShield-Pro-2.2.5.apk)
-- [Browse all GitHub releases](https://github.com/hillman3948-cyber/AdShieldPro/releases)
+## What's new in v3.0.0
 
-## App screenshots
+- **Full rebrand + Deep Ocean Blue UI** — new identity, new all-blue Material 3 theme.
+- **367,000+ rules bundled offline** — HaGeZi Multi Pro (ads/trackers, 176k) + HaGeZi Threat Intelligence (malware/phishing/scam, 191k) ship inside the APK; entry-level (low-RAM) devices automatically load the curated Lite set instead of the max ad list while keeping the full threat feed.
+- **Bloom-filter fast path** — O(1) negative pre-check in front of the multi-million-key rule maps; clean DNS lookups short-circuit without touching hash maps.
+- **NEW Security Center (anti-virus)** —
+  - *Link scanner*: any URL checked against live malware/phishing intelligence + typosquat (Damerau-Levenshtein), punycode/homoglyph, credential-URL, raw-IP-login, risky-TLD, shortener and phishing-language heuristics.
+  - *File scanner*: exact EICAR signature, polyglot executables (PE/ELF/DEX hidden in JPG/PNG/GIF/PDF), script droppers (PowerShell -enc, certutil, mshta, curl|sh), macro documents (vbaProject.bin), Zip-Slip traversal, double-extension bait names — bounded streaming scan, 100% on-device.
+  - *APK analyzer*: real binary AndroidManifest (AXML) parser extracts package + every requested permission without installing; packer detection (jiagu/DEXHelper/…), dynamic-code-loading dropper triage, signing checks, dangerous permission-stack scoring.
+  - *Installed app auditor*: MTD-style triage of every installed app (accessibility abuse, SMS interception stacks, overlay phishing capability, device-admin lockware, surveillance stacks, outdated targetSdk).
+  - Security posture score + all-time malware-blocked counter.
+- **Game Turbo (Zero-Lag Mode)** — real, honest optimizations for MLBB, PUBG, CODM, Free Fire, Genshin, Wild Rift, Roblox and more: cached-process trimming (two waves), master sync pause with auto-restore, DND, frozen background jobs, thermal-guard readout, and **DNS prefetch** of each game's real server domains (e.g. `aena.ms` for Mobile Legends) into the TTL cache so matchmaking connects faster.
+- **Battery Intelligence (Max)** — measured drain-rate regression (%/h + time-to-empty), cell-health scoring (cycle count on Android 14+, thermal history, voltage), charge-taper time-to-full, honest recommendations, and an **Extreme Battery Saver** that stretches background work to 72h while keeping the VPN protection fully active.
+- **True Deep Cleaner** — new categories: hidden/secret temp files, crash & debug logs (.log/.trace/.tombstone), orphaned empty folders, and media thumbnail caches across **all of shared storage** via opt-in All-Files-Access (Android/data and Android/obb remain protected by the OS).
+- **Browser video-ad URL filtering** — EasyList-style network rule engine (`||host^`, substring rules, `$third-party`) targeting VAST/VMAP/preroll/midroll ad servers, exchanges and measurement beacons; YouTube web ad units hidden via cosmetic rules and a visible-Skip auto-clicker inside the built-in browser.
+- **Six-tab navigation** with the new Security tab.
 
-<table>
-  <tr>
-    <td align="center"><img src="docs/images/home-protection.jpg" alt="AdShield Pro home screen showing active DNS protection and statistics" width="280"><br><strong>Home protection</strong></td>
-    <td align="center"><img src="docs/images/smart-boost.jpg" alt="AdShield Pro Smart Boost device health screen" width="280"><br><strong>Smart Boost</strong></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/images/protection-profile.jpg" alt="AdShield Pro DNS activity and protection profiles" width="280"><br><strong>Activity and protection profiles</strong></td>
-    <td align="center"><img src="docs/images/dns-analytics.jpg" alt="AdShield Pro DNS analytics and live top apps" width="280"><br><strong>DNS analytics and live top apps</strong></td>
-  </tr>
-</table>
+## How it works (summary)
 
-## How it Works
+1. **Device-wide DNS filtering** — a local `VpnService` routes only DNS into the on-device filter engine; other traffic flows at native speed. Ads, trackers and malicious domains are blocked for *every app* (games, social, browsers, utilities) without root or HTTPS decryption.
+2. **Built-in Privacy Browser** — subresource interception, URL-pattern ad filtering, tracking-parameter stripping, pop-up blocking, cosmetic element hiding, cookie controls.
+3. **Optimizer** — Smart Boost, RAM manager, junk cleaner (quick/deep/scheduled/custom), Game Booster + Turbo, battery modes.
+4. **Security Center** — anti-virus and anti-phishing as described above, fully offline.
 
-![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
+### Honest disclosures (unchanged physics)
 
-## What AdShield Pro does
+- **YouTube/Facebook/TikTok in-app video ads** are served from the same first-party domains as the videos themselves; DNS blocking cannot remove them without breaking playback. The built-in browser blocks website video ads at the network layer and hides/skips YouTube web ads.
+- A non-root app cannot rewrite CPU governors or force-kill live foreground apps. Game Turbo uses every mechanism Android actually grants and reports exactly what it did.
+- No scanner can guarantee 100% detection of brand-new (zero-day) malware; TitanShield layers signatures, structural analysis and behavioral heuristics to maximize coverage.
 
-- **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
-- **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
-- **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.
-- **Use the built-in Privacy Browser:** Filter browser requests, remove common tracking query parameters, block pop-ups, manage third-party cookies, and apply cosmetic hiding rules inside this browser.
-- **See activity and statistics:** View DNS totals, allowed and blocked queries, recent local activity, trends, and a live top-app view when Android provides app attribution for a DNS request.
-- **Run AI Smart Boost:** Review memory, storage, battery, and temperature signals; safely clean eligible AdShield-owned temporary files; and optimize AdShield's own DNS cache and memory use. The “AI” feature name refers to local, rule-based analysis and recommendations; it does not call a cloud AI service. Android controls memory used by other apps, so Smart Boost does not promise to kill other apps or free their memory.
-- **Clean storage with review controls:** Quick, deep, scheduled, and custom scans distinguish safe app-owned temporary files from downloads, duplicate files, and APK installers that require user review or confirmation. Android scoped-storage rules limit which shared files the app can inspect.
-- **Use Game Booster and battery modes:** Select games and choose AdShield workload profiles that adjust its cache, background filter sync, and local logging behavior. Battery and thermal tools show device readings and can adapt AdShield's own background work; they do not override Android's system-wide power controls.
-- **Check for app updates:** Check GitHub Releases from Home or receive a background update notification when Android runs scheduled work. The app downloads the signed APK and opens Android's installer; users approve installation themselves.
-- **Keep settings on the device:** Settings, custom rules, and activity history are stored locally. Allowed DNS lookups are sent to the upstream DNS provider selected in the app, and that provider's privacy terms apply.
+## Bundled filter lists & licenses
 
-## Download and project links
+| Asset | Source | License |
+|---|---|---|
+| `core_max_ads.txt` | [HaGeZi dns-blocklists — Multi Pro](https://github.com/hagezi/dns-blocklists) | GPLv3 |
+| `core_max_threats.txt` | [HaGeZi Threat Intelligence Feeds — mini](https://github.com/hagezi/dns-blocklists) | GPLv3 |
+| `core_lite_ads.txt` | [HaGeZi dns-blocklists — Light](https://github.com/hagezi/dns-blocklists) | GPLv3 |
+| `default_blocklist.txt` | TitanShield open baseline | GPLv3/MIT compatible |
 
-- [Source code](https://github.com/hillman3948-cyber/AdShieldPro)
-- [Latest releases and APK downloads](https://github.com/hillman3948-cyber/AdShieldPro/releases)
-- [Privacy policy](https://github.com/hillman3948-cyber/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md)
-- [Report a problem](https://github.com/hillman3948-cyber/AdShieldPro/issues)
-
-AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Architecture + MVVM, Room SQLite, DataStore, WorkManager, Hilt, and Android `VpnService`**. DNS filtering can reduce requests to known ad, tracking, and malicious domains, but it cannot guarantee protection from every threat.
-
----
+Remote sources (AdGuard DNS Filter, OISD, URLHaus, StevenBlack) remain available via in-app sync.
 
 ## Technical architecture
 
-### Layer 1 — Device-Wide Wire-Format DNS Engine (`engine/dns/`)
-- **`DnsPacketCodec.kt`**: Full RFC 1035 / RFC 3596 wire-format DNS parser and response synthesizer. Supports IPv4 (`A`) and IPv6 (`AAAA`), `CNAME`, `HTTPS`, `SVCB`, `TXT`, and `MX` queries. Hardened against truncated headers and malicious cyclic compression pointer loops (`0xC0`).
-- **`IpPacketFraming.kt`**: Full IPv4 and IPv6 packet parser and response builder supporting both **UDP (Port 53)** and **TCP (Port 53)** with RFC 1071 and RFC 8200 pseudo-header checksums.
-- **`UpstreamDnsResolver.kt`**:
-  - **DNS-over-HTTPS (DoH, RFC 8484)** via `application/dns-message` wireformat POST with bootstrap DNS resolution.
-  - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
-  - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
-  - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
+### Layer 1 — Wire-Format DNS Engine (`engine/dns/`)
+- RFC 1035/3596 parser + response synthesizer (A, AAAA, CNAME, HTTPS, SVCB, TXT, MX), hardened against compression-pointer loops.
+- DoH (RFC 8484), DoT (RFC 7858), protected UDP/TCP with TCP upgrade on truncation.
+- TTL-aware LRU cache with transaction-ID rewriting; **new**: `buildStandardQuery` + `prefetchHostnames` power Game Turbo cache warming.
 
-### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
-- **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.
-- **Loop Prevention**: Protects all upstream DoH, DoT, and UDP/TCP sockets via `VpnService.protect(socket)` and excludes `com.adshield.pro` from the tunnel.
-- **Per-App Split Tunneling**: Supports per-app VPN exclusion via `VpnService.Builder.addDisallowedApplication()`.
-- **Network Recovery & Boot Restoration**: Monitors Wi-Fi / Mobile Data transitions via `ConnectivityManager.NetworkCallback` and restores protection after device reboot via `BootCompletedReceiver`.
+### Layer 2 — Local VPN Service (`service/AdShieldVpnService.kt`)
+- DNS-only TUN routing, socket protection + loop prevention, per-app split tunneling, network recovery, boot restore, always-on support.
 
-### Layer 3 — Privacy Browser Content & Cosmetic Blocker (`engine/browser/BrowserContentBlocker.kt`)
-- Built-in Android `WebView` privacy browser (`ui/screens/BrowserScreen.kt`) with:
-  - Subresource ad & tracker request interception (`shouldInterceptRequest`)
-  - Cross-site tracking query parameter sanitizer (strips `fbclid`, `gclid`, `utm_*`, `msclkid`, `ttclid`, etc.)
-  - Background pop-up blocker (`onCreateWindow`)
-  - Cosmetic CSS + DOM element hiding for standard ad slots (`ins.adsbygoogle`, `[id^="div-gpt-ad"]`, `[data-ad-slot]`, etc.) plus custom CSS selectors
-  - Per-website allowlist exceptions, third-party cookie blocking, and one-tap cookie/storage wipe.
+### Layer 3 — Privacy Browser Blocker (`engine/browser/BrowserContentBlocker.kt`)
+- **New `UrlPatternFilter`**: compiled EasyList-subset network rules (dedicated ad hosts + video-ad manifest/bidding URL patterns, `$third-party` aware).
+- Cosmetic CSS + MutationObserver collapsing, YouTube web ad selectors, visible-Skip auto-clicker, tracking-parameter sanitizer, pop-up blocker.
 
-### Layer 4 — Intelligent Lock-Free Filtering Rule Engine (`engine/filter/FilterRuleEngine.kt`)
-- Uses an immutable `FilterSnapshot` inside an `AtomicReference` for lock-free microsecond lookups and zero-restart hot updates.
-- Supports **Exact matching**, **$O(k)$ Subdomain suffix walk**, **Wildcard rules (`*`)**, and **Allowlist exceptions (`@@||domain^`)**.
-- Strict priority evaluation:
-  1. User Custom Allow Rules (`Priority 100`)
-  2. User Custom Block Rules (`Priority 90`)
-  3. System Safety Allowlist (`Priority 80`)
-  4. Active Filter Lists filtered by `ProtectionMode` (`Standard`, `Strict`, `Privacy`, `Custom`) (`Priority 50`)
-- Built-in **Duplicate & Conflict Analyzer** (`detectConflictsAndDuplicates`) and interactive **Live Domain Diagnostic Sandbox**.
+### Layer 4 — Lock-Free Filter Engine (`engine/filter/`)
+- Immutable `FilterSnapshot` in an `AtomicReference`; priority-ordered evaluation.
+- **New `BloomFilter`** (MurmurHash3, ~0.1% FP) built over all blocking keys → clean-domain lookups short-circuit; wildcards disable the fast path for correctness.
+- Hosts/adblock/plain-domain parsing, wildcard regexes, allowlist exceptions, conflict analyzer.
 
-### Layer 5 — Atomic Filter List Updater (`data/repository/AdShieldRepository.kt` & `worker/FilterUpdateWorker.kt`)
-- Pre-configured with reputable filter sources (AdShield Core Bundled Baseline, AdGuard DNS Filter, OISD Small, HaGeZi Multi Light, URLHaus Malware Filter, StevenBlack Unified Hosts) + custom HTTPS filter URLs.
-- Validates downloaded lists (rejecting HTML, scripts, or binary payloads), strips duplicates, writes atomically via `.tmp` and `.bak` files, and automatically rolls back on failure.
+### Layer 5 — Security Engines (`engine/security/`)
+- `UrlThreatScanner`, `FileThreatScanner`, `ApkAnalyzer` (incl. binary AXML string-pool + start-tag parser), `AppRiskAuditor`, orchestrated by `SecurityEngine` against the live MALWARE-category rule set.
 
----
+### Layer 6 — Optimizer & Turbo (`engine/optimizer/`, `engine/battery/`)
+- `SystemOptimizerEngine`: RAM/storage/battery telemetry, junk scans with SHA-256 duplicates, deep-clean categories, Smart Boost pipeline, Extreme Battery Saver.
+- `GameTurboEngine`: cached-process trimming, master-sync pause/restore, DND, WorkManager freeze, per-game DNS prefetch catalog, thermal guard.
+- `BatteryAnalytics`: drain regression, charge taper model, health scoring, recommendations.
 
-## 2. Technical Limitations & Honest Disclosures
+### Layer 7 — Atomic Filter Updater (`data/repository/`, `worker/`)
+- Seeded built-in sources (including the on-device max lists — auto-merged into existing installs on upgrade), HTTPS sources with `.tmp`/`.bak` atomic swap + rollback, 900k-rule merge cap for memory safety, low-RAM adaptive asset selection.
 
-1. **First-Party Multiplexed Streaming Ads:** Official YouTube, Facebook, TikTok, Instagram, and Twitch apps serve video/feed ads from the same first-party content delivery servers and TLS connections as legitimate videos. Blocking those domains via DNS would break video playback.
-2. **Hardcoded Encrypted DNS Apps:** Apps that ignore Android system DNS and use proprietary internal DoH/QUIC resolvers bypass local DNS VPNs unless configured to use system DNS.
-3. **External Third-Party Browser Cosmetic Filtering:** Due to Android process sandboxing, a standalone non-root app cannot inject cosmetic CSS into external third-party browsers; cosmetic DOM element hiding applies inside AdShield Pro's built-in Privacy Browser.
-
----
-
-## 3. Project Structure
+## Project structure
 
 ```text
-PROJECT/
-├── app/
-│   ├── build.gradle.kts
-│   ├── proguard-rules.pro
-│   └── src/
-│       ├── main/
-│       │   ├── AndroidManifest.xml
-│       │   ├── assets/default_blocklist.txt
-│       │   └── java/com/adshield/pro/
-│       │       ├── AdShieldApplication.kt
-│       │       ├── MainActivity.kt
-│       │       ├── data/
-│       │       │   ├── local/db/ (Entities.kt, AdShieldDao.kt, AdShieldDatabase.kt)
-│       │       │   ├── local/preferences/UserPreferencesRepository.kt
-│       │       │   └── repository/AdShieldRepository.kt
-│       │       ├── di/AppModule.kt
-│       │       ├── domain/model/ (ProtectionModels.kt, RuleAndVpnModels.kt, StatsAndBillingModels.kt)
-│       │       ├── engine/
-│       │       │   ├── browser/BrowserContentBlocker.kt
-│       │       │   ├── dns/ (DnsPacketCodec.kt, IpPacketFraming.kt, UpstreamDnsResolver.kt)
-│       │       │   └── filter/FilterRuleEngine.kt
-│       │       ├── service/ (AdShieldVpnService.kt, BootCompletedReceiver.kt)
-│       │       ├── ui/
-│       │       │   ├── screens/ (HomeScreen, ActivityScreen, FiltersScreen, RulesScreen, BrowserScreen, SettingsScreen)
-│       │       │   ├── theme/Theme.kt
-│       │       │   └── viewmodel/AdShieldViewModel.kt
-│       │       └── worker/FilterUpdateWorker.kt
-│       └── test/java/com/adshield/pro/AdShieldEngineTestSuite.kt
-└── docs/
-    ├── BUILD_AND_SIGNING_GUIDE.md
-    ├── GOOGLE_PLAY_RELEASE_CHECKLIST.md
-    └── PRIVACY_POLICY.md
+app/src/main/java/com/adshield/pro/
+├── AdShieldApplication.kt / MainActivity.kt
+├── data/ (Room DAO+Entities, DataStore preferences, repository)
+├── di/AppModule.kt
+├── domain/model/ (protection, rules, optimizer, stats models)
+├── engine/
+│   ├── battery/BatteryAnalytics.kt
+│   ├── browser/BrowserContentBlocker.kt
+│   ├── dns/ (DnsPacketCodec, IpPacketFraming, UpstreamDnsResolver)
+│   ├── filter/ (FilterRuleEngine, BloomFilter)
+│   ├── optimizer/ (SystemOptimizerEngine, GameTurboEngine)
+│   └── security/ (SecurityEngine, UrlThreatScanner, FileThreatScanner, ApkAnalyzer, AppRiskAuditor)
+├── service/ (AdShieldVpnService, BootCompletedReceiver)
+├── ui/ (screens incl. SecurityScreen, theme, viewmodel)
+└── worker/ (FilterUpdateWorker, SmartOptimizationWorker)
+app/src/main/assets/ (default_blocklist.txt, core_max_ads.txt, core_max_threats.txt, core_lite_ads.txt)
+app/src/test/java/com/adshield/pro/ (AdShieldEngineTestSuite, TitanShieldMaxEngineTestSuite)
 ```
+
+## Build
+
+```bash
+./gradlew assembleDebug          # debug APK
+./gradlew test                   # unit tests (both engine suites)
+./gradlew assembleRelease        # requires signing env vars (see docs/BUILD_AND_SIGNING_GUIDE.md)
+```
+
+## Two platforms, one core (OmniShield X)
+
+- **Android app** — this repository's APK (DNS VPN firewall, Security Center, in-app ad skip, optimizer).
+- **Web platform** — `website/` (GitHub Pages): live Domain Checker running the real rule file with the same evaluation ladder (CI-tested), Policy Sync via the app's backup JSON, extension distribution. Everything runs locally in the browser.
+- **Browser extension** — `extension/` (Manifest V3): 50,000 DNR block rules generated from the same bundled feed + cosmetic filtering. Load unpacked via developer mode.
+- **No fake cloud**: there are no OmniShield servers or accounts; the platforms share rule assets, engine semantics, and the config schema offline. See `docs/OMNISHIELD_X_PLATFORMS.md`.
+
+## Package identity
+
+Display name: **TitanShield Max** · applicationId `com.adshield.pro` (kept for in-place update compatibility from AdShield Pro 2.x installs).
+
+## License
+
+Project code: GPLv3-compatible open baseline. Bundled lists are the property of their authors (see table above).

@@ -22,3 +22,5 @@ signing.properties
 # Node dependencies and logs
 node_modules/
 npm-debug.log*
+
+website/omnishield-x-extension.zip

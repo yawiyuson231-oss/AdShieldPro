@@ -1,22 +1,22 @@
-# AdShield Pro v2.1 — Privacy Policy & Google Play Data Safety Disclosure
+# TitanShield Max v3.0 — Privacy Policy & Google Play Data Safety Disclosure
 
 **Effective Date:** October 24, 2026  
-**Application:** AdShield Pro (`com.adshield.pro`)
+**Application:** TitanShield Max (`com.adshield.pro`)
 
 ---
 
 ## 1. Core Privacy Commitment
 
-AdShield Pro is engineered from the ground up as a local, on-device privacy and ad-blocking firewall for Android.
-- **No Root Required:** AdShield Pro operates exclusively in standard Android user space.
+TitanShield Max is engineered from the ground up as a local, on-device privacy and ad-blocking firewall for Android.
+- **No Root Required:** TitanShield Max operates exclusively in standard Android user space.
 - **No Browsing Data Collection or Sale:** We do **not** collect, transmit, log, or sell your browsing history, DNS queries, IP addresses, or personal data to any remote analytics or advertising server.
-- **No HTTPS Interception or Root Certificates:** AdShield Pro never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.
+- **No HTTPS Interception or Root Certificates:** TitanShield Max never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.
 
 ---
 
 ## 2. How Android `VpnService` Is Used
 
-AdShield Pro uses the Android `android.net.VpnService` API strictly to establish a **local on-device virtual DNS interface** (`10.215.173.1/30` and `fd00:ad5:1e1d::1/126`):
+TitanShield Max uses the Android `android.net.VpnService` API strictly to establish a **local on-device virtual DNS interface** (`10.215.173.1/30` and `fd00:ad5:1e1d::1/126`):
 1. **DNS-Only Routing:** Only traffic destined for the virtual DNS addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) is routed into the local TUN interface. All non-DNS TCP, UDP, and QUIC application traffic flows directly over your physical Wi-Fi or mobile data interface without passing through a remote VPN server.
 2. **Local Rule Evaluation:** Each DNS query is evaluated locally in memory against your enabled blocklists and custom rules.
    - **Blocked Domains:** Immediately answered on-device with `NXDOMAIN` or `0.0.0.0` / `::` sinkhole in `< 1 ms`.
@@ -34,6 +34,17 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - **Custom DNS Resolver** — Subject to the privacy policy of the operator you configure.
 
 ---
+
+
+## 3b. Security Center (Anti-Virus) Data Handling
+
+TitanShield Max's Security Center performs **100% on-device analysis**:
+
+- **File scanning** (any file you pick, including hidden/system locations via All-Files-Access) reads file bytes locally to match threat signatures and structural patterns. File contents are **never uploaded** — only a SHA-256 hash is stored in the local history database on your device.
+- **Link scanning** evaluates URLs locally against the bundled threat intelligence feed plus heuristic analysis (typosquatting, punycode, credential URLs). URLs you scan are **never transmitted** to us; remote threat feed *updates* are downloaded like filter lists.
+- **App auditing** reads only permission metadata of installed apps (publicly readable without special access) and scores risk locally.
+- **APK analysis** parses the AndroidManifest of an APK file you select — locally, without installing it.
+- Malware-block statistics (a counter) stay in the local Room database and can be erased via **Settings → Clear Data**.
 
 ## 4. Local Activity Logging & User Deletion Controls
 

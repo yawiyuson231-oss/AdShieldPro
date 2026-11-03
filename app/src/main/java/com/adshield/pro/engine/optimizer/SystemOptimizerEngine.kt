@@ -80,12 +80,12 @@ class RuleBasedOptimizationPredictor : OptimizationPredictor {
                     title = "Elevated Memory Utilization (${String.format(Locale.US, "%.1f%%", ram.usagePercent)})",
                     detail = "Available RAM is ${formatBytes(ram.availableRamBytes)} out of ${formatBytes(ram.totalRamBytes)}.",
                     severity = BottleneckSeverity.MODERATE,
-                    recommendedAction = "Release unused AdShield Pro cache allocations."
+                    recommendedAction = "Release unused TitanShield Max cache allocations."
                 )
             )
         }
 
-        // Check AdShield Pro's own memory footprint (> 90 MB Java + Native heap)
+        // Check TitanShield Max's own memory footprint (> 90 MB Java + Native heap)
         val ownTotalHeap = ram.adShieldJavaHeapUsedBytes + ram.adShieldNativeHeapUsedBytes
         if (ownTotalHeap > 90L * 1024L * 1024L || ram.adShieldDnsCacheEntries > 512) {
             penaltyPoints += 8
@@ -201,10 +201,49 @@ class SystemOptimizerEngine @Inject constructor(
     private val ramUsageTrend = ArrayDeque<Float>(20)
     private val temperatureTrend = ArrayDeque<Float>(20)
 
+    // TitanShield Max battery intelligence: rolling drain samples (last ~2 hours)
+    private val batterySamples = ArrayDeque<com.adshield.pro.engine.battery.BatteryAnalytics.BatterySample>(48)
+
     @Volatile
     private var activeGamingPackage: String? = null
 
     fun isGamingSessionActive(): Boolean = activeGamingPackage != null
+
+    // --- Deep-clean scan safety bounds ---
+    private val HIDDEN_JUNK_NAME_REGEX = Regex(
+        """^(temp|tmp|cache|thumb)[_.-].*|.*\.(tmp|temp|partial|part|crdownload|download)$"""
+    )
+    private val MAX_DEEP_SCAN_FILES = 30_000
+    private val MAX_DEEP_CANDIDATES = 4_000
+
+    /**
+     * True when the user granted All-Files-Access (MANAGE_EXTERNAL_STORAGE), enabling the
+     * True Deep Cleaner to find hidden/secret files across all of shared storage.
+     */
+    fun hasAllFilesAccess(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching { Environment.isExternalStorageManager() }.getOrDefault(false)
+        } else {
+            runCatching { Environment.getExternalStorageDirectory().canRead() }.getOrDefault(false)
+        }
+    }
+
+    /** Settings screen that lets the user grant All-Files-Access for the Deep Cleaner. */
+    fun createAllFilesAccessIntent(): Intent? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                Intent(
+                    android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    android.net.Uri.parse("package:${context.packageName}")
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }.getOrNull() ?: runCatching {
+                Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }.getOrNull()
+        } else {
+            null
+        }
+    }
 
     // --- 1. REAL-TIME SYSTEM SNAPSHOTS (RAM, STORAGE, BATTERY & THERMAL) ---
 
@@ -324,15 +363,56 @@ class SystemOptimizerEngine @Inject constructor(
             temperatureTrend.addLast(tempCelsius)
         }
 
+        // --- TitanShield Max Battery Intelligence ---
+        synchronized(batterySamples) {
+            if (batterySamples.size >= 48) batterySamples.removeFirst()
+            batterySamples.addLast(
+                com.adshield.pro.engine.battery.BatteryAnalytics.BatterySample(
+                    timestampEpochMs = System.currentTimeMillis(),
+                    levelPercent = batteryPct,
+                    isCharging = isCharging,
+                    temperatureCelsius = tempCelsius
+                )
+            )
+        }
+        val drainAnalysis = com.adshield.pro.engine.battery.BatteryAnalytics.analyzeDrain(
+            synchronized(batterySamples) { batterySamples.toList() }
+        )
+        val chargeCounterMah = runCatching {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER).takeIf { it > 0 }
+        }.getOrNull() ?: -1
+        val cycleCount = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            intent?.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1)?.takeIf { it > 0 }
+        } else null
+
+        val tempHistory = synchronized(temperatureTrend) { temperatureTrend.toList() }
+        val healthReport = com.adshield.pro.engine.battery.BatteryAnalytics.assessHealth(
+            cycleCount = cycleCount,
+            averageTemperatureCelsius = if (tempHistory.isNotEmpty()) tempHistory.average().toFloat() else null,
+            maxObservedTemperatureCelsius = tempHistory.maxOrNull(),
+            voltageMillivolts = voltageMv,
+            isChargingNow = isCharging
+        )
+
         val recs = mutableListOf<String>()
         if (isOverheating) {
-            recs.add("High temperature detected (${String.format(Locale.US, "%.1f°C", tempCelsius)}). Avoid heavy 3D gaming while fast-charging and switch AdShield to Battery Saver mode.")
+            recs.add("High temperature detected (${String.format(Locale.US, "%.1f°C", tempCelsius)}). Avoid heavy 3D gaming while fast-charging and switch to Battery Saver mode.")
         }
         if (isLowBattery && !isCharging) {
             recs.add("Battery is at $batteryPct%. Enable Battery Saver mode to defer background blocklist updates and reduce disk logging.")
         }
-        if (recs.isEmpty()) {
-            recs.add("Battery temperature (${String.format(Locale.US, "%.1f°C", tempCelsius)}) and voltage (${voltageMv} mV) are within normal operating limits.")
+        recs.addAll(
+            com.adshield.pro.engine.battery.BatteryAnalytics.buildPowerRecommendations(
+                batteryPercent = batteryPct,
+                temperatureCelsius = tempCelsius,
+                isCharging = isCharging,
+                drainPercentPerHour = drainAnalysis.drainPercentPerHour,
+                isPowerSaveModeOn = powerManager.isPowerSaveMode
+            )
+        )
+        if (drainAnalysis.isReliable && !isCharging) {
+            recs.add(0, "Measured drain: ${String.format(Locale.US, "%.1f%%/h", drainAnalysis.drainPercentPerHour)} → about ${drainAnalysis.estimatedMinutesToEmpty?.div(60)}h ${drainAnalysis.estimatedMinutesToEmpty?.rem(60)}m of use remaining.")
         }
 
         val vpnState = repository.vpnRuntimeState.value
@@ -349,7 +429,14 @@ class SystemOptimizerEngine @Inject constructor(
             isOverheating = isOverheating,
             isLowBattery = isLowBattery,
             adShieldBatteryImpactSummary = adShieldImpact,
-            recommendations = recs
+            recommendations = recs,
+            chargeCounterMilliAmpHours = chargeCounterMah,
+            cycleCount = cycleCount,
+            drainPercentPerHour = drainAnalysis.drainPercentPerHour,
+            drainIsReliable = drainAnalysis.isReliable,
+            estimatedMinutesToEmpty = drainAnalysis.estimatedMinutesToEmpty,
+            batteryHealthScore = healthReport.healthScore,
+            batteryHealthSummary = "${healthReport.label} (${healthReport.findings.firstOrNull() ?: "No wear indicators"})"
         )
     }
 
@@ -522,6 +609,93 @@ class SystemOptimizerEngine @Inject constructor(
             }
         }
 
+        // 4. TRUE DEEP CLEAN: hidden/secret files, crash logs, orphaned folders, and thumbnail
+        //    caches across shared storage. Uses All-Files-Access when granted; otherwise falls
+        //    back to the public directories readable under scoped storage.
+        if (mode == JunkCleanMode.DEEP_SCAN || mode == JunkCleanMode.CUSTOM_CLEAN) {
+            val scanRoots = buildList {
+                if (hasAllFilesAccess()) {
+                    add(Environment.getExternalStorageDirectory())
+                }
+                runCatching {
+                    val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    if (downloads.exists() && downloads.canRead()) add(downloads)
+                }
+                context.getExternalFilesDir(null)?.let { add(it) }
+            }
+
+            var scannedFiles = 0
+            val emptyDirCandidates = LinkedHashMap<String, File>()
+            val thumbnailDirNames = setOf(".thumbnails", "thumbnails", ".thumbdata3--1967290299")
+
+            fun addCandidate(file: File, category: JunkCategory) {
+                if (candidates.size >= MAX_DEEP_CANDIDATES) return
+                if (isExcluded(file)) return
+                if (candidates.any { it.absolutePath == file.absolutePath }) return
+                candidates.add(
+                    JunkCandidateItem(
+                        id = file.absolutePath,
+                        absolutePath = file.absolutePath,
+                        displayName = if (file.isHidden || file.name.startsWith(".")) "${file.name} (hidden)" else file.name,
+                        sizeBytes = if (file.isFile) file.length() else 0L,
+                        category = category,
+                        lastModifiedEpochMs = file.lastModified(),
+                        requiresUserConfirmation = !category.autoDeleteSafe,
+                        isSelected = category.autoDeleteSafe
+                    )
+                )
+            }
+
+            run outer@{
+            for (root in scanRoots) {
+                if (!root.exists() || !root.canRead()) continue
+                root.walkTopDown().maxDepth(if (hasAllFilesAccess()) 5 else 3).forEach { file ->
+                    if (scannedFiles++ > MAX_DEEP_SCAN_FILES) return@outer
+                    if (!file.canRead()) return@forEach
+                    val name = file.name.lowercase(Locale.US)
+                    val parentName = file.parentFile?.name?.lowercase(Locale.US) ?: ""
+
+                    // Active system/app data must never be touched
+                    if (file.absolutePath.contains("/Android/data") ||
+                        file.absolutePath.contains("/Android/obb") && !file.isDirectory
+                    ) return@forEach
+
+                    when {
+                        file.isDirectory -> {
+                            if (name !in thumbnailDirNames) {
+                                emptyDirCandidates[file.absolutePath] = file
+                            } else {
+                                // Thumbnail cache folder: candidates are its files
+                                file.listFiles()?.forEach { thumb ->
+                                    if (thumb.isFile && thumb.length() > 0) addCandidate(thumb, JunkCategory.THUMBNAIL_CACHE)
+                                }
+                            }
+                        }
+                        file.isHidden && HIDDEN_JUNK_NAME_REGEX.containsMatchIn(name) ->
+                            addCandidate(file, JunkCategory.HIDDEN_TEMP_FILES)
+                        name.endsWith(".log") || name.endsWith(".trace") || name.endsWith(".tombstone") ->
+                            addCandidate(file, JunkCategory.CRASH_LOGS)
+                        name.startsWith(".") && file.isFile && file.length() in 1..(512L * 1024L * 1024L) &&
+                            (name.endsWith(".tmp") || name.endsWith(".temp") || name.endsWith(".partial") ||
+                                name.endsWith(".download") || name.endsWith(".crdownload")) ->
+                            addCandidate(file, JunkCategory.HIDDEN_TEMP_FILES)
+                    }
+                }
+            }
+            }
+
+            // A folder only counts as orphaned when it is completely empty right now
+            for ((_, dir) in emptyDirCandidates) {
+                if (candidates.size >= MAX_DEEP_CANDIDATES) break
+                val children = runCatching { dir.listFiles() }.getOrNull() ?: continue
+                if (children.isEmpty() && dir.absolutePath != Environment.getExternalStorageDirectory().absolutePath) {
+                    if (dir.isHidden || dir.name.startsWith(".") || dir.parentFile?.let { it !in scanRoots } == true) {
+                        addCandidate(dir, JunkCategory.EMPTY_FOLDERS)
+                    }
+                }
+            }
+        }
+
         val distinctCandidates = candidates.distinctBy { it.absolutePath }
             .sortedByDescending { it.sizeBytes }
 
@@ -599,6 +773,14 @@ class SystemOptimizerEngine @Inject constructor(
 
         for (item in eligible) {
             val file = File(item.absolutePath)
+            if (item.category == JunkCategory.EMPTY_FOLDERS && file.exists() && file.isDirectory) {
+                val children = runCatching { file.listFiles() }.getOrNull()
+                if (children != null && children.isEmpty()) {
+                    val deleted = runCatching { file.delete() }.getOrDefault(false)
+                    if (deleted) deletedCount++
+                }
+                continue
+            }
             if (file.exists() && file.isFile) {
                 val len = file.length()
                 val deleted = runCatching { file.delete() }.getOrDefault(false)
@@ -646,10 +828,10 @@ class SystemOptimizerEngine @Inject constructor(
         repository.enforceLogRetentionPolicy()
         actions.add("Trimmed expired SQLite DNS telemetry logs outside retention window.")
 
-        // 3. Request JVM garbage collection of unreachable objects inside AdShield Pro
+        // 3. Request JVM garbage collection of unreachable objects inside TitanShield Max
         System.runFinalization()
         Runtime.getRuntime().gc()
-        actions.add("Compacted AdShield Pro JVM heap allocations.")
+        actions.add("Compacted TitanShield Max JVM heap allocations.")
 
         val after = readRamSnapshot()
         val adShieldReclaimed = (
@@ -666,7 +848,7 @@ class SystemOptimizerEngine @Inject constructor(
                 add("Switch to Standard or Privacy filter lists if your device has less than 4 GB of physical RAM.")
             }
             if (isEmpty()) {
-                add("AdShield Pro memory footprint is healthy (${RuleBasedOptimizationPredictor.formatBytes(after.adShieldJavaHeapUsedBytes)} Java heap). Active VPN protection was preserved without interruption.")
+                add("TitanShield Max memory footprint is healthy (${RuleBasedOptimizationPredictor.formatBytes(after.adShieldJavaHeapUsedBytes)} Java heap). Active VPN protection was preserved without interruption.")
             }
         }
 
@@ -919,7 +1101,7 @@ class SystemOptimizerEngine @Inject constructor(
             actionsCompleted.add("Checked temporary cache directories (already clean).")
         }
 
-        // Step 2: Optimize AdShield Pro RAM & caches safely
+        // Step 2: Optimize TitanShield Max RAM & caches safely
         val ramResult = optimizeRam()
         actionsCompleted.addAll(ramResult.actionsTaken)
 
@@ -962,5 +1144,50 @@ class SystemOptimizerEngine @Inject constructor(
             pendingUserApprovalActions = pendingApprovals,
             wasSkippedDueToRecentBoost = false
         )
+    }
+
+    // --- 7. EXTREME BATTERY SAVER (TITANSHIELD MAX) ---
+
+    /**
+     * Applies the deepest power reduction Android permits a normal app to make:
+     * stretches background work to 72h, disables all disk logging, freezes the periodic
+     * maintenance worker, and trims every internal cache. Reversible via [restoreBalancedPower].
+     */
+    suspend fun runExtremeBatterySaver(): List<String> = withContext(Dispatchers.IO) {
+        val actions = mutableListOf<String>()
+
+        preferencesRepository.setDetailedDnsLogging(false)
+        actions.add("Verbose DNS disk logging disabled (zero per-domain writes).")
+
+        preferencesRepository.setAutoUpdateFilters(true, 72)
+        FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(context, true, 72)
+        actions.add("Filter sync stretched to every 72 hours.")
+
+        runCatching {
+            com.adshield.pro.worker.SmartOptimizationWorker.scheduleOrCancelSmartMaintenance(context, false, 24)
+            actions.add("Automatic background optimization scans frozen.")
+        }
+
+        preferencesRepository.setBatteryMode(BatteryMode.BATTERY_SAVER)
+        val trimmed = upstreamDnsResolver.trimExpiredAndExcessCache(64)
+        actions.add("Internal caches trimmed ($trimmed stale DNS entries released).")
+
+        System.runFinalization()
+        Runtime.getRuntime().gc()
+        actions.add("App heap compacted. VPN protection stays fully active.")
+
+        actions
+    }
+
+    /** Restores the normal balanced power profile after Extreme Battery Saver. */
+    suspend fun restoreBalancedPower(): List<String> = withContext(Dispatchers.IO) {
+        val actions = mutableListOf<String>()
+        preferencesRepository.setDetailedDnsLogging(true)
+        preferencesRepository.setAutoUpdateFilters(true, 24)
+        FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(context, true, 24)
+        com.adshield.pro.worker.SmartOptimizationWorker.scheduleOrCancelSmartMaintenance(context, true, 24)
+        preferencesRepository.setBatteryMode(BatteryMode.BALANCED)
+        actions.add("Balanced power profile restored: 24h sync, normal logging, background scans resumed.")
+        actions
     }
 }

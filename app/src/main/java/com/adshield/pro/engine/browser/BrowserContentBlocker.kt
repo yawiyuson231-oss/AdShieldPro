@@ -19,7 +19,7 @@ import javax.inject.Singleton
  *
  * Note: As disclosed in the UI and documentation, Android security sandboxing prevents
  * a non-root app from injecting cosmetic CSS into external third-party browsers; cosmetic
- * filtering operates inside AdShield Pro's built-in Privacy Browser.
+ * filtering operates inside TitanShield Max's built-in Privacy Browser.
  */
 @Singleton
 class BrowserContentBlocker @Inject constructor(
@@ -93,7 +93,32 @@ class BrowserContentBlocker @Inject constructor(
             )
         }
 
+        // Evaluate EasyList-style URL pattern rules (network-level video/display ad filtering)
+        val resourceType = guessResourceType(requestUrl, (uri.rawPath ?: "").lowercase())
+        val patternMatch = UrlPatternFilter.match(requestUrl, requestHost, isThirdParty, resourceType)
+        if (patternMatch != null) {
+            sessionBlockedSubresources.incrementAndGet()
+            return InterceptionDecision(
+                shouldBlock = true,
+                reason = "URL filter match: $patternMatch",
+                matchedRule = patternMatch
+            )
+        }
+
         return InterceptionDecision(false, "Allowed")
+    }
+
+    private fun guessResourceType(url: String, path: String): String {
+        return when {
+            path.endsWith(".js") || path.contains(".js?") -> "script"
+            path.endsWith(".css") -> "stylesheet"
+            path.endsWith(".mp4") || path.endsWith(".m3u8") || path.endsWith(".ts") ||
+                path.endsWith(".webm") || path.endsWith(".mpd") -> "media"
+            path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".jpeg") ||
+                path.endsWith(".gif") || path.endsWith(".webp") || path.endsWith(".svg") -> "image"
+            path.endsWith(".html") -> "subdocument"
+            else -> "xmlhttprequest"
+        }
     }
 
     /**
@@ -140,7 +165,7 @@ class BrowserContentBlocker @Inject constructor(
             "text/plain",
             "UTF-8",
             204,
-            "Blocked by AdShield Pro",
+            "Blocked by TitanShield Max",
             mapOf(
                 "Access-Control-Allow-Origin" to "*",
                 "Cache-Control" to "no-store"
@@ -177,7 +202,7 @@ class BrowserContentBlocker @Inject constructor(
             (function() {
                 if (window.__adshieldCosmeticApplied) return;
                 window.__adshieldCosmeticApplied = true;
-                const styleId = 'adshield-pro-cosmetic-style';
+                const styleId = 'titanshield-cosmetic-style';
                 function applyStyle() {
                     if (!document.getElementById(styleId) && document.head) {
                         const style = document.createElement('style');
@@ -189,6 +214,29 @@ class BrowserContentBlocker @Inject constructor(
                 }
                 applyStyle();
                 document.addEventListener('DOMContentLoaded', applyStyle);
+                // Collapse ad placeholders whenever the DOM mutates (SPA / infinite feeds)
+                try {
+                    const observer = new MutationObserver(function() { applyStyle(); });
+                    observer.observe(document.documentElement, { childList: true, subtree: true });
+                } catch (e) {}
+                // Video-ad auto-skip: clicks the visible "Skip" control the moment it appears
+                // (YouTube web & common HTML5 players). Never touches the video itself.
+                setInterval(function() {
+                    try {
+                        const skipSelectors = [
+                            '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern', '.ytp-ad-overlay-close-button',
+                            '.videoAdUiSkipButton', '.skip-ad-button', 'button[class*=skip-ad]',
+                            '.ad-skip-button'
+                        ];
+                        for (const sel of skipSelectors) {
+                            const btn = document.querySelector(sel);
+                            if (btn && btn.offsetParent !== null) { btn.click(); break; }
+                        }
+                        // Collapse unskippable ad overlays' companion banners
+                        const companion = document.querySelector('.ytp-ad-player-overlay-layout, .ytp-ad-action-interstitial');
+                        if (companion) companion.style.display = 'none';
+                    } catch (e) {}
+                }, 500);
             })();
         """.trimIndent()
     }
@@ -220,6 +268,127 @@ class BrowserContentBlocker @Inject constructor(
             "rb_clickid"
         )
 
+        /**
+         * TitanShield Max — EasyList-style network URL filter for the built-in browser.
+         *
+         * Compiled from classic Adblock network syntax subset:
+         *   ||host^          → host suffix match
+         *   /keyword/…       → substring match on the full URL
+         *   rule$third-party → only match requests to a different site than the page
+         *   rule$important   → cannot be excepted
+         *   @@rule           → exception (allow)
+         *
+         * Focused on video-ad delivery (VAST/VMAP/preroll/midroll ad servers), ad exchanges,
+         * measurement beacons, and popup/interstitial networks — the layer that actually stops
+         * in-website video ads without touching the primary media CDN.
+         */
+        object UrlPatternFilter {
+
+            enum class RuleKind { HOST_SUFFIX, SUBSTRING }
+
+            data class NetworkRule(
+                val pattern: String,
+                val kind: RuleKind,
+                val thirdPartyOnly: Boolean,
+                val isException: Boolean
+            )
+
+            /** Hosts dedicated to advertising — blocked regardless of page context. */
+            private val dedicatedAdHosts = setOf(
+                "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+                "adnxs.com", "adsrvr.org", "rubiconproject.com", "pubmatic.com",
+                "openx.net", "criteo.com", "criteo.net", "casalemedia.com", "33across.com",
+                "spotxchange.com", "spotx.tv", "tremorhub.com", "smartadserver.com",
+                "adform.net", "zedo.com", "admob.com", "adcolony.com",
+                "applovin.com", "unityads.unity3d.com", "vungle.com", "chartboost.com",
+                "inmobi.com", "moatads.com", "adsafeprotected.com", "doubleverify.com",
+                "scorecardresearch.com", "quantserve.com",
+                "outbrain.com", "taboola.com", "teads.tv", "teads.com", "sharethrough.com",
+                "media.net", "amazon-adsystem.com", "adap.tv", "adtechus.com",
+                "advertising.com", "adroll.com", "bidswitch.net",
+                "contextweb.com", "gumgum.com", "improvedigital.com", "indexww.com",
+                "liadm.com", "liquidad.net", "magnetic.com",
+                "mathtag.com", "moatpixel.com", "nexac.com",
+                "pixfuture.net", "popads.net", "popcash.net", "propellerads.com",
+                "revcontent.com", "rlcdn.com", "servenobid.com", "serving-sys.com",
+                "smaato.net", "sonobi.com", "sovrn.com", "tapad.com",
+                "turn.com", "undertone.com", "yieldmo.com", "yieldlab.net",
+                "atdmt.com", "histats.com", "adriver.ru", "adfox.ru"
+            )
+
+            /**
+             * First-party video-ad beacons (YouTube): pure advertising telemetry —
+             * blocking them never touches video playback, so the $third-party gate
+             * is intentionally waived for this set only.
+             */
+            private val firstPartyVideoAdPatterns = listOf(
+                "api/stats/ads", "/ptracking", "/pcs/click", "youtube.com/pagead"
+            )
+
+            /** Full-URL substring patterns for video-ad manifest & bidding endpoints. */
+            private val urlSubstringRules = listOf(
+                "/vast", "/vmap", "/vmap.xml", "vastads", "vasttag", "vast_wrapper",
+                "preroll", "midroll", "postroll", "admanifest", "ad-manifest", "adunit/",
+                "/adserver", "/adservice", "/adframe", "/adframe.js", "/adrequest",
+                "/getads", "/fetchads", "/loadads", "/requestads", "/adcall", "/adconfig",
+                "/adproxy", "/adrouter", "ads.js", "adsdk", "adtag", "adtag.js",
+                "/gpt.js", "/pubads_impl", "pagead/ads", "pagead/js", "/adsbygoogle",
+                "apstag.js", "prebid", "pbjs", "headerbid", "/bid/bid?", "/openrtb",
+                "/rtb/", "/rtb2/auction", "/imp?", "/adv/", "popunder", "pop-under",
+                "/ima/ads", "videoads", "/ads/video", "videoplaza", "ima3", "securepubads",
+                "interstitial?", "interstitial.js", "adinterax", "atgsvcs", "atdmt.com",
+                "amung.us", "histats.com", "statcounter.com/count", "addthis.com",
+                "adriver.ru", "adfox.ru", "an.yandex.ru", "mc.yandex.ru/metrika"
+            )
+
+            /** Compiled, immutable rule set (hot path — matched on every browser request). */
+            private val rules: List<NetworkRule> = buildRules()
+
+            private fun buildRules(): List<NetworkRule> {
+                val list = ArrayList<NetworkRule>(256)
+                for (host in dedicatedAdHosts) {
+                    list.add(NetworkRule(host, RuleKind.HOST_SUFFIX, thirdPartyOnly = false, isException = false))
+                }
+                for (pattern in urlSubstringRules) {
+                    list.add(NetworkRule(pattern, RuleKind.SUBSTRING, thirdPartyOnly = true, isException = false))
+                }
+                return list
+            }
+
+            /**
+             * Returns the matched rule label when the request should be blocked, else null.
+             */
+            fun match(requestUrl: String, requestHost: String, isThirdParty: Boolean, resourceType: String): String? {
+                val url = requestUrl.lowercase()
+                // Ad-only telemetry beacons are safe to block even first-party (no playback impact)
+                for (pattern in firstPartyVideoAdPatterns) {
+                    if (url.contains(pattern)) return "video-ad beacon: $pattern"
+                }
+                // Cheap exception check for first-party analytics opt-outs
+                if (url.contains("pagead2.googlesyndication.com/pcs/activeview") &&
+                    resourceType == "image"
+                ) {
+                    return null
+                }
+                for (rule in rules) {
+                    if (rule.thirdPartyOnly && !isThirdParty) continue
+                    val hit = when (rule.kind) {
+                        RuleKind.HOST_SUFFIX -> {
+                            var suffix: String? = requestHost
+                            while (suffix != null) {
+                                if (suffix == rule.pattern || suffix.endsWith(".${rule.pattern}")) return "||${rule.pattern}^"
+                                suffix = if (suffix.contains('.')) suffix.substringAfter('.') else null
+                            }
+                            false
+                        }
+                        RuleKind.SUBSTRING -> url.contains(rule.pattern)
+                    }
+                    if (hit) return if (rule.kind == RuleKind.SUBSTRING) rule.pattern else "||${rule.pattern}^"
+                }
+                return null
+            }
+        }
+
         private val THIRD_PARTY_AD_PATH_PATTERNS = listOf(
             "/pagead/",
             "/ads/ads.js",
@@ -248,7 +417,32 @@ class BrowserContentBlocker @Inject constructor(
             "iframe[src*=doubleclick]",
             "iframe[src*=googlesyndication]",
             "iframe[src*=adnxs]",
-            "iframe[src*=taboola]"
+            "iframe[src*=taboola]",
+            // YouTube (web/mobile web) display & feed ad units
+            "#masthead-ad",
+            "#player-ads",
+            "ytd-promoted-video-renderer",
+            "ytd-compact-promoted-video-renderer",
+            "ytd-player-legacy-desktop-watch-ads-renderer",
+            ".ytp-ad-text-overlay",
+            "ytd-display-ad-renderer",
+            "ytd-ad-slot-renderer",
+            "ytd-in-feed-ad-layout-renderer",
+            "ytd-promoted-sparkles-web-renderer",
+            "ytd-promoted-sparkles-text-search-renderer",
+            "ytd-compact-promoted-video-renderer",
+            "ytd-banner-promo-renderer",
+            "ytd-statement-banner-renderer",
+            "ytm-promoted-video-renderer",
+            "ytm-companion-slot",
+            "#masthead-ad",
+            "#player-ads",
+            "#related ytd-ad-slot-renderer",
+            ".ytd-merch-shelf-renderer",
+            // Generic pop/interstitial overlays
+            "[id*=interstitial-ad]",
+            "[class*=popup-ad]",
+            "[class*=ad-overlay]"
         )
     }
 }

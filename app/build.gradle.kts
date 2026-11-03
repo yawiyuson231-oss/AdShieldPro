@@ -56,8 +56,8 @@ android {
         applicationId = "com.adshield.pro"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20205
-        versionName = "2.2.5"
+        versionCode = 40700
+        versionName = "4.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -124,6 +124,14 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events = setOf(org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED)
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showCauses = true
     }
 }
 

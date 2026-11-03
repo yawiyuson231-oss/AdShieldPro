@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Restores AdShield Pro VPN protection automatically after device boot or app update
+ * Restores TitanShield Max VPN protection automatically after device boot or app update
  * if the user had protection active and enabled boot restoration.
  */
 @AndroidEntryPoint
