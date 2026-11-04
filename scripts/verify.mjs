@@ -17,6 +17,7 @@
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
+import { inspect as inspectExtension, MAX_STATIC_RULES } from './build-extension.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const abs = (p) => resolve(ROOT, p);
@@ -160,6 +161,28 @@ export function verify() {
   add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
+
+  /* 9c. The shipped extension is a real archive built from reviewed sources. */
+  const ext = inspectExtension({ root: ROOT });
+  add('extension archive is readable', !!ext.ok, ext.error || `${ext.ruleCount} rules · ${ext.bytes} bytes`);
+  add('extension stays inside Chrome\'s guaranteed static-rule allowance',
+    !ext.overLimit, `${ext.ruleCount} ≤ ${MAX_STATIC_RULES}`);
+  add('extension rulesets are unique and non-empty',
+    ext.uniqueDomains === ext.ruleCount, `${ext.uniqueDomains} unique of ${ext.ruleCount}`);
+  add('extension manifest is MV3 and matches the app version',
+    ext.manifestVersion === 3 && ext.version === JSON.parse(read('package.json')).version,
+    `MV${ext.manifestVersion ?? '?'} · ${ext.version ?? '?'}`);
+  for (const file of ['extension/src/background.js', 'extension/src/content.js', 'extension/src/popup.js', 'extension/src/popup.html']) {
+    add(`extension source: ${file}`, exists(file) && statSync(abs(file)).size > 100);
+  }
+  const extSources = ['extension/src/background.js', 'extension/src/popup.js', 'extension/src/content.js'].map(read).join('\n');
+  add('extension sources make no network calls', !/\bfetch\s*\(|XMLHttpRequest|WebSocket|navigator\.sendBeacon/.test(extSources));
+  let facts = null;
+  try { facts = JSON.parse(read('assets/extension-facts.json')); } catch { /* reported below */ }
+  add('extension facts file is present and matches the archive',
+    !!facts && facts.rules === ext.ruleCount && facts.rulesets === ext.rulesets && facts.version === ext.version,
+    facts ? `${facts.rules} rules · v${facts.version}` : 'missing or unparsable');
+  add('extension builder is wired into package scripts', !!JSON.parse(read('package.json')).scripts?.['build:extension']);
 
   /* 10. Package scripts point at real test globs. */
   const pkg = JSON.parse(read('package.json'));

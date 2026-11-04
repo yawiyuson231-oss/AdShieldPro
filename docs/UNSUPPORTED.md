@@ -61,6 +61,21 @@ under **Capabilities**.
   it never reports an optimisation it cannot perform.
 - Nothing here is a substitute for a maintained antivirus, EDR, or enterprise DNS gateway.
 
+## 5b. Browser extension limits
+
+- **Static rules are capped at 30,000.** Chrome only guarantees that many
+  `declarativeNetRequest` static rules per extension; the rest is shared with every other
+  installed blocker. The bundled feeds contain 79,739 rules, so the extension ships the
+  first 30,000 by feed order. Popularity ordering is not available offline, so this is a
+  breadth trade-off, not a claim that the shipped 30,000 are the "best" ones.
+- **Third-party requests only.** Rules use `domainType: "thirdParty"`, so ads served from
+  a site's own domain are not blocked by DNR.
+- **Per-tab counts need a dev install.** `onRuleMatchedDebug` requires the
+  `declarativeNetRequestFeedback` permission and an unpacked/development install. Where it
+  is unavailable the popup shows `—` and the reason instead of a fabricated `0`.
+- **One browser at a time.** The extension filters the browser it is installed in. It
+  cannot filter other applications or other browsers.
+
 ## 6. Claims policy
 
 The following are never claimed anywhere in the product, and `scripts/verify.mjs` fails the

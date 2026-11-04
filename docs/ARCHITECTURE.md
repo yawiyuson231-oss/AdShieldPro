@@ -20,7 +20,7 @@ security/           firewall AI, monitor, feeds, backup, privacy, sha256, storag
 assets/             bundled rule feeds (GPLv3, HaGeZi) + curated supplements + icon
 sw.js               offline caching (never caches DoH)
 scripts/verify.mjs  static architecture + honesty-claim verification
-tests/              unit (137) + integration (15) + static gates
+tests/              unit (153) + integration (16) + static gates
 ```
 
 ## 2. Data flow of a single lookup
@@ -143,6 +143,28 @@ never a guess.
 - `backup.js` — hashed immutable snapshots (ring of 4), write verification, schema
   migration v1→v3, newest-valid-first recovery that skips corrupt snapshots and reports
   what it skipped.
+
+## 9b. Browser extension (`extension/`, `scripts/build-extension.mjs`)
+
+The ZIP served at `/omnishield-x-extension.zip` is a build artifact, not a hand-made
+download:
+
+- `extension/src/` holds the reviewed sources — `background.js` (counts from
+  `onRuleMatchedDebug`, with an explicit "unsupported" path), `popup.html/js` (renders
+  measured counts or `—` plus the reason), `content.js` (cosmetic CSS only), `icon.png`.
+- `scripts/build-extension.mjs` extracts `||domain^` rules from the bundled feeds
+  (curated supplement first, then the light list, in feed order), removes duplicates and
+  anything on the system safety allowlist, caps the result at **30,000** static rules
+  (Chrome's `GUARANTEED_MINIMUM_STATIC_RULES`), splits them into ruleset files, generates
+  the MV3 manifest from `package.json`'s version, and writes a deterministic ZIP
+  (fixed timestamps, sorted entries, no dependencies — the writer and reader are ~120
+  lines of `zlib` + CRC-32 in the script).
+- It also emits `assets/extension-facts.json`, which the Extension page fetches so the
+  numbers shown in the UI come from the shipped archive rather than from copy.
+- `npm run verify` re-reads the ZIP, checks the rule count is inside the limit, that all
+  domains are unique, that the manifest is MV3 and matches the app version, and that the
+  facts file has not drifted. `tests/unit/extension.test.mjs` tests the selection,
+  capping, ZIP round-trip and manifest generation against synthetic feeds.
 
 ## 10. Security posture of the app itself
 

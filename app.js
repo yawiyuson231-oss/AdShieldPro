@@ -350,13 +350,20 @@ function navigate(page) {
   for (const other of document.querySelectorAll('.page')) {
     if (other !== section) other.removeAttribute('aria-current');
   }
-  try { PAGE_RENDERERS[page]?.(); } catch (err) { console.error(err); toast(`Render error on ${page}: ${err.message}`, 'bad'); }
+  try {
+    // Renderers may be async (they read shipped artifacts); a rejection must be
+    // reported, never left as an unhandled promise.
+    Promise.resolve(PAGE_RENDERERS[page]?.()).catch((err) => {
+      console.error(err);
+      toast(`Render error on ${page}: ${err.message}`, 'bad');
+    });
+  } catch (err) { console.error(err); toast(`Render error on ${page}: ${err.message}`, 'bad'); }
   if (location.hash !== `#${page}`) history.replaceState(null, '', `#${page}`);
 }
 
 function renderAll() {
   for (const render of Object.values(PAGE_RENDERERS)) {
-    try { render(); } catch (err) { console.error('render failed', err); }
+    try { Promise.resolve(render()).catch((err) => console.error('render failed', err)); } catch (err) { console.error('render failed', err); }
   }
 }
 
@@ -1241,19 +1248,44 @@ function exportMergedConfig() {
 /* Extension & capabilities                                            */
 /* ------------------------------------------------------------------ */
 
-function renderExtension() {
+async function renderExtension() {
   const breakdown = state.engine?.breakdown();
+  const facts = await fetchJSONSafe('./assets/extension-facts.json');
+  const artifactRows = facts
+    ? [
+        ['Rules shipped in the ZIP', `${number(facts.rules)} static rules in ${facts.rulesets} ruleset files`],
+        ['Unique domains', number(facts.uniqueDomains)],
+        ['Feed lines considered', `${number(facts.feedLinesConsidered)} → capped at ${number(facts.maxStaticRules)} by feed order`],
+        ['Archive size', bytes(facts.bytes)],
+        ['Archive version', String(facts.version)]
+      ]
+    : [['Rules shipped in the ZIP', 'facts file unavailable — rebuild with npm run build:extension']];
+
   mount('#extension-facts',
-    h('h2', { text: 'Extension facts (measured, not marketed)' }),
+    h('h2', { text: 'Extension facts (measured from the shipped ZIP, not marketed)' }),
     kv([
-      ['Rule files', '2 declarativeNetRequest files shipped in the zip'],
+      ...artifactRows,
       ['Rules in this web core', `${number(breakdown?.total ?? 0)} (same feeds, different engine)`],
-      ['Permissions requested', 'declarativeNetRequest, storage, activeTab — no host access to read page data'],
+      ['Why not all of them', `Chrome guarantees ${number(facts?.maxStaticRules ?? 30000)} static rules per extension; anything above that is shared with every other installed blocker and can fail to enable`],
+      ['Permissions requested', 'declarativeNetRequest, declarativeNetRequestFeedback, storage'],
+      ['Host access', 'a content script matches http/https pages to inject cosmetic CSS — it reads no page content and sends nothing'],
       ['Network calls', 'none at runtime; rules are static files'],
-      ['Cannot do', 'filter other apps, filter traffic in other browsers, or block first-party ads served from the site\'s own domain']
+      ['Counts in the popup', 'from the browser\'s own matched-rule events, and only where the browser exposes them — otherwise the popup shows "—" and the reason'],
+      ['Cannot do', 'filter other apps, filter traffic in other browsers, or block first-party ads served from the site\'s own domain (rules are third-party only)']
     ]),
-    note('The web platform and the extension share feed data, not runtime state. The extension\'s per-tab counts come from its own counters.', 'warn')
+    note('This is a content blocker, not a privacy VPN. Chrome limits how many static rules an extension may ship, which is why the extension carries a capped subset of the 79k-rule web core. The builder script (npm run build:extension) regenerates the ZIP deterministically from the bundled feeds.', 'warn')
   );
+}
+
+/** Fetch + parse JSON, returning null instead of throwing on any failure. */
+async function fetchJSONSafe(url) {
+  try {
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
 }
 
 const CAPABILITIES = [
