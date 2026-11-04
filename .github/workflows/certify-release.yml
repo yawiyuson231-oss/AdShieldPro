@@ -28,7 +28,7 @@ env:
   VERSION_NAME: '5.0.0'
   VERSION_CODE: '50000'
   RELEASE_TAG: 'v5.0.0'
-  EXPECTED_TESTS: '129'
+  EXPECTED_TESTS: '133'
 
 jobs:
   certify:

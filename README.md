@@ -12,7 +12,7 @@ OmniShield X Infinity (formerly TitanShield Max, originally AdShield Pro) is a n
 - Real-data network shield, per-category DNS event feed, connectivity validation, DNS-path disclosure and conservative local IP classification.
 - Battery percentage/status, current, voltage, temperature, battery-side power, optional capacity/cycle data, estimated remaining time, foreground trends and private charging sessions—with measured/computed/estimated/unavailable provenance.
 - Persistent local scan history and explicit SAF file quarantine. Original deletion is claimed only when the document provider confirms it.
-- Expanded **129-case** JVM test contract plus a hard Android lint and development-APK inspection gate.
+- Expanded **133-case** JVM test contract plus a hard Android lint and development-APK inspection gate.
 
 ## Existing foundation retained
 

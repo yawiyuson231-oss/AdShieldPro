@@ -91,6 +91,7 @@ data class AppSettingsState(
     val emergencyPreviousHeuristicEnabled: Boolean = true
 )
 
+@kotlinx.serialization.Serializable
 enum class DarkThemePreference(val label: String) {
     DARK("Dark (Default)"),
     LIGHT("Light"),

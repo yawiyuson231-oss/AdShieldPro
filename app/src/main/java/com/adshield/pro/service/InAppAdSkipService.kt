@@ -12,6 +12,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -36,6 +37,7 @@ class InAppAdSkipService : AccessibilityService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val throttle = AdSkipDecisionEngine.Throttle(minIntervalMs = 900L)
+    private var configJob: Job? = null
 
     @Volatile private var enabled = false
     @Volatile private var extraPackages: Set<String> = emptySet()
@@ -67,10 +69,17 @@ class InAppAdSkipService : AccessibilityService() {
             flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
             notificationTimeout = 150
         }
-        refreshConfigFromSettings()
+        configJob?.cancel()
+        configJob = scope.launch {
+            prefs.settingsFlow.collect { settings ->
+                enabled = settings.inAppAdSkipEnabled
+                extraPackages = settings.adSkipExtraPackages
+                universalMode = settings.inAppAdSkipUniversal
+            }
+        }
     }
 
-    /** Live config: settings changes apply without re-enabling the service. */
+    /** Live config is collected continuously, including changes made by backup restore. */
     fun refreshConfigFromSettings() {
         scope.launch {
             val settings = prefs.getSettingsSnapshot()
@@ -130,6 +139,7 @@ class InAppAdSkipService : AccessibilityService() {
 
         val bestPair = AdSkipDecisionEngine.pickBest(candidates.map { it.second to it.first }) ?: return
         val target = candidates.firstOrNull { it.first.type == bestPair.second.type }?.third ?: return
+        if (!throttle.tryAcquire(android.os.SystemClock.uptimeMillis())) return
         val clicked = runCatching { target.performAction(AccessibilityNodeInfo.ACTION_CLICK) }.getOrDefault(false)
         if (clicked && bestPair.second.type == AdSkipDecisionEngine.ActionType.CLICK_SKIP) {
             scope.launch { prefs.incrementInAppAdsSkipped() }

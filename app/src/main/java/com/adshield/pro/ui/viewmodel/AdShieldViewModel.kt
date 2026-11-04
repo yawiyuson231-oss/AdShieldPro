@@ -1227,6 +1227,20 @@ class AdShieldViewModel @Inject constructor(
             res.fold(
                 onSuccess = { ruleCount ->
                     upstreamDnsResolver.clearCache()
+                    val restored = preferencesRepository.getSettingsSnapshot()
+                    aetherCore.autonomousResponseEnabled = restored.autonomousResponseEnabled
+                    aetherCore.manualOverrideEnabled = restored.manualOverrideEnabled
+                    FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(
+                        appContext,
+                        restored.autoUpdateFiltersEnabled,
+                        restored.updateIntervalHours
+                    )
+                    com.adshield.pro.worker.SmartOptimizationWorker.scheduleOrCancelSmartMaintenance(
+                        appContext,
+                        restored.smartAutoOptimizeEnabled,
+                        restored.autoJunkCleanIntervalHours
+                    )
+                    reloadTunnelIfConnected()
                     refreshRuleConflicts()
                     showFeedback("Restored configuration backup ($ruleCount custom rules).")
                 },

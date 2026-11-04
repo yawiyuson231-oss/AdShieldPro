@@ -9,11 +9,15 @@ import com.adshield.pro.data.local.db.DailyStatEntity
 import com.adshield.pro.data.local.db.DnsLogEntity
 import com.adshield.pro.data.local.db.FilterSourceEntity
 import com.adshield.pro.data.local.preferences.AppSettingsState
+import com.adshield.pro.data.local.preferences.DarkThemePreference
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.AppDnsActivity
 import com.adshield.pro.domain.model.CustomRule
+import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.DnsActivityRecord
+import com.adshield.pro.domain.model.DnsResolverConfig
+import com.adshield.pro.domain.model.GamingProfile
 import com.adshield.pro.domain.model.DomainBlockCount
 import com.adshield.pro.domain.model.FilterListSource
 import com.adshield.pro.domain.model.ProtectionMode
@@ -783,12 +787,40 @@ class AdShieldRepository @Inject constructor(
 
     @Serializable
     data class FullConfigurationBackup(
-        val version: Int = 2,
+        val version: Int = 3,
         val exportedAtEpochMs: Long = System.currentTimeMillis(),
         val protectionMode: ProtectionMode,
         val customRules: List<CustomRule>,
         val browserSiteExceptions: Set<String>,
-        val excludedAppPackages: Set<String>
+        val excludedAppPackages: Set<String>,
+        val resolverConfig: DnsResolverConfig = DnsResolverConfig(),
+        val darkThemeMode: DarkThemePreference = DarkThemePreference.DARK,
+        val detailedDnsLoggingEnabled: Boolean = true,
+        val logRetentionDays: Int = 7,
+        val autoUpdateFiltersEnabled: Boolean = true,
+        val updateIntervalHours: Int = 24,
+        val browserCosmeticFilteringEnabled: Boolean = true,
+        val browserPopupBlockingEnabled: Boolean = true,
+        val browserBlockThirdPartyCookies: Boolean = true,
+        val browserJavaScriptEnabled: Boolean = true,
+        val customCosmeticSelectors: Set<String> = emptySet(),
+        val blockHeuristicThreats: Boolean = true,
+        val checkNewDomains: Boolean = false,
+        val blockEncryptedDnsBypass: Boolean = true,
+        val inAppAdSkipEnabled: Boolean = false,
+        val adSkipExtraPackages: Set<String> = emptySet(),
+        val inAppAdSkipUniversal: Boolean = true,
+        val resolverAutoTune: Boolean = false,
+        val autonomousResponseEnabled: Boolean = false,
+        val manualOverrideEnabled: Boolean = false,
+        val smartAutoOptimizeEnabled: Boolean = true,
+        val autoJunkCleanIntervalHours: Int = 24,
+        val excludedJunkPaths: Set<String> = emptySet(),
+        val favoriteGamePackages: Set<String> = emptySet(),
+        val gamingProfile: GamingProfile = GamingProfile.BALANCED,
+        val gameBoosterSuppressNotifications: Boolean = false,
+        val gameBoosterTempWarningCelsius: Int = 41,
+        val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC
     )
 
     suspend fun createConfigurationBackupJson(): String = withContext(Dispatchers.IO) {
@@ -798,17 +830,57 @@ class AdShieldRepository @Inject constructor(
             protectionMode = settings.protectionMode,
             customRules = rules,
             browserSiteExceptions = settings.browserSiteExceptions,
-            excludedAppPackages = settings.excludedAppPackages
+            excludedAppPackages = settings.excludedAppPackages,
+            resolverConfig = settings.resolverConfig,
+            darkThemeMode = settings.darkThemeMode,
+            detailedDnsLoggingEnabled = settings.detailedDnsLoggingEnabled,
+            logRetentionDays = settings.logRetentionDays,
+            autoUpdateFiltersEnabled = settings.autoUpdateFiltersEnabled,
+            updateIntervalHours = settings.updateIntervalHours,
+            browserCosmeticFilteringEnabled = settings.browserCosmeticFilteringEnabled,
+            browserPopupBlockingEnabled = settings.browserPopupBlockingEnabled,
+            browserBlockThirdPartyCookies = settings.browserBlockThirdPartyCookies,
+            browserJavaScriptEnabled = settings.browserJavaScriptEnabled,
+            customCosmeticSelectors = settings.customCosmeticSelectors,
+            blockHeuristicThreats = settings.blockHeuristicThreats,
+            checkNewDomains = settings.checkNewDomains,
+            blockEncryptedDnsBypass = settings.blockEncryptedDnsBypass,
+            inAppAdSkipEnabled = settings.inAppAdSkipEnabled,
+            adSkipExtraPackages = settings.adSkipExtraPackages,
+            inAppAdSkipUniversal = settings.inAppAdSkipUniversal,
+            resolverAutoTune = settings.resolverAutoTune,
+            autonomousResponseEnabled = settings.autonomousResponseEnabled,
+            manualOverrideEnabled = settings.manualOverrideEnabled,
+            smartAutoOptimizeEnabled = settings.smartAutoOptimizeEnabled,
+            autoJunkCleanIntervalHours = settings.autoJunkCleanIntervalHours,
+            excludedJunkPaths = settings.excludedJunkPaths,
+            favoriteGamePackages = settings.favoriteGamePackages,
+            gamingProfile = settings.gamingProfile,
+            gameBoosterSuppressNotifications = settings.gameBoosterSuppressNotifications,
+            gameBoosterTempWarningCelsius = settings.gameBoosterTempWarningCelsius,
+            batteryMode = settings.batteryMode
         )
         jsonSerializer.encodeToString(backup)
     }
 
     suspend fun restoreConfigurationFromJson(rawJson: String): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
+            require(rawJson.length <= com.adshield.pro.engine.security.ConfigurationBackupPolicy.MAX_BACKUP_CHARS) {
+                "Backup exceeds the 2 MB safety limit"
+            }
             val backup = jsonSerializer.decodeFromString<FullConfigurationBackup>(rawJson)
-            prefs.setProtectionMode(backup.protectionMode)
-            filterEngine.updateProtectionMode(backup.protectionMode)
+            require(backup.version in 1..3) { "Unsupported backup version ${backup.version}" }
+            com.adshield.pro.engine.security.ConfigurationBackupPolicy.validateEnvelope(
+                rawJson = rawJson,
+                ruleCount = backup.customRules.size,
+                exceptionCount = backup.browserSiteExceptions.size + backup.excludedAppPackages.size +
+                    backup.customCosmeticSelectors.size + backup.adSkipExtraPackages.size +
+                    backup.excludedJunkPaths.size + backup.favoriteGamePackages.size
+            )
+            val resolver = com.adshield.pro.engine.security.ConfigurationBackupPolicy
+                .validateResolver(backup.resolverConfig)
 
+            // Parse every rule before changing settings or replacing the existing rule database.
             val validEntities = backup.customRules.mapNotNull { rule ->
                 filterEngine.validateAndParseRuleInput(
                     rawInput = rule.rawPattern,
@@ -818,16 +890,48 @@ class AdShieldRepository @Inject constructor(
                 ).getOrNull()?.copy(isEnabled = rule.isEnabled)?.toEntity()
             }
 
+            prefs.setProtectionMode(backup.protectionMode)
+            prefs.updateResolverConfig(resolver)
+            prefs.setDarkThemePreference(backup.darkThemeMode)
+            prefs.setDetailedDnsLogging(backup.detailedDnsLoggingEnabled)
+            prefs.setLogRetentionDays(backup.logRetentionDays)
+            prefs.setAutoUpdateFilters(backup.autoUpdateFiltersEnabled, backup.updateIntervalHours)
+            prefs.updateBrowserPrivacyOptions(
+                backup.browserCosmeticFilteringEnabled,
+                backup.browserPopupBlockingEnabled,
+                backup.browserBlockThirdPartyCookies,
+                backup.browserJavaScriptEnabled
+            )
+            prefs.setBlockHeuristicThreats(backup.blockHeuristicThreats)
+            prefs.setCheckNewDomains(backup.checkNewDomains)
+            prefs.setBlockEncryptedDnsBypass(backup.blockEncryptedDnsBypass)
+            prefs.setInAppAdSkipEnabled(backup.inAppAdSkipEnabled)
+            prefs.setAdSkipExtraPackages(backup.adSkipExtraPackages)
+            prefs.setInAppAdSkipUniversal(backup.inAppAdSkipUniversal)
+            prefs.setResolverAutoTune(backup.resolverAutoTune)
+            prefs.setAutonomousResponseEnabled(backup.autonomousResponseEnabled)
+            prefs.setManualOverrideEnabled(backup.manualOverrideEnabled)
+            prefs.setSmartAutoOptimizeSchedule(
+                backup.smartAutoOptimizeEnabled,
+                backup.autoJunkCleanIntervalHours
+            )
+            prefs.updateGamingBoosterSettings(
+                backup.gamingProfile,
+                backup.gameBoosterSuppressNotifications,
+                backup.gameBoosterTempWarningCelsius
+            )
+            prefs.setBatteryMode(backup.batteryMode)
+            filterEngine.updateProtectionMode(backup.protectionMode)
+
             dao.clearAllCustomRules()
             dao.insertCustomRules(validEntities)
             syncCustomRulesToEngine()
 
-            for (site in backup.browserSiteExceptions) {
-                prefs.toggleBrowserSiteException(site, true)
-            }
-            for (pkg in backup.excludedAppPackages) {
-                prefs.toggleExcludedAppPackage(pkg, true)
-            }
+            for (site in backup.browserSiteExceptions) prefs.toggleBrowserSiteException(site, true)
+            for (pkg in backup.excludedAppPackages) prefs.toggleExcludedAppPackage(pkg, true)
+            for (selector in backup.customCosmeticSelectors) prefs.addCustomCosmeticSelector(selector)
+            for (path in backup.excludedJunkPaths) prefs.addExcludedJunkPath(path)
+            for (pkg in backup.favoriteGamePackages) prefs.toggleFavoriteGame(pkg, true)
             validEntities.size
         }
     }
