@@ -1,14 +1,21 @@
 name: Deploy website
 
-# Publishes the project website to GitHub Pages.
+# Publishes the project website, with two independent destinations.
 #
 #   /            ← docs/            (marketing site, APK links)
 #   /app/        ← the web platform (index.html, app.js, modules, feeds)
 #
+# 1. GitHub Pages (primary, needs Pages enabled once by a repository admin).
+# 2. The `gh-pages` branch (fallback that needs NO admin click at all).
+#    Every run force-pushes the assembled site to `gh-pages` in a single commit,
+#    so the site can also be served from a CDN / static host that reads a branch
+#    (GitHub Pages "Deploy from a branch", Netlify, Cloudflare Pages, Vercel),
+#    or simply downloaded as the run artifact.
+#
 # The web platform is static and uses relative URLs, so serving it from a
 # subdirectory works unchanged (its service worker scope is /app/).
 # Runs on every change to docs/ or the web platform, and can be triggered by hand.
-# Safe to re-run: the job is idempotent and only needs the default token.
+# Safe to re-run: both destinations are idempotent.
 
 on:
   workflow_dispatch:
@@ -28,6 +35,8 @@ on:
       - 'dns/**'
       - 'aether/**'
       - 'security/**'
+      - 'cyber/**'
+      - 'scripts/stage-site.mjs'
       - 'omnishield-x-extension.zip'
       - '.github/workflows/deploy-website.yml'
 
@@ -36,9 +45,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write   # required to publish the gh-pages fallback
+  pages: write      # required to publish to GitHub Pages
+  id-token: write   # required by actions/deploy-pages
 
 jobs:
   deploy:
@@ -46,7 +55,7 @@ jobs:
     timeout-minutes: 20
     environment:
       name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+      url: ${{ steps.pages.outputs.page_url || format('https://github.com/{0}/tree/gh-pages', github.repository) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -94,6 +103,23 @@ jobs:
         # site at /, web platform at /app/) and fails if any service-worker
         # precache target is missing from the staged tree.
         run: node scripts/stage-site.mjs --out _site
+
+      - name: Publish to the gh-pages branch (no admin needed)
+        # This is the destination that always works: pushing a branch only needs
+        # contents:write. One orphan commit per deploy keeps the history flat, and
+        # --force means a failed earlier attempt can never block a new one.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          cd _site
+          git init -q -b gh-pages .
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "site: ${GITHUB_SHA::12} from ${GITHUB_REF_NAME}"
+          git push --force --quiet "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          echo "::notice title=gh-pages updated::Branch gh-pages now serves this build (Pages 'Deploy from a branch' can use it directly)."
 
       # Always upload: the artifact is the deliverable and stays downloadable from the
       # run even when Pages is not switched on yet.

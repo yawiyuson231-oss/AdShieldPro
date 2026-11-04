@@ -22,6 +22,7 @@ npm run lint       # house lint rules for shipped runtime code
 npm run stage      # assemble the deployable _site/ (site at /, app at /app/)
 npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
 npm run build:extension  # regenerate omnishield-x-extension.zip + assets/extension-facts.json
+node tools/make-pwa-icons.mjs  # regenerate the PNG icon set referenced by the web manifest
 ```
 
 ## What this release adds

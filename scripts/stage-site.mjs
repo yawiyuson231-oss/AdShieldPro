@@ -12,9 +12,16 @@
  * service-worker precache list is verified against the staged tree — the failure
  * mode this prevents is "the site deployed but the app cannot start offline".
  *
+ * docs/ is also copied to the site root so the policy and platform documents are
+ * linkable. Those files were written to sit beside the repository root, where
+ * `docs/FOO.md` resolves; served from the root the same link would 404. Every
+ * relative markdown link is therefore rewritten against the file's real location
+ * before it ships, and a link that resolves nowhere in the repository fails the
+ * build instead of shipping as a 404.
+ *
  * Usage: `node scripts/stage-site.mjs [--out _site] [--check-only]`
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
 
@@ -54,6 +61,9 @@ export function stageSite({ out = '_site', root = ROOT } = {}) {
   if (!existsSync(resolve(docs, 'index.html'))) throw new Error('docs/index.html is missing');
   cpSync(docs, target, { recursive: true });
 
+  // 1b. Shipped documentation: make its relative links true for the new location.
+  const docLinks = rewriteDocLinks({ from: docs, to: target, root });
+
   // 2. The web platform under /app/.
   const appDir = resolve(target, 'app');
   mkdirSync(appDir, { recursive: true });
@@ -85,8 +95,53 @@ export function stageSite({ out = '_site', root = ROOT } = {}) {
     copied,
     precache: precache.listed.length,
     appBytes: directorySize(appDir),
-    files: countFiles(appDir)
+    files: countFiles(appDir),
+    docLinks
   };
+}
+
+const MARKDOWN_LINK = /\]\((?!https?:|mailto:|#|data:)([^)\s]+)(\s+"[^"]*")?\)/g;
+
+/**
+ * Rewrites relative markdown links in the staged root copies of docs/*.md so they
+ * resolve from the site root instead of from their repository location.
+ *
+ * @param {{from: string, to: string, root: string}} options
+ * @returns {{rewritten: number, broken: string[]}}
+ */
+export function rewriteDocLinks({ from, to, root }) {
+  let rewritten = 0;
+  const broken = [];
+  for (const file of readdirSync(from)) {
+    if (!file.endsWith('.md')) continue;
+    const source = readFileSync(resolve(from, file), 'utf8');
+    const out = source.replace(MARKDOWN_LINK, (match, rawPath, title = '') => {
+      const target = rawPath.split('#')[0];
+      if (!target) return match;
+      const anchor = rawPath.includes('#') ? `#${rawPath.split('#').slice(1).join('#')}` : '';
+      // Where the link points from the document's own repository location.
+      let resolved = resolve(from, target);
+      // A link that escapes the repository is treated as the root-relative path
+      // the author meant (`../README.md` at the top of the repository).
+      if (!existsSync(resolved)) {
+        const asRoot = resolve(root, target.replace(/^(\.\.\/)+/, ''));
+        if (existsSync(asRoot)) resolved = asRoot;
+      }
+      if (!existsSync(resolved)) {
+        broken.push(`${file} -> ${rawPath}`);
+        return match;
+      }
+      const rel = relative(to, resolved);
+      const next = `${rel.startsWith('.') ? rel : `./${rel}`}${anchor}`;
+      if (next !== rawPath) rewritten++;
+      return `](${next}${title})`;
+    });
+    if (out !== source) writeFileSync(resolve(to, file), out);
+  }
+  // A shipped document that links to a path that exists nowhere is a 404 we
+  // would otherwise only find by clicking it in production.
+  if (broken.length) throw new Error(`shipped documentation has dead links — ${broken.join(', ')}`);
+  return { rewritten, broken };
 }
 
 function directorySize(dir) {

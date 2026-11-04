@@ -13,6 +13,10 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
   rights, which a workflow token cannot have, so no code change can do it for you. Until then the
   workflow still assembles the site, uploads it as a downloadable Pages artifact, and says so in
   the run summary instead of failing.
+
+  Every deploy also force-pushes the assembled site to the **`gh-pages` branch**, which needs no
+  admin click. Point any static host — or Pages itself with *Deploy from a branch* — at that
+  branch and the site is served from there instead.
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 

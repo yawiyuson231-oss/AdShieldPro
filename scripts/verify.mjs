@@ -123,10 +123,27 @@ export function verify() {
   const total = weights.reduce((a, b) => a + b, 0);
   add('reputation weights sum to 100', total === 100, `sum = ${total} over ${weights.length} signals`);
 
+  /* 7b. One version, everywhere. Drift between these is how a "new release"
+        ships with an old service-worker cache and an old export header. */
+  const pkgVersion = JSON.parse(read('package.json')).version;
+  const headerVersion = /data-version="([^"]+)"/.exec(read('index.html'))?.[1];
+  const swVersion = /VERSION = 'omnishield-x-v([^']+)'/.exec(read('sw.js'))?.[1];
+  const extVersion = (() => { try { return JSON.parse(read('assets/extension-facts.json')).version; } catch { return null; } })();
+  add('version is identical in package.json, index.html, sw.js and the extension',
+    pkgVersion && pkgVersion === headerVersion && pkgVersion === swVersion && pkgVersion === extVersion,
+    `pkg ${pkgVersion} · html ${headerVersion} · sw ${swVersion} · ext ${extVersion}`);
+  add('the UI reads the version from the document instead of hardcoding it',
+    /data-version/.test(read('index.html')) && /dataset\.version/.test(read('app.js')),
+    'single source of truth');
+
   /* 8. Bundled data present and parsable. */
   for (const asset of ['assets/core_lite_ads.txt', 'assets/core_supplement_ads.txt',
     'assets/core_supplement_aggressive.txt', 'assets/icon.svg']) {
     add(`asset: ${asset}`, exists(asset) && statSync(abs(asset)).size > 100);
+  }
+  for (const icon of ['assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png']) {
+    add(`installable icon: ${icon}`, exists(icon) && statSync(abs(icon)).size > 500,
+      exists(icon) ? `${statSync(abs(icon)).size} bytes` : 'missing — the manifest would be rejected');
   }
   const lite = read('assets/core_lite_ads.txt');
   const liteRules = (lite.match(/^\|\|/gm) || []).length;
@@ -139,6 +156,13 @@ export function verify() {
   add('supplement states it is curated, not upstream', /NOT an upstream feed/i.test(supplement));
   const aggressive = read('assets/core_supplement_aggressive.txt');
   add('aggressive tier warns about breakage and is opt-in', /SHIPS DISABLED BY DEFAULT/i.test(aggressive));
+
+  /* 8c. The marketing site must survive a JavaScript failure. It is the only
+        entry point that is not an app, so a blank page there loses the download. */
+  const marketing = read('docs/index.html');
+  add('marketing site renders without JavaScript',
+    /class="no-js"/.test(marketing) && /@media \(scripting: none\)/.test(marketing) && /<noscript>/.test(marketing),
+    'no-js fallback + scripting: none media query + noscript notice');
 
   /* 9. Manifest validity. */
   let manifestOk = false;
@@ -153,6 +177,15 @@ export function verify() {
     manifestDetail = err.message;
   }
   add('web manifest is valid', manifestOk, manifestDetail);
+  const manifest = JSON.parse(read('manifest.webmanifest'));
+  add('manifest ships PNG icons at installable sizes',
+    manifest.icons.some((i) => i.type === 'image/png' && i.sizes === '192x192')
+      && manifest.icons.some((i) => i.type === 'image/png' && i.sizes === '512x512'),
+    manifest.icons.map((i) => `${i.sizes} ${i.type}`).join(' · '));
+  add('manifest declares a maskable icon', manifest.icons.some((i) => /maskable/.test(i.purpose || '')));
+  add('manifest declares app shortcuts', Array.isArray(manifest.shortcuts) && manifest.shortcuts.length > 0,
+    (manifest.shortcuts || []).map((x) => x.name).join(' · '));
+  add('every manifest icon exists at its declared size', manifest.icons.every((i) => exists(i.src)));
 
   /* 9b. Accessibility basics that must not regress. */
   const htmlA11y = read('index.html');
@@ -250,6 +283,12 @@ export function verify() {
   add('the deploy run explains the one-time Pages switch',
     /Settings → Pages → Source: GitHub Actions/.test(deployWorkflow) && /GITHUB_STEP_SUMMARY/.test(deployWorkflow),
     'step summary names the exact click path');
+  add('shipped docs rewrite their relative links for the site root',
+    /rewriteDocLinks/.test(read('scripts/stage-site.mjs')),
+    'no docs/*.md link 404s when served from the root');
+  add('the deploy publishes a gh-pages fallback that needs no admin click',
+    /gh-pages/.test(deployWorkflow) && /contents:\s*write/.test(deployWorkflow),
+    'branch publish + Pages in one run');
   add('the assembler verifies every service-worker precache target',
     /checkPrecache/.test(read('scripts/stage-site.mjs')) && /is not self-sufficient/.test(read('scripts/stage-site.mjs')));
 

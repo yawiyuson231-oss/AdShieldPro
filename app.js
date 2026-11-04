@@ -26,6 +26,13 @@ import * as ui from './ui/dom.js';
 import { createCyberConsole } from './cyber/dashboard.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
+/**
+ * The release version, read from the page itself so it can never drift from
+ * package.json / sw.js / the header. `index.html` sets data-version from the
+ * same string the build stamps.
+ */
+const APP_VERSION = document.documentElement.dataset.version || 'dev';
+
 const BUNDLED = {
   lite: { file: 'assets/core_lite_ads.txt', category: 'ADS', source: 'core_lite_ads', label: 'HaGeZi Multi LIGHT (bundled)' },
   supplement: { file: 'assets/core_supplement_ads.txt', category: 'ADS', source: 'core_supplement_ads', label: 'Curated apex supplement (bundled)' },
@@ -207,7 +214,7 @@ function buildState({ includeModel = false } = {}) {
   }
   return {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: '5.0.1',
+    appVersion: APP_VERSION,
     savedAt: new Date().toISOString(),
     settings: { ...state.settings },
     customRules: state.customRules.map((r) => ({ pattern: r.pattern, isAllow: r.isAllow, rawPattern: r.pattern, ruleType: r.isAllow ? 'ALLOW' : 'BLOCK', matchType: 'SUFFIX', isEnabled: true })),
@@ -1428,7 +1435,7 @@ function exportMergedConfig() {
     ...(state.importedBackup || {}),
     ...buildState({ includeModel: true }),
     exportedAt: new Date().toISOString(),
-    exportedBy: 'OmniShield X web platform v5.0.1'
+    exportedBy: `OmniShield X web platform v${APP_VERSION}`
   };
   download('omnishield-x-config.json', JSON.stringify(payload, null, 2));
   toast('Merged configuration exported.', 'ok');

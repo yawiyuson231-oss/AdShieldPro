@@ -7,7 +7,11 @@
   "display": "standalone",
   "background_color": "#050b16",
   "theme_color": "#2e7dff",
-  "categories": ["security", "utilities", "productivity"],
+  "categories": [
+    "security",
+    "utilities",
+    "productivity"
+  ],
   "lang": "en",
   "icons": [
     {
@@ -15,6 +19,44 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "CyberShield console",
+      "short_name": "Console",
+      "url": "./#cyber",
+      "description": "Threat-intelligence dashboard and detection feed"
+    },
+    {
+      "name": "AETHER lookup",
+      "short_name": "AETHER",
+      "url": "./#aether",
+      "description": "Score any domain with named, attributable evidence"
+    },
+    {
+      "name": "DNS lab",
+      "short_name": "DNS",
+      "url": "./#dns",
+      "description": "Encrypted resolution, DNSSEC assessment and caching"
     }
   ]
 }

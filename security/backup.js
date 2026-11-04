@@ -55,6 +55,7 @@ export class BackupManager {
     if (!this.storage) throw new Error('BackupManager requires a storage adapter');
     this.clock = options.clock ?? (() => Date.now());
     this.maxSnapshots = options.maxSnapshots ?? 5;
+    // Defaulted from the app so an exported backup always names its producer.
     this.appVersion = options.appVersion ?? '5.0.1';
     this.prefix = options.prefix ?? 'backup:';
   }

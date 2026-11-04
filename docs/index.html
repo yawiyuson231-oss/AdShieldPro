@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,6 +13,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 54'%3E%3Cpath d='M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z' fill='%2314e8a2'/%3E%3Ccircle cx='24' cy='26.5' r='8.4' fill='none' stroke='%2302060b' stroke-width='3.8'/%3E%3Cpath d='m18.2 20.7 11.6 11.6' stroke='%2302060b' stroke-width='3.8' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script>document.documentElement.classList.remove('no-js');document.documentElement.classList.add('js');</script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
   <style>
 /* =========================================================
@@ -902,10 +903,32 @@ p { overflow-wrap: break-word; }
   .shield-check { stroke-dashoffset: 0; }
   .b-fill { stroke-dashoffset: 40; }
 }
+
+/* ---------- Resilience: no JavaScript, or a very old engine ----------
+   Everything below is reveal-on-scroll polish. If the script never runs, the
+   page must still be fully readable instead of rendering blank sections. */
+@media (scripting: none) {
+  .is-loading .site-header { transform: none; }
+  .hero-logo .char, .hero-fade, .hero-stage, .scroll-cue, .word,
+  [data-reveal], .b-list li { opacity: 1 !important; transform: none !important; filter: none !important; }
+}
+.no-js .is-loading .site-header { transform: none; }
+.no-js [data-reveal],
+.no-js .word,
+.no-js .hero-fade,
+.no-js .hero-stage,
+.no-js .scroll-cue,
+.no-js .b-list li { opacity: 1 !important; transform: none !important; filter: none !important; }
   </style>
 </head>
 <body class="is-loading">
   <a class="skip-link" href="#main">Skip to content</a>
+  <noscript>
+    <p style="margin:0;padding:10px 16px;background:#0b1a2b;border-bottom:1px solid #1d3a6e;color:#cfe0f2;font-size:14px;text-align:center">
+      All text and links on this page work without JavaScript. The animated shield and the
+      simulated demo need it; the download links and documentation do not.
+    </p>
+  </noscript>
 
   <!-- Shared SVG symbols -->
   <svg class="sprite" aria-hidden="true" focusable="false">
