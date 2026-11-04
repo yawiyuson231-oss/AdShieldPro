@@ -341,7 +341,7 @@ fun RulesScreen(
                 }
             }
         } else {
-            items(filteredRules, key = { it.id }) { rule ->
+            items(filteredRules, key = { it.id }, contentType = { "custom-rule" }) { rule ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),

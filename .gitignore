@@ -31,3 +31,11 @@ coverage/
 
 # Locally assembled deploy tree (scripts/stage-site.mjs)
 _site/
+
+# CI log mirrors are force-added by the workflow only for failed runs
+.ci/
+.ci-mirror/
+
+# Python bytecode from repo tooling
+__pycache__/
+tools/__pycache__/

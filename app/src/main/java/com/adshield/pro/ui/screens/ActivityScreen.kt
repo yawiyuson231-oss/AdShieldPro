@@ -449,7 +449,7 @@ fun ActivityScreen(
                 }
             }
         } else {
-            items(filteredLogs, key = { it.id }) { record ->
+            items(filteredLogs, key = { it.id }, contentType = { "dns-log" }) { record ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),

@@ -505,8 +505,8 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(filteredApps, key = { it.packageName }) { app ->
+                    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(filteredApps, key = { it.packageName }, contentType = { "installed-app" }) { app ->
                             Card(
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant

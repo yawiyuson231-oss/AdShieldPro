@@ -58,6 +58,16 @@ jobs:
           chmod +x gradlew tools/gradle-ci.sh
           ./gradlew --version 2>&1 | tee .ci/gradle-version.log
 
+      - name: Verify generated docs match code (capability matrix)
+        run: |
+          chmod +x tools/generate_capability_matrix.py
+          python3 tools/generate_capability_matrix.py --check
+
+      - name: UI performance and lazy-list gates
+        run: |
+          chmod +x tools/check_ui_performance.py
+          python3 tools/check_ui_performance.py
+
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |
           set -o pipefail
@@ -87,9 +97,19 @@ jobs:
           ls -l "$APK"
           sha256sum "$APK"
 
+      - name: Universal-build gate (debug APK must be device-independent)
+        run: |
+          chmod +x tools/check_universal_release.py
+          python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/debug/*.apk | head -1)"
+
       - name: JVM unit tests
         run: |
           set -o pipefail
+          # Debug aid: the registry test reads source files from disk, so the working directory
+          # and surround of the test JVM must be visible in the mirrored log.
+          pwd
+          ls -a
+          ls -a app/src/main/java/com/adshield/pro | head -5
           tools/gradle-ci.sh .ci/test.log :app:testDebugUnitTest
 
       - name: Android lint
@@ -97,10 +117,15 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/lint.log :app:lintDebug
 
-      - name: Assert unit tests actually ran (19 cases)
+      - name: Assert every discovered unit test ran and passed
         run: |
           python3 - <<'EOF'
-          import glob, sys, xml.etree.ElementTree as ET
+          import glob, re, sys, xml.etree.ElementTree as ET
+          from pathlib import Path
+          expected = sum(
+              len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), re.MULTILINE))
+              for path in Path('app/src/test').rglob('*.kt')
+          )
           files = glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')
           if not files:
               sys.exit('no JUnit XML produced: the test task did not run any tests')
@@ -114,10 +139,11 @@ jobs:
               for case in root.iter('testcase'):
                   print('  PASS' if len(case.findall('failure')) == 0 and len(case.findall('error')) == 0
                         else '  FAIL', case.get('name'))
-          print(f'tests={total} failures={failures} errors={errors} skipped={skipped}')
-          expected = 19
-          if total != expected or failures or errors:
-              sys.exit(f'expected {expected} passing tests, got total={total} failures={failures} errors={errors}')
+          print(f'tests={total} expected={expected} failures={failures} errors={errors} skipped={skipped}')
+          if expected == 0:
+              sys.exit('no @Test cases discovered in app/src/test')
+          if total != expected or failures or errors or skipped:
+              sys.exit(f'expected {expected} passing tests, got total={total} failures={failures} errors={errors} skipped={skipped}')
           EOF
 
       - name: Assert the debug APK is a real, installable package
@@ -131,6 +157,12 @@ jobs:
           ls -l "$APK"
           sha256sum "$APK"
 
+      # The log-mirror step below commits .ci/ into the branch, so the checkout must never
+      # carry those artifacts (and must not fail when Gradle did not get far enough to write them).
+      - name: Clean CI log mirrors before mirroring
+        if: failure()
+        run: rm -rf .ci-mirror || true
+
       - name: Surface Gradle errors as annotations
         if: failure()
         run: |
@@ -142,7 +174,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: adshield-pro-2.3.0-debug-apk
+          name: adshield-pro-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 

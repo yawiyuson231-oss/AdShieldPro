@@ -1,15 +1,5 @@
 package com.adshield.pro.ui.screens
 
-import com.adshield.pro.BuildConfig
-import com.adshield.pro.R
-
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,8 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,26 +17,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Https
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PauseCircle
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.OfflineBolt
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -58,54 +47,59 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.res.painterResource
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.adshield.pro.BuildConfig
+import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.AppSettingsState
-import com.adshield.pro.domain.model.BatteryThermalSnapshot
-import com.adshield.pro.domain.model.DeviceHealthAssessment
+import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.ProtectionMode
-import com.adshield.pro.domain.model.RamSnapshot
+import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.SmartBoostResult
-import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
+import com.adshield.pro.ui.components.BarRow
+import com.adshield.pro.ui.components.CyberPanel
+import com.adshield.pro.ui.components.DonutChart
+import com.adshield.pro.ui.components.DonutSegment
+import com.adshield.pro.ui.components.MetricSpec
+import com.adshield.pro.ui.components.PrivacyBadge
+import com.adshield.pro.ui.components.ProtectionShield
+import com.adshield.pro.ui.components.ResponsiveMetrics
+import com.adshield.pro.ui.components.ScrollToTopButton
+import com.adshield.pro.ui.components.Sparkline
+import com.adshield.pro.ui.components.StatusPill
+import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.theme.AlertRed
-import com.adshield.pro.ui.theme.formatInteger
-import com.adshield.pro.ui.theme.formatPercent
 import com.adshield.pro.ui.theme.CyberCyan
-import com.adshield.pro.ui.theme.EmeraldGlow
+import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.EmeraldPrimary
+import com.adshield.pro.ui.theme.NavyBorder
+import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.theme.WarningAmber
+import com.adshield.pro.ui.theme.formatInteger
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     vpnState: VpnRuntimeState,
@@ -113,12 +107,11 @@ fun HomeScreen(
     allTimeTotal: Long,
     allTimeBlocked: Long,
     allTimeAllowed: Long,
+    malwareBlocks: Long,
     chartBuckets: List<TimeBucketStat>,
+    recentLogs: List<DnsActivityRecord>,
+    liveNetwork: LiveNetworkModel.NetworkSnapshot,
     isUpdatingFilters: Boolean,
-    ramSnapshot: RamSnapshot,
-    storageMetrics: StorageMetrics,
-    batterySnapshot: BatteryThermalSnapshot,
-    healthAssessment: DeviceHealthAssessment,
     smartBoostResult: SmartBoostResult?,
     isRunningSmartBoost: Boolean,
     isCheckingForUpdates: Boolean,
@@ -128,694 +121,334 @@ fun HomeScreen(
     onSelectProtectionMode: (ProtectionMode) -> Unit,
     onTriggerFilterSync: () -> Unit,
     onRunOptimizeNow: () -> Unit,
-    onOpenOptimizerTab: () -> Unit
+    onOpenOptimizerTab: () -> Unit,
+    onOpenLiveTab: () -> Unit,
+    onOpenStatisticsTab: () -> Unit,
+    onOpenStatusTab: () -> Unit
 ) {
+    val listState = rememberLazyListState()
+    val screenWidth = LocalConfiguration.current.screenWidthDp
     val isConnected = vpnState.status == VpnStatus.CONNECTED
     val isPaused = vpnState.status == VpnStatus.PAUSED
     val isActiveOrPaused = isConnected || isPaused
-
-    val shieldColor by animateColorAsState(
-        targetValue = when (vpnState.status) {
-            VpnStatus.CONNECTED -> EmeraldPrimary
-            VpnStatus.PAUSED -> WarningAmber
-            VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
-            VpnStatus.ERROR -> AlertRed
-            VpnStatus.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        label = "shield_color"
-    )
-
-    val shieldScale by animateFloatAsState(
-        targetValue = when (vpnState.status) {
-            VpnStatus.CONNECTED -> 1f
-            VpnStatus.PAUSED -> 0.94f
-            VpnStatus.STARTING, VpnStatus.RECONNECTING -> 1.08f
-            VpnStatus.ERROR -> 0.9f
-            VpnStatus.DISCONNECTED -> 0.86f
-        },
-        animationSpec = tween(durationMillis = 420),
-        label = "shield_state_scale"
-    )
-    val glowPulse = remember { Animatable(0f) }
-    LaunchedEffect(isConnected) {
-        if (!isConnected) {
-            glowPulse.snapTo(0f)
-            return@LaunchedEffect
-        }
-        while (true) {
-            glowPulse.animateTo(1f, tween(durationMillis = 1400, easing = FastOutSlowInEasing))
-            glowPulse.animateTo(0f, tween(durationMillis = 1400, easing = FastOutSlowInEasing))
+    val overview = remember(allTimeTotal, allTimeBlocked, allTimeAllowed, vpnState.sessionTotalQueries, vpnState.sessionBlockedQueries, vpnState.sessionAllowedQueries, malwareBlocks, liveNetwork.threatsBlocked) {
+        DashboardPresentation.overview(
+            allTimeTotal, allTimeBlocked, allTimeAllowed,
+            vpnState.sessionTotalQueries, vpnState.sessionBlockedQueries, vpnState.sessionAllowedQueries,
+            malwareBlocks, liveNetwork.threatsBlocked
+        )
+    }
+    val blockedSegments = remember(liveNetwork.categories) {
+        liveNetwork.categories.filter { it.lane != LiveNetworkModel.TrafficLane.ALLOWED }.map { slice ->
+            DonutSegment(slice.lane.label, slice.count, laneColor(slice.lane))
         }
     }
-    val outerWireRotation = remember { Animatable(0f) }
-    val innerWireRotation = remember { Animatable(0f) }
-    LaunchedEffect(isConnected) {
-        if (!isConnected) {
-            outerWireRotation.snapTo(0f)
-            innerWireRotation.snapTo(0f)
-            return@LaunchedEffect
-        }
-        coroutineScope {
-            launch {
-                while (true) {
-                    outerWireRotation.animateTo(360f, tween(4200, easing = LinearEasing))
-                    outerWireRotation.snapTo(0f)
-                }
-            }
-            launch {
-                while (true) {
-                    innerWireRotation.animateTo(-360f, tween(3100, easing = LinearEasing))
-                    innerWireRotation.snapTo(0f)
-                }
-            }
-        }
+    val recentBlocked = blockedSegments.sumOf { it.value }
+    val statusColor = when (vpnState.status) {
+        VpnStatus.CONNECTED -> EmeraldPrimary
+        VpnStatus.PAUSED -> WarningAmber
+        VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
+        VpnStatus.ERROR -> AlertRed
+        VpnStatus.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val ringScale by animateFloatAsState(
-        targetValue = if (vpnState.status == VpnStatus.STARTING || vpnState.status == VpnStatus.RECONNECTING) 1.1f else 1f,
-        animationSpec = tween(durationMillis = 520),
-        label = "shield_ring_scale"
-    )
+    val statusLabel = when (vpnState.status) {
+        VpnStatus.CONNECTED -> "SYSTEM PROTECTED"
+        VpnStatus.PAUSED -> "FILTERING PAUSED"
+        VpnStatus.STARTING -> "STARTING PROTECTION"
+        VpnStatus.RECONNECTING -> "RECONNECTING"
+        VpnStatus.ERROR -> "NEEDS ATTENTION"
+        VpnStatus.DISCONNECTED -> "PROTECTION OFF"
+    }
+    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.US) }
 
-    // Combine session + historical stats safely (never fabricated)
-    val displayTotal = maxOf(vpnState.sessionTotalQueries, allTimeTotal)
-    val displayBlocked = maxOf(vpnState.sessionBlockedQueries, allTimeBlocked)
-    val displayAllowed = maxOf(vpnState.sessionAllowedQueries, allTimeAllowed)
-    val displayBlockPct = if (displayTotal > 0L) {
-        (displayBlocked.toFloat() / displayTotal.toFloat()) * 100f
-    } else 0f
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        // Top Header Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.ic_adshield_mark),
-                    contentDescription = "AdShield Pro shield logo",
-                    modifier = Modifier.size(30.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "AdShield Pro",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            item(key = "header") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_adshield_mark),
+                        contentDescription = "AdShield Pro",
+                        modifier = Modifier.size(34.dp)
                     )
-                    Text(
-                        text = "v${BuildConfig.VERSION_NAME} • Multi-Layer Local DNS & Browser Firewall",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Surface(
-                modifier = Modifier.clickable(
-                    enabled = !isCheckingForUpdates,
-                    onClickLabel = "Check for app updates",
-                    onClick = onCheckForUpdates
-                ),
-                shape = RoundedCornerShape(50),
-                color = EmeraldPrimary.copy(alpha = 0.18f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SystemUpdateAlt,
-                        contentDescription = "Check for app updates",
-                        tint = EmeraldGlow,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isCheckingForUpdates) "Checking…" else "Check updates",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = EmeraldGlow,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // Main Hero Shield & One-Tap Switch Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = shieldColor.copy(alpha = 0.45f),
-                    shape = RoundedCornerShape(24.dp)
-                ),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                shieldColor.copy(alpha = 0.14f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                    // Bright halo and rotating signal arcs animate only while protection is active.
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(184.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier.size(190.dp)
-                            .graphicsLayer {
-                                val pulse = glowPulse.value
-                                alpha = if (isConnected) 0.68f + 0.30f * pulse else 0f
-                                scaleX = 0.92f + 0.12f * pulse
-                                scaleY = 0.92f + 0.12f * pulse
-                            }
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        shieldColor.copy(alpha = 0.92f),
-                                        shieldColor.copy(alpha = 0.55f),
-                                        shieldColor.copy(alpha = 0.18f),
-                                        Color.Transparent
-                                    )
-                                ),
-                                CircleShape
-                            )
-                    )
-                    Canvas(
-                        modifier = Modifier.size(184.dp).graphicsLayer {
-                            scaleX = ringScale
-                            scaleY = ringScale
-                            alpha = if (isConnected) 1f else 0.48f
-                        }
-                    ) {
-                        val centerOffset = Offset(size.width / 2f, size.height / 2f)
-                        val outerRadius = size.minDimension * 0.48f
-                        val innerRadius = size.minDimension * 0.40f
-                        drawCircle(shieldColor.copy(alpha = 0.25f), outerRadius, centerOffset, style = Stroke(1.dp.toPx()))
-                        drawCircle(shieldColor.copy(alpha = 0.38f), innerRadius, centerOffset, style = Stroke(1.dp.toPx()))
-                        if (isConnected) {
-                            rotate(outerWireRotation.value, centerOffset) {
-                                drawArc(
-                                    color = EmeraldGlow.copy(alpha = 0.32f), startAngle = 0f, sweepAngle = 92f,
-                                    useCenter = false,
-                                    topLeft = Offset(centerOffset.x - outerRadius, centerOffset.y - outerRadius),
-                                    size = Size(outerRadius * 2, outerRadius * 2),
-                                    style = Stroke(width = 9.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                )
-                                drawArc(
-                                    color = Color(0xFF72FFD0), startAngle = 0f, sweepAngle = 92f,
-                                    useCenter = false,
-                                    topLeft = Offset(centerOffset.x - outerRadius, centerOffset.y - outerRadius),
-                                    size = Size(outerRadius * 2, outerRadius * 2),
-                                    style = Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                )
-                            }
-                            rotate(innerWireRotation.value, centerOffset) {
-                                drawArc(
-                                    color = EmeraldGlow.copy(alpha = 0.30f), startAngle = 185f, sweepAngle = 74f,
-                                    useCenter = false,
-                                    topLeft = Offset(centerOffset.x - innerRadius, centerOffset.y - innerRadius),
-                                    size = Size(innerRadius * 2, innerRadius * 2),
-                                    style = Stroke(width = 7.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                )
-                                drawArc(
-                                    color = Color(0xFF8CFFE0), startAngle = 185f, sweepAngle = 74f,
-                                    useCenter = false,
-                                    topLeft = Offset(centerOffset.x - innerRadius, centerOffset.y - innerRadius),
-                                    size = Size(innerRadius * 2, innerRadius * 2),
-                                    style = Stroke(width = 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                )
-                            }
-                        }
-                    }
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(128.dp).scale(shieldScale)
-                            .clip(CircleShape)
-                            .background(shieldColor.copy(alpha = 0.14f))
-                            .border(2.dp, shieldColor.copy(alpha = 0.6f), CircleShape)
-                            .clickable(onClickLabel = if (isActiveOrPaused) "Turn protection off" else "Turn protection on") {
-                                onToggleVpn(!isActiveOrPaused)
-                            }
-                    ) {
-                        Image(
-                            painter = painterResource(R.drawable.ic_adshield_mark),
-                            contentDescription = "Protection status: ${vpnState.status.name.lowercase()}",
-                            alpha = if (isConnected) 1f else 0.82f,
-                            modifier = Modifier.size(84.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Actual VPN Connection Status Badge
-                Surface(
-                    color = shieldColor.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(shieldColor)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("AdShield Pro", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
                         Text(
-                            text = when (vpnState.status) {
-                                VpnStatus.CONNECTED -> "Protected • ${vpnState.activeNetworkLabel}"
-                                VpnStatus.PAUSED -> "Filtering paused"
-                                VpnStatus.STARTING -> "Starting protection…"
-                                VpnStatus.RECONNECTING -> "Reconnecting…"
-                                VpnStatus.ERROR -> "Protection needs attention"
-                                VpnStatus.DISCONNECTED -> "Protection off"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = shieldColor
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = when (vpnState.status) {
-                        VpnStatus.CONNECTED -> "Filtering ads, trackers, and malware across apps via ${settings.resolverConfig.protocol.label}."
-                        VpnStatus.PAUSED -> "Your connection is active, but DNS filtering is paused. Tap Resume to restart filtering."
-                        VpnStatus.ERROR -> vpnState.lastError ?: "Unable to establish VPN tunnel."
-                        else -> "Tap the switch below to start device-wide non-root DNS & VPN protection."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // One-Tap Switch Row (Cleanly separated from Pause/Resume button)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PowerSettingsNew,
-                            contentDescription = null,
-                            tint = shieldColor
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = when (vpnState.status) {
-                                    VpnStatus.CONNECTED -> "Protection is on"
-                                    VpnStatus.PAUSED -> "Filtering is paused"
-                                    VpnStatus.STARTING, VpnStatus.RECONNECTING -> "Connecting…"
-                                    VpnStatus.ERROR -> "Protection needs attention"
-                                    VpnStatus.DISCONNECTED -> "Turn on protection"
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (isConnected) "${vpnState.loadedRuleCount} rules active" else if (isPaused) "Filtering is paused" else "Device-wide DNS filtering",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    Switch(
-                        checked = isActiveOrPaused,
-                        onCheckedChange = { onToggleVpn(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = EmeraldPrimary,
-                            checkedBorderColor = EmeraldPrimary,
-                            uncheckedThumbColor = Color(0xFF9AA4B2),
-                            uncheckedTrackColor = Color(0xFF1E2636),
-                            uncheckedBorderColor = Color(0xFF3A4558)
-                        )
-                    )
-                }
-
-                if (isActiveOrPaused) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = onPauseResumeVpn,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = if (isPaused) Icons.Default.PlayCircle else Icons.Default.PauseCircle,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = if (isPaused) WarningAmber else EmeraldPrimary
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isPaused) "Resume filtering" else "Pause filtering",
+                            "Real-Time Threat Intelligence · v${BuildConfig.VERSION_NAME}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                    IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdates) {
+                        Icon(
+                            Icons.Default.SystemUpdateAlt,
+                            contentDescription = if (isCheckingForUpdates) "Checking for updates" else "Check for updates",
+                            tint = SkyBlueGlow
+                        )
+                    }
                 }
             }
-        }
 
-        // Live DNS Request Counters (4-Card Grid — Real Queries Only)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            DashboardStatCard(
-                modifier = Modifier.weight(1f),
-                title = "Total DNS Queries",
-                value = formatInteger(displayTotal),
-                subtitle = "Session: ${vpnState.sessionTotalQueries}",
-                accentColor = CyberCyan
-            )
-            DashboardStatCard(
-                modifier = Modifier.weight(1f),
-                title = "Blocked Queries",
-                value = formatInteger(displayBlocked),
-                subtitle = "Ads & Trackers",
-                accentColor = AlertRed
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            DashboardStatCard(
-                modifier = Modifier.weight(1f),
-                title = "Allowed Queries",
-                value = formatInteger(displayAllowed),
-                subtitle = "Cached: ${vpnState.sessionCachedQueries}",
-                accentColor = EmeraldPrimary
-            )
-            DashboardStatCard(
-                modifier = Modifier.weight(1f),
-                title = "Blocking Rate",
-                value = if (displayTotal > 0L) formatPercent(displayBlockPct) else "—",
-                subtitle = if (displayTotal > 0L) "Average latency: ${vpnState.averageLatencyMs} ms" else "No DNS requests yet",
-                accentColor = WarningAmber
-            )
-        }
-
-        // Prominent AI Smart Boost & Phone Optimization Card ("OPTIMIZE NOW")
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = CyberCyan.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(20.dp)
-                ),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            item(key = "shield") {
+                CyberPanel(
+                    title = "Local threat shield",
+                    subtitle = "On-device DNS · ${settings.resolverConfig.protocol.label} · ${vpnState.activeNetworkLabel}",
+                    trailing = { StatusPill(if (isConnected) "LIVE" else "IDLE", statusColor) }
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = null,
-                            tint = CyberCyan,
-                            modifier = Modifier.size(22.dp)
+                    ProtectionShield(
+                        status = vpnState.status,
+                        hasTraffic = liveNetwork.hasData,
+                        threatSignals = liveNetwork.threatsBlocked.toInt(),
+                        onClick = { onToggleVpn(!isActiveOrPaused) },
+                        modifier = Modifier.fillMaxWidth().height(250.dp)
+                    )
+                    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(statusLabel, color = if (isConnected) EmeraldPrimary else statusColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 14.sp)
+                        Text(
+                            text = when (vpnState.status) {
+                                VpnStatus.CONNECTED -> "DNS filtering active · ${formatInteger(vpnState.loadedRuleCount)} rules loaded"
+                                VpnStatus.PAUSED -> "Tunnel is paused. Resume to keep filtering."
+                                VpnStatus.ERROR -> vpnState.lastError ?: "The tunnel could not start."
+                                else -> "Tap the shield or the button to start non-root DNS protection."
+                            },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "AI Smart Boost & Phone Optimizer",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "RAM: ${String.format(Locale.US, "%.0f%%", ramSnapshot.usagePercent)} • Free Storage: ${RuleBasedOptimizationPredictor.formatBytes(storageMetrics.availableBytes)} • ${String.format(Locale.US, "%.1f°C", batterySnapshot.temperatureCelsius)}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = { onToggleVpn(!isActiveOrPaused) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isActiveOrPaused) AlertRed.copy(alpha = 0.85f) else ElectricBlue)
+                            ) {
+                                Icon(if (isActiveOrPaused) Icons.Default.Shield else Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (isActiveOrPaused) "Turn off" else "Protect device", maxLines = 1)
+                            }
+                            OutlinedButton(onClick = onPauseResumeVpn, enabled = isActiveOrPaused, modifier = Modifier.weight(1f)) {
+                                Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(if (isPaused) "Resume" else "Pause", maxLines = 1)
+                            }
+                        }
+                        TextButton(onClick = onOpenLiveTab, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                            Text("Open live network dashboard", fontSize = 12.sp)
                         }
                     }
-
-                    Surface(
-                        color = EmeraldPrimary.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier.clickable { onOpenOptimizerTab() }
-                    ) {
-                        Text(
-                            text = "Score ${healthAssessment.readinessScore}/100",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = EmeraldGlow,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
                 }
+            }
 
-                Button(
-                    onClick = onRunOptimizeNow,
-                    enabled = !isRunningSmartBoost,
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                    modifier = Modifier.fillMaxWidth()
+            item(key = "overview") {
+                CyberPanel(
+                    title = "Threat overview",
+                    subtitle = overview.scope.label,
+                    trailing = { Text("${overview.blockPercent.toInt()}% blocked", color = SkyBlueGlow, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
                 ) {
-                    Icon(Icons.Default.Bolt, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isRunningSmartBoost) "ANALYZING & OPTIMIZING..." else "OPTIMIZE NOW",
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                    Sparkline(
+                        values = chartBuckets.map { it.blockedQueries },
+                        secondaryValues = chartBuckets.map { it.totalQueries },
+                        lineColor = AlertRed,
+                        secondaryColor = ElectricBlue,
+                        modifier = Modifier.fillMaxWidth().height(72.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    ResponsiveMetrics(
+                        columns = if (screenWidth >= 600) 4 else 2,
+                        metrics = listOf(
+                            MetricSpec("Total queries", formatInteger(overview.total), overview.scope.label, Color.White),
+                            MetricSpec("Blocked", formatInteger(overview.blocked), "Ads, trackers & threats", AlertRed),
+                            MetricSpec("Allowed", formatInteger(overview.allowed), "Passed the filter", EmeraldPrimary),
+                            MetricSpec("Threats", formatInteger(overview.threats), "Malware / phishing", WarningAmber)
+                        )
                     )
                 }
+            }
 
-                if (isRunningSmartBoost) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
-                    )
-                }
-
-                if (smartBoostResult != null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = if (smartBoostResult.wasSkippedDueToRecentBoost) {
-                                    "Optimization Summary: Already Optimized"
-                                } else {
-                                    "Optimization Summary (${RuleBasedOptimizationPredictor.formatBytes(smartBoostResult.bytesRecoveredAutomatically)} recovered)"
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = EmeraldPrimary,
-                                fontWeight = FontWeight.Bold
-                            )
-                            smartBoostResult.actionsCompleted.forEach { act ->
-                                Text(
-                                    text = "✓ $act",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            if (smartBoostResult.pendingUserApprovalActions.isNotEmpty()) {
-                                smartBoostResult.pendingUserApprovalActions.forEach { pending ->
-                                    Text(
-                                        text = "• Approval Needed: $pending",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = WarningAmber
-                                    )
+            item(key = "active-threats") {
+                CyberPanel(title = "Active threats", subtitle = "Recent logged block mix") {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        DonutChart(
+                            segments = blockedSegments,
+                            centerValue = formatInteger(recentBlocked),
+                            centerLabel = "RECENT",
+                            modifier = Modifier.size(124.dp)
+                        )
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                            if (blockedSegments.isEmpty()) {
+                                Text("No blocked traffic in the recent log yet.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                            } else {
+                                blockedSegments.take(5).forEach { segment ->
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(segment.color))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(segment.label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(formatInteger(segment.value), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
                                 }
                             }
-                            OutlinedButton(
-                                onClick = onOpenOptimizerTab,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Open Full Phone Optimizer Suite")
+                        }
+                    }
+                }
+            }
+
+            item(key = "detection-engine") {
+                val coverage = settings.protectionMode.activeCategories.size.toFloat() / RuleCategory.entries.size.toFloat()
+                CyberPanel(title = "Threat detection engine", subtitle = "Local analysis · no cloud AI") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier.size(64.dp).clip(CircleShape).background(ElectricBlue.copy(alpha = 0.10f)).border(1.dp, ElectricBlue.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, tint = SkyBlueGlow, modifier = Modifier.size(34.dp))
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DetectionRow("DNS filter", if (isConnected) "Active" else "Standby", isConnected)
+                            DetectionRow("Threat lists", if (vpnState.loadedRuleCount > 0) "Loaded" else "Loading", vpnState.loadedRuleCount > 0)
+                            DetectionRow("Browser shield", if (settings.browserCosmeticFilteringEnabled) "Enabled" else "Off", settings.browserCosmeticFilteringEnabled)
+                            DetectionRow("Offline baseline", "Bundled", true)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Category coverage", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                        Text("${(coverage * 100).toInt()}%", color = SkyBlueGlow, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    LinearProgressIndicator(progress = { coverage.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(6.dp), color = ElectricBlue, trackColor = NavyBorder.copy(alpha = 0.5f))
+                }
+            }
+
+            item(key = "attack-vectors") {
+                CyberPanel(title = "Top attack vectors", subtitle = "Share of recent blocked queries") {
+                    if (blockedSegments.isEmpty()) {
+                        Text("Nothing blocked yet. Categories appear here after real DNS traffic is filtered.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            blockedSegments.sortedByDescending { it.value }.take(5).forEach { segment ->
+                                val percent = if (recentBlocked > 0) segment.value * 100f / recentBlocked else 0f
+                                BarRow(segment.label, "${percent.toInt()}%", percent, segment.color)
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Real-Time Activity Chart Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            item(key = "activity-feed") {
+                CyberPanel(
+                    title = "Threat activity feed",
+                    subtitle = if (settings.detailedDnsLoggingEnabled) "Live updates from this device" else "Detailed DNS logging is off",
+                    trailing = { TextButton(onClick = onOpenStatisticsTab) { Text("View all", fontSize = 12.sp) } }
                 ) {
-                    Column {
+                    val events = recentLogs.take(5)
+                    if (events.isEmpty()) {
                         Text(
-                            text = "DNS Filtering Activity (Last 7 Days)",
-                            style = MaterialTheme.typography.titleMedium
+                            if (settings.detailedDnsLoggingEnabled) "No DNS events logged yet. Turn on protection and open an app to populate this feed."
+                            else "Enable detailed logging in Settings to see per-domain events. Aggregate counters still work.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
                         )
-                        Text(
-                            text = "Green = allowed • Red = blocked",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            events.forEach { record -> EventRow(record, timeFormat.format(Date(record.timestampEpochMs))) }
+                        }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                RealTimeActivityBarChart(
-                    buckets = chartBuckets,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(110.dp)
+            item(key = "device-status") {
+                ResponsiveMetrics(
+                    columns = 3,
+                    metrics = listOf(
+                        MetricSpec("DNS tunnel", if (isConnected) "Active" else if (isPaused) "Paused" else "Off", vpnState.activeNetworkLabel, if (isConnected) EmeraldPrimary else WarningAmber),
+                        MetricSpec("Filter core", formatInteger(vpnState.loadedRuleCount), "rules in memory", SkyBlueGlow),
+                        MetricSpec("Resolver", if (vpnState.averageLatencyMs > 0) "${vpnState.averageLatencyMs} ms" else "—", settings.resolverConfig.protocol.label, CyberCyan)
+                    )
                 )
             }
-        }
 
-        // Protection Mode Selector (Standard, Strict, Privacy, Custom)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Active Protection Profile",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = "Switching profiles updates the in-memory filter engine immediately.",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            item(key = "privacy") {
+                CyberPanel(title = "Privacy & coverage", subtitle = "What this build actually does — not a certification claim") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PrivacyBadge("Local only", Icons.Default.Lock, true, Modifier.weight(1f))
+                        PrivacyBadge("No root", Icons.Default.Shield, true, Modifier.weight(1f))
+                        PrivacyBadge("No MITM", Icons.Default.Https, true, Modifier.weight(1f))
+                        PrivacyBadge("Offline rules", Icons.Default.OfflineBolt, vpnState.loadedRuleCount > 0, Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(onClick = onOpenStatusTab, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("View capability report")
+                    }
+                }
+            }
 
-                Spacer(modifier = Modifier.height(10.dp))
+            item(key = "quick-actions") {
+                CyberPanel(title = "Quick actions", subtitle = "Optimizer and filter maintenance") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = onRunOptimizeNow, enabled = !isRunningSmartBoost, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (isRunningSmartBoost) "Optimizing…" else "Optimize now", maxLines = 1)
+                        }
+                        OutlinedButton(onClick = onTriggerFilterSync, enabled = !isUpdatingFilters, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (isUpdatingFilters) "Syncing…" else "Sync lists", maxLines = 1)
+                        }
+                    }
+                    if (isUpdatingFilters || isRunningSmartBoost) {
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = ElectricBlue)
+                    }
+                    smartBoostResult?.let { result ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            if (result.wasSkippedDueToRecentBoost) "Already optimized recently"
+                            else "Recovered ${RuleBasedOptimizationPredictor.formatBytes(result.bytesRecoveredAutomatically)}",
+                            color = EmeraldPrimary, fontWeight = FontWeight.SemiBold, fontSize = 13.sp
+                        )
+                        result.actionsCompleted.take(3).forEach { action ->
+                            Text("✓ $action", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                        }
+                        TextButton(onClick = onOpenOptimizerTab) { Text("Open full optimizer") }
+                    }
+                }
+            }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ProtectionMode.entries.forEach { mode ->
-                        val isSelected = settings.protectionMode == mode
-                        Surface(
-                            shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) {
-                                EmeraldPrimary.copy(alpha = 0.15f)
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(
-                                    width = if (isSelected) 1.5.dp else 0.dp,
-                                    color = if (isSelected) EmeraldPrimary else Color.Transparent,
-                                    shape = RoundedCornerShape(14.dp)
-                                )
-                                .clickable { onSelectProtectionMode(mode) }
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+            item(key = "protection-mode") {
+                CyberPanel(title = "Protection profile", subtitle = "Applies immediately to the in-memory filter engine") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ProtectionMode.entries.forEach { mode ->
+                            val selected = settings.protectionMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (selected) ElectricBlue.copy(alpha = 0.14f) else Color(0xFF08182B),
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { onSelectProtectionMode(mode) }
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
-                                            imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.Security,
+                                            if (selected) Icons.Default.CheckCircle else Icons.Default.Security,
                                             contentDescription = null,
-                                            tint = if (isSelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            tint = if (selected) SkyBlueGlow else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = mode.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = if (isSelected) EmeraldGlow else MaterialTheme.colorScheme.onSurface
-                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(mode.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                     }
-
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = mode.subtitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                if (isSelected && mode.warningNote != null) {
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = WarningAmber,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = mode.warningNote,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = WarningAmber
-                                        )
+                                    Text(mode.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+                                    if (selected && mode.warningNote != null) {
+                                        Text(mode.warningNote, color = WarningAmber, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
                                     }
                                 }
                             }
@@ -823,199 +456,111 @@ fun HomeScreen(
                     }
                 }
             }
-        }
 
-        // DNS Resolver & Last Blocklist Update Status Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Dns,
-                            contentDescription = null,
-                            tint = CyberCyan
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
+            item(key = "resolver") {
+                CyberPanel(title = "DNS resolver", subtitle = "${settings.resolverConfig.preset.displayName} · IPv6 ${if (settings.resolverConfig.enableIpv6) "on" else "off"}") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Dns, contentDescription = null, tint = CyberCyan)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(settings.resolverConfig.protocol.label, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                             Text(
-                                text = "Resolver: ${settings.resolverConfig.preset.displayName}",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = "${settings.resolverConfig.protocol.label} • IPv6 ${if (settings.resolverConfig.enableIpv6) "Enabled" else "Disabled"}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                if (settings.lastFilterUpdateEpochMs > 0L) "Lists synced ${SimpleDateFormat("MMM d, HH:mm", Locale.US).format(Date(settings.lastFilterUpdateEpochMs))}"
+                                else "Bundled offline baseline ready",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp
                             )
                         }
+                        IconButton(onClick = onTriggerFilterSync, enabled = !isUpdatingFilters) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Sync filter lists", tint = SkyBlueGlow)
+                        }
                     }
+                }
+            }
 
-                    IconButton(onClick = onTriggerFilterSync, enabled = !isUpdatingFilters) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sync Filter Lists",
-                            tint = EmeraldPrimary
+            item(key = "disclosure") {
+                CyberPanel(title = "Coverage disclosure", subtitle = "DNS-level protection has real limits") {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "AdShield blocks third-party ad, tracker and malicious domains without root or HTTPS decryption. Apps that serve video ads from the same first-party servers as their content (for example some YouTube, Facebook, TikTok and streaming apps) cannot be fully blocked by DNS alone.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
                         )
                     }
                 }
-
-                if (isUpdatingFilters) {
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = EmeraldPrimary
-                    )
-                }
-
-                val lastSyncStr = if (settings.lastFilterUpdateEpochMs > 0L) {
-                    SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.US)
-                        .format(Date(settings.lastFilterUpdateEpochMs))
-                } else {
-                    "Bundled v2.0 Baseline Ready (Tap Refresh to sync online lists)"
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = EmeraldPrimary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Last Filter Sync: $lastSyncStr",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
-
-        // Transparent Technical Coverage Disclosure Card (Required by Prompt)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(14.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = CyberCyan,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "Transparent Coverage & Privacy Disclosure",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "AdShield Pro blocks third-party ad SDKs, trackers, and malicious domains across games, utilities, news apps, and browsers without root or HTTPS decryption. Official YouTube, Facebook, TikTok, and some streaming apps deliver video ads from the same first-party servers as primary content and cannot be 100% blocked via DNS alone.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+        ScrollToTopButton(state = listState, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp))
     }
 }
 
 @Composable
-private fun DashboardStatCard(
-    modifier: Modifier = Modifier,
-    title: String,
-    value: String,
-    subtitle: String,
-    accentColor: Color
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineMedium,
-                color = accentColor,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+private fun DetectionRow(label: String, value: String, active: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(7.dp).clip(CircleShape).background(if (active) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant))
+        Spacer(Modifier.width(8.dp))
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        Text(value, color = if (active) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
+@Composable
+private fun EventRow(record: DnsActivityRecord, time: String) {
+    val severity = DashboardPresentation.eventSeverity(record)
+    val color = when (severity) {
+        "CRITICAL" -> AlertRed
+        "HIGH" -> Color(0xFFFF7A45)
+        "MEDIUM" -> WarningAmber
+        "CUSTOM" -> CyberCyan
+        else -> EmeraldPrimary
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(color = color.copy(alpha = 0.16f), shape = RoundedCornerShape(5.dp)) {
+            Text(severity, color = color, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(DashboardPresentation.eventTitle(record), color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(record.domain, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text(time, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+    }
+}
+
+private fun laneColor(lane: LiveNetworkModel.TrafficLane): Color = when (lane) {
+    LiveNetworkModel.TrafficLane.ADS -> Color(0xFFFF6B6B)
+    LiveNetworkModel.TrafficLane.TRACKERS -> WarningAmber
+    LiveNetworkModel.TrafficLane.THREATS -> AlertRed
+    LiveNetworkModel.TrafficLane.CUSTOM -> CyberCyan
+    LiveNetworkModel.TrafficLane.ALLOWED -> EmeraldPrimary
+}
+
+/** Kept public for the Statistics screen. */
 @Composable
 fun RealTimeActivityBarChart(
     buckets: List<TimeBucketStat>,
     modifier: Modifier = Modifier
 ) {
     val maxTotal = (buckets.maxOfOrNull { it.totalQueries } ?: 1L).coerceAtLeast(1L)
-
     Column(modifier = modifier) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
+        Canvas(Modifier.fillMaxWidth().weight(1f)) {
             if (buckets.isEmpty()) return@Canvas
-            val count = buckets.size
-            val slotWidth = size.width / count
+            val slotWidth = size.width / buckets.size
             val barWidth = (slotWidth * 0.55f).coerceAtMost(36.dp.toPx())
-
             buckets.forEachIndexed { index, bucket ->
-                val centerX = index * slotWidth + (slotWidth / 2f)
-                val left = centerX - (barWidth / 2f)
-
+                val centerX = index * slotWidth + slotWidth / 2f
+                val left = centerX - barWidth / 2f
                 val totalRatio = (bucket.totalQueries.toFloat() / maxTotal.toFloat()).coerceIn(0.04f, 1f)
                 val blockedRatio = (bucket.blockedQueries.toFloat() / maxTotal.toFloat()).coerceIn(0f, totalRatio)
-
                 val totalHeight = size.height * totalRatio
                 val blockedHeight = size.height * blockedRatio
-
-                // Allowed bar background (Emerald)
                 drawRoundRect(
                     color = EmeraldPrimary.copy(alpha = 0.45f),
                     topLeft = Offset(left, size.height - totalHeight),
                     size = Size(barWidth, totalHeight),
                     cornerRadius = CornerRadius(8f, 8f)
                 )
-
-                // Blocked portion overlay (Red)
                 if (blockedHeight > 1f) {
                     drawRoundRect(
                         color = AlertRed,
@@ -1026,19 +571,10 @@ fun RealTimeActivityBarChart(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            buckets.forEach { b ->
-                Text(
-                    text = b.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            buckets.forEach { bucket ->
+                Text(bucket.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

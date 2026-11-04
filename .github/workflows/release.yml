@@ -75,9 +75,10 @@ jobs:
           echo "apk_name=AdShieldPro-${VERSION_NAME}-release.apk" >> "$GITHUB_OUTPUT"
           echo "Releasing $TAG (versionName=$VERSION_NAME, versionCode=$VERSION_CODE)"
 
-      # Signing key: reuse the key stored in the "release-signing" Actions secret, otherwise
-      # reuse the keystore attached to the latest existing release, otherwise generate one and
-      # attach it to this release so future builds can upgrade-install over it.
+      # Signing key: reuse the key stored in the ADSHIELD_KEYSTORE_BASE64 Actions secret,
+      # otherwise reuse the keystore attached to ANY existing release (newest first), otherwise
+      # generate one — but only for a first-ever release; with existing releases and no key,
+      # fail instead of silently breaking upgrade installs. The key is attached to every release.
       - name: Prepare signing key
         env:
           KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
@@ -99,18 +100,39 @@ jobs:
               echo "ADSHIELD_KEY_PASSWORD=${ADSHIELD_KEY_PASSWORD:-${ADSHIELD_STORE_PASSWORD}}"
             } >> "$GITHUB_ENV"
           else
+            # Scan EVERY release (newest first) for the keystore, not just the latest one:
+            # a release that reused an older key does not re-attach it, so the newest release
+            # may not carry the asset even though an older one does. Picking only the latest
+            # release once silently generated a fresh key and broke upgrade installs.
             # Pattern is a glob: it matches the .keystore name and the .jks name an earlier run used.
-            gh release download --pattern 'adshield-release.*' --dir /tmp/keystore \
-              --clobber 2>/dev/null || true
-            FOUND="$(ls /tmp/keystore/adshield-release.* 2>/dev/null | head -1 || true)"
-            if [ -n "$FOUND" ] && [ -s "$FOUND" ]; then
-              echo "reusing keystore attached to the latest release: $FOUND"
+            FOUND=""
+            FOUND_TAG=""
+            for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
+              if gh release download "$TAG" --pattern 'adshield-release.*' --dir /tmp/keystore \
+                  --clobber 2>/dev/null; then
+                CANDIDATE="$(ls /tmp/keystore/adshield-release.* 2>/dev/null | head -1 || true)"
+                if [ -n "$CANDIDATE" ] && [ -s "$CANDIDATE" ]; then
+                  FOUND="$CANDIDATE"
+                  FOUND_TAG="$TAG"
+                  break
+                fi
+              fi
+            done
+            if [ -n "$FOUND" ]; then
+              echo "reusing keystore attached to release $FOUND_TAG: $FOUND"
               cp "$FOUND" "$KEYSTORE"
               STORE_PASS="${ADSHIELD_STORE_PASSWORD:-adshield-release}"
               echo "STORE_PASS=${STORE_PASS}" >> "$GITHUB_ENV"
               echo "reused=true" >> "$GITHUB_ENV"
             else
-              echo "generating a new release keystore"
+              # No keystore on any release. Generating a new one is only safe when no AdShield
+              # release has ever shipped; otherwise every existing install would refuse the
+              # update (signature mismatch), so fail loudly instead of breaking upgrades.
+              if gh release list --limit 100 --json tagName --jq '.[].tagName' | grep -qE '^v[0-9]'; then
+                echo "::error::Releases exist but no adshield-release.keystore asset was found on any of them. Set the ADSHIELD_KEYSTORE_BASE64 and ADSHIELD_STORE_PASSWORD repository secrets to the original signing key. Refusing to generate a new key that would break upgrade installs."
+                exit 1
+              fi
+              echo "generating a new release keystore (first-ever release)"
               keytool -genkeypair -v -keystore "$KEYSTORE" -storetype PKCS12 \
                 -storepass "$STORE_PASS" -keypass "$STORE_PASS" -alias adshield \
                 -keyalg RSA -keysize 4096 -validity 10000 \
@@ -126,6 +148,11 @@ jobs:
           echo "ADSHIELD_KEYSTORE_PATH=${KEYSTORE}" >> "$GITHUB_ENV"
           keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASS" | tail -3
 
+      - name: UI performance and lazy-list gates
+        run: |
+          chmod +x tools/check_ui_performance.py
+          python3 tools/check_ui_performance.py
+
       - name: JVM unit tests
         run: |
           chmod +x gradlew
@@ -135,6 +162,48 @@ jobs:
         run: |
           ./gradlew :app:assembleRelease --no-daemon --console=plain
           ls -l app/build/outputs/apk/release/
+
+      - name: Universal-build gate (blocks the release if the APK is device-specific)
+        run: |
+          set -euo pipefail
+          chmod +x tools/check_universal_release.py
+          python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/release/*.apk | head -1)" | tee .ci/universal.log
+
+      # Guard the upgrade path: the new APK must be signed with the same certificate as the
+      # previous published release, or Android will refuse to install it as an update.
+      - name: Verify signing continuity with the previous release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          NEW_APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          "$APKSIGNER" verify --print-certs "$NEW_APK" > /tmp/new-certs.txt
+          NEW_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/new-certs.txt | head -1 | awk '{print $NF}')"
+          test -n "$NEW_DIGEST"
+          # Newest release that actually shipped an AdShield Pro APK (this repo also holds
+          # older OmniShield X releases signed with a different key — skip those).
+          PREV_TAG=""
+          for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
+            if gh release download "$TAG" --pattern 'AdShieldPro-*-release.apk' --dir /tmp/prev --clobber 2>/dev/null; then
+              PREV_TAG="$TAG"
+              break
+            fi
+          done
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous AdShield Pro release APK; nothing to compare against."
+            exit 0
+          fi
+          PREV_APK="$(ls /tmp/prev/AdShieldPro-*-release.apk | head -1)"
+          "$APKSIGNER" verify --print-certs "$PREV_APK" > /tmp/prev-certs.txt
+          PREV_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/prev-certs.txt | head -1 | awk '{print $NF}')"
+          echo "previous ($PREV_TAG): $PREV_DIGEST"
+          echo "new build:            $NEW_DIGEST"
+          if [ "$NEW_DIGEST" != "$PREV_DIGEST" ]; then
+            echo "::error::Signing certificate changed versus $PREV_TAG. Installing this APK over an existing AdShield Pro would fail. Use the original keystore (ADSHIELD_KEYSTORE_BASE64 secret or the adshield-release.keystore release asset)."
+            exit 1
+          fi
+          echo "Signing continuity verified: updates from $PREV_TAG will install over the existing app."
 
       - name: Verify and package APK
         id: apk
@@ -184,25 +253,48 @@ jobs:
           ## What is in this build
           - On-device DNS filtering over Android VpnService (no root): ad, tracker and threat lists,
             custom block/allow rules, protection modes, background list sync.
+          - Cyber-console dashboard: dark navy/electric-blue threat overview, animated local
+            shield, block-mix donut, attack-vector bars and a real DNS activity feed — no
+            fictional enterprise endpoints or compliance badges.
+          - Aether AI decision core: explainable VERIFIED / SUSPECTED / UNKNOWN verdicts with
+            evidence and a user-controlled autonomy ceiling, plus a live network dashboard fed
+            only by this device's real DNS log.
+          - Battery Intelligence (measured telemetry and charging diagnostics) and Security Center
+            (URL/file/APK scanning, installed-app risk audit) — all on-device.
+          - 367k offline rules bundled in the APK, so a fresh install protects before any sync.
           - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking.
           - Activity, statistics and per-app DNS analytics; AI Smart Boost, storage cleaning,
             Game Booster and battery/thermal tools — all local, no cloud AI.
           - In-app update checks against this repository's own releases.
+          - Smoother scrolling: lazy keyed lists, per-tab state isolation, draw-state animation
+            that stops when idle, and a scroll-to-top control on long dashboards.
+
+          ## Universal build
+          One APK for every device: any native helper library (AndroidX graphics-path,
+          DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
+          installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
+          Verified by `tools/check_universal_release.py` before this release was published.
 
           ## Notes
           - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.
-          - Built and verified by the "Release APK" workflow (unit tests, APK structure checks).
+          - Built and verified by the "Release APK" workflow (unit tests, APK structure checks,
+            universal-build gate, signing-continuity check against the previous release).
           - The signing key is attached below as \`adshield-release.keystore\` so future releases
             can upgrade-install over this one. Treat it as a secret: anyone with it can sign an
-            app Android will accept as an update.
+            app Android will accept as an update. For real secrecy, move it into the
+            \`ADSHIELD_KEYSTORE_BASE64\` / \`ADSHIELD_STORE_PASSWORD\` repository secrets and
+            delete the release asset.
           EOF
           gh release create "$TAG" "$APK" "$APK.sha256" \
             --title "AdShield Pro ${{ steps.meta.outputs.version_name }}" \
             --notes-file /tmp/notes.md \
             --target "$GITHUB_SHA"
 
+      # Always attach the keystore, even when it was reused: the next release looks for the
+      # key on existing releases, and a release without the asset is what caused the
+      # "latest release has no keystore" bug in the first place.
       - name: Attach signing key for future upgrades
-        if: env.reused == 'false'
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.meta.outputs.tag }}
@@ -210,25 +302,17 @@ jobs:
           cp "$ADSHIELD_KEYSTORE_PATH" /tmp/adshield-release.keystore
           gh release upload "$TAG" /tmp/adshield-release.keystore --clobber
 
-      # Best effort: Pages has to be switched on once by a repository admin
-      # (Settings -> Pages -> Source: GitHub Actions). Do not fail a good release over it.
-      - name: Publish the website (GitHub Pages)
+      # Best effort: trigger the real Pages pipeline (docs/ at /, web platform at /app/).
+      # Pages has to be switched on once by a repository admin (Settings -> Pages ->
+      # Source: GitHub Actions); until then the deploy workflow reports that clearly.
+      # The old approach force-pushed docs/ to a gh-pages branch, which is not how this
+      # repository's Pages site is built anymore.
+      - name: Trigger website deploy (GitHub Pages)
         if: success()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          W="$(mktemp -d)"
-          cp -r docs/. "$W/"
-          cd "$W"
-          git init -q
-          git checkout -q -b gh-pages
-          git config user.name "AdShield Release"
-          git config user.email "release@adshield.local"
-          git add -A
-          git commit -qm "Website: AdShield Pro ${{ steps.meta.outputs.version_name }}" || true
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+        run: gh workflow run deploy-website.yml --ref main
 
       - name: Upload workflow artifacts
         if: always()

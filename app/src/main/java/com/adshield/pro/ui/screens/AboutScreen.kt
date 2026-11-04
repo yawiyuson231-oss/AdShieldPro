@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -177,8 +178,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 )
             }
 
-            items(links.size) { index ->
-                val link = links[index]
+            items(links, key = { it.url }, contentType = { "about-link" }) { link ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

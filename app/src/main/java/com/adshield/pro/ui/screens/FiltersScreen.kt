@@ -220,7 +220,7 @@ fun FiltersScreen(
         }
 
         // Filter List Cards
-        items(sources, key = { it.id }) { source ->
+        items(sources, key = { it.id }, contentType = { "filter-source" }) { source ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
