@@ -1,0 +1,20 @@
+{
+  "name": "OmniShield X — AETHER AI Evolution",
+  "short_name": "OmniShield X",
+  "description": "Local-first DNS security, ad/tracker filtering, explainable threat intelligence and behavioural firewall analytics.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050b16",
+  "theme_color": "#2e7dff",
+  "categories": ["security", "utilities", "productivity"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="OmniShield X">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6fb3ff"/>
+      <stop offset="1" stop-color="#2e7dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="#050b16"/>
+  <path d="M64 18 L104 34 V64 C104 88 86 104 64 112 C42 104 24 88 24 64 V34 Z"
+        fill="url(#g)" opacity="0.18" stroke="url(#g)" stroke-width="4"/>
+  <path d="M64 34 L94 46 V64 C94 82 80 94 64 100 C48 94 34 82 34 64 V46 Z"
+        fill="none" stroke="#6fb3ff" stroke-width="3" opacity="0.85"/>
+  <path d="M50 66 L60 76 L80 54" fill="none" stroke="#34d399" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
