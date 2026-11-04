@@ -1,8 +1,20 @@
-# OmniShield X 4.0 (formerly TitanShield Max) — AI-Orchestrated DNS Firewall, Ad Block, Anti-Virus & Device Suite for Android
+# OmniShield X Infinity 5.0 — AETHER Android Security Ecosystem
 
-OmniShield X (formerly TitanShield Max, originally AdShield Pro) is a non-root Android all-in-one protection suite: device-wide DNS ad/tracker/malware filtering through a local VPN, an on-device anti-virus Security Center (files, links, apps, APKs), a zero-lag Game Turbo engine, battery intelligence, a true deep storage cleaner, and a built-in privacy browser with video-ad URL filtering. Built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+OmniShield X Infinity (formerly TitanShield Max, originally AdShield Pro) is a non-root Android protection suite: device-wide DNS ad/tracker/malware filtering through a local VPN, an on-device Security Center for user-selected files, links, apps and APKs, real-data network visualization, measured battery intelligence, storage tools and a built-in privacy browser. Built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt and Android `VpnService`.
 
-## What's new in v3.0.0
+**Release status:** development, not production-certified. See [the 5.0 evidence matrix](docs/OMNISHIELD_INFINITY_STATUS.md). The development workflow compiles and tests the app but never publishes a release. Physical-device validation is still required.
+
+## What's new in Infinity 5.0
+
+- AETHER now distinguishes **VERIFIED**, **SUSPECTED** and **UNKNOWN** evidence, attaches heuristic confidence and plain-language explanations, and never turns UNKNOWN into a malware verdict.
+- User-controlled autonomous response, emergency Strict mode with previous-setting restoration, and manual override that leaves existing DNS protection active.
+- DoH/DoT no longer downgrade to plaintext. Optional encrypted-only failover is bounded by Speed mode, autonomous response and manual override; caches are resolver-scoped and failure responses are not cached as successful answers.
+- Real-data network shield, per-category DNS event feed, connectivity validation, DNS-path disclosure and conservative local IP classification.
+- Battery percentage/status, current, voltage, temperature, battery-side power, optional capacity/cycle data, estimated remaining time, foreground trends and private charging sessions—with measured/computed/estimated/unavailable provenance.
+- Persistent local scan history and explicit SAF file quarantine. Original deletion is claimed only when the document provider confirms it.
+- Expanded **118-case** JVM test contract plus a hard Android lint and development-APK inspection gate.
+
+## Existing foundation retained
 
 - **Full rebrand + Deep Ocean Blue UI** — new identity, new all-blue Material 3 theme.
 - **367,000+ rules bundled offline** — HaGeZi Multi Pro (ads/trackers, 176k) + HaGeZi Threat Intelligence (malware/phishing/scam, 191k) ship inside the APK; entry-level (low-RAM) devices automatically load the curated Lite set instead of the max ad list while keeping the full threat feed.
