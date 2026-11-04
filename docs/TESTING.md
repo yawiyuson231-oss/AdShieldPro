@@ -59,7 +59,7 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
 - 153 unit tests, 16 integration tests — all passing.
-- Static verification: 73 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
+- Static verification: 75 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.

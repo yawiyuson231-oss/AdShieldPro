@@ -184,6 +184,15 @@ export function verify() {
     facts ? `${facts.rules} rules · v${facts.version}` : 'missing or unparsable');
   add('extension builder is wired into package scripts', !!JSON.parse(read('package.json')).scripts?.['build:extension']);
 
+  /* 9d. Boot wiring sanity: the governor and monitor loop are started once. */
+  const bootSource = read('app.js');
+  const governorCalls = (bootSource.match(/^\s*startPowerGovernor\(\);$/gm) || []).length;
+  add('boot starts the power governor exactly once', governorCalls === 1, `${governorCalls} call sites`);
+  const bootBody = (bootSource.split('async function startPowerGovernor')[0].split('function boot')[1]) || '';
+  add('the monitor loop is started by the governor, not separately',
+    !/^\s*startMonitorLoop\(\);$/m.test(bootBody),
+    'no duplicate timer install during boot');
+
   /* 10. Package scripts point at real test globs. */
   const pkg = JSON.parse(read('package.json'));
   add('package has test script', !!pkg.scripts?.test, pkg.scripts?.test);

@@ -104,8 +104,9 @@ async function boot() {
     // Train the lexical model after first paint so the UI never blocks.
     setTimeout(() => { ensureModel().catch((err) => { state.trainingError = err.message; }); }, 300);
     registerServiceWorker();
-    startPowerGovernor();
-    startMonitorLoop();
+    // The governor starts the monitor loop itself, with the interval it derives
+    // from device power state — calling startMonitorLoop() separately here would
+    // briefly install an untrottled timer and then replace it.
     startPowerGovernor();
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
