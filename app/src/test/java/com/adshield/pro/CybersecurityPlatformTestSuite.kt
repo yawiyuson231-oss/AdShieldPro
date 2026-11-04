@@ -254,13 +254,13 @@ class CybersecurityPlatformTestSuite {
 
     @Test
     fun yaraParsingRejectsOversizedOrUnboundedRuleInput() {
-        val huge = "rule Big { strings: $s = \"" + "a".repeat(5_000) + "\" condition: any of them }"
+        val huge = "rule Big { strings: ${'$'}s = \"" + "a".repeat(5_000) + "\" condition: any of them }"
         assertThrows(IllegalArgumentException::class.java) { YaraLiteEngine.parse(huge) }
         assertThrows(IllegalArgumentException::class.java) {
             YaraLiteEngine.parse("rule NoStrings { strings: condition: any of them }")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            YaraLiteEngine.parse("rule BadCondition { strings: $s = \"x\" condition: 2 of them }")
+            YaraLiteEngine.parse("rule BadCondition { strings: ${'$'}s = \"x\" condition: 2 of them }")
         }
     }
 }
