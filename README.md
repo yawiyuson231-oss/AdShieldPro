@@ -3,22 +3,12 @@
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
 AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
-## Website and downloads
 
-- **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
-  [docs/](docs) and the web platform, deployed by
-  [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
-  **One-time setup, and the only reason that URL can still 404:** open
-  **Settings → Pages → Source: GitHub Actions**. Creating a Pages site needs repository *admin*
-  rights, which a workflow token cannot have, so no code change can do it for you. Until then the
-  workflow still assembles the site, uploads it as a downloadable Pages artifact, and says so in
-  the run summary instead of failing.
+## Downloads
 
-  Every deploy also force-pushes the assembled site to the **`gh-pages` branch**, which needs no
-  admin click. Point any static host — or Pages itself with *Deploy from a branch* — at that
-  branch and the site is served from there instead.
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+- **Chrome extension:** [`omnishield-x-extension.zip`](omnishield-x-extension.zip) — regenerate with `npm run build:extension`
 
 ### Publishing a release
 
@@ -33,45 +23,26 @@ git tag v2.3.1 && git push origin v2.3.1
 ```
 
 The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
-publishes it to GitHub Releases with a SHA-256 checksum, uploads `adshield-release.keystore` for
-future upgrade installs, and refreshes the GitHub Pages site. Re-running it for an existing tag
-replaces that release's APK assets instead of failing or creating a duplicate release.
+publishes it to GitHub Releases with a SHA-256 checksum, and uploads `adshield-release.keystore` for
+future upgrade installs. Re-running it for an existing tag replaces that release's APK assets
+instead of failing or creating a duplicate release.
 To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
 `ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
 
 
-## OmniShield X web platform (browser)
+## Chrome extension
 
-The same repository ships the **OmniShield X — AETHER AI Evolution** web platform: a
-local-first DNS security, ad/tracker filtering and threat-intelligence app that runs entirely
-in the browser (no backend, no accounts, no telemetry endpoint). It is static files: open it
-over HTTP and it works offline after the first visit.
-
-```bash
-npm install               # jsdom, used only by the integration tests
-npm test                  # 166 unit + 19 integration tests
-npm run lint              # house lint rules for the shipped runtime code
-npm run verify            # 86 static architecture, claim, artifact and packaging gates
-npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
-npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
-npm run stage             # assemble _site/ exactly as the Pages workflow does
-```
+The repository also ships a Manifest V3 ad-blocking extension built from the same bundled rule
+set as the app. `npm test` covers it, and `npm run check:extension` verifies the archive it
+produces is inside Chrome's static-rule limit.
 
 | Document | Contents |
 |---|---|
-| [`docs/WEB_PLATFORM.md`](docs/WEB_PLATFORM.md) | Features, quick start, integration instructions |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map: DNS plumbing, AETHER, Firewall AI, recovery, power governor, extension builder |
-| [`docs/AETHER.md`](docs/AETHER.md) | Signal weights, evidence floors, calibration methodology and measured metrics |
-| [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this platform deliberately does **not** do, and why |
-| [`docs/WEB_TESTING.md`](docs/WEB_TESTING.md) | What the browser suite actually verifies |
-
-The platform includes a **CyberShield AI** console (`#cyber`): a threat-intelligence dashboard with
-an animated dot-matrix world map, severity donut, live detection feed, attack-vector mix and an
-honest compliance report. Measured figures are read from the live engine, monitor and model; the
-global telemetry is a seeded simulation and is labelled as such in every panel that uses it.
-
-Capabilities are also listed inside the app on the **Capabilities** page, including the rows
-that read *not implemented* — nothing there is aspirational.
+| [`docs/EXTENSION.md`](docs/EXTENSION.md) | How the extension is built, loaded and verified |
+| [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this project deliberately does **not** do, and why |
+| [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) | Data handling |
+| [`docs/TESTING.md`](docs/TESTING.md) | Android test suite |
+| [`docs/BUILD_AND_SIGNING_GUIDE.md`](docs/BUILD_AND_SIGNING_GUIDE.md) | Signing and release builds |
 
 ## App screenshots
 
@@ -212,8 +183,15 @@ PROJECT/
 │       │       │   └── viewmodel/AdShieldViewModel.kt
 │       │       └── worker/FilterUpdateWorker.kt
 │       └── test/java/com/adshield/pro/AdShieldEngineTestSuite.kt
+├── extension/src/                  # Manifest V3 sources shipped in the extension ZIP
+├── assets/                         # Bundled filter feeds + extension icon
+├── scripts/build-extension.mjs     # Reproducible extension builder
+├── tests/unit/extension.test.mjs   # Extension builder and archive tests
 └── docs/
     ├── BUILD_AND_SIGNING_GUIDE.md
+    ├── EXTENSION.md
     ├── GOOGLE_PLAY_RELEASE_CHECKLIST.md
-    └── PRIVACY_POLICY.md
+    ├── PRIVACY_POLICY.md
+    ├── TESTING.md
+    └── UNSUPPORTED.md
 ```

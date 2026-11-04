@@ -1,11 +1,8 @@
 # Testing
 
-This repository holds two deliverables with separate suites:
-
-| Suite | Where | Run it |
-|---|---|---|
-| **Android app (Kotlin)** | this document | `./gradlew test` |
-| **Web platform (browser)** | [`WEB_TESTING.md`](WEB_TESTING.md) | `npm test` · `npm run verify` |
+This document covers the Android app test suite. The Chrome extension has its
+own suite — `npm test` at the repository root — described in
+[`EXTENSION.md`](EXTENSION.md).
 
 This document describes how AdShield Pro is built and how its automated tests are run.
 

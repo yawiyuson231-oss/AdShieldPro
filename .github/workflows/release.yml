@@ -212,24 +212,6 @@ jobs:
 
       # Best effort: Pages has to be switched on once by a repository admin
       # (Settings -> Pages -> Source: GitHub Actions). Do not fail a good release over it.
-      - name: Publish the website (GitHub Pages)
-        if: success()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          W="$(mktemp -d)"
-          cp -r docs/. "$W/"
-          cd "$W"
-          git init -q
-          git checkout -q -b gh-pages
-          git config user.name "AdShield Release"
-          git config user.email "release@adshield.local"
-          git add -A
-          git commit -qm "Website: AdShield Pro ${{ steps.meta.outputs.version_name }}" || true
-          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-
       - name: Upload workflow artifacts
         if: always()
         uses: actions/upload-artifact@v4

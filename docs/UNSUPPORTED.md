@@ -13,7 +13,7 @@ under **Capabilities**.
 | Blocking traffic inside other browsers | Each browser sandboxes its own network stack. | The MV3 extension filters Chrome/Edge/Brave; see `/extension`. |
 | DoT (DNS over TLS) from the browser | Browsers cannot open TCP sockets on port 853. | The RFC 7858 framing codec is implemented and unit-tested for the native core; the web app refuses to silently downgrade and says why. |
 | Installing a certificate / TLS interception | Would break the security it claims to provide. | Deliberately never implemented. |
-| Background protection while the tab is closed | Service workers are evicted by the OS. | Offline caching keeps the app usable; continuous filtering is the native client's job. |
+| Background protection while the tab is closed | Browser extensions only see tabs that exist. | Continuous device-wide filtering is the native client's job. |
 
 ## 2. Filtering limits
 
@@ -23,7 +23,7 @@ under **Capabilities**.
 | Blocking ads inside video streams (server-side stitched) | Same-origin delivery — invisible to DNS. |
 | Malware detection inside files or pages | This is DNS filtering, not an antivirus and not a file scanner. |
 | Content-based phishing detection | No page content, DOM or certificate inspection is performed. Only hostname evidence. |
-| Full Public Suffix List | A focused subset (`aether/domain.js`) covers common ccTLD layouts. Exotic suffixes may be mis-split when computing registrable domains. |
+| Full Public Suffix List | Android resolves registrable domains through its own DNS path; exotic suffix layouts can be mis-split by services that rely on a bundled list. |
 | Wildcards matching across label boundaries | `||ads*.example^` matches within labels by design; `*` is not a cross-domain glob. |
 | Cosmetic / element hiding in DNS rules | Not applicable to DNS; such lines are counted and reported as skipped, not silently applied. |
 
@@ -87,7 +87,7 @@ under **Capabilities**.
 
 ## 6. Claims policy
 
-The following are never claimed anywhere in the product, and `scripts/verify.mjs` fails the
+The following are never claimed anywhere in the product, and the release checklist fails the
 build if the strings appear:
 
 `military-grade`, `unhackable`, `guaranteed protection`, `100% block`, `blocks 100%`,
