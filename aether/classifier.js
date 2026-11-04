@@ -445,8 +445,10 @@ export class DomainClassifier {
       logLikNeg: Float64Array.from(json.logLikNeg),
       logPriorPos: json.logPriorPos,
       logPriorNeg: json.logPriorNeg,
-      normalizeEvidence: json.normalizeEvidence ?? true,
-      evidenceExponent: json.evidenceExponent ?? 1,
+      featureMode: json.featureMode ?? c.featureMode,
+      binary: json.binary ?? c.binary,
+      normalizeEvidence: json.normalizeEvidence ?? c.normalizeEvidence,
+      evidenceExponent: json.evidenceExponent ?? c.evidenceExponent,
       trainedAt: json.trainedAt
     };
     c.metrics = json.metrics;

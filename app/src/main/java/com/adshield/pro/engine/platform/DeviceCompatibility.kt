@@ -130,8 +130,8 @@ object DeviceCompatibility {
         if (rawMillis == null || rawMillis <= 0L) return null
         val minutes = rawMillis / 60_000L
         return when {
-            minutes in 1..1_440 -> minutes.toInt()          // up to 24 h
-            rawMillis / 1_000L in 60..86_400 -> (rawMillis / 60_000L).toInt() // seconds-based fork
+            minutes in 1..1_440 -> minutes.toInt()          // up to 24 h (milliseconds)
+            rawMillis in 60L..59_999L -> (rawMillis / 60L).toInt() // seconds-based vendor fork (1..999 min)
             else -> null
         }
     }

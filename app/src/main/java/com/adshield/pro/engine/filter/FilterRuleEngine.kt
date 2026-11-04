@@ -297,11 +297,16 @@ class FilterRuleEngine @Inject constructor() {
             working = working.removePrefix("@@")
         }
 
-        // Detect Adblock ||domain^ syntax
+        // Detect Adblock ||domain^ or exact |domain^ syntax
         if (working.startsWith("||")) {
             working = working.removePrefix("||")
             if (detectedMatchType == null) {
                 detectedMatchType = RuleMatchType.SUBDOMAIN
+            }
+        } else if (working.startsWith("|")) {
+            working = working.removePrefix("|")
+            if (detectedMatchType == null) {
+                detectedMatchType = RuleMatchType.EXACT
             }
         }
 
@@ -464,6 +469,27 @@ class FilterRuleEngine @Inject constructor() {
                     val prev = subdomainMap.putIfAbsent(
                         clean,
                         FilterListEntry(activeCategory, sourceName, RuleMatchType.SUBDOMAIN)
+                    )
+                    if (prev != null) duplicates++
+                }
+                return@forEach
+            }
+
+            // Case 3b: Exact-host Adblock |domain.com^
+            if (withoutComment.startsWith("|") && !withoutComment.startsWith("||")) {
+                val clean = normalizeDomain(
+                    withoutComment.removePrefix("|").substringBefore('^').substringBefore('$')
+                )
+                if (clean.contains('*')) {
+                    compileWildcardRegex(clean)?.let { regex ->
+                        wildcardList.add(
+                            WildcardEntry(clean, regex, RuleType.BLOCK, activeCategory, sourceName, 50)
+                        )
+                    }
+                } else if (isValidDomainStructure(clean, false)) {
+                    val prev = exactMap.putIfAbsent(
+                        clean,
+                        FilterListEntry(activeCategory, sourceName, RuleMatchType.EXACT)
                     )
                     if (prev != null) duplicates++
                 }

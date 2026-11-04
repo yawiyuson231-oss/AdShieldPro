@@ -4,7 +4,7 @@
   "rules": 30000,
   "uniqueDomains": 30000,
   "rulesets": 2,
-  "bytes": 317662,
+  "bytes": 317743,
   "maxStaticRules": 30000,
   "feedLinesConsidered": 79802,
   "skipped": {

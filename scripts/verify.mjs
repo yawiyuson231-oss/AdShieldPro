@@ -34,11 +34,11 @@ const FORBIDDEN_CLAIMS = [
 
 const MODULE_FILES = [
   'app.js', 'engine.js', 'ui/dom.js',
-  'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
+  'dns/codec.js', 'dns/cache.js', 'dns/chain.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
   'security/monitor.js', 'security/firewall-ai.js', 'security/feedmanager.js',
-  'security/backup.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js'
+  'security/backup.js', 'security/power.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js'
 ];
 
 export function verify() {
@@ -46,7 +46,8 @@ export function verify() {
   const add = (name, ok, detail = '') => checks.push({ name, ok: !!ok, detail: String(detail) });
 
   /* 1. Core files exist and are non-trivial. */
-  for (const file of ['index.html', 'app.js', 'engine.js', 'sw.js', 'manifest.webmanifest', ...MODULE_FILES]) {
+  const coreFiles = [...new Set(['index.html', 'sw.js', 'manifest.webmanifest', ...MODULE_FILES])];
+  for (const file of coreFiles) {
     add(`file: ${file}`, exists(file) && statSync(abs(file)).size > 100,
       exists(file) ? `${statSync(abs(file)).size} bytes` : 'missing');
   }
@@ -238,11 +239,31 @@ export function verify() {
   add('no runtime dependencies', !pkg.dependencies || Object.keys(pkg.dependencies).length === 0,
     JSON.stringify(pkg.dependencies || {}));
 
-  /* 11. Documentation exists for the honest capability list. */
-  for (const doc of ['README.md', 'docs/WEB_PLATFORM.md', 'docs/ARCHITECTURE.md', 'docs/AETHER.md',
-    'docs/UNSUPPORTED.md', 'docs/WEB_TESTING.md', 'docs/TESTING.md']) {
+  /* 11. Documentation exists for the honest capability list, and relative links resolve. */
+  const docFiles = ['README.md', 'docs/WEB_PLATFORM.md', 'docs/ARCHITECTURE.md', 'docs/AETHER.md',
+    'docs/UNSUPPORTED.md', 'docs/WEB_TESTING.md', 'docs/TESTING.md'];
+  for (const doc of docFiles) {
     add(`doc: ${doc}`, exists(doc) && statSync(abs(doc)).size > 400);
   }
+  const brokenDocLinks = [];
+  const mdLinkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+  for (const doc of docFiles) {
+    if (!exists(doc)) continue;
+    const text = read(doc);
+    for (const m of text.matchAll(mdLinkRe)) {
+      const target = m[2].trim();
+      if (/^(https?:|mailto:|#)/.test(target)) continue;
+      const clean = target.split('#')[0];
+      if (!clean) continue;
+      const resolved = resolve(dirname(abs(doc)), clean);
+      if (!existsSync(resolved)) brokenDocLinks.push(`${doc} -> ${target}`);
+    }
+  }
+  add('markdown relative links resolve', brokenDocLinks.length === 0, brokenDocLinks.join('; '));
+
+  const marketingHtml = exists('docs/index.html') ? read('docs/index.html').trim() : '';
+  add('marketing site ends cleanly at </html> without stray code fences',
+    marketingHtml.endsWith('</html>') && !marketingHtml.includes('```'));
 
   return {
     ok: checks.every((c) => c.ok),

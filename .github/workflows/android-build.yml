@@ -22,7 +22,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: JDK 21
         uses: actions/setup-java@v5
@@ -97,10 +97,11 @@ jobs:
           ls -l "$APK"
           sha256sum "$APK"
 
-      - name: Universal-build gate (debug APK must be device-independent)
+      - name: Universal-build gate (debug and release APKs must be device-independent)
         run: |
           chmod +x tools/check_universal_release.py
           python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/debug/*.apk | head -1)"
+          python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/release/*.apk | head -1)"
 
       - name: JVM unit tests
         run: |
@@ -172,7 +173,7 @@ jobs:
 
       - name: Upload debug APK
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: adshield-pro-debug-apk
           path: app/build/outputs/apk/debug/*.apk
@@ -181,7 +182,7 @@ jobs:
       - name: Upload reports
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gradle-reports
           path: |

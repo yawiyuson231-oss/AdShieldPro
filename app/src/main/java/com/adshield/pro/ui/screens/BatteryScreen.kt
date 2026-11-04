@@ -53,6 +53,7 @@ import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnosticSeverity
 import com.adshield.pro.engine.battery.BatteryDiagnostics
 import com.adshield.pro.engine.battery.BatteryReading
+import com.adshield.pro.ui.theme.currentLocale
 import com.adshield.pro.engine.battery.BatteryReadingSource
 import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.battery.BatteryTelemetry
@@ -505,7 +506,7 @@ private fun DiagnosticsSection(
             text = when {
                 isDiagnosing -> "Analyzing live readings…"
                 lastDiagnosticAtMs == 0L -> "Tap DETECT to run a diagnostic against the live readings."
-                else -> "Last run ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(lastDiagnosticAtMs))}" +
+                else -> "Last run ${DateFormat.getTimeInstance(DateFormat.SHORT, currentLocale()).format(Date(lastDiagnosticAtMs))}" +
                     (chargeRatePercentPerHour?.let { " · measured ${BatteryDiagnostics.format1(it)}%/h" } ?: "")
             },
             fontSize = 11.sp,

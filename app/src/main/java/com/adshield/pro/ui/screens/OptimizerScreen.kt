@@ -1,7 +1,10 @@
 package com.adshield.pro.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -127,6 +130,7 @@ fun OptimizerScreen(
     isDndPolicyGranted: Boolean,
     onRunSmartBoost: () -> Unit,
     onScanJunk: (JunkCleanMode) -> Unit,
+    onScanSafFolderTree: (Uri) -> Unit,
     onToggleJunkCandidate: (String, Boolean) -> Unit,
     onCleanSelectedJunk: () -> Unit,
     onAddExcludedJunkPath: (String) -> Unit,
@@ -136,6 +140,7 @@ fun OptimizerScreen(
     onToggleFavoriteGame: (String, Boolean) -> Unit,
     onUpdateGamingSettings: (GamingProfile, Boolean, Int) -> Unit,
     onTriggerGameBoost: (String?, String?) -> Unit,
+    onEndGameTurboSession: () -> Unit,
     onSelectBatteryMode: (BatteryMode) -> Unit
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -193,6 +198,7 @@ fun OptimizerScreen(
                     scanReport = junkScanReport,
                     isScanning = isScanningJunk,
                     onScanMode = onScanJunk,
+                    onScanSafFolderTree = onScanSafFolderTree,
                     onToggleCandidate = onToggleJunkCandidate,
                     onCleanSelected = onCleanSelectedJunk,
                     onAddExcludedPath = onAddExcludedJunkPath,
@@ -214,7 +220,8 @@ fun OptimizerScreen(
                     isDndGranted = isDndPolicyGranted,
                     onToggleFavorite = onToggleFavoriteGame,
                     onUpdateSettings = onUpdateGamingSettings,
-                    onBoostAndLaunch = onTriggerGameBoost
+                    onBoostAndLaunch = onTriggerGameBoost,
+                    onEndGameTurboSession = onEndGameTurboSession
                 )
 
                 OptimizerSubTab.BATTERY_TEMP -> BatteryThermalTabContent(
@@ -582,12 +589,18 @@ private fun JunkCleanerTabContent(
     scanReport: JunkScanReport?,
     isScanning: Boolean,
     onScanMode: (JunkCleanMode) -> Unit,
+    onScanSafFolderTree: (Uri) -> Unit,
     onToggleCandidate: (String, Boolean) -> Unit,
     onCleanSelected: () -> Unit,
     onAddExcludedPath: (String) -> Unit,
     onRemoveExcludedPath: (String) -> Unit
 ) {
     var showExclusionDialog by remember { mutableStateOf(false) }
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri != null) onScanSafFolderTree(treeUri)
+    }
     val currentMode = scanReport?.mode ?: JunkCleanMode.QUICK_CLEAN
     val candidates = scanReport?.candidates ?: emptyList()
     val selectedBytes = candidates.filter { it.isSelected }.sumOf { it.sizeBytes }
@@ -715,6 +728,16 @@ private fun JunkCleanerTabContent(
                             Text("Exclusions (${settings.excludedJunkPaths.size})", maxLines = 1)
                         }
                     }
+
+                    OutlinedButton(
+                        onClick = { runCatching { folderPicker.launch(null) } },
+                        enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Scan User-Selected Folder (SAF Storage Picker)")
+                    }
                 }
             }
         }
@@ -749,7 +772,7 @@ private fun JunkCleanerTabContent(
                 }
             }
         } else {
-            items(candidates, key = { it.id }) { item ->
+            items(candidates, key = { it.id }, contentType = { "junk-candidate" }) { item ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -1096,7 +1119,8 @@ private fun GameBoosterTabContent(
     isDndGranted: Boolean,
     onToggleFavorite: (String, Boolean) -> Unit,
     onUpdateSettings: (GamingProfile, Boolean, Int) -> Unit,
-    onBoostAndLaunch: (String?, String?) -> Unit
+    onBoostAndLaunch: (String?, String?) -> Unit,
+    onEndGameTurboSession: () -> Unit
 ) {
     val context = LocalContext.current
     var showAllAppsFilter by remember { mutableStateOf(false) }
@@ -1163,14 +1187,22 @@ private fun GameBoosterTabContent(
                         )
                     }
 
-                    Button(
-                        onClick = { onBoostAndLaunch(null, null) },
-                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Bolt, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("APPLY GAME BOOST (${settings.gamingProfile.title.uppercase()})", fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { onBoostAndLaunch(null, null) },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("APPLY BOOST (${settings.gamingProfile.title.uppercase()})", fontWeight = FontWeight.Bold, maxLines = 1)
+                        }
+                        OutlinedButton(onClick = onEndGameTurboSession) {
+                            Text("End Session", maxLines = 1)
+                        }
                     }
                 }
             }
@@ -1318,7 +1350,7 @@ private fun GameBoosterTabContent(
             }
         }
 
-        items(displayedGames.take(40), key = { it.packageName }) { game ->
+        items(displayedGames.take(40), key = { it.packageName }, contentType = { "game-app" }) { game ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),

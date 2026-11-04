@@ -62,6 +62,7 @@ import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
 import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.TimeBucketStat
+import com.adshield.pro.engine.aether.DnsAnomalyScorer
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.formatInteger
 import com.adshield.pro.ui.theme.CyberCyan
@@ -79,6 +80,7 @@ fun ActivityScreen(
     liveTopApps: List<AppDnsActivity>,
     sourceEffectiveness: List<SourceEffectiveness>,
     chartBuckets: List<TimeBucketStat>,
+    ruleSuggestions: List<DnsAnomalyScorer.RuleSuggestion>,
     selectedRange: StatsChartRange,
     allTimeTotal: Long,
     allTimeBlocked: Long,
@@ -385,6 +387,59 @@ fun ActivityScreen(
         }
 
         // Live DNS Query Log Header & Filter Tabs (Two clean rows so chips never wrap vertically)
+        if (ruleSuggestions.isNotEmpty()) {
+            item(key = "anomaly-rule-suggestions") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "On-Device Anomaly & Rule Suggestions (${ruleSuggestions.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Heuristic Shannon-entropy, DGA & tracker-beacon suggestions computed locally:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        ruleSuggestions.take(5).forEach { suggestion ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        suggestion.domain,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        suggestion.rationale,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                val targetType = suggestion.suggestedRuleType
+                                TextButton(onClick = { onQuickRuleFromLog(suggestion.domain, targetType) }) {
+                                    Text(
+                                        if (targetType == RuleType.ALLOW) "Allow" else "Block",
+                                        color = if (targetType == RuleType.ALLOW) EmeraldPrimary else AlertRed,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Column(
                 modifier = Modifier.fillMaxWidth(),

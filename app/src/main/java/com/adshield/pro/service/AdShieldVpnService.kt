@@ -4,9 +4,13 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.Manifest
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -16,6 +20,7 @@ import android.os.Process
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.adshield.pro.MainActivity
 import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
@@ -25,6 +30,8 @@ import com.adshield.pro.engine.dns.DnsPacketCodec
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.security.AppRiskAuditor
+import com.adshield.pro.engine.security.SecurityEngine
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +67,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var securityEngine: SecurityEngine
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -73,6 +81,7 @@ class AdShieldVpnService : VpnService() {
 
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var packageInstallReceiver: BroadcastReceiver? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -82,6 +91,7 @@ class AdShieldVpnService : VpnService() {
             protectUdp = { datagramSocket -> protect(datagramSocket) }
         )
         registerNetworkCallback()
+        registerPackageInstallReceiver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -577,10 +587,63 @@ class AdShieldVpnService : VpnService() {
         nm.createNotificationChannel(channel)
     }
 
+    private fun registerPackageInstallReceiver() {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val pkg = intent?.data?.schemeSpecificPart ?: return
+                serviceScope.launch {
+                    val audit = securityEngine.auditSinglePackage(pkg) ?: return@launch
+                    if (audit.riskLevel == AppRiskAuditor.RiskLevel.HIGH) {
+                        postHighRiskAppInstallAlert(audit)
+                    }
+                }
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(receiver, filter)
+            }
+            packageInstallReceiver = receiver
+        }
+    }
+
+    private fun postHighRiskAppInstallAlert(audit: AppRiskAuditor.AppRiskAudit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        val openAppIntent = PendingIntent.getActivity(
+            this,
+            audit.profile.packageName.hashCode(),
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alert = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_shield)
+            .setContentTitle("High-Risk App Installed: ${audit.profile.appName}")
+            .setContentText(audit.findings.firstOrNull() ?: "Review requested permissions in Security Center.")
+            .setContentIntent(openAppIntent)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(2100 + (audit.profile.packageName.hashCode() and 0x7FF), alert)
+    }
+
     override fun onRevoke() {
-        // Triggered when the user or another VPN application revokes our VPN permission
-        serviceScope.launch {
-            preferencesRepository.setVpnShouldRemainActive(false)
+        // Triggered when the user or another VPN application revokes our VPN permission.
+        // Persist synchronously before stopSelf() tears down serviceScope.
+        runCatching {
+            runBlocking {
+                withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
+                    preferencesRepository.setVpnShouldRemainActive(false)
+                }
+            }
         }
         stopVpnTunnel(reason = "VPN permission was revoked or superseded by another VPN app.")
         stopSelf()
@@ -600,11 +663,22 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        packageInstallReceiver?.let { rcv ->
+            runCatching { unregisterReceiver(rcv) }
+            packageInstallReceiver = null
+        }
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
         }
         upstreamDnsResolver.bindVpnSocketProtectors(null, null)
-        stopVpnTunnel()
+        val currentState = repository.vpnRuntimeState.value
+        if (currentState.status == VpnStatus.ERROR) {
+            tunnelJob?.cancel()
+            tunnelJob = null
+            closeTunInterface()
+        } else {
+            stopVpnTunnel(reason = currentState.lastError)
+        }
         serviceScope.cancel()
         super.onDestroy()
     }

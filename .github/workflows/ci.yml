@@ -20,12 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
+          cache: npm
 
       - name: Install dev dependencies (jsdom, tests only)
         run: npm install --no-audit --no-fund
@@ -44,6 +45,9 @@ jobs:
 
       - name: Check the extension archive is inside Chrome's static-rule limit
         run: node scripts/build-extension.mjs --check
+
+      - name: Assemble the Pages deployment (and verify every precache target exists)
+        run: npm run stage
 
       - name: Summarise the bundled rule set
         run: |

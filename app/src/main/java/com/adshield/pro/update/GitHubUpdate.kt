@@ -56,9 +56,8 @@ object GitHubReleaseClient {
                 .mapNotNull { assets.optJSONObject(it) }
                 .map { it to it.optString("name") }
                 .filter { (_, name) -> isInstallableReleaseApk(name) }
-            val chosen = candidates.firstOrNull { (_, name) ->
-                name.contains("release", true) || name.contains("universal", true)
-            } ?: candidates.firstOrNull()
+            val preferredName = selectBestApkAssetName(candidates.map { it.second })
+            val chosen = candidates.firstOrNull { (_, name) -> name == preferredName } ?: candidates.firstOrNull()
             val apk = chosen?.first?.optString("browser_download_url")
             val digest = chosen?.first?.optString("digest")
                 ?.takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
@@ -81,6 +80,23 @@ object GitHubReleaseClient {
         if (lower.contains("debug")) return false
         if (SPLIT_ABI.containsMatchIn(lower)) return false
         return true
+    }
+
+    /**
+     * Picks the best release APK among candidate asset names, preferring AdShield Pro universal/release
+     * builds while ignoring debug or split-ABI artifacts.
+     */
+    fun selectBestApkAssetName(assetNames: List<String>): String? {
+        val installable = assetNames.filter { isInstallableReleaseApk(it) }
+        if (installable.isEmpty()) return null
+        return installable.firstOrNull { name ->
+            name.contains("adshield", ignoreCase = true) &&
+                (name.contains("release", ignoreCase = true) || name.contains("universal", ignoreCase = true))
+        } ?: installable.firstOrNull { name ->
+            name.contains("release", ignoreCase = true) || name.contains("universal", ignoreCase = true)
+        } ?: installable.firstOrNull { name ->
+            name.contains("adshield", ignoreCase = true)
+        } ?: installable.first()
     }
 }
 
@@ -151,18 +167,23 @@ object GitHubApkDownload {
             val apk = File(dir, "adshield-" + release.code + ".apk")
             val hash = MessageDigest.getInstance("SHA-256")
             var total = 0L
-            body.byteStream().use { input ->
-                FileOutputStream(part).use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        if (total > limit) throw java.io.IOException("APK exceeds the download size limit.")
-                        hash.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
+            try {
+                body.byteStream().use { input ->
+                    FileOutputStream(part).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            if (total > limit) throw java.io.IOException("APK exceeds the download size limit.")
+                            hash.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
                     }
                 }
+            } catch (t: Throwable) {
+                part.delete()
+                throw t
             }
             val actual = hash.digest().joinToString("") { "%02x".format(it) }
             if (release.sha256 != null && !actual.equals(release.sha256, true)) {

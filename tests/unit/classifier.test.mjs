@@ -141,15 +141,23 @@ test('ad and phishing-shaped names score high, with explainable tokens', () => {
   }
 });
 
-test('model survives a JSON round-trip with identical predictions', () => {
+test('model survives a JSON round-trip with identical predictions (including repeated n-grams)', () => {
   const c = new DomainClassifier();
   c.train({ positives: samplePositives(3000), negatives: [...POPULAR_DOMAINS] });
-  const clone = DomainClassifier.fromJSON(JSON.parse(JSON.stringify(c.toJSON())));
+  const serialized = JSON.parse(JSON.stringify(c.toJSON()));
+  const clone = DomainClassifier.fromJSON(serialized);
   assert.ok(clone, 'fromJSON must accept a serialized model');
   assert.equal(clone.operatingThreshold, c.operatingThreshold);
-  for (const d of ['paypal.com', 'ads.doubleclick.net', 'random.example']) {
+  for (const d of ['paypal.com', 'ads.doubleclick.net', 'random.example', 'banana.example.com', 'analytics-analytics.tracker.net']) {
     assert.equal(clone.predict(d).score, c.predict(d).score, `prediction drifted for ${d}`);
   }
+  const legacyPayload = { ...serialized };
+  delete legacyPayload.evidenceExponent;
+  delete legacyPayload.binary;
+  delete legacyPayload.featureMode;
+  const legacyClone = DomainClassifier.fromJSON(legacyPayload);
+  assert.equal(legacyClone.predict('banana.example.com').score, c.predict('banana.example.com').score,
+    'legacy model payload without binary/evidenceExponent fields must default to identical scoring');
   assert.equal(DomainClassifier.fromJSON({ version: 99 }), null, 'unknown versions are rejected');
 });
 

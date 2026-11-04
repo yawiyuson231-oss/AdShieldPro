@@ -1,95 +1,83 @@
 name: Deploy website
 
-# Publishes the project website to GitHub Pages.
-#
-#   /            ← docs/            (marketing site, APK links)
-#   /app/        ← the web platform (index.html, app.js, modules, feeds)
-#
-# The web platform is static and uses relative URLs, so serving it from a
-# subdirectory works unchanged (its service worker scope is /app/).
-# Runs on every change to docs/ or the web platform, and can be triggered by hand.
-# Safe to re-run: the job is idempotent and only needs the default token.
-
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
       - 'arena/**'
-    paths:
-      - 'docs/**'
-      - 'index.html'
-      - 'app.js'
-      - 'engine.js'
-      - 'sw.js'
-      - 'manifest.webmanifest'
-      - 'assets/**'
-      - 'ui/**'
-      - 'dns/**'
-      - 'aether/**'
-      - 'security/**'
-      - 'omnishield-x-extension.zip'
-      - '.github/workflows/deploy-website.yml'
-
-concurrency:
-  group: pages-${{ github.ref }}
-  cancel-in-progress: false
+  workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  build:
+    name: Assemble & verify site
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+    outputs:
+      pages_enabled: ${{ steps.pages_status.outputs.enabled }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
 
       - name: Check the site files are present
         run: |
           test -s docs/index.html
-          grep -q "AdShield Pro" docs/index.html
+          grep -qi '<title>AdShield Pro' docs/index.html
           test -s index.html
           test -s app.js
-          ls -l docs/index.html docs/PRIVACY_POLICY.md
+          test -s sw.js
 
-      # Pages must be turned on once with build_type=workflow. A repository admin can do that
-      # in Settings -> Pages; the default token cannot, so report it instead of failing silently.
-      - name: Ensure GitHub Pages is enabled
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if ! gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
-            echo "::error::GitHub Pages is not enabled for this repository yet. A repository admin must open Settings -> Pages and set Source to \"GitHub Actions\", then re-run this workflow."
-            exit 1
-          fi
-          echo "Pages is enabled."
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Assemble the site
-        # Single source of truth: scripts/stage-site.mjs builds _site/ (marketing
-        # site at /, web platform at /app/) and fails if any service-worker
-        # precache target is missing from the staged tree.
+      - name: Assemble the site (marketing at /, web platform at /app/)
         run: node scripts/stage-site.mjs --out _site
 
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+      - name: Check GitHub Pages enablement
+        id: pages_status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh api -i "repos/${{ github.repository }}/pages" 2>/dev/null | awk 'NR==1 {print $2}' || true)
+          if [ "$status" = "200" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GitHub Pages is not enabled for ${{ github.repository }} yet (Settings -> Pages -> Source: GitHub Actions). Site assembly succeeded; live Pages upload was skipped."
+          fi
+
+      - name: Configure Pages
+        if: github.ref == 'refs/heads/main' && steps.pages_status.outputs.enabled == 'true'
+        uses: actions/configure-pages@v6
+
+      - name: Upload site artifact for GitHub Pages
+        if: github.ref == 'refs/heads/main' && steps.pages_status.outputs.enabled == 'true'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.pages_enabled == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to Pages
-        id: pages
-        uses: actions/deploy-pages@v4
+        id: deployment
+        uses: actions/deploy-pages@v5

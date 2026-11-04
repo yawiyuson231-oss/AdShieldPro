@@ -439,3 +439,50 @@ test('no page uses innerHTML or trusts file content as markup', () => {
   assert.equal(/insertAdjacentHTML/.test(appSource), false, 'app.js must not use insertAdjacentHTML');
   assert.equal(/\.innerHTML\s*=/.test(domSource), false, 'ui/dom.js must not assign innerHTML');
 });
+
+test('toggling allow/block rules and removing imported ||domain^ rules leave no stale overrides', () => {
+  app.navigate('aether');
+  $('#aether-input').value = 'toggle-check.example';
+  click('#aether-go');
+
+  // Block clean domain -> Allow it -> Block it again; opposing rule must not linger.
+  const actionBtn = () => [...win.document.querySelectorAll('#aether-result button')]
+    .find((b) => /Allow this domain|Block this domain/i.test(b.textContent));
+  actionBtn().dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(app.state.engine.evaluate('toggle-check.example').blocked, true);
+
+  actionBtn().dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(app.state.engine.evaluate('toggle-check.example').blocked, false);
+
+  actionBtn().dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  assert.equal(app.state.engine.evaluate('toggle-check.example').blocked, true,
+    'blocking after allowing must remove the previous user allow rule');
+  assert.equal(app.state.customRules.filter((r) => r.pattern === 'toggle-check.example').length, 1);
+
+  // Clean up via Backup & Sync Remove button, verifying ||domain^ syntax removal works too.
+  const backup = {
+    customRules: [{ rawPattern: '||imported-wrap.example^', ruleType: 'BLOCK', matchType: 'SUBDOMAIN', isEnabled: true }]
+  };
+  const file = new win.File([JSON.stringify(backup)], 'wrap.json', { type: 'application/json' });
+  const input = $('#import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new win.Event('change', { bubbles: true }));
+
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        assert.equal(app.state.engine.evaluate('imported-wrap.example').blocked, true);
+        app.navigate('sync');
+        const rows = [...win.document.querySelectorAll('#rules-body tr')];
+        for (const domain of ['imported-wrap.example', 'toggle-check.example']) {
+          const row = rows.find((tr) => tr.textContent.includes(domain));
+          assert.ok(row, `expected custom rule row for ${domain}`);
+          row.querySelector('button').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+          assert.equal(app.state.engine.evaluate(domain).blocked, false, `removing ${domain} must undo block`);
+        }
+        resolve();
+      } catch (err) { reject(err); }
+    }, 120);
+  });
+});
+

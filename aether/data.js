@@ -214,7 +214,7 @@ export const THREAT_TOKENS = Object.freeze([
 export const HOMOGLYPHS = Object.freeze({
   '0': 'o', '1': 'l', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b',
   '9': 'g', '$': 's', '@': 'a', '!': 'i', '|': 'l',
-  rn: 'm', vv: 'w', cl: 'd', nn: 'm', ii: 'u', '5': 's', '2': 'z'
+  rn: 'm', vv: 'w', cl: 'd', nn: 'm', ii: 'u', '2': 'z'
 });
 
 /** Physical keyboard neighbours (QWERTY) for adjacent-key typo detection. */

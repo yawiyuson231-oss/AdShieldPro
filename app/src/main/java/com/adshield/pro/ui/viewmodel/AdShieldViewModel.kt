@@ -1,18 +1,26 @@
 package com.adshield.pro.ui.viewmodel
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.provider.OpenableColumns
+import android.provider.Settings
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.adshield.pro.BuildConfig
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
-import com.adshield.pro.BuildConfig
-import com.adshield.pro.domain.model.AppExclusionInfo
+import com.adshield.pro.data.repository.BatteryIntelligenceRepository
 import com.adshield.pro.domain.model.AppDnsActivity
+import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.BatteryThermalSnapshot
 import com.adshield.pro.domain.model.CustomRule
@@ -39,25 +47,34 @@ import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
-import com.adshield.pro.data.repository.BatteryIntelligenceRepository
+import com.adshield.pro.engine.aether.DnsAnomalyScorer
+import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnostics
+import com.adshield.pro.engine.battery.BatteryHealthStatus
 import com.adshield.pro.engine.battery.BatterySession
-import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
-import com.adshield.pro.engine.platform.DeviceProfiler
+import com.adshield.pro.engine.browser.SearchProvider
+import com.adshield.pro.engine.dns.DnsLeakDetector
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
+import com.adshield.pro.engine.downloader.MediaDownloaderEngine
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
+import com.adshield.pro.engine.platform.DeviceCompatibility
+import com.adshield.pro.engine.platform.DeviceProfiler
+import com.adshield.pro.engine.platform.DiagnosticReportBuilder
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.ScanKind
 import com.adshield.pro.engine.security.SecurityEngine
 import com.adshield.pro.engine.security.SecurityLevel
 import com.adshield.pro.engine.security.SecurityPosture
 import com.adshield.pro.engine.security.SecurityScanRecord
+import com.adshield.pro.engine.security.SystemScannerEngine
 import com.adshield.pro.engine.security.UrlThreatScanner
+import com.adshield.pro.engine.storage.PrivateCloudBoxEngine
+import com.adshield.pro.engine.storage.UniversalFileManager
 import com.adshield.pro.service.AdShieldVpnService
 import com.adshield.pro.ui.UpdatePromptActivity
 import com.adshield.pro.update.GitHubReleaseClient
@@ -65,8 +82,8 @@ import com.adshield.pro.worker.FilterUpdateWorker
 import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -98,7 +115,11 @@ class AdShieldViewModel @Inject constructor(
     private val optimizerEngine: SystemOptimizerEngine,
     private val securityEngine: SecurityEngine,
     private val batteryRepository: BatteryIntelligenceRepository,
-    private val deviceProfiler: DeviceProfiler
+    private val deviceProfiler: DeviceProfiler,
+    private val privateCloudBoxEngine: PrivateCloudBoxEngine,
+    private val universalFileManager: UniversalFileManager,
+    private val mediaDownloaderEngine: MediaDownloaderEngine,
+    private val dnsLeakDetector: DnsLeakDetector
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -141,6 +162,17 @@ class AdShieldViewModel @Inject constructor(
         .flatMapLatest { range -> repository.observeDailyChartBuckets(range.days) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val ruleSuggestions: StateFlow<List<DnsAnomalyScorer.RuleSuggestion>> = combine(
+        recentLogs,
+        customRules
+    ) { logs, rules ->
+        DnsAnomalyScorer.suggestRulesFromLogs(
+            recentLogs = logs,
+            existingCustomDomains = rules.mapTo(HashSet()) { it.normalizedPattern }
+        )
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _ruleConflicts = MutableStateFlow<List<RuleConflictReport>>(emptyList())
     val ruleConflicts: StateFlow<List<RuleConflictReport>> = _ruleConflicts.asStateFlow()
 
@@ -159,6 +191,12 @@ class AdShieldViewModel @Inject constructor(
     private val _sandboxTestResult = MutableStateFlow<FilterEvaluationResult?>(null)
     val sandboxTestResult: StateFlow<FilterEvaluationResult?> = _sandboxTestResult.asStateFlow()
 
+    // --- DNS Leak & Bypass Audit ---
+    private val _dnsLeakReport = MutableStateFlow<DnsLeakDetector.LeakAuditReport?>(null)
+    val dnsLeakReport: StateFlow<DnsLeakDetector.LeakAuditReport?> = _dnsLeakReport.asStateFlow()
+
+    private val _isRunningDnsLeakAudit = MutableStateFlow(false)
+    val isRunningDnsLeakAudit: StateFlow<Boolean> = _isRunningDnsLeakAudit.asStateFlow()
 
     // --- Phone Optimizer & AI Smart Boost Live States ---
     private val _ramSnapshot = MutableStateFlow(optimizerEngine.readRamSnapshot())
@@ -200,17 +238,115 @@ class AdShieldViewModel @Inject constructor(
     private val _isDndPolicyGranted = MutableStateFlow(optimizerEngine.isDoNotDisturbAccessGranted())
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
+    // --- Security Center + Complete System Scanner ---
+    private val _malwareBlocks = MutableStateFlow(0L)
+    val malwareBlocks: StateFlow<Long> = _malwareBlocks.asStateFlow()
+
+    private val _securityPosture = MutableStateFlow(
+        SecurityPosture(
+            protectionScore = 0,
+            highRiskApps = 0,
+            threatSignatures = 0,
+            webProtectionActive = false
+        )
+    )
+    val securityPosture: StateFlow<SecurityPosture> = _securityPosture.asStateFlow()
+
+    private val _appAudits = MutableStateFlow<List<AppRiskAuditor.AppRiskAudit>>(emptyList())
+    val appAudits: StateFlow<List<AppRiskAuditor.AppRiskAudit>> = _appAudits.asStateFlow()
+
+    private val _isAuditingApps = MutableStateFlow(false)
+    val isAuditingApps: StateFlow<Boolean> = _isAuditingApps.asStateFlow()
+
+    private val _urlScanResult = MutableStateFlow<UrlThreatScanner.UrlVerdict?>(null)
+    val urlScanResult: StateFlow<UrlThreatScanner.UrlVerdict?> = _urlScanResult.asStateFlow()
+
+    private val _fileScanResult = MutableStateFlow<SecurityScanRecord?>(null)
+    val fileScanResult: StateFlow<SecurityScanRecord?> = _fileScanResult.asStateFlow()
+
+    private val _isScanningSecurity = MutableStateFlow(false)
+    val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
+
+    private val _securityHistory = MutableStateFlow(securityEngine.historyStore.getScanRecords())
+    val securityHistory: StateFlow<List<SecurityScanRecord>> = _securityHistory.asStateFlow()
+
+    private val _systemScanReports = MutableStateFlow(securityEngine.historyStore.getSystemReports())
+    val systemScanReports: StateFlow<List<SystemScannerEngine.SystemScanReport>> = _systemScanReports.asStateFlow()
+
+    private val _systemScanProgress = MutableStateFlow<SystemScannerEngine.SystemScanProgress?>(null)
+    val systemScanProgress: StateFlow<SystemScannerEngine.SystemScanProgress?> = _systemScanProgress.asStateFlow()
+
+    // --- Private Cloud Storage Box ---
+    private val _vaultSelectedFolder = MutableStateFlow<String?>(null)
+    val vaultSelectedFolder: StateFlow<String?> = _vaultSelectedFolder.asStateFlow()
+
+    private val _vaultSelectedCategory = MutableStateFlow<PrivateCloudBoxEngine.VaultCategory?>(null)
+    val vaultSelectedCategory: StateFlow<PrivateCloudBoxEngine.VaultCategory?> = _vaultSelectedCategory.asStateFlow()
+
+    private val _vaultSearchQuery = MutableStateFlow("")
+    val vaultSearchQuery: StateFlow<String> = _vaultSearchQuery.asStateFlow()
+
+    private val _vaultItems = MutableStateFlow(privateCloudBoxEngine.listItems())
+    val vaultItems: StateFlow<List<PrivateCloudBoxEngine.VaultItem>> = _vaultItems.asStateFlow()
+
+    private val _vaultSummary = MutableStateFlow(privateCloudBoxEngine.storageSummary())
+    val vaultSummary: StateFlow<PrivateCloudBoxEngine.VaultStorageSummary> = _vaultSummary.asStateFlow()
+
+    private val _vaultCloudConfig = MutableStateFlow(privateCloudBoxEngine.getCloudEndpointConfig())
+    val vaultCloudConfig: StateFlow<PrivateCloudBoxEngine.CloudEndpointConfig> = _vaultCloudConfig.asStateFlow()
+
+    private val _vaultPreview = MutableStateFlow<PrivateCloudBoxEngine.VaultPreview?>(null)
+    val vaultPreview: StateFlow<PrivateCloudBoxEngine.VaultPreview?> = _vaultPreview.asStateFlow()
+
+    private val _isVaultBusy = MutableStateFlow(false)
+    val isVaultBusy: StateFlow<Boolean> = _isVaultBusy.asStateFlow()
+
+    // --- Universal App & File Support ---
+    private val _managedFileKindFilter = MutableStateFlow<UniversalFileManager.ManagedMediaKind?>(null)
+    val managedFileKindFilter: StateFlow<UniversalFileManager.ManagedMediaKind?> = _managedFileKindFilter.asStateFlow()
+
+    private val _managedFiles = MutableStateFlow(universalFileManager.listManagedFiles())
+    val managedFiles: StateFlow<List<UniversalFileManager.ManagedFileItem>> = _managedFiles.asStateFlow()
+
+    // --- Universal Video & Music Downloader ---
+    val mediaDownloadTasks: StateFlow<List<MediaDownloaderEngine.MediaDownloadTask>> = mediaDownloaderEngine.tasks
+
+    private val _mediaProbeResult = MutableStateFlow<MediaDownloaderEngine.MediaProbeResult?>(null)
+    val mediaProbeResult: StateFlow<MediaDownloaderEngine.MediaProbeResult?> = _mediaProbeResult.asStateFlow()
+
+    private val _mediaProbeError = MutableStateFlow<String?>(null)
+    val mediaProbeError: StateFlow<String?> = _mediaProbeError.asStateFlow()
+
+    private val _isProbingMedia = MutableStateFlow(false)
+    val isProbingMedia: StateFlow<Boolean> = _isProbingMedia.asStateFlow()
+
     init {
         viewModelScope.launch {
             customRules.collect {
                 refreshRuleConflicts()
             }
         }
-        // Security Center: keep the malware-block counter and protection score live.
         viewModelScope.launch {
             repository.malwareBlocksFlow.collect { count ->
                 _malwareBlocks.value = count
                 refreshSecurityPosture()
+            }
+        }
+        // Keep security posture synchronized with VPN connection changes and filter list updates
+        viewModelScope.launch {
+            repository.vpnRuntimeState.collect {
+                refreshSecurityPosture()
+            }
+        }
+        viewModelScope.launch {
+            repository.filterSourcesFlow.collect {
+                refreshSecurityPosture()
+            }
+        }
+        // Keep derived battery rates & ETAs live whenever hardware battery broadcasts arrive
+        viewModelScope.launch {
+            batteryRepository.telemetry.collect {
+                refreshBatteryDerived()
             }
         }
         // Initial Junk quick scan & periodic lightweight telemetry refresh while UI is open
@@ -281,7 +417,6 @@ class AdShieldViewModel @Inject constructor(
             _isRunningSmartBoost.value = true
             val result = optimizerEngine.runOneTapSmartBoost(forceRun = false)
             _smartBoostResult.value = result
-            // Refresh junk scan and telemetry after boost
             val updatedScan = optimizerEngine.scanJunkFiles(
                 mode = _junkScanReport.value?.mode ?: JunkCleanMode.QUICK_CLEAN,
                 excludedPaths = settingsState.value.excludedJunkPaths
@@ -311,6 +446,18 @@ class AdShieldViewModel @Inject constructor(
             _junkScanReport.value = report
             _healthAssessment.value = optimizerEngine.evaluateCurrentHealth(report.totalRecoverableBytes)
             _isScanningJunk.value = false
+        }
+    }
+
+    fun scanUserSelectedSafFolder(treeUri: Uri) {
+        if (_isScanningJunk.value) return
+        viewModelScope.launch {
+            _isScanningJunk.value = true
+            val report = optimizerEngine.scanSafFolderTree(treeUri)
+            _junkScanReport.value = report
+            _healthAssessment.value = optimizerEngine.evaluateCurrentHealth(report.totalRecoverableBytes)
+            _isScanningJunk.value = false
+            showFeedback("Scanned selected folder: ${report.candidates.size} reviewable item(s) found.")
         }
     }
 
@@ -420,6 +567,13 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun endGameTurboSession() {
+        viewModelScope.launch {
+            val actions = optimizerEngine.endGameTurboSession()
+            showFeedback(actions.firstOrNull() ?: "Game Turbo session ended.")
+        }
+    }
+
     fun selectAndApplyBatteryMode(mode: BatteryMode) {
         viewModelScope.launch {
             val actions = optimizerEngine.runAutoBatteryOptimize(mode)
@@ -464,11 +618,12 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             repository.selectProtectionMode(mode)
             upstreamDnsResolver.clearCache()
+            refreshSecurityPosture()
             showFeedback("Switched to ${mode.title} (applied immediately without VPN restart)")
         }
     }
 
-    // --- DNS Resolver Settings ---
+    // --- DNS Resolver Settings & DNS Leak Audit ---
 
     fun updateDnsResolverConfig(config: DnsResolverConfig) {
         viewModelScope.launch {
@@ -483,6 +638,23 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun runDnsLeakAudit() {
+        if (_isRunningDnsLeakAudit.value) return
+        viewModelScope.launch {
+            _isRunningDnsLeakAudit.value = true
+            val currentSettings = preferencesRepository.getSettingsSnapshot()
+            val connected = vpnState.value.status == VpnStatus.CONNECTED
+            val report = dnsLeakDetector.runAudit(
+                vpnConnected = connected,
+                config = currentSettings.resolverConfig,
+                runLiveUpstreamProbe = true
+            )
+            _dnsLeakReport.value = report
+            _isRunningDnsLeakAudit.value = false
+            showFeedback("DNS Audit: ${report.verdict.name} (${report.findings.firstOrNull() ?: "No leak risk detected"})")
+        }
+    }
+
     // --- Filter List Updates & Sources ---
 
     fun triggerManualFilterUpdate() {
@@ -494,6 +666,7 @@ class AdShieldViewModel @Inject constructor(
             res.fold(
                 onSuccess = { totalRules ->
                     upstreamDnsResolver.clearCache()
+                    refreshSecurityPosture()
                     showFeedback("Filter lists synchronized: $totalRules active rules loaded.")
                 },
                 onFailure = { err ->
@@ -507,6 +680,7 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             repository.toggleFilterSourceEnabled(source, enabled)
             upstreamDnsResolver.clearCache()
+            refreshSecurityPosture()
         }
     }
 
@@ -528,6 +702,7 @@ class AdShieldViewModel @Inject constructor(
     fun deleteCustomFilterSource(sourceId: String) {
         viewModelScope.launch {
             repository.deleteCustomFilterSource(sourceId)
+            refreshSecurityPosture()
             showFeedback("Custom filter source removed.")
         }
     }
@@ -557,6 +732,7 @@ class AdShieldViewModel @Inject constructor(
                 onSuccess = { rule ->
                     upstreamDnsResolver.clearCache()
                     refreshRuleConflicts()
+                    refreshSecurityPosture()
                     showFeedback("Rule '${rule.normalizedPattern}' (${rule.ruleType}) applied immediately.")
                 },
                 onFailure = { err ->
@@ -666,7 +842,7 @@ class AdShieldViewModel @Inject constructor(
 
     fun loadInstalledApps() {
         viewModelScope.launch {
-            val excluded = settingsState.value.excludedAppPackages
+            val excluded = preferencesRepository.getSettingsSnapshot().excludedAppPackages
             _installedApps.value = repository.getInstalledApps(excluded)
         }
     }
@@ -674,7 +850,8 @@ class AdShieldViewModel @Inject constructor(
     fun toggleAppExclusion(packageName: String, excluded: Boolean) {
         viewModelScope.launch {
             preferencesRepository.toggleExcludedAppPackage(packageName, excluded)
-            loadInstalledApps()
+            val refreshedExcluded = preferencesRepository.getSettingsSnapshot().excludedAppPackages
+            _installedApps.value = repository.getInstalledApps(refreshedExcluded)
             reloadTunnelIfConnected()
             showFeedback(
                 if (excluded) "Excluded $packageName from VPN tunnel."
@@ -695,7 +872,7 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
-    // --- Browser Controls ---
+    // --- Browser & Private Search Controls ---
 
     fun toggleBrowserSiteException(host: String, allowlisted: Boolean) {
         viewModelScope.launch {
@@ -711,15 +888,31 @@ class AdShieldViewModel @Inject constructor(
         cosmetic: Boolean,
         popups: Boolean,
         blockThirdPartyCookies: Boolean,
-        jsEnabled: Boolean
+        jsEnabled: Boolean,
+        httpsUpgradeEnabled: Boolean = settingsState.value.browserHttpsUpgradeEnabled
     ) {
         viewModelScope.launch {
             preferencesRepository.updateBrowserPrivacyOptions(
                 cosmeticFiltering = cosmetic,
                 popupBlocking = popups,
                 blockThirdPartyCookies = blockThirdPartyCookies,
-                javaScriptEnabled = jsEnabled
+                javaScriptEnabled = jsEnabled,
+                httpsUpgradeEnabled = httpsUpgradeEnabled
             )
+        }
+    }
+
+    fun setPreferredSearchProvider(provider: SearchProvider) {
+        viewModelScope.launch {
+            preferencesRepository.setPreferredSearchProvider(provider)
+            showFeedback("Private Search provider set to ${provider.displayName}.")
+        }
+    }
+
+    fun setBrowserHttpsUpgradeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBrowserHttpsUpgradeEnabled(enabled)
+            showFeedback(if (enabled) "HTTPS-only automatic upgrade enabled." else "HTTPS-only automatic upgrade disabled.")
         }
     }
 
@@ -736,9 +929,23 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
-    // --- Backup & Restore ---
+    // --- Backup, Restore & Diagnostic Report ---
 
     suspend fun exportFullBackupJson(): String = repository.createConfigurationBackupJson()
+
+    fun exportDiagnosticReportJson(screenWidthDp: Int, smallestWidthDp: Int): String {
+        val profile = deviceProfile(screenWidthDp, smallestWidthDp)
+        val telemetry = batteryRepository.telemetry.value
+        return DiagnosticReportBuilder.buildJson(
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+            deviceProfile = profile,
+            vpnState = vpnState.value,
+            batteryLevelPercent = telemetry.levelPercent.rawValue,
+            batteryTempCelsius = telemetry.temperatureCelsius.rawValue,
+            batteryHealthLabel = telemetry.healthLabel
+        )
+    }
 
     fun restoreFullBackupJson(rawJson: String) {
         viewModelScope.launch {
@@ -746,7 +953,16 @@ class AdShieldViewModel @Inject constructor(
             res.fold(
                 onSuccess = { ruleCount ->
                     upstreamDnsResolver.clearCache()
+                    val snap = preferencesRepository.getSettingsSnapshot()
+                    FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(
+                        appContext,
+                        snap.autoUpdateFiltersEnabled,
+                        snap.updateIntervalHours
+                    )
                     refreshRuleConflicts()
+                    refreshSecurityPosture()
+                    loadInstalledApps()
+                    reloadTunnelIfConnected()
                     showFeedback("Restored configuration backup ($ruleCount custom rules).")
                 },
                 onFailure = { err ->
@@ -758,9 +974,7 @@ class AdShieldViewModel @Inject constructor(
 
     private fun reloadTunnelIfConnected() {
         val currentStatus = vpnState.value.status
-        if (currentStatus == com.adshield.pro.domain.model.VpnStatus.CONNECTED ||
-            currentStatus == com.adshield.pro.domain.model.VpnStatus.PAUSED
-        ) {
+        if (currentStatus == VpnStatus.CONNECTED || currentStatus == VpnStatus.PAUSED) {
             val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
                 action = AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG
             }
@@ -768,38 +982,7 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
-    // --- Security Center (on-device anti-virus / anti-phishing) ---
-
-    private val _malwareBlocks = MutableStateFlow(0L)
-    val malwareBlocks: StateFlow<Long> = _malwareBlocks.asStateFlow()
-
-    private val _securityPosture = MutableStateFlow(
-        SecurityPosture(
-            protectionScore = 0,
-            highRiskApps = 0,
-            threatSignatures = 0,
-            webProtectionActive = false
-        )
-    )
-    val securityPosture: StateFlow<SecurityPosture> = _securityPosture.asStateFlow()
-
-    private val _appAudits = MutableStateFlow<List<AppRiskAuditor.AppRiskAudit>>(emptyList())
-    val appAudits: StateFlow<List<AppRiskAuditor.AppRiskAudit>> = _appAudits.asStateFlow()
-
-    private val _isAuditingApps = MutableStateFlow(false)
-    val isAuditingApps: StateFlow<Boolean> = _isAuditingApps.asStateFlow()
-
-    private val _urlScanResult = MutableStateFlow<UrlThreatScanner.UrlVerdict?>(null)
-    val urlScanResult: StateFlow<UrlThreatScanner.UrlVerdict?> = _urlScanResult.asStateFlow()
-
-    private val _fileScanResult = MutableStateFlow<SecurityScanRecord?>(null)
-    val fileScanResult: StateFlow<SecurityScanRecord?> = _fileScanResult.asStateFlow()
-
-    private val _isScanningSecurity = MutableStateFlow(false)
-    val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
-
-    private val _securityHistory = MutableStateFlow<List<SecurityScanRecord>>(emptyList())
-    val securityHistory: StateFlow<List<SecurityScanRecord>> = _securityHistory.asStateFlow()
+    // --- Security Center & Complete System Scanner ---
 
     fun scanUrl(rawUrl: String) {
         val trimmed = rawUrl.trim()
@@ -826,7 +1009,7 @@ class AdShieldViewModel @Inject constructor(
                 recommendation = verdict.recommendation,
                 timestampEpochMs = System.currentTimeMillis()
             )
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            _securityHistory.value = securityEngine.historyStore.recordItemScan(record)
             _isScanningSecurity.value = false
         }
     }
@@ -836,7 +1019,7 @@ class AdShieldViewModel @Inject constructor(
             _isScanningSecurity.value = true
             val record = securityEngine.scanFile(file)
             _fileScanResult.value = record
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            _securityHistory.value = securityEngine.historyStore.recordItemScan(record)
             refreshSecurityPosture()
             _isScanningSecurity.value = false
             showFeedback(scanFeedback(record, record.target))
@@ -849,7 +1032,7 @@ class AdShieldViewModel @Inject constructor(
             val record = securityEngine.scanUriContent(uri, displayName)
             if (record != null) {
                 _fileScanResult.value = record
-                _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+                _securityHistory.value = securityEngine.historyStore.recordItemScan(record)
                 showFeedback(scanFeedback(record, displayName))
             } else {
                 showFeedback("Could not read the selected file for scanning.")
@@ -866,12 +1049,117 @@ class AdShieldViewModel @Inject constructor(
             _appAudits.value = audits
             val flagged = audits.count { it.riskLevel == AppRiskAuditor.RiskLevel.HIGH }
             refreshSecurityPosture(highRisk = flagged)
+            val record = SecurityScanRecord(
+                id = System.currentTimeMillis(),
+                kind = ScanKind.APP_AUDIT,
+                target = "Installed Apps (${audits.size} packages)",
+                threatLevel = when {
+                    flagged > 0 -> SecurityLevel.DANGEROUS
+                    audits.any { it.riskLevel == AppRiskAuditor.RiskLevel.MEDIUM } -> SecurityLevel.SUSPICIOUS
+                    else -> SecurityLevel.CLEAN
+                },
+                riskScore = (flagged * 30).coerceAtMost(100),
+                threatName = if (flagged > 0) "$flagged high-risk app(s) detected" else null,
+                findings = audits.filter { it.riskLevel == AppRiskAuditor.RiskLevel.HIGH }
+                    .take(5)
+                    .map { "${it.profile.appName}: ${it.findings.firstOrNull() ?: "high-risk permissions"}" },
+                recommendation = if (flagged > 0) "Review and uninstall untrusted high-risk apps." else "No high-risk permission stacks detected.",
+                timestampEpochMs = System.currentTimeMillis()
+            )
+            _securityHistory.value = securityEngine.historyStore.recordItemScan(record)
             _isAuditingApps.value = false
             showFeedback(
                 if (flagged > 0) "Full app audit complete: $flagged high-risk app(s) found — review them in Security."
                 else "Full app audit complete: no high-risk apps detected."
             )
         }
+    }
+
+    fun runCompleteSystemScan() {
+        if (_systemScanProgress.value?.isRunning == true) return
+        viewModelScope.launch {
+            val currentSettings = preferencesRepository.getSettingsSnapshot()
+            val storage = optimizerEngine.readStorageMetrics()
+            val ram = optimizerEngine.readRamSnapshot()
+            val junk = optimizerEngine.scanJunkFiles(JunkCleanMode.QUICK_CLEAN, currentSettings.excludedJunkPaths)
+            val batTelemetry = batteryRepository.telemetry.value
+            val sources = filterSources.value
+            val conflicts = repository.analyzeCustomRuleConflicts()
+
+            val scanDirs = buildList {
+                add(File(appContext.filesDir, "managed_files/items"))
+                add(File(appContext.filesDir, "media_downloads"))
+                appContext.getExternalFilesDir(null)?.let { add(it) }
+                runCatching {
+                    val dl = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    if (dl != null) add(dl)
+                }
+            }
+
+            var auditedAppsCache: List<AppRiskAuditor.AppRiskAudit> = emptyList()
+            val inputs = SystemScannerEngine.ScanInputs(
+                vpnConnected = vpnState.value.status == VpnStatus.CONNECTED,
+                protectionMode = currentSettings.protectionMode,
+                dnsProtocol = currentSettings.resolverConfig.protocol,
+                threatSignatureCount = securityEngine.activeThreatSignatureCount(),
+                httpsUpgradeEnabled = currentSettings.browserHttpsUpgradeEnabled,
+                blockThirdPartyCookies = currentSettings.browserBlockThirdPartyCookies,
+                auditAppsProvider = {
+                    val list = securityEngine.auditInstalledApps()
+                    auditedAppsCache = list
+                    list
+                },
+                scanDirectories = scanDirs,
+                storageUsedPercent = storage.usedPercent,
+                storageAvailableBytes = storage.availableBytes,
+                recoverableJunkBytes = junk.totalRecoverableBytes,
+                ramUsagePercent = ram.usagePercent,
+                isLowMemory = ram.isLowMemoryCondition,
+                sdkInt = Build.VERSION.SDK_INT,
+                supportedPlatform = DeviceCompatibility.isSupportedPlatform(Build.VERSION.SDK_INT),
+                batteryTempCelsius = batTelemetry.temperatureCelsius.rawValue,
+                batteryHealthGood = batTelemetry.health == BatteryHealthStatus.GOOD || batTelemetry.health == BatteryHealthStatus.UNKNOWN,
+                enabledFilterListCount = sources.count { it.isEnabled },
+                totalLoadedRules = filterRuleEngine.getCurrentSnapshot().totalLoadedRules,
+                ruleConflictCount = conflicts.size,
+                lastFilterSyncEpochMs = currentSettings.lastFilterUpdateEpochMs
+            )
+
+            val report = securityEngine.systemScanner.runCompleteScan(inputs) { progress ->
+                _systemScanProgress.value = progress
+            }
+
+            if (auditedAppsCache.isNotEmpty()) {
+                _appAudits.value = auditedAppsCache
+                refreshSecurityPosture(
+                    highRisk = auditedAppsCache.count { it.riskLevel == AppRiskAuditor.RiskLevel.HIGH }
+                )
+            } else {
+                refreshSecurityPosture()
+            }
+
+            _systemScanReports.value = securityEngine.historyStore.recordSystemScan(report)
+            val summaryRecord = SecurityScanRecord(
+                id = report.id,
+                kind = ScanKind.SYSTEM,
+                target = "Complete System Scan (${report.totalItemsScanned} items)",
+                threatLevel = report.overallLevel,
+                riskScore = report.overallRiskScore,
+                threatName = if (report.totalFindings > 0) "${report.totalFindings} finding(s) across ${report.modules.size} modules" else null,
+                findings = report.modules.flatMap { it.findings }.take(12),
+                recommendation = report.summary,
+                timestampEpochMs = report.timestampEpochMs
+            )
+            _securityHistory.value = securityEngine.historyStore.recordItemScan(summaryRecord)
+            showFeedback(report.summary)
+        }
+    }
+
+    fun clearSecurityScanHistory() {
+        securityEngine.historyStore.clearAll()
+        _securityHistory.value = emptyList()
+        _systemScanReports.value = emptyList()
+        showFeedback("Cleared security scan history and reports.")
     }
 
     fun refreshSecurityPosture(highRisk: Int? = null) {
@@ -890,6 +1178,502 @@ class AdShieldViewModel @Inject constructor(
         SecurityLevel.SUSPICIOUS -> "Suspicious file: ${record.findings.firstOrNull() ?: "risk indicators found"}."
         else -> "File is clean: no signatures or structural threats found."
     }
+
+    // --- Private Cloud Storage Box Actions ---
+
+    private fun refreshVaultStates() {
+        _vaultItems.value = privateCloudBoxEngine.listItems(
+            folder = _vaultSelectedFolder.value,
+            category = _vaultSelectedCategory.value,
+            searchQuery = _vaultSearchQuery.value
+        )
+        _vaultSummary.value = privateCloudBoxEngine.storageSummary()
+        _vaultCloudConfig.value = privateCloudBoxEngine.getCloudEndpointConfig()
+    }
+
+    fun selectVaultFolder(folder: String?) {
+        _vaultSelectedFolder.value = folder
+        refreshVaultStates()
+    }
+
+    fun selectVaultCategory(category: PrivateCloudBoxEngine.VaultCategory?) {
+        _vaultSelectedCategory.value = category
+        refreshVaultStates()
+    }
+
+    fun setVaultSearchQuery(query: String) {
+        _vaultSearchQuery.value = query
+        refreshVaultStates()
+    }
+
+    fun createVaultFolder(name: String) {
+        privateCloudBoxEngine.createFolder(name).fold(
+            onSuccess = {
+                refreshVaultStates()
+                showFeedback("Created folder '$it'.")
+            },
+            onFailure = { showFeedback(it.message ?: "Could not create folder.") }
+        )
+    }
+
+    fun moveVaultItem(itemId: String, targetFolder: String) {
+        privateCloudBoxEngine.moveItemToFolder(itemId, targetFolder).fold(
+            onSuccess = {
+                refreshVaultStates()
+                showFeedback("Moved '${it.displayName}' to '${it.folder}'.")
+            },
+            onFailure = { showFeedback(it.message ?: "Move failed.") }
+        )
+    }
+
+    fun uploadUriToVault(uri: Uri, targetFolder: String? = null) {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val name = queryDisplayName(uri) ?: "vault_file_${System.currentTimeMillis()}"
+            val mime = appContext.contentResolver.getType(uri)
+            val result = withContext(Dispatchers.IO) {
+                val stream = appContext.contentResolver.openInputStream(uri)
+                    ?: return@withContext Result.failure<PrivateCloudBoxEngine.VaultItem>(
+                        IllegalStateException("Could not open selected file.")
+                    )
+                stream.use { input ->
+                    privateCloudBoxEngine.uploadStream(input, name, mime, targetFolder)
+                }
+            }
+            _isVaultBusy.value = false
+            refreshVaultStates()
+            result.fold(
+                onSuccess = { item ->
+                    showFeedback("Encrypted & stored '${item.displayName}' in ${item.folder}.")
+                },
+                onFailure = { showFeedback(it.message ?: "Vault upload failed.") }
+            )
+        }
+    }
+
+    fun exportVaultItemToUri(itemId: String, destUri: Uri) {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = withContext(Dispatchers.IO) {
+                val out = appContext.contentResolver.openOutputStream(destUri)
+                    ?: return@withContext Result.failure<PrivateCloudBoxEngine.VaultItem>(
+                        IllegalStateException("Cannot write to destination URI.")
+                    )
+                out.use { stream ->
+                    privateCloudBoxEngine.downloadToStream(itemId, stream)
+                }
+            }
+            _isVaultBusy.value = false
+            res.fold(
+                onSuccess = { showFeedback("Exported '${it.displayName}' with verified SHA-256 checksum.") },
+                onFailure = { showFeedback(it.message ?: "Export failed.") }
+            )
+        }
+    }
+
+    fun previewVaultItem(itemId: String) {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = privateCloudBoxEngine.buildPreview(itemId)
+            _isVaultBusy.value = false
+            res.fold(
+                onSuccess = { _vaultPreview.value = it },
+                onFailure = { showFeedback(it.message ?: "Could not decrypt preview.") }
+            )
+        }
+    }
+
+    fun closeVaultPreview() {
+        _vaultPreview.value = null
+        privateCloudBoxEngine.clearPreviewTempFiles()
+    }
+
+    fun deleteVaultItem(itemId: String, deleteRemote: Boolean = false) {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = privateCloudBoxEngine.deleteItem(itemId, deleteRemote)
+            _isVaultBusy.value = false
+            refreshVaultStates()
+            res.fold(
+                onSuccess = { showFeedback("Deleted file from Private Cloud Storage Box.") },
+                onFailure = { showFeedback(it.message ?: "Delete failed.") }
+            )
+        }
+    }
+
+    fun setVaultPin(pin: String) {
+        privateCloudBoxEngine.setOrUpdatePin(pin).fold(
+            onSuccess = {
+                refreshVaultStates()
+                showFeedback("Vault PIN protection enabled.")
+            },
+            onFailure = { showFeedback(it.message ?: "Invalid PIN.") }
+        )
+    }
+
+    fun unlockVault(pin: String) {
+        if (privateCloudBoxEngine.unlockVault(pin)) {
+            refreshVaultStates()
+            showFeedback("Private Cloud Storage Box unlocked.")
+        } else {
+            showFeedback("Incorrect Vault PIN.")
+        }
+    }
+
+    fun lockVault() {
+        privateCloudBoxEngine.lockVault()
+        _vaultPreview.value = null
+        refreshVaultStates()
+        showFeedback("Private Cloud Storage Box locked.")
+    }
+
+    fun removeVaultPin(currentPin: String) {
+        privateCloudBoxEngine.clearPin(currentPin).fold(
+            onSuccess = {
+                refreshVaultStates()
+                showFeedback("Vault PIN lock removed.")
+            },
+            onFailure = { showFeedback(it.message ?: "Incorrect current PIN.") }
+        )
+    }
+
+    fun configureVaultCloud(config: PrivateCloudBoxEngine.CloudEndpointConfig) {
+        privateCloudBoxEngine.configureCloudEndpoint(config).fold(
+            onSuccess = {
+                refreshVaultStates()
+                showFeedback(
+                    if (it.isConfigured) "Saved HTTPS WebDAV cloud endpoint."
+                    else "Cleared WebDAV cloud endpoint."
+                )
+            },
+            onFailure = { showFeedback(it.message ?: "Invalid cloud endpoint configuration.") }
+        )
+    }
+
+    fun syncVaultItemToCloud(itemId: String) {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = privateCloudBoxEngine.syncItemToCloud(itemId)
+            _isVaultBusy.value = false
+            refreshVaultStates()
+            res.fold(
+                onSuccess = { showFeedback("Synced '${it.displayName}' to Private Cloud.") },
+                onFailure = { showFeedback(it.message ?: "Cloud sync failed.") }
+            )
+        }
+    }
+
+    fun syncAllVaultToCloud() {
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = privateCloudBoxEngine.syncAllUnsyncedToCloud()
+            _isVaultBusy.value = false
+            refreshVaultStates()
+            res.fold(
+                onSuccess = { showFeedback("Synced $it item(s) to Private Cloud.") },
+                onFailure = { showFeedback(it.message ?: "Cloud sync failed.") }
+            )
+        }
+    }
+
+    // --- Universal App & File Support Actions ---
+
+    private fun refreshManagedFilesState() {
+        _managedFiles.value = universalFileManager.listManagedFiles(_managedFileKindFilter.value)
+    }
+
+    fun setManagedFileKindFilter(kind: UniversalFileManager.ManagedMediaKind?) {
+        _managedFileKindFilter.value = kind
+        refreshManagedFilesState()
+    }
+
+    fun importUriToManagedFiles(uri: Uri) {
+        viewModelScope.launch {
+            _isScanningSecurity.value = true
+            val name = queryDisplayName(uri) ?: "imported_file"
+            val mime = appContext.contentResolver.getType(uri)
+            val res = withContext(Dispatchers.IO) {
+                val stream = appContext.contentResolver.openInputStream(uri)
+                    ?: return@withContext Result.failure<UniversalFileManager.ManagedFileItem>(
+                        IllegalStateException("Could not open selected file.")
+                    )
+                stream.use { input ->
+                    universalFileManager.importStream(input, name, mime)
+                }
+            }
+            _isScanningSecurity.value = false
+            refreshManagedFilesState()
+            res.fold(
+                onSuccess = { item ->
+                    val rec = SecurityScanRecord(
+                        id = System.currentTimeMillis(),
+                        kind = if (item.kind == UniversalFileManager.ManagedMediaKind.APK) ScanKind.APK else ScanKind.FILE,
+                        target = item.displayName,
+                        threatLevel = item.securityLevel,
+                        riskScore = item.riskScore,
+                        threatName = item.findings.firstOrNull(),
+                        findings = item.findings,
+                        recommendation = if (item.securityLevel == SecurityLevel.CLEAN) "Verified clean (${item.mimeType})." else "Review findings before opening or installing.",
+                        timestampEpochMs = item.importedAtEpochMs
+                    )
+                    _fileScanResult.value = rec
+                    _securityHistory.value = securityEngine.historyStore.recordItemScan(rec)
+                    showFeedback("Imported & verified '${item.displayName}' (${item.securityLevel.name}).")
+                },
+                onFailure = { showFeedback(it.message ?: "File import failed.") }
+            )
+        }
+    }
+
+    fun deleteManagedFile(itemId: String) {
+        if (universalFileManager.deleteManagedItem(itemId)) {
+            refreshManagedFilesState()
+            showFeedback("Removed managed file.")
+        }
+    }
+
+    fun sendManagedFileToVault(itemId: String) {
+        val file = universalFileManager.getFileForItem(itemId)
+        val item = _managedFiles.value.firstOrNull { it.id == itemId }
+        if (file == null || item == null) {
+            showFeedback("Managed file is no longer present.")
+            return
+        }
+        viewModelScope.launch {
+            _isVaultBusy.value = true
+            val res = withContext(Dispatchers.IO) {
+                file.inputStream().use { s ->
+                    privateCloudBoxEngine.uploadStream(s, item.displayName, item.mimeType)
+                }
+            }
+            _isVaultBusy.value = false
+            refreshVaultStates()
+            res.fold(
+                onSuccess = { showFeedback("Stored '${it.displayName}' in Private Cloud Storage Box.") },
+                onFailure = { showFeedback(it.message ?: "Could not copy to Vault.") }
+            )
+        }
+    }
+
+    fun openFileExternally(file: File, mimeType: String) {
+        runCatching {
+            val contentUri = FileProvider.getUriForFile(
+                appContext,
+                "${appContext.packageName}.fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, mimeType.ifBlank { "*/*" })
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appContext.startActivity(Intent.createChooser(intent, "Open with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onFailure {
+            showFeedback("No compatible viewer app installed for $mimeType.")
+        }
+    }
+
+    fun openManagedItemExternally(itemId: String) {
+        val file = universalFileManager.getFileForItem(itemId) ?: return
+        val item = _managedFiles.value.firstOrNull { it.id == itemId } ?: return
+        if (item.kind == UniversalFileManager.ManagedMediaKind.APK) {
+            requestInstallApk(file, item.securityLevel)
+        } else {
+            openFileExternally(file, item.mimeType)
+        }
+    }
+
+    fun requestInstallApk(apkFile: File, securityLevel: SecurityLevel) {
+        if (securityLevel == SecurityLevel.DANGEROUS) {
+            showFeedback("Installation blocked: APK flagged as DANGEROUS by static security scan.")
+            return
+        }
+        if (!appContext.packageManager.canRequestPackageInstalls()) {
+            runCatching {
+                val permIntent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:${appContext.packageName}")
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                appContext.startActivity(permIntent)
+                showFeedback("Grant 'Install unknown apps' permission if you trust this APK.")
+            }.onFailure {
+                showFeedback("Enable 'Install unknown apps' in Android Settings to install APKs.")
+            }
+            return
+        }
+        runCatching {
+            val apkUri = FileProvider.getUriForFile(
+                appContext,
+                "${appContext.packageName}.fileprovider",
+                apkFile
+            )
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appContext.startActivity(installIntent)
+        }.onFailure {
+            showFeedback("Could not launch Android Package Installer: ${it.message}")
+        }
+    }
+
+    fun openSystemAppSettings(packageName: String) {
+        runCatching {
+            val intent = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$packageName")
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            appContext.startActivity(intent)
+        }
+    }
+
+    // --- Universal Video & Music Downloader Actions ---
+
+    fun probeMediaUrl(rawUrl: String) {
+        val trimmed = rawUrl.trim()
+        if (trimmed.isEmpty()) {
+            showFeedback("Paste a video or audio URL first.")
+            return
+        }
+        viewModelScope.launch {
+            _isProbingMedia.value = true
+            _mediaProbeError.value = null
+            _mediaProbeResult.value = null
+            val res = mediaDownloaderEngine.probeUrl(trimmed)
+            _isProbingMedia.value = false
+            res.fold(
+                onSuccess = { probe ->
+                    _mediaProbeResult.value = probe
+                    showFeedback("Detected ${probe.formats.size} downloadable format(s) from ${probe.sourceHost}.")
+                },
+                onFailure = { err ->
+                    _mediaProbeError.value = err.message ?: "Could not inspect media URL."
+                }
+            )
+        }
+    }
+
+    fun startMediaDownload(
+        probe: MediaDownloaderEngine.MediaProbeResult,
+        format: MediaDownloaderEngine.MediaFormatOption,
+        destinationKind: MediaDownloaderEngine.DownloadDestinationKind,
+        safTreeUri: Uri? = null
+    ) {
+        val task = mediaDownloaderEngine.startDownload(
+            probe = probe,
+            format = format,
+            destinationKind = destinationKind
+        )
+        showFeedback("Started downloading '${task.fileName}' (${format.qualityLabel}).")
+
+        if (destinationKind == MediaDownloaderEngine.DownloadDestinationKind.SYSTEM_MEDIASTORE ||
+            (destinationKind == MediaDownloaderEngine.DownloadDestinationKind.CUSTOM_DIRECTORY && safTreeUri != null)
+        ) {
+            viewModelScope.launch(Dispatchers.IO) {
+                mediaDownloaderEngine.awaitTaskSettlement(task.id)
+                val finished = mediaDownloaderEngine.tasks.value.firstOrNull { it.id == task.id } ?: return@launch
+                if (finished.status != MediaDownloaderEngine.DownloadStatus.COMPLETED) return@launch
+                val localFile = File(finished.outputFilePath)
+                if (!localFile.exists()) return@launch
+
+                if (destinationKind == MediaDownloaderEngine.DownloadDestinationKind.SYSTEM_MEDIASTORE) {
+                    val saved = exportFileToMediaStoreDownloads(localFile, finished.fileName, finished.mimeType, finished.mediaKind)
+                    if (saved) showFeedback("Saved '${finished.fileName}' to device Downloads / Media library.")
+                } else if (safTreeUri != null) {
+                    val saved = exportFileToSafTree(localFile, safTreeUri, finished.fileName, finished.mimeType)
+                    if (saved) showFeedback("Saved '${finished.fileName}' to selected folder.")
+                }
+            }
+        }
+    }
+
+    fun pauseMediaDownload(taskId: String) = mediaDownloaderEngine.pauseDownload(taskId)
+
+    fun resumeMediaDownload(taskId: String) = mediaDownloaderEngine.resumeDownload(taskId)
+
+    fun cancelMediaDownload(taskId: String) = mediaDownloaderEngine.cancelDownload(taskId)
+
+    fun removeMediaDownload(taskId: String, deleteFile: Boolean) =
+        mediaDownloaderEngine.removeTaskFromHistory(taskId, deleteFile)
+
+    fun clearCompletedMediaDownloads() {
+        mediaDownloaderEngine.clearCompletedAndCancelledHistory()
+        showFeedback("Cleared finished download history.")
+    }
+
+    fun saveDownloadedMediaToVault(taskId: String) {
+        val task = mediaDownloadTasks.value.firstOrNull { it.id == taskId } ?: return
+        val file = File(task.outputFilePath)
+        if (!file.exists()) {
+            showFeedback("Downloaded file is no longer on disk.")
+            return
+        }
+        viewModelScope.launch {
+            val res = privateCloudBoxEngine.uploadFile(file, task.mimeType)
+            refreshVaultStates()
+            res.fold(
+                onSuccess = { showFeedback("Encrypted '${it.displayName}' into Private Cloud Storage Box.") },
+                onFailure = { showFeedback(it.message ?: "Could not store in Vault.") }
+            )
+        }
+    }
+
+    private fun exportFileToMediaStoreDownloads(
+        sourceFile: File,
+        displayName: String,
+        mimeType: String,
+        kind: MediaDownloaderEngine.MediaKind
+    ): Boolean = runCatching {
+        val resolver = appContext.contentResolver
+        val (collection, relPath) = when (kind) {
+            MediaDownloaderEngine.MediaKind.AUDIO ->
+                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "${Environment.DIRECTORY_MUSIC}/AdShieldPro"
+            MediaDownloaderEngine.MediaKind.VIDEO ->
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI to "${Environment.DIRECTORY_DOWNLOADS}/AdShieldPro"
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relPath)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+        }
+        val uri = resolver.insert(collection, values) ?: return false
+        resolver.openOutputStream(uri)?.use { out ->
+            sourceFile.inputStream().use { input -> input.copyTo(out) }
+        } ?: return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            resolver.update(uri, done, null, null)
+        }
+        true
+    }.getOrDefault(false)
+
+    private fun exportFileToSafTree(
+        sourceFile: File,
+        treeUri: Uri,
+        displayName: String,
+        mimeType: String
+    ): Boolean = runCatching {
+        val docId = android.provider.DocumentsContract.getTreeDocumentId(treeUri)
+        val parentDocUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+        val created = android.provider.DocumentsContract.createDocument(
+            appContext.contentResolver,
+            parentDocUri,
+            mimeType,
+            displayName
+        ) ?: return false
+        appContext.contentResolver.openOutputStream(created)?.use { out ->
+            sourceFile.inputStream().use { input -> input.copyTo(out) }
+        } ?: return false
+        true
+    }.getOrDefault(false)
+
+    private fun queryDisplayName(uri: Uri): String? = runCatching {
+        appContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull()
 
     // --- Battery Intelligence (real hardware telemetry only) ---
 
@@ -921,12 +1705,10 @@ class AdShieldViewModel @Inject constructor(
         _batteryMinutesToEmpty.value = batteryRepository.minutesToEmpty()
     }
 
-    /** Runs the on-device diagnostic chain against live readings. */
     fun runBatteryDiagnosis() {
         if (_isDiagnosingBattery.value) return
         viewModelScope.launch {
             _isDiagnosingBattery.value = true
-            // Sample the sensors once more so the report reflects "now" rather than the last broadcast.
             batteryRepository.runDiagnostics()
             refreshBatteryDerived()
             val worst = batteryRepository.diagnostics.value.maxByOrNull { it.severity.ordinal }
@@ -948,7 +1730,6 @@ class AdShieldViewModel @Inject constructor(
         batteryRepository.telemetry.value.let { refreshBatteryDerived() }
     }
 
-    /** Runtime capability profile for the Status screen (no defaults guessed). */
     fun deviceProfile(screenWidthDp: Int, smallestWidthDp: Int) =
         deviceProfiler.profile(batteryRepository.telemetry.value, screenWidthDp, smallestWidthDp)
 
@@ -959,11 +1740,6 @@ class AdShieldViewModel @Inject constructor(
 
     // --- Aether AI (live network intelligence) ---
 
-    /**
-     * The live network snapshot is derived from the repository's own streams (session runtime,
-     * DNS log, top apps, blocked domains). It is recomputed whenever any of them changes, so the
-     * dashboard can only ever show traffic that actually happened.
-     */
     val liveNetwork: StateFlow<LiveNetworkModel.NetworkSnapshot> = combine(
         repository.vpnRuntimeState,
         recentLogs,

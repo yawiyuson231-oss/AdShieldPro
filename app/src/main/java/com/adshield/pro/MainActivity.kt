@@ -345,6 +345,10 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
     val sandboxResult by viewModel.sandboxTestResult.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val isUpdatingFilters by viewModel.isUpdatingFilters.collectAsStateWithLifecycle()
+    val mediaProbeResult by viewModel.mediaProbeResult.collectAsStateWithLifecycle()
+    val mediaProbeError by viewModel.mediaProbeError.collectAsStateWithLifecycle()
+    val isProbingMedia by viewModel.isProbingMedia.collectAsStateWithLifecycle()
+    val mediaTasks by viewModel.mediaDownloadTasks.collectAsStateWithLifecycle()
     AdBlockerHubScreen(
         sources = filterSources,
         rules = customRules,
@@ -353,6 +357,10 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         settings = settings,
         isUpdatingFilters = isUpdatingFilters,
         browserContentBlocker = viewModel.browserContentBlocker,
+        mediaProbeResult = mediaProbeResult,
+        mediaProbeError = mediaProbeError,
+        isProbingMedia = isProbingMedia,
+        mediaTasks = mediaTasks,
         onToggleSource = viewModel::toggleFilterSource,
         onSyncAllNow = viewModel::triggerManualFilterUpdate,
         onAddCustomSource = viewModel::addCustomFilterSource,
@@ -368,7 +376,17 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onTestDomainSandbox = viewModel::testDomainInSandbox,
         onToggleSiteException = viewModel::toggleBrowserSiteException,
         onUpdateBrowserPrivacy = viewModel::updateBrowserPrivacySettings,
+        onSelectSearchProvider = viewModel::setPreferredSearchProvider,
         onAddCustomCosmeticSelector = viewModel::addCustomCosmeticSelector,
+        onProbeMediaUrl = viewModel::probeMediaUrl,
+        onStartMediaDownload = viewModel::startMediaDownload,
+        onPauseMediaDownload = viewModel::pauseMediaDownload,
+        onResumeMediaDownload = viewModel::resumeMediaDownload,
+        onCancelMediaDownload = viewModel::cancelMediaDownload,
+        onRemoveMediaDownload = viewModel::removeMediaDownload,
+        onClearCompletedMediaDownloads = viewModel::clearCompletedMediaDownloads,
+        onOpenCompletedFile = viewModel::openFileExternally,
+        onSaveCompletedToVault = viewModel::saveDownloadedMediaToVault,
         onShowFeedback = viewModel::showFeedback
     )
 }
@@ -390,6 +408,19 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
     val fileScanResult by viewModel.fileScanResult.collectAsStateWithLifecycle()
     val isScanningSecurity by viewModel.isScanningSecurity.collectAsStateWithLifecycle()
     val securityHistory by viewModel.securityHistory.collectAsStateWithLifecycle()
+    val systemScanProgress by viewModel.systemScanProgress.collectAsStateWithLifecycle()
+    val systemScanReports by viewModel.systemScanReports.collectAsStateWithLifecycle()
+    val managedFiles by viewModel.managedFiles.collectAsStateWithLifecycle()
+    val managedFileKindFilter by viewModel.managedFileKindFilter.collectAsStateWithLifecycle()
+    val vaultItems by viewModel.vaultItems.collectAsStateWithLifecycle()
+    val vaultSummary by viewModel.vaultSummary.collectAsStateWithLifecycle()
+    val vaultCloudConfig by viewModel.vaultCloudConfig.collectAsStateWithLifecycle()
+    val vaultSelectedFolder by viewModel.vaultSelectedFolder.collectAsStateWithLifecycle()
+    val vaultSelectedCategory by viewModel.vaultSelectedCategory.collectAsStateWithLifecycle()
+    val vaultSearchQuery by viewModel.vaultSearchQuery.collectAsStateWithLifecycle()
+    val vaultPreview by viewModel.vaultPreview.collectAsStateWithLifecycle()
+    val isVaultBusy by viewModel.isVaultBusy.collectAsStateWithLifecycle()
+
     SecurityScreen(
         posture = securityPosture,
         vpnState = vpnState,
@@ -400,9 +431,47 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         fileScanResult = fileScanResult,
         isScanning = isScanningSecurity,
         scanHistory = securityHistory,
+        systemScanProgress = systemScanProgress,
+        systemScanReports = systemScanReports,
+        managedFiles = managedFiles,
+        managedFileKindFilter = managedFileKindFilter,
+        vaultItems = vaultItems,
+        vaultSummary = vaultSummary,
+        vaultCloudConfig = vaultCloudConfig,
+        vaultSelectedFolder = vaultSelectedFolder,
+        vaultSelectedCategory = vaultSelectedCategory,
+        vaultSearchQuery = vaultSearchQuery,
+        vaultPreview = vaultPreview,
+        isVaultBusy = isVaultBusy,
+        onRunCompleteSystemScan = viewModel::runCompleteSystemScan,
+        onClearScanHistory = viewModel::clearSecurityScanHistory,
         onScanUrl = viewModel::scanUrl,
         onScanUri = viewModel::scanUri,
-        onAuditApps = viewModel::auditInstalledApps
+        onAuditApps = viewModel::auditInstalledApps,
+        onOpenAppSettings = viewModel::openSystemAppSettings,
+        onSetManagedFileKindFilter = viewModel::setManagedFileKindFilter,
+        onImportManagedUri = viewModel::importUriToManagedFiles,
+        onOpenManagedItem = viewModel::openManagedItemExternally,
+        onSendManagedToVault = viewModel::sendManagedFileToVault,
+        onDeleteManagedItem = viewModel::deleteManagedFile,
+        onSelectVaultFolder = viewModel::selectVaultFolder,
+        onSelectVaultCategory = viewModel::selectVaultCategory,
+        onVaultSearchChange = viewModel::setVaultSearchQuery,
+        onCreateVaultFolder = viewModel::createVaultFolder,
+        onMoveVaultItem = viewModel::moveVaultItem,
+        onUploadUriToVault = viewModel::uploadUriToVault,
+        onExportVaultItemToUri = viewModel::exportVaultItemToUri,
+        onPreviewVaultItem = viewModel::previewVaultItem,
+        onCloseVaultPreview = viewModel::closeVaultPreview,
+        onOpenFileExternally = viewModel::openFileExternally,
+        onDeleteVaultItem = viewModel::deleteVaultItem,
+        onSetVaultPin = viewModel::setVaultPin,
+        onUnlockVault = viewModel::unlockVault,
+        onLockVault = viewModel::lockVault,
+        onRemoveVaultPin = viewModel::removeVaultPin,
+        onConfigureVaultCloud = viewModel::configureVaultCloud,
+        onSyncVaultItem = viewModel::syncVaultItemToCloud,
+        onSyncAllVault = viewModel::syncAllVaultToCloud
     )
 }
 
@@ -439,6 +508,7 @@ private fun OptimizerDestination(viewModel: AdShieldViewModel) {
         isDndPolicyGranted = isDndPolicyGranted,
         onRunSmartBoost = viewModel::runOneTapSmartBoost,
         onScanJunk = viewModel::scanJunk,
+        onScanSafFolderTree = viewModel::scanUserSelectedSafFolder,
         onToggleJunkCandidate = viewModel::toggleJunkCandidateSelection,
         onCleanSelectedJunk = viewModel::cleanSelectedJunk,
         onAddExcludedJunkPath = viewModel::addExcludedJunkPath,
@@ -448,6 +518,7 @@ private fun OptimizerDestination(viewModel: AdShieldViewModel) {
         onToggleFavoriteGame = viewModel::toggleFavoriteGame,
         onUpdateGamingSettings = viewModel::updateGamingBoosterSettings,
         onTriggerGameBoost = viewModel::triggerGameBoost,
+        onEndGameTurboSession = viewModel::endGameTurboSession,
         onSelectBatteryMode = viewModel::selectAndApplyBatteryMode
     )
 }
@@ -488,6 +559,7 @@ private fun StatisticsDestination(viewModel: AdShieldViewModel) {
     val topBlockedDomains by viewModel.topBlockedDomains.collectAsStateWithLifecycle()
     val sourceEffectiveness by viewModel.sourceEffectiveness.collectAsStateWithLifecycle()
     val chartBuckets by viewModel.chartBuckets.collectAsStateWithLifecycle()
+    val ruleSuggestions by viewModel.ruleSuggestions.collectAsStateWithLifecycle()
     val selectedChartRange by viewModel.selectedChartRange.collectAsStateWithLifecycle()
     val allTimeTotal by viewModel.allTimeTotalQueries.collectAsStateWithLifecycle()
     val allTimeBlocked by viewModel.allTimeBlockedQueries.collectAsStateWithLifecycle()
@@ -499,6 +571,7 @@ private fun StatisticsDestination(viewModel: AdShieldViewModel) {
         topBlockedDomains = topBlockedDomains,
         sourceEffectiveness = sourceEffectiveness,
         chartBuckets = chartBuckets,
+        ruleSuggestions = ruleSuggestions,
         selectedRange = selectedChartRange,
         allTimeTotal = allTimeTotal,
         allTimeBlocked = allTimeBlocked,
@@ -526,20 +599,29 @@ private fun SettingsDestination(
     onOpenAbout: () -> Unit,
     onCloseAbout: () -> Unit
 ) {
+    val configuration = LocalConfiguration.current
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val dnsLeakReport by viewModel.dnsLeakReport.collectAsStateWithLifecycle()
+    val isRunningLeakCheck by viewModel.isRunningDnsLeakAudit.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
         onCloseAbout = onCloseAbout,
         settings = settings,
         installedApps = installedApps,
+        dnsLeakReport = dnsLeakReport,
+        isRunningLeakCheck = isRunningLeakCheck,
+        onRunDnsLeakCheck = viewModel::runDnsLeakAudit,
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,
         onLoadInstalledApps = viewModel::loadInstalledApps,
         onToggleAppExclusion = viewModel::toggleAppExclusion,
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,
+        onExportDiagnosticReportJson = {
+            viewModel.exportDiagnosticReportJson(configuration.screenWidthDp, configuration.smallestScreenWidthDp)
+        },
         onRestoreBackupJson = viewModel::restoreFullBackupJson
     )
 }

@@ -49,6 +49,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
@@ -57,6 +59,8 @@ import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
+import com.adshield.pro.engine.dns.DnsLeakDetector
+import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
@@ -69,12 +73,16 @@ fun SettingsScreen(
     onCloseAbout: () -> Unit,
     settings: AppSettingsState,
     installedApps: List<AppExclusionInfo>,
+    dnsLeakReport: DnsLeakDetector.LeakAuditReport?,
+    isRunningLeakCheck: Boolean,
+    onRunDnsLeakCheck: () -> Unit,
     onUpdateResolverConfig: (DnsResolverConfig) -> Unit,
     onLoadInstalledApps: () -> Unit,
     onToggleAppExclusion: (String, Boolean) -> Unit,
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
+    onExportDiagnosticReportJson: () -> String,
     onRestoreBackupJson: (String) -> Unit
 ) {
     if (showAboutScreen) {
@@ -84,8 +92,11 @@ fun SettingsScreen(
 
     var showAppExclusionDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
+    var showDiagnosticDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
     var backupJsonBuffer by remember { mutableStateOf("") }
+    var diagnosticJsonBuffer by remember { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
 
     var customDohInput by remember(settings.resolverConfig) {
         mutableStateOf(settings.resolverConfig.customDohUrl)
@@ -95,6 +106,9 @@ fun SettingsScreen(
     }
     var customIpv4Input by remember(settings.resolverConfig) {
         mutableStateOf(settings.resolverConfig.customPrimaryIpv4)
+    }
+    var customSecondaryIpv4Input by remember(settings.resolverConfig) {
+        mutableStateOf(settings.resolverConfig.customSecondaryIpv4)
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -244,13 +258,21 @@ fun SettingsScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+                        OutlinedTextField(
+                            value = customSecondaryIpv4Input,
+                            onValueChange = { customSecondaryIpv4Input = it },
+                            label = { Text("Custom Secondary IPv4 Address") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Button(
                             onClick = {
                                 onUpdateResolverConfig(
                                     settings.resolverConfig.copy(
                                         customDohUrl = customDohInput,
                                         customDotHost = customDotInput,
-                                        customPrimaryIpv4 = customIpv4Input
+                                        customPrimaryIpv4 = customIpv4Input,
+                                        customSecondaryIpv4 = customSecondaryIpv4Input
                                     )
                                 )
                             }
@@ -452,6 +474,62 @@ fun SettingsScreen(
                             Text("Privacy Policy")
                         }
                     }
+
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                diagnosticJsonBuffer = onExportDiagnosticReportJson()
+                                showDiagnosticDialog = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Export Privacy-Scrubbed Diagnostic Report")
+                    }
+                }
+            }
+        }
+
+        // DNS Leak & Bypass Audit Card
+        item(key = "dns-leak-audit-card") {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("DNS Leak & Bypass Audit", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Inspects active LinkProperties DNS servers, Android Private DNS (DoT) bypass state, split-tunnel exclusions, and upstream encryption.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = onRunDnsLeakCheck,
+                        enabled = !isRunningLeakCheck,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (isRunningLeakCheck) "Auditing Active DNS Path…" else "Run DNS Leak Audit")
+                    }
+                    dnsLeakReport?.let { report ->
+                        val color = when (report.verdict) {
+                            DnsLeakDetector.AuditVerdict.PROTECTED -> EmeraldPrimary
+                            DnsLeakDetector.AuditVerdict.BYPASS_RISK -> WarningAmber
+                            DnsLeakDetector.AuditVerdict.UNPROTECTED -> AlertRed
+                        }
+                        Text(
+                            "${report.verdict.name} · Encrypted: ${if (report.encryptedUpstream) "YES" else "NO"} · Tunnel Captures DNS: ${if (report.tunnelCapturesDns) "YES" else "NO"}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = color,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        report.findings.forEach { finding ->
+                            Text("• $finding", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                 }
             }
         }
@@ -637,6 +715,44 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showPrivacyPolicyDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    if (showDiagnosticDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiagnosticDialog = false },
+            title = { Text("Privacy-Scrubbed Diagnostic Report") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Contains zero domain names, zero browsing history, and zero custom endpoint URLs:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = diagnosticJsonBuffer,
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        clipboard.setText(AnnotatedString(diagnosticJsonBuffer))
+                        showDiagnosticDialog = false
+                    }
+                ) {
+                    Text("Copy JSON")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiagnosticDialog = false }) {
                     Text("Close")
                 }
             }

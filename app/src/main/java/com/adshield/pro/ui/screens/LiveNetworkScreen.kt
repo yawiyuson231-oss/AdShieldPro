@@ -50,6 +50,7 @@ import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.theme.WarningAmber
+import com.adshield.pro.ui.theme.currentLocale
 import com.adshield.pro.ui.theme.formatInteger
 import java.text.DateFormat
 import java.util.Date
@@ -61,7 +62,8 @@ import java.util.Date
 @Composable
 fun LiveNetworkScreen(snapshot: LiveNetworkModel.NetworkSnapshot) {
     val listState = rememberLazyListState()
-    val timeFormat = remember { DateFormat.getTimeInstance(DateFormat.MEDIUM) }
+    val locale = currentLocale()
+    val timeFormat = remember(locale) { DateFormat.getTimeInstance(DateFormat.MEDIUM, locale) }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,

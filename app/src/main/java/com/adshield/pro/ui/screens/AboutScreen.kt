@@ -45,7 +45,7 @@ import com.adshield.pro.R
 import com.adshield.pro.ui.theme.EmeraldGlow
 import com.adshield.pro.ui.theme.EmeraldPrimary
 
-private const val REPOSITORY_URL = "https://github.com/yawiyuson231-oss/AdShieldPro"
+private val REPOSITORY_URL: String = "https://github.com/${BuildConfig.GITHUB_UPDATE_REPOSITORY}"
 
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
@@ -70,9 +70,9 @@ fun AboutScreen(onBack: () -> Unit) {
             icon = Icons.Default.Policy
         ),
         AboutLink(
-            title = "Contact / Report an Issue",
-            detail = "Send a question or report a problem on GitHub",
-            url = "$REPOSITORY_URL/issues/new",
+            title = "Pull Requests & Contributions",
+            detail = "Review open pull requests and contribute on GitHub",
+            url = "$REPOSITORY_URL/pulls",
             icon = Icons.Default.BugReport
         )
     )

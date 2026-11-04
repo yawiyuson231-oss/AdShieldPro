@@ -7,12 +7,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Debug
 import android.os.Environment
 import android.os.PowerManager
 import android.os.StatFs
+import android.provider.DocumentsContract
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.domain.model.BatteryMode
@@ -35,6 +37,7 @@ import com.adshield.pro.domain.model.SmartBoostResult
 import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.worker.FilterUpdateWorker
+import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -619,13 +622,24 @@ class SystemOptimizerEngine @Inject constructor(
         var deletedCount = 0
 
         for (item in eligible) {
-            val file = File(item.absolutePath)
-            if (file.exists() && file.isFile) {
-                val len = file.length()
-                val deleted = runCatching { file.delete() }.getOrDefault(false)
+            if (item.absolutePath.startsWith("content://")) {
+                val docUri = runCatching { Uri.parse(item.absolutePath) }.getOrNull()
+                val deleted = if (docUri != null) {
+                    runCatching { DocumentsContract.deleteDocument(context.contentResolver, docUri) }.getOrDefault(false)
+                } else false
                 if (deleted) {
-                    recoveredBytes += len
+                    recoveredBytes += item.sizeBytes.coerceAtLeast(0L)
                     deletedCount++
+                }
+            } else {
+                val file = File(item.absolutePath)
+                if (file.exists() && file.isFile) {
+                    val len = file.length()
+                    val deleted = runCatching { file.delete() }.getOrDefault(false)
+                    if (deleted) {
+                        recoveredBytes += len
+                        deletedCount++
+                    }
                 }
             }
         }
@@ -774,6 +788,17 @@ class SystemOptimizerEngine @Inject constructor(
         val trimmed = upstreamDnsResolver.trimExpiredAndExcessCache(targetSize = profile.dnsCacheMaxEntries / 4)
         actions.add("Prepared in-memory DNS cache for ${profile.title} gaming profile ($trimmed stale entries cleared).")
 
+        // 1b. Pause periodic background syncs during active Game Turbo session to prevent background network/CPU spikes
+        FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(context, enabled = false, intervalHours = settings.updateIntervalHours)
+        SmartOptimizationWorker.scheduleOrCancelSmartMaintenance(context, enabled = false, intervalHours = settings.autoJunkCleanIntervalHours)
+        actions.add("Paused periodic background sync jobs for the active Game Turbo session.")
+
+        // 1c. Request OS cached-background process trim for non-essential apps (respects Android foreground sandbox)
+        val trimmedBgApps = trimCachedBackgroundProcesses(skipPackage = packageName)
+        if (trimmedBgApps > 0) {
+            actions.add("Requested Android ActivityManager cached-process trim across $trimmedBgApps background package(s).")
+        }
+
         // 2. Apply background disk-logging preference if profile minimizes disk I/O
         if (profile.minimizeDiskLogging && settings.detailedDnsLoggingEnabled) {
             preferencesRepository.setDetailedDnsLogging(false)
@@ -827,6 +852,131 @@ class SystemOptimizerEngine @Inject constructor(
         }
 
         actions
+    }
+
+    /**
+     * Ends an active Game Turbo session and restores user-configured background sync schedules.
+     */
+    suspend fun endGameTurboSession(): List<String> = withContext(Dispatchers.IO) {
+        val settings = preferencesRepository.getSettingsSnapshot()
+        activeGamingPackage = null
+        gamingSessionStartedAtMs = 0L
+        FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(
+            context,
+            enabled = settings.autoUpdateFiltersEnabled,
+            intervalHours = settings.updateIntervalHours
+        )
+        SmartOptimizationWorker.scheduleOrCancelSmartMaintenance(
+            context,
+            enabled = settings.smartAutoOptimizeEnabled,
+            intervalHours = settings.autoJunkCleanIntervalHours
+        )
+        if (settings.gameBoosterSuppressNotifications) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (nm.isNotificationPolicyAccessGranted) {
+                runCatching { nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL) }
+            }
+        }
+        listOf("Game Turbo session ended — restored normal background sync schedule.")
+    }
+
+    private fun trimCachedBackgroundProcesses(skipPackage: String?): Int {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return 0
+        val pm = context.packageManager
+        val installed = runCatching { pm.getInstalledApplications(0) }.getOrDefault(emptyList())
+        var count = 0
+        for (app in installed) {
+            if ((app.flags and ApplicationInfo.FLAG_SYSTEM) != 0) continue
+            if (app.packageName == context.packageName || app.packageName == skipPackage) continue
+            runCatching {
+                am.killBackgroundProcesses(app.packageName)
+                count++
+            }
+            if (count >= 25) break
+        }
+        return count
+    }
+
+    /**
+     * Scans a user-granted Android SAF folder (`OpenDocumentTree`) for large, old, temporary, or
+     * unused APK files without requesting `MANAGE_EXTERNAL_STORAGE`.
+     */
+    suspend fun scanSafFolderTree(treeUri: Uri): JunkScanReport = withContext(Dispatchers.IO) {
+        val startMs = System.currentTimeMillis()
+        val candidates = ArrayList<JunkCandidateItem>()
+        val thirtyDaysAgoMs = startMs - (30L * 24L * 3600L * 1000L)
+        val rootDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+
+        fun walkDocumentFolder(parentDocId: String, depth: Int) {
+            if (depth > 3 || candidates.size >= 250) return
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+            val projection = arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED
+            )
+            runCatching {
+                context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                    while (cursor.moveToNext() && candidates.size < 250) {
+                        val docId = cursor.getString(0) ?: continue
+                        val name = cursor.getString(1) ?: continue
+                        val mime = cursor.getString(2) ?: ""
+                        val size = if (cursor.isNull(3)) 0L else cursor.getLong(3)
+                        val modified = if (cursor.isNull(4)) 0L else cursor.getLong(4)
+
+                        if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                            walkDocumentFolder(docId, depth + 1)
+                        } else if (size > 0L) {
+                            val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                            val lower = name.lowercase(Locale.US)
+                            val cat = when {
+                                lower.endsWith(".tmp") || lower.endsWith(".log") || lower.endsWith(".bak") ->
+                                    JunkCategory.ADSHIELD_TEMP_STAGING
+                                lower.endsWith(".apk") || lower.endsWith(".xapk") ->
+                                    JunkCategory.UNUSED_APKS
+                                size >= 10L * 1024L * 1024L ->
+                                    JunkCategory.LARGE_FILES
+                                modified in 1 until thirtyDaysAgoMs ->
+                                    JunkCategory.OLD_DOWNLOADS
+                                else -> null
+                            }
+                            if (cat != null) {
+                                candidates.add(
+                                    JunkCandidateItem(
+                                        id = docUri.toString(),
+                                        absolutePath = docUri.toString(),
+                                        displayName = name,
+                                        sizeBytes = size,
+                                        category = cat,
+                                        lastModifiedEpochMs = modified,
+                                        requiresUserConfirmation = true,
+                                        isSelected = false
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (rootDocId != null) {
+            walkDocumentFolder(rootDocId, 0)
+        }
+
+        val sorted = candidates.sortedByDescending { it.sizeBytes }
+        val total = sorted.sumOf { it.sizeBytes }
+        JunkScanReport(
+            mode = JunkCleanMode.CUSTOM_CLEAN,
+            candidates = sorted,
+            totalRecoverableBytes = total,
+            safeAutoCleanBytes = 0L,
+            confirmationRequiredBytes = total,
+            scanDurationMs = (System.currentTimeMillis() - startMs).coerceAtLeast(1L),
+            scannedAtEpochMs = System.currentTimeMillis()
+        )
     }
 
     // --- 5. BATTERY & TEMPERATURE OPTIMIZER ---

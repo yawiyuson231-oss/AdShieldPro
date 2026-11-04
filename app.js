@@ -96,6 +96,8 @@ async function boot() {
     } });
 
     await restoreConfiguration();
+    await loadInstalledFeeds(state.engine);
+    if (state.settings.aggressiveTier) await enableAggressiveTier(true, { snapshot: false });
     applyUserRules();
     await loadCachedModel();
 
@@ -114,7 +116,10 @@ async function boot() {
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    window.addEventListener('pagehide', () => { saveSnapshot('pagehide').catch(() => {}); });
+    window.addEventListener('pagehide', () => {
+      state.analytics?.flush().catch(() => {});
+      saveSnapshot('pagehide').catch(() => {});
+    });
   } catch (err) {
     console.error(err);
     setBootStatus('boot failed', 'bad');
@@ -136,7 +141,19 @@ async function loadBundledRules() {
   if (state.settings.aggressiveTier) await enableAggressiveTier(true);
 }
 
-async function enableAggressiveTier(enable) {
+async function loadInstalledFeeds(engine = state.engine) {
+  if (!state.feeds || !engine) return;
+  for (const feed of FEED_REGISTRY) {
+    try {
+      const verified = await state.feeds.verify(feed.id);
+      if (!verified.ok) continue;
+      const text = await state.feeds.content(feed.id);
+      if (text) engine.loadFilterList(text, feed.category, feed.id);
+    } catch { /* fall back to bundled copy */ }
+  }
+}
+
+async function enableAggressiveTier(enable, { snapshot = true } = {}) {
   const descriptor = BUNDLED.aggressive;
   if (enable) {
     try {
@@ -152,8 +169,10 @@ async function enableAggressiveTier(enable) {
     state.settings.aggressiveTier = false;
     await rebuildEngine();
   }
-  scheduleSnapshot('aggressive-tier');
-  renderAll();
+  if (snapshot) {
+    scheduleSnapshot('aggressive-tier');
+    renderAll();
+  }
   return true;
 }
 
@@ -165,6 +184,7 @@ async function rebuildEngine() {
       engine.loadFilterList(text, BUNDLED[key].category, BUNDLED[key].source);
     } catch { /* keep going with whatever loads */ }
   }
+  await loadInstalledFeeds(engine);
   if (state.settings.aggressiveTier) {
     try { engine.loadFilterList(await fetchText(BUNDLED.aggressive.file), 'ADS', BUNDLED.aggressive.source); } catch { /* ignore */ }
   }
@@ -174,6 +194,11 @@ async function rebuildEngine() {
   state.client.setEngine(engine);
 }
 
+function scheduleAnalyticsFlush() {
+  clearTimeout(state.analyticsTimer);
+  state.analyticsTimer = setTimeout(() => { state.analytics?.flush().catch(() => {}); }, 1500);
+}
+
 function handleObservation(event) {
   const domain = event.name;
   if (!domain) return;
@@ -181,12 +206,14 @@ function handleObservation(event) {
     const category = event.blockedBy?.category || 'UNCATEGORISED';
     state.monitor.record({ kind: 'blocked', domain, category, latencyMs: event.latencyMs, at: event.at });
     state.analytics.record({ kind: 'blocked', category, domain, at: event.at });
+    scheduleAnalyticsFlush();
     state.aether.observe(domain, { blocked: true, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
     return;
   }
   state.monitor.record({ kind: 'lookup', domain, status: event.status, latencyMs: event.latencyMs, at: event.at });
   state.analytics.record({ kind: event.ok ? 'allowed' : 'error', category: 'DNS', domain, at: event.at });
+  scheduleAnalyticsFlush();
   if (event.ok) {
     state.aether.observe(domain, { blocked: false, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
@@ -222,6 +249,10 @@ function applyUserRules() {
   for (const rule of state.customRules) state.engine.addUserRule(rule.pattern, rule.isAllow);
 }
 
+function cleanRulePattern(raw) {
+  return String(raw ?? '').trim().replace(/^@@/, '').replace(/^\|\|/, '').replace(/\^$/, '');
+}
+
 async function restoreConfiguration() {
   const recovery = await state.backups.recover();
   if (recovery.ok) {
@@ -230,7 +261,7 @@ async function restoreConfiguration() {
     if (Array.isArray(saved.customRules)) {
       state.customRules = saved.customRules
         .map((r) => ({
-          pattern: String(r.pattern ?? r.rawPattern ?? ''),
+          pattern: cleanRulePattern(r.pattern ?? r.rawPattern ?? ''),
           isAllow: r.isAllow ?? r.ruleType === 'ALLOW'
         }))
         .filter((r) => r.pattern);
@@ -259,6 +290,7 @@ function scheduleSnapshot(reason = 'change') {
 async function saveSnapshot(reason = 'manual', { silent = true } = {}) {
   if (!state.booted && reason !== 'manual') return null;
   try {
+    await state.analytics?.flush();
     const saved = await state.backups.save(buildState(), { reason });
     state.lastSnapshotId = saved.id;
     if (!silent) toast('Configuration snapshot saved.', 'ok');
@@ -423,7 +455,7 @@ function renderDashboard() {
       ['Repaint cadence', `${state.monitorIntervalMs || state.settings.monitorRefreshMs} ms while a live view is open · 0 ms when the tab is hidden`],
       ['Power state', power ? power.summary : 'starting…'],
       ['Throttle', power && power.factor > 1 ? `${power.factor}x (band: ${power.band})` : 'none — default cadence'],
-      ['Rule set memory', `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round((estimateRuleMemory(breakdown.total) / breakdown.total))} bytes per rule)`],
+      ['Rule set memory', `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${breakdown.total > 0 ? Math.round(estimateRuleMemory(breakdown.total) / breakdown.total) : 0} bytes per rule)`],
       ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background']
     ]),
     h('div', { class: 'row', style: { marginTop: '10px' } },
@@ -602,20 +634,22 @@ function analyseDomain(input) {
 }
 
 function toggleDomainRule(domain, currentlyBlocked) {
+  const clean = cleanRulePattern(domain);
+  state.customRules = state.customRules.filter((r) => cleanRulePattern(r.pattern) !== clean);
   if (currentlyBlocked) {
-    state.customRules = state.customRules.filter((r) => !(r.pattern === domain && r.isAllow));
-    state.customRules.push({ pattern: domain, isAllow: true });
-    state.engine.addUserRule(`||${domain}^`, true);
-    toast(`${domain} added to your allowlist.`, 'ok');
+    state.engine.removeUserRule(clean, false);
+    state.customRules.push({ pattern: clean, isAllow: true });
+    state.engine.addUserRule(`||${clean}^`, true);
+    toast(`${clean} added to your allowlist.`, 'ok');
   } else {
-    state.customRules = state.customRules.filter((r) => !(r.pattern === domain && !r.isAllow));
-    state.customRules.push({ pattern: domain, isAllow: false });
-    state.engine.addUserRule(`||${domain}^`, false);
-    toast(`${domain} blocked by your rule.`, 'ok');
+    state.engine.removeUserRule(clean, true);
+    state.customRules.push({ pattern: clean, isAllow: false });
+    state.engine.addUserRule(`||${clean}^`, false);
+    toast(`${clean} blocked by your rule.`, 'ok');
   }
   state.aether.reputation.cache.clear();
   scheduleSnapshot('custom-rule');
-  analyseDomain(domain);
+  analyseDomain(clean);
   renderSync();
   renderDashboard();
 }
@@ -1076,6 +1110,8 @@ function runEngineBenchmark(iterations = 5000) {
   if (!domains.length) return { ok: false, reason: 'no rules loaded, so there is nothing to measure' };
   const sample = domains.slice(0, Math.min(iterations, domains.length));
   const samples = new Float64Array(sample.length);
+  // Clear memoised verdicts first so repeat runs measure real evaluation, not Map cache hits.
+  state.engine._verdictCache.clear();
   const startedAt = performance.now();
   for (let i = 0; i < sample.length; i++) {
     const t0 = performance.now();
@@ -1083,16 +1119,17 @@ function runEngineBenchmark(iterations = 5000) {
     samples[i] = performance.now() - t0;
   }
   const totalMs = performance.now() - startedAt;
+  const safeTotalMs = Math.max(totalMs, 0.01);
   const sorted = Array.from(samples).sort((a, b) => a - b);
   const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
   return {
     ok: true,
     evaluated: sample.length,
     totalMs: Math.round(totalMs * 100) / 100,
-    perSecond: Math.round(sample.length / (totalMs / 1000)),
+    perSecond: Math.round(sample.length / (safeTotalMs / 1000)),
     p50us: Math.round(pct(0.5) * 1000),
     p95us: Math.round(pct(0.95) * 1000),
-    meanUs: Math.round((totalMs * 1000 / sample.length) * 10) / 10,
+    meanUs: Math.round((safeTotalMs * 1000 / sample.length) * 10) / 10,
     measuredAt: new Date().toISOString()
   };
 }
@@ -1330,7 +1367,7 @@ function renderSync() {
             class: 'sm ghost', text: 'Remove',
             onclick: () => {
               state.customRules = state.customRules.filter((r) => r !== rule);
-              state.engine.removeUserRule(`||${rule.pattern}^`, rule.isAllow);
+              state.engine.removeUserRule(rule.pattern, rule.isAllow);
               scheduleSnapshot('rule-removed');
               renderSync();
               renderDashboard();
@@ -1355,9 +1392,11 @@ function importAndroidBackup(file) {
       state.importedBackup = data;
       let applied = 0;
       for (const rule of data.customRules) {
-        const pattern = String(rule.rawPattern ?? rule.pattern ?? '').trim();
+        const raw = String(rule.rawPattern ?? rule.pattern ?? '').trim();
+        const isAllowFromSyntax = raw.startsWith('@@');
+        const pattern = cleanRulePattern(raw);
         if (!pattern) continue;
-        const isAllow = rule.ruleType === 'ALLOW' || rule.isAllow === true;
+        const isAllow = rule.ruleType === 'ALLOW' || rule.isAllow === true || isAllowFromSyntax;
         if (state.customRules.some((r) => r.pattern === pattern && r.isAllow === isAllow)) continue;
         state.customRules.push({ pattern, isAllow });
         if (state.engine.addUserRule(pattern, isAllow)) applied++;
@@ -1572,13 +1611,20 @@ function wireEvents() {
   document.getElementById('fw-go').addEventListener('click', inspectFirewall);
   document.getElementById('fw-export').addEventListener('click', () => {
     const snapshot = state.firewall.snapshot();
+    const observations = [];
+    for (const d of state.firewall.destinations.values()) {
+      if (d.domain.startsWith('parent:')) continue;
+      if (Array.isArray(d.times) && d.times.length) {
+        for (const ts of d.times) observations.push({ domain: d.domain, app: d.app, timestamp: ts });
+      } else {
+        observations.push({ domain: d.domain, app: d.app, timestamp: d.lastSeen ?? Date.now() });
+      }
+    }
     download('omnishield-firewall-observations.json', JSON.stringify({
       exportedAt: new Date().toISOString(),
       stats: snapshot.stats,
       note: 'Destination scale only; no payloads are ever captured.',
-      observations: [...state.firewall.destinations.values()]
-        .filter((d) => !d.domain.startsWith('parent:'))
-        .map((d) => ({ domain: d.domain, app: d.app, count: d.count, firstSeen: d.firstSeen, lastSeen: d.lastSeen }))
+      observations
     }, null, 2));
   });
   document.getElementById('fw-import').addEventListener('change', (event) => {
@@ -1605,7 +1651,10 @@ function wireEvents() {
     const result = await state.backups.recover();
     const status = document.getElementById('sync-status');
     if (result.ok) {
-      mount(status, note(`Newest valid snapshot ${result.id} verified (${relativeTime(result.createdAt)}${result.skipped.length ? `, ${result.skipped.length} corrupt skipped` : ''}).`, 'ok'));
+      await restoreConfiguration();
+      await rebuildEngine();
+      renderAll();
+      mount(status, note(`Newest valid snapshot ${result.id} restored (${relativeTime(result.createdAt)}${result.skipped.length ? `, ${result.skipped.length} corrupt skipped` : ''}).`, 'ok'));
     } else {
       mount(status, note(`Recovery: ${result.reason}. ${result.detail || ''}`, 'warn'));
     }
@@ -1653,6 +1702,8 @@ globalThis.__omnishield = {
   startMonitorLoop,
   stop() {
     clearInterval(state.monitorTimer);
+    clearTimeout(state.snapshotTimer);
+    clearTimeout(state.analyticsTimer);
     try { state.power?.stop(); } catch { /* ignore */ }
   }
 };

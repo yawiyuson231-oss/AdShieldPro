@@ -153,7 +153,7 @@ object LiveNetworkModel {
         return when (config.protocol.name) {
             "DOH" -> config.activeDohUrl
             "DOT" -> config.activeDotHost
-            else -> "${config.customPrimaryIpv4} (plain DNS)"
+            else -> "${config.activePrimaryIpv4} (plain DNS)"
         }
     }
 

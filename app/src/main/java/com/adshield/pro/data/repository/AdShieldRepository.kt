@@ -434,12 +434,15 @@ class AdShieldRepository @Inject constructor(
             appendLine("# AdShield Pro v2.0 Custom Rules Export")
             appendLine("# Exported at: ${Date()}")
             for (r in rules) {
-                val prefix = if (r.ruleType == RuleType.ALLOW.name) "@@||" else "||"
-                val suffix = if (r.matchType == RuleMatchType.SUBDOMAIN.name) "^" else ""
+                val allowPrefix = if (r.ruleType == RuleType.ALLOW.name) "@@" else ""
+                val formattedRule = when (r.matchType) {
+                    RuleMatchType.EXACT.name -> "$allowPrefix|${r.normalizedPattern}^"
+                    else -> "$allowPrefix||${r.normalizedPattern}^"
+                }
                 if (r.comment.isNotBlank()) {
                     appendLine("# ${r.comment}")
                 }
-                appendLine("$prefix${r.normalizedPattern}$suffix")
+                appendLine(formattedRule)
             }
         }
     }
@@ -460,15 +463,15 @@ class AdShieldRepository @Inject constructor(
      */
     suspend fun importRulesFromText(content: String): Int = withContext(Dispatchers.IO) {
         val storedKeys = dao.getAllCustomRulesNow()
-            .mapTo(HashSet()) { entity -> entity.normalizedPattern to entity.ruleType }
-        val batchedKeys = HashSet<Pair<String, String>>()
+            .mapTo(HashSet()) { entity -> Triple(entity.normalizedPattern, entity.ruleType, entity.matchType) }
+        val batchedKeys = HashSet<Triple<String, String, String>>()
         val toInsert = ArrayList<CustomRuleEntity>()
         content.lineSequence().forEach { line ->
             val trimmed = line.trim()
             if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) return@forEach
             val parsed = filterEngine.validateAndParseRuleInput(trimmed).getOrNull() ?: return@forEach
             val entity = parsed.toEntity()
-            val key = entity.normalizedPattern to entity.ruleType
+            val key = Triple(entity.normalizedPattern, entity.ruleType, entity.matchType)
             if (key !in storedKeys && batchedKeys.add(key)) {
                 toInsert.add(entity)
             }
@@ -556,8 +559,8 @@ class AdShieldRepository @Inject constructor(
             for (source in sources) {
                 if (!source.isEnabled) continue
                 if (source.url.startsWith("asset://")) {
-                    // Refresh bundled asset rules
-                    val assetContent = readBundledDefaultBlocklist()
+                    // Refresh the specific bundled asset assigned to this source
+                    val assetContent = readBundledBlocklistAsset(bundledAssetFor(source))
                     val parsed = filterEngine.parseFilterListContent(
                         assetContent,
                         parseRuleCategory(source.category),
@@ -789,9 +792,9 @@ class AdShieldRepository @Inject constructor(
             // Merge: a restore must not delete rules the user created after the backup was
             // taken. Only rules that are not already stored are inserted.
             val storedKeys = dao.getAllCustomRulesNow()
-                .mapTo(HashSet()) { entity -> entity.normalizedPattern to entity.ruleType }
+                .mapTo(HashSet()) { entity -> Triple(entity.normalizedPattern, entity.ruleType, entity.matchType) }
             val newEntities = validEntities.filter { entity ->
-                (entity.normalizedPattern to entity.ruleType) !in storedKeys
+                Triple(entity.normalizedPattern, entity.ruleType, entity.matchType) !in storedKeys
             }
             if (newEntities.isNotEmpty()) {
                 dao.insertCustomRules(newEntities)

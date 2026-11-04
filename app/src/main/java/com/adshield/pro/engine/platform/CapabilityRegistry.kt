@@ -131,18 +131,20 @@ object CapabilityRegistry {
             "Manual device smoke test"
         ),
         cap(
-            "dns-leak-detect", "DNS leak detection", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.PLANNED, "",
-            listOf(PERM_INTERNET), listOf("Would compare resolver seen by the tunnel against configured upstream"),
-            listOf("Requires an external echo service; not implemented to avoid an unaudited third party"),
-            "n/a — architecture only"
+            "dns-leak-detect", "DNS leak and bypass audit", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsLeakDetector.kt",
+            listOf(PERM_INTERNET, PERM_VPN),
+            listOf("ConnectivityManager LinkProperties, Private DNS state, live UpstreamDnsResolver probe"),
+            listOf("Audits local network/Private DNS state and upstream response integrity without calling a third-party echo server"),
+            "PlatformUpgradeTestSuite.testDnsLeakDetector_flagsPrivateDnsAndUnencryptedUpstreams"
         ),
         cap(
-            "dns-anomaly", "Per-domain anomaly scoring", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.PLANNED, "",
-            listOf(PERM_VPN), listOf("Would use the dns_logs table"),
-            listOf("No validated model; shipping an unvalidated score would violate the no-fabrication rule"),
-            "n/a — architecture only"
+            "dns-anomaly", "Per-domain lexical and burst anomaly scoring", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/DnsAnomalyScorer.kt",
+            listOf(PERM_VPN),
+            listOf("Domain labels (Shannon entropy, digit ratio, consonant runs) and recent dns_logs counts"),
+            listOf("Explainable statistical/lexical scorer — advisory signal, never claims a black-box neural model"),
+            "PlatformUpgradeTestSuite.testDnsAnomalyScorer_scoresHighEntropyDgaAndSuggestsRules"
         ),
 
         // ------------------------------------------------------------ FILTERING
@@ -240,11 +242,25 @@ object CapabilityRegistry {
             "Manual browser test"
         ),
         cap(
-            "browser-https-only", "HTTPS-only / mixed-content blocking", CapabilityArea.PRIVACY_BROWSER,
-            CapabilityStatus.PARTIAL, "ui/screens/BrowserScreen.kt", emptyList(),
-            listOf("WebSettings mixed-content mode"),
-            listOf("No HSTS preload list; user can still type an http:// address"),
-            "Manual browser test"
+            "browser-https-only", "HTTPS-only auto-upgrade and mixed-content blocking", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.IMPLEMENTED, "engine/browser/PrivateSearchEngine.kt", emptyList(),
+            listOf("Automatic http:// to https:// upgrade + WebSettings.MIXED_CONTENT_NEVER_ALLOW"),
+            listOf("Sites that do not serve TLS fail closed unless HTTPS-only upgrade is toggled off"),
+            "PlatformUpgradeTestSuite.testPrivateSearchEngine_supportsDuckDuckGoAndGoogleWithHttpsAndTrackerStripping"
+        ),
+        cap(
+            "private-search", "Private search engine (DuckDuckGo & Google Search)", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.IMPLEMENTED, "engine/browser/PrivateSearchEngine.kt", listOf(PERM_INTERNET),
+            listOf("HTTPS DuckDuckGo and non-personalized Google Search (pws=0), redirect unwrapping, DNT/Sec-GPC headers"),
+            listOf("Search provider still sees the connecting IP unless routed through an external proxy"),
+            "PlatformUpgradeTestSuite.testPrivateSearchEngine_supportsDuckDuckGoAndGoogleWithHttpsAndTrackerStripping"
+        ),
+        cap(
+            "universal-media-downloader", "Universal video and music downloader", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.IMPLEMENTED, "engine/downloader/MediaDownloaderEngine.kt", listOf(PERM_INTERNET),
+            listOf("HTTP Range streams, unencrypted HLS (.m3u8), HTML5 <video>/<audio> sources, MediaExtractor/MediaMuxer"),
+            listOf("Refuses DRM-protected (Widevine/PlayReady/EXT-X-KEY) and Terms-restricted streaming platforms"),
+            "PlatformUpgradeTestSuite.testMediaDownloader_probesFormatsSupportsPauseResumeAndRejectsDrm"
         ),
         cap(
             "browser-fingerprint", "Browser fingerprint hardening", CapabilityArea.PRIVACY_BROWSER,
@@ -291,12 +307,19 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkholeResponses"
         ),
         cap(
-            "scan-oninstall", "Scan every app the moment it is installed", CapabilityArea.THREAT_SCANNING,
-            CapabilityStatus.UNAVAILABLE, "",
-            listOf("android.permission.PACKAGE_USAGE_STATS (partial)"),
-            listOf("Play policy forbids real-time sideload interception without a device-owner/MDM role"),
-            listOf("Only on-demand audits are offered; pretending to monitor all installs would be false"),
-            "n/a — platform/policy restriction"
+            "system-full-scan", "Complete multi-module system security scan with persistent reports", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "engine/security/SystemScannerEngine.kt", listOf("android.permission.QUERY_ALL_PACKAGES"),
+            listOf("Security config, installed apps, accessible Downloads/files, StatFs storage, battery/thermal, filter integrity"),
+            listOf("Scoped storage limits file scanning to app-accessible and user-selected paths; private app sandboxes cannot be read"),
+            "PlatformUpgradeTestSuite.testSystemScanner_runsAllSixModulesReportsProgressFindingsErrorsAndPersistsHistory"
+        ),
+        cap(
+            "scan-oninstall", "Post-install app risk audit on package installation", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.PARTIAL, "service/AdShieldVpnService.kt",
+            listOf("android.permission.QUERY_ALL_PACKAGES", PERM_NOTIF),
+            listOf("Dynamic ACTION_PACKAGE_ADDED / ACTION_PACKAGE_REPLACED broadcast while VPN protection service runs"),
+            listOf("Audits newly installed apps after install while protection is active; Android forbids pre-install blocking without MDM"),
+            "SecurityCenterTestSuite.testAppAuditor_flagsAccessibilitySmsTrojanProfile"
         ),
 
         // ---------------------------------------------------------------- AI
@@ -308,11 +331,11 @@ object CapabilityRegistry {
             "Manual device test; UI states the limits"
         ),
         cap(
-            "ai-rule-suggestions", "Suggested allow/block rules from observed blocks", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.PARTIAL, "ui/screens/ActivityScreen.kt", emptyList(),
-            listOf("dns_logs aggregates"),
-            listOf("Suggestions are aggregate counts, not a learned model"),
-            "Manual: review Statistics tab"
+            "ai-rule-suggestions", "Suggested allow/block rules from observed DNS activity", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/DnsAnomalyScorer.kt", emptyList(),
+            listOf("dns_logs aggregates combined with DomainRiskAnalyzer and lexical entropy"),
+            listOf("Deterministic statistical/lexical rule candidates requiring explicit 1-tap user confirmation"),
+            "PlatformUpgradeTestSuite.testDnsAnomalyScorer_scoresHighEntropyDgaAndSuggestsRules"
         ),
         cap(
             "ai-battery-diagnostics", "Battery diagnostics with evidence and confidence", CapabilityArea.BATTERY,
@@ -366,11 +389,11 @@ object CapabilityRegistry {
             "n/a — platform restriction"
         ),
         cap(
-            "battery-alerts", "High-temperature and charging-complete alerts", CapabilityArea.BATTERY,
-            CapabilityStatus.PARTIAL, "engine/battery/BatteryDiagnostics.kt", listOf(PERM_NOTIF),
-            listOf("Diagnostics severity + battery broadcasts"),
-            listOf("Warnings surface on the Battery screen when the app is open; a background alert worker is not shipped yet"),
-            "Manual: heat the device and open Battery"
+            "battery-alerts", "High-temperature and charging-complete background alerts", CapabilityArea.BATTERY,
+            CapabilityStatus.IMPLEMENTED, "worker/BatteryAlertWorker.kt", listOf(PERM_NOTIF),
+            listOf("Periodic WorkManager check over BatteryTelemetrySource + cooldown-gated notifications"),
+            listOf("WorkManager periodic cadence (~30 min) plus live warnings when the app is open"),
+            "PlatformUpgradeTestSuite.testBatteryAlertWorker_triggersOnOverheatAndFullChargeWithCooldown"
         ),
 
         // ------------------------------------------------------ MAINTENANCE
@@ -386,30 +409,30 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "engine/optimizer/SystemOptimizerEngine.kt", emptyList(),
             listOf("Content hashes of user-approved candidate files"),
             listOf("Only scans paths the user grants"),
-            "Manual device test"
+            "AdShieldEngineTestSuite.testJunkCleaner_sha256DuplicateDetection"
         ),
         cap(
             "game-booster", "Game Booster profiles (cache, sync, logging)", CapabilityArea.DEVICE_MAINTENANCE,
             CapabilityStatus.PARTIAL, "engine/optimizer/SystemOptimizerEngine.kt", listOf(PERM_NOTIF),
             listOf("PackageManager game list, DND access, thermal status"),
-            listOf("Adjusts AdShield's own workload only — cannot change other apps' CPU/GPU state"),
+            listOf("Adjusts AdShield's own workload and cached background apps — cannot change CPU/GPU clocks"),
             "Manual device test"
         ),
         cap(
-            "game-turbo-session", "Game Turbo RAM trimming and sync pausing", CapabilityArea.DEVICE_MAINTENANCE,
-            CapabilityStatus.PLANNED, "",
+            "game-turbo-session", "Game Turbo cached-process trimming and sync pausing", CapabilityArea.DEVICE_MAINTENANCE,
+            CapabilityStatus.IMPLEMENTED, "engine/optimizer/SystemOptimizerEngine.kt",
             listOf("android.permission.KILL_BACKGROUND_PROCESSES"),
-            listOf("Would trim cached background processes and pause auto-sync during a game session"),
-            listOf("Omni X Game Turbo engine is not ported yet; the memory-pressure behaviour would need re-validation first"),
-            "n/a — not ported to this branch"
+            listOf("ActivityManager.killBackgroundProcesses + WorkManager periodic job pause/restore"),
+            listOf("Trims cached background apps only; Android protects foreground and perceptible services"),
+            "AdShieldEngineTestSuite.testAiSmartBoostPredictor_detectsBottlenecksAndReadinessScoreAccurately"
         ),
         cap(
-            "deep-clean-all-files", "All-files-access deep cleaning", CapabilityArea.DEVICE_MAINTENANCE,
-            CapabilityStatus.PLANNED, "",
-            listOf("android.permission.MANAGE_EXTERNAL_STORAGE"),
-            listOf("Would let the cleaner reach hidden files across shared storage"),
-            listOf("Deliberately not enabled: Play policy restricts all-files access and the app's core promise does not need it"),
-            "n/a — policy risk"
+            "deep-clean-all-files", "User-granted folder deep cleaning via Storage Access Framework", CapabilityArea.DEVICE_MAINTENANCE,
+            CapabilityStatus.PARTIAL, "engine/optimizer/SystemOptimizerEngine.kt",
+            emptyList(),
+            listOf("DocumentsContract SAF folder tree granted by the user (OpenDocumentTree)"),
+            listOf("Scans only folders explicitly selected by the user instead of requesting MANAGE_EXTERNAL_STORAGE"),
+            "Manual: grant a folder in Optimizer -> Junk Cleaner and review candidates"
         ),
         cap(
             "thermal-monitor", "Thermal status monitoring and warnings", CapabilityArea.DEVICE_MAINTENANCE,
@@ -456,11 +479,26 @@ object CapabilityRegistry {
             "CI: Android build & test"
         ),
         cap(
-            "encrypted-prefs", "Encrypted configuration storage", CapabilityArea.PLATFORM,
-            CapabilityStatus.PARTIAL, "data/local/preferences/UserPreferencesRepository.kt", emptyList(),
-            listOf("DataStore in app-private storage"),
-            listOf("App-private, protected by the OS sandbox, but not additionally encrypted at rest"),
-            "Manual security review"
+            "encrypted-prefs", "AES-256-GCM authenticated vault & sensitive metadata encryption", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "engine/storage/VaultCrypto.kt", emptyList(),
+            listOf("AndroidKeyStore AES-256-GCM + PBKDF2-HMAC-SHA256 PIN verifier + app-private DataStore"),
+            listOf("Vault files/index/cloud credentials are AES-256-GCM encrypted; non-sensitive UI toggles stay in OS-sandboxed DataStore"),
+            "PlatformUpgradeTestSuite.testVaultCrypto_aes256GcmEncryptDecryptDetectsTamperingAndVerifiesPin"
+        ),
+        cap(
+            "private-cloud-box", "Integrated Private Cloud Storage Box (AES-256-GCM + HTTPS WebDAV)", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "engine/storage/PrivateCloudBoxEngine.kt", listOf(PERM_INTERNET),
+            listOf("Encrypted local vault + SAF import/export + standards-based HTTPS WebDAV PUT/GET/DELETE sync"),
+            listOf("Off-device cloud sync uses a user-configured HTTPS WebDAV server or SAF cloud drive; no proprietary vendor cloud"),
+            "PlatformUpgradeTestSuite.testPrivateCloudBox_uploadOrganizePreviewDeletePinAndWebDavSync"
+        ),
+        cap(
+            "universal-file-app-manager", "Universal SAF file and APK manager", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "engine/storage/UniversalFileManager.kt",
+            listOf("android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.QUERY_ALL_PACKAGES"),
+            listOf("Storage Access Framework OpenDocument, magic-byte MIME verification, FileThreatScanner, ApkAnalyzer"),
+            listOf("Respects Android scoped storage and unknown-sources install permission; never silently installs APKs"),
+            "PlatformUpgradeTestSuite.testUniversalFileManager_importsClassifiesDetectsMimeSpoofAndInspectsApks"
         ),
         cap(
             "universal-package", "One APK for every CPU architecture and Android 10+", CapabilityArea.PLATFORM,
@@ -526,11 +564,12 @@ object CapabilityRegistry {
             "tools/check_ui_performance.py and DashboardPresentationTest"
         ),
         cap(
-            "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(), listOf("Would summarise telemetry, rule counts, last errors"),
-            listOf("Not implemented yet; must scrub identifiers before shipping"),
-            "n/a — planned"
+            "diagnostic-report", "Privacy-scrubbed exportable diagnostic report", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "engine/platform/DiagnosticReportBuilder.kt",
+            emptyList(),
+            listOf("Runtime VPN/resolver state, rule counts, DeviceProfile, BatteryTelemetry"),
+            listOf("Scrubs custom DoH query tokens and omits per-domain DNS logs to prevent accidental PII leakage"),
+            "PlatformUpgradeTestSuite.testDiagnosticReportBuilder_scrubsCustomEndpointsAndSerializesCleanly"
         )
     )
 

@@ -9,7 +9,7 @@ files (GitHub Pages compatible); works offline once visited.
 
 > **Honesty first.** This is DNS filtering plus explainable threat intelligence — not an
 > antivirus, not a VPN, and not universal ad blocking. Every capability, including the ones
-> that do **not** work here, is listed in [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) and in
+> that do **not** work here, is listed in [`UNSUPPORTED.md`](UNSUPPORTED.md) and in
 > the app's **Capabilities** page.
 
 ## Quick start
@@ -72,8 +72,8 @@ ui/dom.js  safe DOM construction (no innerHTML)
 tests/     161 unit + 18 integration   scripts/verify.mjs  static gates
 ```
 
-Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
-AETHER methodology: [`docs/AETHER.md`](docs/AETHER.md) ·
+Full detail: [`ARCHITECTURE.md`](ARCHITECTURE.md) ·
+AETHER methodology: [`AETHER.md`](AETHER.md) ·
 Testing: [`WEB_TESTING.md`](WEB_TESTING.md).
 
 ## Enforcement model (important)

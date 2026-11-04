@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.update.GitHubUpdateWorker
+import com.adshield.pro.worker.BatteryAlertWorker
 import com.adshield.pro.worker.FilterUpdateWorker
 import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.HiltAndroidApp
@@ -31,6 +32,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         GitHubUpdateWorker.schedule(this)
+        BatteryAlertWorker.schedule(this)
         appScope.launch {
             val settings = preferencesRepository.getSettingsSnapshot()
             FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(

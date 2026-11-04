@@ -165,9 +165,9 @@ export class DnsClient {
     const result = await this.cache.singleFlight(
       key,
       () => this.pool.query(name, type, { preferredIds: options.preferredIds }),
-      (value) => ({
-        ttl: value.ttl, negative: value.negative, negativeTtl: value.negativeTtl
-      })
+      (value) => (value && (value.ok || value.status === 'nxdomain')
+        ? { ttl: value.ttl, negative: value.negative, negativeTtl: value.negativeTtl }
+        : null)
     ).catch((err) => ({
       name, type, status: 'error', ok: false, addresses: [], cname: [], ttl: 0,
       negative: false, resolver: null, transport: null, latencyMs: this.clock() - started,
@@ -176,7 +176,7 @@ export class DnsClient {
       attempts: []
     }));
 
-    if (result.status === 'error') this.stats.errors++;
+    if (result.status === 'error' || result.status === 'servfail') this.stats.errors++;
     if (result.status === 'nxdomain') this.stats.nxdomain++;
     this._noteLatency(this.clock() - started);
 
@@ -189,7 +189,9 @@ export class DnsClient {
         : [
           result.status === 'nxdomain'
             ? 'The resolver returned NXDOMAIN (the name does not exist).'
-            : `${result.addresses.length} address record(s) received over ${result.transport} from ${result.resolver?.name}.`,
+            : result.status === 'servfail'
+              ? `${result.resolver?.name || 'The resolver'} returned SERVFAIL (upstream failure or DNSSEC validation failure).`
+              : `${result.addresses.length} address record(s) received over ${result.transport} from ${result.resolver?.name}.`,
           result.dnssec?.detail
         ].filter(Boolean),
       pipeline: ['normalize', 'filter:allowed', 'cache:miss', `transport:${result.transport || 'none'}`, `dnssec:${result.dnssec?.status || 'n/a'}`]

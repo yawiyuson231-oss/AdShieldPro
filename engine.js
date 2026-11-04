@@ -235,17 +235,28 @@ export class OmniShieldFilterEngine {
 
   _addWildcard(pattern, isException, category, source) {
     const normalized = pattern.trim().toLowerCase().replace(/^\|\|?/, '').replace(/\^$/, '');
-    if (!normalized.includes('*') || normalized.length < 3) { this.stats.invalid++; return false; }
+    if (!normalized.includes('*') || normalized.length < 3) {
+      if (source !== 'user') this.stats.invalid++;
+      return false;
+    }
     // Guard: a wildcard that matches "everything" is never accepted.
-    if (/^\*+$/.test(normalized) || normalized === '*.*') { this.stats.invalid++; return false; }
-    const escaped = normalized.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+    if (/^\*+$/.test(normalized) || normalized === '*.*') {
+      if (source !== 'user') this.stats.invalid++;
+      return false;
+    }
+    const escaped = normalized.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^./]*');
     const re = new RegExp(`^${escaped}$`);
     const entry = { re, category, source, pattern: normalized };
     const bucket = isException ? this.wildcardAllow : this.wildcardBlock;
-    if (bucket.some((w) => w.pattern === normalized)) { this.stats.duplicates++; return false; }
+    if (bucket.some((w) => w.pattern === normalized && w.source === source)) {
+      if (source !== 'user') this.stats.duplicates++;
+      return false;
+    }
     bucket.push(entry);
-    this.stats.wildcards++;
-    if (!isException) this.categoryCounts.set(category, (this.categoryCounts.get(category) || 0) + 1);
+    if (source !== 'user') {
+      this.stats.wildcards++;
+      if (!isException) this.categoryCounts.set(category, (this.categoryCounts.get(category) || 0) + 1);
+    }
     return true;
   }
 
@@ -255,11 +266,15 @@ export class OmniShieldFilterEngine {
    */
   addUserRule(pattern, isAllow) {
     const cleaned = String(pattern || '')
+      .trim()
+      .toLowerCase()
       .replace(/^@@/, '')
       .replace(/^\|\|?/, '')
       .replace(/\^.*$/, '');
-    if (/[*?]/.test(cleaned)) {
-      return this._addWildcard(cleaned, !!isAllow, isAllow ? 'USER_ALLOW' : 'USER_BLOCK', 'user');
+    if (cleaned.includes('*')) {
+      const added = this._addWildcard(cleaned, !!isAllow, isAllow ? 'USER_ALLOW' : 'USER_BLOCK', 'user');
+      if (added) this._invalidate();
+      return added;
     }
     const domain = OmniShieldFilterEngine.normalizeDomain(cleaned);
     if (!domain) return false;
@@ -275,7 +290,22 @@ export class OmniShieldFilterEngine {
   }
 
   removeUserRule(pattern, isAllow) {
-    const cleaned = String(pattern || '').replace(/^@@/, '').replace(/^\|\|?/, '').replace(/\^.*$/, '');
+    const cleaned = String(pattern || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^@@/, '')
+      .replace(/^\|\|?/, '')
+      .replace(/\^.*$/, '');
+    if (cleaned.includes('*')) {
+      const bucket = isAllow ? this.wildcardAllow : this.wildcardBlock;
+      const before = bucket.length;
+      const filtered = bucket.filter((w) => !(w.source === 'user' && w.pattern === cleaned));
+      if (isAllow) this.wildcardAllow = filtered;
+      else this.wildcardBlock = filtered;
+      const removed = filtered.length !== before;
+      if (removed) this._invalidate();
+      return removed;
+    }
     const domain = OmniShieldFilterEngine.normalizeDomain(cleaned);
     // Both sets must be cleared: `||` would short-circuit after the first delete
     // and leave the suffix rule behind (which silently kept the domain allowed).
@@ -383,7 +413,7 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardAllow) {
-      if (w.re.test(domain)) {
+      if (w.source === 'user' && w.re.test(domain)) {
         return {
           domain, blocked: false, source: 'User Allowlist', action: 'ALLOW', matched: w.pattern,
           reasons: [`Wildcard allow rule "${w.pattern}" matches this host.`]
@@ -393,7 +423,7 @@ export class OmniShieldFilterEngine {
 
     // 2. User blocklist.
     for (const suffix of this._walk(domain)) {
-      if (this.customBlockExact.has(suffix)) {
+      if (this.customBlockExact.has(suffix) || this.customBlockSuffix.has(suffix)) {
         return {
           domain, blocked: true, source: 'User Blocklist', action: 'BLOCK', category: 'USER_BLOCK', matched: suffix,
           reasons: [`You explicitly blocked ${suffix}.`]
@@ -429,7 +459,7 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardAllow) {
-      if (w.re.test(domain)) {
+      if (w.source !== 'user' && w.re.test(domain)) {
         return {
           domain, blocked: false, source: 'List Exception', action: 'ALLOW', matched: w.pattern,
           reasons: [`Feed exception wildcard "${w.pattern}" matches this host.`]
@@ -454,7 +484,7 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardBlock) {
-      if (w.re.test(domain)) {
+      if (w.source !== 'user' && w.re.test(domain)) {
         return {
           domain, blocked: true, source: w.source, action: 'BLOCK', category: w.category, matched: w.pattern,
           reasons: [`Wildcard rule "${w.pattern}" from ${w.source} matches this host.`]
@@ -473,17 +503,23 @@ export class OmniShieldFilterEngine {
   /* ------------------------------------------------------------------ */
 
   totalRules() {
-    return this.filterSubdomains.size + this.allowSubdomains.size + this.wildcardBlock.length + this.wildcardAllow.length;
+    const feedWildcardBlocks = this.wildcardBlock.filter((w) => w.source !== 'user').length;
+    const feedWildcardAllows = this.wildcardAllow.filter((w) => w.source !== 'user').length;
+    return this.filterSubdomains.size + this.allowSubdomains.size + feedWildcardBlocks + feedWildcardAllows;
   }
 
   ruleCountByCategory() { return Object.fromEntries(this.categoryCounts); }
 
   breakdown() {
+    const userWildcards = this.wildcardBlock.filter((w) => w.source === 'user').length
+      + this.wildcardAllow.filter((w) => w.source === 'user').length;
+    const feedWildcards = this.wildcardBlock.filter((w) => w.source !== 'user').length
+      + this.wildcardAllow.filter((w) => w.source !== 'user').length;
     return {
       blockDomains: this.filterSubdomains.size,
       exceptions: this.allowSubdomains.size,
-      wildcards: this.wildcardBlock.length + this.wildcardAllow.length,
-      userRules: this.customBlockExact.size + this.customAllowExact.size,
+      wildcards: feedWildcards,
+      userRules: this.customBlockExact.size + this.customAllowExact.size + userWildcards,
       safetyEntries: this.safetyAllow.size,
       total: this.totalRules(),
       categories: this.ruleCountByCategory(),

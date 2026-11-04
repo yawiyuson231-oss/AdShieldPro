@@ -121,15 +121,33 @@ test('NXDOMAIN is negatively cached using the SOA-derived TTL', async () => {
   assert.equal(client.stats.nxdomain, 1);
 });
 
-test('network failure is surfaced honestly (no plaintext fallback, no fake answer)', async () => {
-  const net = createMockDoh({ failHosts: new Set(['cloudflare-dns.com', 'dns.google']) });
-  const { client } = makeClient({ net });
+test('network failure and SERVFAIL are never cached, so recovery is immediate', async () => {
+  const failHosts = new Set(['cloudflare-dns.com', 'dns.google']);
+  const net = createMockDoh({ failHosts });
+  const { client, cache } = makeClient({ net });
   const result = await client.lookup('example.com');
   assert.equal(result.status, 'error');
   assert.equal(result.ok, false);
   assert.deepEqual(result.addresses, []);
   assert.match(result.reasons.join(' '), /does not fall back to unencrypted DNS/);
   assert.equal(client.stats.errors, 1);
+  assert.equal(cache.get('example.com', 'A'), null, 'transient network failure must never be cached');
+
+  // Network recovers: immediate retry must hit the resolver and succeed.
+  failHosts.clear();
+  const recovered = await client.lookup('example.com');
+  assert.equal(recovered.status, 'ok');
+  assert.equal(recovered.cached, false);
+  assert.deepEqual(recovered.addresses, ['93.184.216.34']);
+
+  // SERVFAIL must also never be cached.
+  const sfNet = createMockDoh({ rcode: 2 });
+  const { client: sfClient, cache: sfCache } = makeClient({ net: sfNet });
+  const sf = await sfClient.lookup('example.com');
+  assert.equal(sf.status, 'servfail');
+  assert.equal(sf.ok, false);
+  assert.match(sf.reasons.join(' '), /SERVFAIL/);
+  assert.equal(sfCache.get('example.com', 'A'), null, 'SERVFAIL must never be cached');
 });
 
 test('IP literals and invalid input short-circuit without network traffic', async () => {

@@ -18,6 +18,7 @@ import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.GameSessionRecord
 import com.adshield.pro.domain.model.GamingProfile
 import com.adshield.pro.domain.model.ProtectionMode
+import com.adshield.pro.engine.browser.SearchProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -48,6 +49,8 @@ data class AppSettingsState(
     val browserPopupBlockingEnabled: Boolean = true,
     val browserBlockThirdPartyCookies: Boolean = true,
     val browserJavaScriptEnabled: Boolean = true,
+    val browserHttpsUpgradeEnabled: Boolean = true,
+    val preferredSearchProvider: SearchProvider = SearchProvider.DUCKDUCKGO,
     val customCosmeticSelectors: Set<String> = emptySet(),
     // --- Phone Optimizer & AI Smart Boost Settings ---
     val smartAutoOptimizeEnabled: Boolean = true,
@@ -102,6 +105,8 @@ class UserPreferencesRepository @Inject constructor(
         val BROWSER_POPUP_BLOCK = booleanPreferencesKey("browser_popup_blocking")
         val BROWSER_BLOCK_3P_COOKIES = booleanPreferencesKey("browser_block_3p_cookies")
         val BROWSER_JS_ENABLED = booleanPreferencesKey("browser_js_enabled")
+        val BROWSER_HTTPS_UPGRADE = booleanPreferencesKey("browser_https_upgrade_enabled")
+        val PREFERRED_SEARCH_PROVIDER = stringPreferencesKey("preferred_search_provider")
         val CUSTOM_COSMETIC_SELECTORS = stringSetPreferencesKey("custom_cosmetic_selectors")
 
         // Optimizer & Smart Boost keys
@@ -144,6 +149,10 @@ class UserPreferencesRepository @Inject constructor(
             BatteryMode.valueOf(prefs[Keys.BATTERY_MODE] ?: BatteryMode.SMART_AUTOMATIC.name)
         }.getOrDefault(BatteryMode.SMART_AUTOMATIC)
 
+        val searchProvider = runCatching {
+            SearchProvider.valueOf(prefs[Keys.PREFERRED_SEARCH_PROVIDER] ?: SearchProvider.DUCKDUCKGO.name)
+        }.getOrDefault(SearchProvider.DUCKDUCKGO)
+
         val cleanHistory = prefs[Keys.CLEAN_HISTORY_JSON]?.let { raw ->
             runCatching { json.decodeFromString<List<CleanHistoryRecord>>(raw) }.getOrDefault(emptyList())
         } ?: emptyList()
@@ -177,6 +186,8 @@ class UserPreferencesRepository @Inject constructor(
             browserPopupBlockingEnabled = prefs[Keys.BROWSER_POPUP_BLOCK] ?: true,
             browserBlockThirdPartyCookies = prefs[Keys.BROWSER_BLOCK_3P_COOKIES] ?: true,
             browserJavaScriptEnabled = prefs[Keys.BROWSER_JS_ENABLED] ?: true,
+            browserHttpsUpgradeEnabled = prefs[Keys.BROWSER_HTTPS_UPGRADE] ?: true,
+            preferredSearchProvider = searchProvider,
             customCosmeticSelectors = prefs[Keys.CUSTOM_COSMETIC_SELECTORS] ?: emptySet(),
             smartAutoOptimizeEnabled = prefs[Keys.SMART_AUTO_OPTIMIZE] ?: true,
             autoJunkCleanIntervalHours = prefs[Keys.AUTO_JUNK_CLEAN_HOURS] ?: 24,
@@ -264,13 +275,27 @@ class UserPreferencesRepository @Inject constructor(
         cosmeticFiltering: Boolean,
         popupBlocking: Boolean,
         blockThirdPartyCookies: Boolean,
-        javaScriptEnabled: Boolean
+        javaScriptEnabled: Boolean,
+        httpsUpgradeEnabled: Boolean = true
     ) {
         context.adShieldDataStore.edit { prefs ->
             prefs[Keys.BROWSER_COSMETIC] = cosmeticFiltering
             prefs[Keys.BROWSER_POPUP_BLOCK] = popupBlocking
             prefs[Keys.BROWSER_BLOCK_3P_COOKIES] = blockThirdPartyCookies
             prefs[Keys.BROWSER_JS_ENABLED] = javaScriptEnabled
+            prefs[Keys.BROWSER_HTTPS_UPGRADE] = httpsUpgradeEnabled
+        }
+    }
+
+    suspend fun setPreferredSearchProvider(provider: SearchProvider) {
+        context.adShieldDataStore.edit { prefs ->
+            prefs[Keys.PREFERRED_SEARCH_PROVIDER] = provider.name
+        }
+    }
+
+    suspend fun setBrowserHttpsUpgradeEnabled(enabled: Boolean) {
+        context.adShieldDataStore.edit { prefs ->
+            prefs[Keys.BROWSER_HTTPS_UPGRADE] = enabled
         }
     }
 

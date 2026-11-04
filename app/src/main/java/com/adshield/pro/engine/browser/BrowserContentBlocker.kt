@@ -173,7 +173,10 @@ class BrowserContentBlocker @Inject constructor(
         val cssRuleString = combinedSelectors.joinToString(", ") +
             " { display: none !important; visibility: hidden !important; height: 0 !important; min-height: 0 !important; pointer-events: none !important; }"
 
-        val escapedCss = cssRuleString.replace("\\", "\\\\").replace("`", "\\`")
+        val escapedCss = cssRuleString
+            .replace("\\", "\\\\")
+            .replace("`", "\\`")
+            .replace("\${", "\\\${")
 
         return """
             (function() {
@@ -230,7 +233,12 @@ class BrowserContentBlocker @Inject constructor(
             "_gl",
             "igshid",
             "vero_id",
-            "rb_clickid"
+            "rb_clickid",
+            "ved",
+            "ei",
+            "gs_lcp",
+            "sclient",
+            "sca_esv"
         )
 
         private val THIRD_PARTY_AD_PATH_PATTERNS = listOf(

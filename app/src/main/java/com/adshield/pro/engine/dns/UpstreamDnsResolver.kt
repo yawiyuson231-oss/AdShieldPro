@@ -262,10 +262,7 @@ class UpstreamDnsResolver @Inject constructor() {
      * Executes an RFC 7858 DNS-over-TLS query over port 853 with SNI and certificate verification.
      */
     fun queryDot(rawDnsQuery: ByteArray, config: DnsResolverConfig): ByteArray {
-        val candidates = buildList {
-            add(config.activePrimaryIpv4)
-            if (config.enableIpv6) add(config.activePrimaryIpv6)
-        }.filter { it.isNotBlank() }.distinct()
+        val candidates = upstreamDotServers(config)
         var lastFailure: Throwable? = null
         for (candidate in candidates) {
             try {
@@ -283,14 +280,19 @@ class UpstreamDnsResolver @Inject constructor() {
         serverIp: String
     ): ByteArray {
         val rawSocket = Socket()
-        currentProtector?.invoke(rawSocket)
-        val targetIp = InetAddress.getByName(serverIp)
-        rawSocket.connect(InetSocketAddress(targetIp, config.preset.dotPort), 3500)
-        rawSocket.soTimeout = 3500
+        val sslSocket = try {
+            currentProtector?.invoke(rawSocket)
+            val targetIp = InetAddress.getByName(serverIp)
+            rawSocket.connect(InetSocketAddress(targetIp, config.preset.dotPort), 3500)
+            rawSocket.soTimeout = 3500
 
-        val sslFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
+            val sslFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
+            sslFactory.createSocket(rawSocket, config.activeDotHost, config.preset.dotPort, true) as SSLSocket
+        } catch (t: Throwable) {
+            runCatching { rawSocket.close() }
+            throw t
+        }
         val dotHost = config.activeDotHost
-        val sslSocket = sslFactory.createSocket(rawSocket, dotHost, config.preset.dotPort, true) as SSLSocket
         sslSocket.use { tls ->
             tls.startHandshake()
             val session = tls.session
@@ -432,13 +434,26 @@ class UpstreamDnsResolver @Inject constructor() {
         }
 
         /**
+         * Ordered DoT server list: IPv4 primary/secondary first, then preset IPv6 primary/secondary
+         * when IPv6 is enabled (custom presets do not silently fall back to preset IPv6 addresses).
+         */
+        fun upstreamDotServers(config: DnsResolverConfig): List<String> = buildList {
+            add(config.activePrimaryIpv4)
+            add(config.activeSecondaryIpv4)
+            if (config.enableIpv6 && config.preset != com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) {
+                add(config.activePrimaryIpv6)
+                add(config.activeSecondaryIpv6)
+            }
+        }.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+
+        /**
          * Ordered plaintext DNS server list: IPv4 primary/secondary first (fastest, most
          * common), then IPv6 primary/secondary so IPv6-only networks still resolve.
          */
         fun upstreamUdpTcpServers(config: DnsResolverConfig): List<String> = buildList {
             add(config.activePrimaryIpv4)
             add(config.activeSecondaryIpv4)
-            if (config.enableIpv6) {
+            if (config.enableIpv6 && config.preset != com.adshield.pro.domain.model.DnsProviderPreset.CUSTOM) {
                 add(config.activePrimaryIpv6)
                 add(config.activeSecondaryIpv6)
             }
@@ -451,7 +466,7 @@ class UpstreamDnsResolver @Inject constructor() {
         fun buildCacheKey(query: DnsPacketCodec.ParsedDnsQuery, config: DnsResolverConfig): String {
             val endpoint = when (config.protocol) {
                 DnsProtocol.DOH -> config.activeDohUrl.lowercase()
-                DnsProtocol.DOT -> "${config.activeDotHost.lowercase()}:${config.preset.dotPort}"
+                DnsProtocol.DOT -> "${config.activeDotHost.lowercase()}:${config.preset.dotPort}@${upstreamDotServers(config).joinToString(",")}"
                 DnsProtocol.UDP_TCP -> upstreamUdpTcpServers(config).joinToString(",")
             }
             return "${config.protocol.name}@$endpoint|${query.cacheKey}"

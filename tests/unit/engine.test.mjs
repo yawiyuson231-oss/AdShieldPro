@@ -209,3 +209,42 @@ test('add/remove user rules are symmetric (undo really undoes)', () => {
   assert.equal(e.evaluate('extra.example').blocked, false);
   assert.equal(e.removeUserRule('||never-added.example^', false), false);
 });
+
+test('feed wildcard exceptions never outrank user blocklist and report List Exception', () => {
+  const e = new OmniShieldFilterEngine();
+  e.loadFilterList('||ads.example.com^\n@@||safe-*.ads.example.com^\n', 'ADS', 'feed');
+  // Feed exception overrides feed block as List Exception (not User Allowlist).
+  const feedAllowed = e.evaluate('safe-1.ads.example.com');
+  assert.equal(feedAllowed.blocked, false);
+  assert.equal(feedAllowed.source, 'List Exception');
+
+  // Explicit user block must beat the feed wildcard exception.
+  e.addUserRule('||safe-1.ads.example.com^', false);
+  const userBlocked = e.evaluate('safe-1.ads.example.com');
+  assert.equal(userBlocked.blocked, true);
+  assert.equal(userBlocked.source, 'User Blocklist');
+});
+
+test('user wildcard rules invalidate cache, stay out of feed counts, and undo cleanly', () => {
+  const e = new OmniShieldFilterEngine();
+  e.loadFilterList('||feed.example^\n', 'ADS', 'feed');
+  const feedTotalBefore = e.totalRules();
+
+  assert.equal(e.evaluate('ad1.wild.example').blocked, false); // warm verdict cache
+  assert.equal(e.addUserRule('||ad*.wild.example^', false), true);
+  assert.equal(e.evaluate('ad1.wild.example').blocked, true, 'wildcard block must invalidate cached ALLOW');
+  assert.equal(e.evaluate('ad1.wild.example').source, 'User Blocklist');
+  assert.equal(e.totalRules(), feedTotalBefore, 'user wildcards must not inflate feed rule totals');
+  assert.equal(e.breakdown().userRules, 1);
+  assert.equal(e.breakdown().categories.USER_BLOCK, undefined);
+
+  assert.equal(e.addUserRule('@@||ad1.wild.example^', true), true);
+  assert.equal(e.evaluate('ad1.wild.example').blocked, false);
+  assert.equal(e.removeUserRule('@@||ad1.wild.example^', true), true);
+  assert.equal(e.evaluate('ad1.wild.example').blocked, true);
+
+  assert.equal(e.removeUserRule('||ad*.wild.example^', false), true);
+  assert.equal(e.evaluate('ad1.wild.example').blocked, false, 'removing user wildcard must restore ALLOW');
+  assert.equal(e.breakdown().userRules, 0);
+});
+

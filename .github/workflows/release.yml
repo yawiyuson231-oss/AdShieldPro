@@ -27,6 +27,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -34,7 +35,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -184,7 +185,7 @@ jobs:
           # Newest release that actually shipped an AdShield Pro APK (this repo also holds
           # older OmniShield X releases signed with a different key — skip those).
           PREV_TAG=""
-          for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
+          for TAG in $(gh release list --limit 100 --json tagName --jq --arg cur "${{ steps.meta.outputs.tag }}" '[.[] | select(.tagName != $cur)][].tagName'); do
             if gh release download "$TAG" --pattern 'AdShieldPro-*-release.apk' --dir /tmp/prev --clobber 2>/dev/null; then
               PREV_TAG="$TAG"
               break
@@ -273,7 +274,7 @@ jobs:
           One APK for every device: any native helper library (AndroidX graphics-path,
           DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
           installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
-          Verified by `tools/check_universal_release.py` before this release was published.
+          Verified by \`tools/check_universal_release.py\` before this release was published.
 
           ## Notes
           - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.
@@ -309,14 +310,15 @@ jobs:
       # repository's Pages site is built anymore.
       - name: Trigger website deploy (GitHub Pages)
         if: success()
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-website.yml --ref main
+        run: |
+          gh workflow run deploy-website.yml --ref main 2>/dev/null \
+            || echo "::notice::Could not dispatch deploy-website.yml via GITHUB_TOKEN; pushes to main already trigger it automatically."
 
       - name: Upload workflow artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: adshield-pro-${{ steps.meta.outputs.version_name }}-release
           path: |

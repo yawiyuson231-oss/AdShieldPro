@@ -38,6 +38,12 @@ class UrlThreatScanner {
     /** Result provider hook: returns true when the host (or a parent domain) is on the active malware/phishing blocklist. */
     interface KnownThreatHostLookup {
         fun isKnownThreatHost(host: String): Boolean
+
+        /**
+         * Optional full-host evaluation that honours user allowlists and exact-only vs subdomain
+         * rule semantics. Returns null to fall back to [isKnownThreatHost] suffix walking.
+         */
+        fun evaluateFullHost(host: String): Boolean? = null
     }
 
     private val knownThreatLookup: KnownThreatHostLookup?
@@ -78,14 +84,22 @@ class UrlThreatScanner {
 
         // 1. Known threat intelligence host check (highest confidence)
         if (knownThreatLookup != null) {
-            var suffix: String? = host
-            while (suffix != null) {
-                if (knownThreatLookup.isKnownThreatHost(suffix)) {
-                    findings.add("Known malicious host: $suffix (active malware/phishing blocklist match)")
+            val fullEval = knownThreatLookup.evaluateFullHost(host)
+            if (fullEval != null) {
+                if (fullEval) {
+                    findings.add("Known malicious host: $host (active malware/phishing blocklist match)")
                     score += 85
-                    break
                 }
-                suffix = if (suffix.contains('.')) suffix.substringAfter('.') else null
+            } else {
+                var suffix: String? = host
+                while (suffix != null) {
+                    if (knownThreatLookup.isKnownThreatHost(suffix)) {
+                        findings.add("Known malicious host: $suffix (active malware/phishing blocklist match)")
+                        score += 85
+                        break
+                    }
+                    suffix = if (suffix.contains('.')) suffix.substringAfter('.') else null
+                }
             }
         }
 
@@ -121,13 +135,13 @@ class UrlThreatScanner {
         val registrableDomain = registrableSuffixOf(host)
         for (brand in BRAND_NAMES) {
             if (registrableDomain == brand) break
-            val base = registrableDomain.substringBeforeLast('.')
+            val base = registrableDomain.substringBefore('.')
             if (base != brand && damerauLevenshteinDistance(base, brand) <= 2 && base.length >= brand.length - 1) {
                 findings.add("Possible typosquat of '$brand': '$registrableDomain'")
                 score += 40
                 break
             }
-            if (base != brand && base.contains(brand) && base != "$brand" && registrableDomain !in BRAND_CANONICAL_DOMAINS) {
+            if (base != brand && base.contains(brand) && registrableDomain !in BRAND_CANONICAL_DOMAINS) {
                 val tld = registrableDomain.substringAfterLast('.')
                 if (tld in HIGH_RISK_TLDS || tld !in COMMON_LEGIT_TLDS) {
                     findings.add("Brand name '$brand' embedded in unrelated domain '$registrableDomain'")
@@ -162,7 +176,7 @@ class UrlThreatScanner {
             findings.add("Credential-style page served without HTTPS encryption")
             score += 20
         }
-        if (host.count { it == '-' } >= 3 && host.contains("secure") || host.contains("-login") || host.contains("login-")) {
+        if ((host.count { it == '-' } >= 3 && host.contains("secure")) || host.contains("-login") || host.contains("login-")) {
             findings.add("Hyphenated spoof-pattern hostname (secure-login style)")
             score += 10
         }
@@ -264,6 +278,7 @@ class UrlThreatScanner {
         private val COMMON_LEGIT_TLDS = setOf(
             "com", "org", "net", "edu", "gov", "mil", "int", "io", "co", "app", "dev",
             "ph", "us", "uk", "ca", "de", "fr", "jp", "au", "in", "br", "id", "sg", "my",
+            "kr", "mx", "za",
             "tv", "me", "ai", "info", "biz", "name", "pro", "shop", "site", "online", "store"
         )
 

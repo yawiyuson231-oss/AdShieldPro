@@ -122,10 +122,12 @@ export class DnsCache {
       try {
         const value = await factory();
         if (store) {
-          // Key format is `${TYPE}|${name}` — see DnsCache.key().
-          const [type, name] = key.split('|');
-          const meta = store(value) || {};
-          this.set(name, type, value, meta);
+          const meta = store(value);
+          if (meta) {
+            // Key format is `${TYPE}|${name}` — see DnsCache.key().
+            const [type, name] = key.split('|');
+            this.set(name, type, value, meta);
+          }
         }
         return value;
       } finally {

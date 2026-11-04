@@ -160,7 +160,7 @@ smoke test checklist.
 - [Source code](https://github.com/yawiyuson231-oss/AdShieldPro)
 - [Latest releases and APK downloads](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 - [Privacy policy](https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md)
-- [Report a problem](https://github.com/yawiyuson231-oss/AdShieldPro/issues)
+- [Pull requests and contributions](https://github.com/yawiyuson231-oss/AdShieldPro/pulls)
 
 AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Architecture + MVVM, Room SQLite, DataStore, WorkManager, Hilt, and Android `VpnService`**. DNS filtering can reduce requests to known ad, tracking, and malicious domains, but it cannot guarantee protection from every threat.
 
@@ -218,36 +218,31 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
 ## 3. Project Structure
 
 ```text
-PROJECT/
-├── app/
+AdShieldPro/
+├── app/                                  # Android application (Kotlin, Compose, Hilt, Room, VpnService)
 │   ├── build.gradle.kts
 │   ├── proguard-rules.pro
 │   └── src/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
-│       │   ├── assets/default_blocklist.txt
+│       │   ├── assets/                   # Bundled offline filter lists (default, core_lite, core_pro)
 │       │   └── java/com/adshield/pro/
 │       │       ├── AdShieldApplication.kt
 │       │       ├── MainActivity.kt
-│       │       ├── data/
-│       │       │   ├── local/db/ (Entities.kt, AdShieldDao.kt, AdShieldDatabase.kt)
-│       │       │   ├── local/preferences/UserPreferencesRepository.kt
-│       │       │   └── repository/AdShieldRepository.kt
+│       │       ├── data/                 # DataStoreSettingsManager, Room DB/DAO, AdShieldRepository, BatteryRepository
 │       │       ├── di/AppModule.kt
-│       │       ├── domain/model/ (ProtectionModels.kt, RuleAndVpnModels.kt, StatsAndBillingModels.kt)
-│       │       ├── engine/
-│       │       │   ├── browser/BrowserContentBlocker.kt
-│       │       │   ├── dns/ (DnsPacketCodec.kt, IpPacketFraming.kt, UpstreamDnsResolver.kt)
-│       │       │   └── filter/FilterRuleEngine.kt
-│       │       ├── service/ (AdShieldVpnService.kt, BootCompletedReceiver.kt)
-│       │       ├── ui/
-│       │       │   ├── screens/ (HomeScreen, ActivityScreen, FiltersScreen, RulesScreen, BrowserScreen, SettingsScreen)
-│       │       │   ├── theme/Theme.kt
-│       │       │   └── viewmodel/AdShieldViewModel.kt
-│       │       └── worker/FilterUpdateWorker.kt
-│       └── test/java/com/adshield/pro/AdShieldEngineTestSuite.kt
-└── docs/
-    ├── BUILD_AND_SIGNING_GUIDE.md
-    ├── GOOGLE_PLAY_RELEASE_CHECKLIST.md
-    └── PRIVACY_POLICY.md
+│       │       ├── domain/model/         # ProtectionModels, AetherModels, BatteryModels, CapabilityRegistry, LiveNetworkModel, SecurityModels
+│       │       ├── engine/               # DnsPacketCodec, IpPacketFraming, UpstreamDnsResolver, FilterRuleEngine, BrowserContentBlocker, aether/, battery/, security/
+│       │       ├── service/              # AdShieldVpnService, BootCompletedReceiver
+│       │       ├── ui/                   # Compose screens, components, DashboardPresentation, Theme, AdShieldViewModel
+│       │       ├── update/               # GitHubUpdate, UpdateCheckWorker
+│       │       └── worker/               # FilterUpdateWorker, SmartOptimizationWorker
+│       └── test/java/com/adshield/pro/   # 6 JVM JUnit4 test suites
+├── index.html, app.js, engine.js, sw.js  # Browser web platform (OmniShield X)
+├── aether/, dns/, security/, ui/         # Web threat intelligence, DoH/DNSSEC, Firewall AI, safe DOM helpers
+├── extension/src/                        # Chrome MV3 declarativeNetRequest extension sources
+├── scripts/                              # Linter, static verifier, site stager, extension ZIP builder
+├── tests/                                # Node unit and jsdom integration test suites
+├── tools/                                # Capability matrix, UI perf & universal APK verification scripts
+└── docs/                                 # Marketing site (docs/index.html) and technical documentation
 ```
