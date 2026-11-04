@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
+import com.adshield.pro.data.local.preferences.ScanJournalStore
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.BuildConfig
@@ -46,6 +47,7 @@ import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.SearchProvider
 import com.adshield.pro.engine.platform.DeviceProfiler
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -53,6 +55,13 @@ import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.ScanKind
+import com.adshield.pro.engine.security.QuarantineManager
+import com.adshield.pro.engine.security.QuarantineNaming
+import com.adshield.pro.engine.security.QuarantinedItem
+import com.adshield.pro.engine.security.ScanJournal
+import com.adshield.pro.engine.security.ScanJournalSummary
+import com.adshield.pro.engine.security.ScanProgress
+import com.adshield.pro.engine.security.ScanSource
 import com.adshield.pro.engine.security.SecurityEngine
 import com.adshield.pro.engine.security.SecurityLevel
 import com.adshield.pro.engine.security.SecurityPosture
@@ -62,6 +71,7 @@ import com.adshield.pro.service.AdShieldVpnService
 import com.adshield.pro.ui.UpdatePromptActivity
 import com.adshield.pro.update.GitHubReleaseClient
 import com.adshield.pro.worker.FilterUpdateWorker
+import com.adshield.pro.worker.ScheduledScanWorker
 import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -74,6 +84,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -97,6 +108,8 @@ class AdShieldViewModel @Inject constructor(
     val browserContentBlocker: BrowserContentBlocker,
     private val optimizerEngine: SystemOptimizerEngine,
     private val securityEngine: SecurityEngine,
+    private val scanJournalStore: ScanJournalStore,
+    private val quarantineManager: QuarantineManager,
     private val batteryRepository: BatteryIntelligenceRepository,
     private val deviceProfiler: DeviceProfiler
 ) : ViewModel() {
@@ -212,6 +225,16 @@ class AdShieldViewModel @Inject constructor(
                 _malwareBlocks.value = count
                 refreshSecurityPosture()
             }
+        }
+        // Restore the scheduled-scan job after process death / app upgrade. WorkManager keeps the
+        // enqueue itself persistent; this reconciles it with the current user preference.
+        viewModelScope.launch {
+            val settings = preferencesRepository.getSettingsSnapshot()
+            ScheduledScanWorker.scheduleOrCancel(
+                appContext,
+                settings.scheduledScanEnabled,
+                settings.scheduledScanIntervalHours
+            )
         }
         // Initial Junk quick scan & periodic lightweight telemetry refresh while UI is open
         viewModelScope.launch {
@@ -695,6 +718,13 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    /** Private search provider used by the in-app browser's address bar. */
+    fun setSearchProvider(provider: SearchProvider) {
+        viewModelScope.launch {
+            preferencesRepository.setSearchProvider(provider)
+        }
+    }
+
     // --- Browser Controls ---
 
     fun toggleBrowserSiteException(host: String, allowlisted: Boolean) {
@@ -798,8 +828,22 @@ class AdShieldViewModel @Inject constructor(
     private val _isScanningSecurity = MutableStateFlow(false)
     val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
 
-    private val _securityHistory = MutableStateFlow<List<SecurityScanRecord>>(emptyList())
-    val securityHistory: StateFlow<List<SecurityScanRecord>> = _securityHistory.asStateFlow()
+    /** Persisted scan journal — survives process death and restarts. */
+    val securityHistory: StateFlow<List<SecurityScanRecord>> = scanJournalStore.historyFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val scanSummary: StateFlow<ScanJournalSummary> = securityHistory
+        .map { ScanJournal.summarize(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ScanJournalSummary())
+
+    val quarantineItems: StateFlow<List<QuarantinedItem>> = scanJournalStore.quarantineFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _scanProgress = MutableStateFlow<ScanProgress?>(null)
+    val scanProgress: StateFlow<ScanProgress?> = _scanProgress.asStateFlow()
+
+    private var lastScannedUri: Uri? = null
+    private var lastScannedName: String? = null
 
     fun scanUrl(rawUrl: String) {
         val trimmed = rawUrl.trim()
@@ -826,7 +870,7 @@ class AdShieldViewModel @Inject constructor(
                 recommendation = verdict.recommendation,
                 timestampEpochMs = System.currentTimeMillis()
             )
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            scanJournalStore.record(record)
             _isScanningSecurity.value = false
         }
     }
@@ -834,9 +878,16 @@ class AdShieldViewModel @Inject constructor(
     fun scanFile(file: File) {
         viewModelScope.launch {
             _isScanningSecurity.value = true
-            val record = securityEngine.scanFile(file)
+            _scanProgress.value = ScanProgress(label = file.name, completed = 0, total = 1)
+            val startedAt = System.currentTimeMillis()
+            val scanned = securityEngine.scanFile(file)
+            val record = scanJournalStore.record(
+                scanned.copy(durationMs = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L))
+            )
             _fileScanResult.value = record
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            lastScannedUri = Uri.fromFile(file)
+            lastScannedName = file.name
+            _scanProgress.value = ScanProgress(label = file.name, completed = 1, total = 1)
             refreshSecurityPosture()
             _isScanningSecurity.value = false
             showFeedback(scanFeedback(record, record.target))
@@ -846,15 +897,119 @@ class AdShieldViewModel @Inject constructor(
     fun scanUri(uri: Uri, displayName: String) {
         viewModelScope.launch {
             _isScanningSecurity.value = true
-            val record = securityEngine.scanUriContent(uri, displayName)
-            if (record != null) {
+            _scanProgress.value = ScanProgress(label = displayName, completed = 0, total = 1)
+            val startedAt = System.currentTimeMillis()
+            val scanned = securityEngine.scanUriContent(uri, displayName)
+            if (scanned != null) {
+                val record = scanJournalStore.record(
+                    scanned.copy(durationMs = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L))
+                )
                 _fileScanResult.value = record
-                _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+                lastScannedUri = uri
+                lastScannedName = displayName
+                _scanProgress.value = ScanProgress(label = displayName, completed = 1, total = 1)
                 showFeedback(scanFeedback(record, displayName))
             } else {
-                showFeedback("Could not read the selected file for scanning.")
+                showFeedback("Could not read the selected file for scanning. No result was recorded.")
             }
             _isScanningSecurity.value = false
+        }
+    }
+
+    // --- Quarantine (explicit user actions only; never automatic deletion) ---
+
+    /**
+     * Isolates the most recently scanned file. [removeOriginal] is opt-in, and the feedback states
+     * plainly when Android refused to delete the original.
+     */
+    fun quarantineLastScannedFile(removeOriginal: Boolean) {
+        val uri = lastScannedUri
+        val record = _fileScanResult.value
+        if (uri == null || record == null) {
+            showFeedback("Scan a file first, then quarantine it.")
+            return
+        }
+        viewModelScope.launch {
+            val item = quarantineManager.isolate(uri, lastScannedName ?: record.target, record)
+            if (item == null) {
+                showFeedback("Could not read the file to quarantine it. Nothing was changed.")
+                return@launch
+            }
+            val removed = if (removeOriginal) quarantineManager.tryRemoveOriginal(uri) else false
+            val stored = item.copy(originalRemoved = removed)
+            scanJournalStore.addQuarantined(stored)
+            showFeedback(
+                when {
+                    removed -> "Quarantined ${stored.displayName}; the original was deleted."
+                    removeOriginal -> "Quarantined ${stored.displayName}. Android did not allow deleting the original — remove it manually."
+                    else -> "Quarantined ${stored.displayName}. The original is still in place."
+                }
+            )
+        }
+    }
+
+    /** Restores a quarantined file to a user-chosen destination, verifying its hash. */
+    fun restoreQuarantined(item: QuarantinedItem, destination: Uri) {
+        viewModelScope.launch {
+            val ok = quarantineManager.exportTo(item, destination)
+            if (ok) {
+                showFeedback("Restored ${item.displayName} (SHA-256 verified).")
+            } else {
+                showFeedback("Restore failed: the quarantined copy is missing or failed hash verification.")
+            }
+        }
+    }
+
+    fun deleteQuarantined(item: QuarantinedItem) {
+        viewModelScope.launch {
+            val deleted = quarantineManager.delete(item)
+            if (deleted) {
+                scanJournalStore.removeQuarantined(item.id)
+                showFeedback("Permanently deleted the quarantined copy of ${item.displayName}.")
+            } else {
+                showFeedback("Could not delete the quarantined copy.")
+            }
+        }
+    }
+
+    fun verifyQuarantined(item: QuarantinedItem) {
+        viewModelScope.launch {
+            val intact = quarantineManager.verifyIntegrity(item)
+            showFeedback(
+                if (intact) "${item.displayName}: SHA-256 matches the recorded digest."
+                else "${item.displayName}: integrity check FAILED. Do not restore this file."
+            )
+        }
+    }
+
+    fun quarantineDiskUsageBytes(): Long = quarantineManager.diskUsageBytes()
+
+    // --- Scan history management & reports ---
+
+    fun clearScanHistory() {
+        viewModelScope.launch {
+            scanJournalStore.clearHistory()
+            showFeedback("Scan history cleared. Quarantined files were kept.")
+        }
+    }
+
+    /** Builds the exportable report from real records only. */
+    suspend fun buildScanReport(): String = withContext(Dispatchers.Default) {
+        ScanJournal.buildTextReport(
+            history = scanJournalStore.historySnapshot(),
+            appVersion = com.adshield.pro.BuildConfig.VERSION_NAME,
+            generatedAtEpochMs = System.currentTimeMillis()
+        )
+    }
+
+    fun setScheduledScan(enabled: Boolean, intervalHours: Int) {
+        viewModelScope.launch {
+            preferencesRepository.setScheduledScan(enabled, intervalHours)
+            ScheduledScanWorker.scheduleOrCancel(appContext, enabled, intervalHours)
+            showFeedback(
+                if (enabled) "Scheduled scan enabled every ${intervalHours.coerceIn(12, 168)} hours."
+                else "Scheduled scan disabled."
+            )
         }
     }
 
@@ -862,11 +1017,43 @@ class AdShieldViewModel @Inject constructor(
         if (_isAuditingApps.value) return
         viewModelScope.launch {
             _isAuditingApps.value = true
-            val audits = securityEngine.auditInstalledApps()
+            _scanProgress.value = ScanProgress(label = "Installed applications", completed = 0, total = 0)
+            val startedAt = System.currentTimeMillis()
+            val audits = securityEngine.auditInstalledApps { completed, total, target ->
+                _scanProgress.value = ScanProgress(label = target, completed = completed, total = total)
+            }
             _appAudits.value = audits
             val flagged = audits.count { it.riskLevel == AppRiskAuditor.RiskLevel.HIGH }
+            scanJournalStore.record(
+                SecurityScanRecord(
+                    id = 0L,
+                    kind = ScanKind.APP_AUDIT,
+                    target = "Device app audit — ${audits.size} installed app(s) examined",
+                    threatLevel = when {
+                        flagged > 0 -> SecurityLevel.DANGEROUS
+                        audits.any { it.riskLevel == AppRiskAuditor.RiskLevel.MEDIUM } -> SecurityLevel.SUSPICIOUS
+                        else -> SecurityLevel.CLEAN
+                    },
+                    riskScore = audits.maxOfOrNull { it.riskScore } ?: 0,
+                    threatName = audits.firstOrNull { it.riskLevel == AppRiskAuditor.RiskLevel.HIGH }?.profile?.appName,
+                    findings = buildList {
+                        add("${audits.size} installed application(s) audited.")
+                        add("$flagged high-risk app(s) detected.")
+                        add("Other apps' private files were not examined: Android does not grant access.")
+                    },
+                    recommendation = if (flagged > 0) {
+                        "Review the flagged apps in the Apps tab."
+                    } else {
+                        "No high-risk permission stacks matched. This is not a guarantee of a malware-free device."
+                    },
+                    timestampEpochMs = System.currentTimeMillis(),
+                    scanSource = ScanSource.MANUAL,
+                    durationMs = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L)
+                )
+            )
             refreshSecurityPosture(highRisk = flagged)
             _isAuditingApps.value = false
+            _scanProgress.value = null
             showFeedback(
                 if (flagged > 0) "Full app audit complete: $flagged high-risk app(s) found — review them in Security."
                 else "Full app audit complete: no high-risk apps detected."

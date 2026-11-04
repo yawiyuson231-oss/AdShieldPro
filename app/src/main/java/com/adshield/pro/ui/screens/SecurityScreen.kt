@@ -30,16 +30,19 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,13 +64,19 @@ import androidx.compose.ui.unit.sp
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.engine.security.AppRiskAuditor
+import com.adshield.pro.engine.security.QuarantinedItem
+import com.adshield.pro.engine.security.ScanJournalSummary
 import com.adshield.pro.engine.security.ScanKind
+import com.adshield.pro.engine.security.ScanProgress
 import com.adshield.pro.engine.security.SecurityLevel
 import com.adshield.pro.engine.security.SecurityPosture
 import com.adshield.pro.engine.security.SecurityScanRecord
 import com.adshield.pro.engine.security.UrlThreatScanner
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 
@@ -86,9 +96,22 @@ fun SecurityScreen(
     fileScanResult: SecurityScanRecord?,
     isScanning: Boolean,
     scanHistory: List<SecurityScanRecord>,
+    scanSummary: ScanJournalSummary,
+    scanProgress: ScanProgress?,
+    quarantineItems: List<QuarantinedItem>,
+    scheduledScanEnabled: Boolean,
+    scheduledScanIntervalHours: Int,
     onScanUrl: (String) -> Unit,
     onScanUri: (android.net.Uri, String) -> Unit,
-    onAuditApps: () -> Unit
+    onAuditApps: () -> Unit,
+    onQuarantineLastScanned: (Boolean) -> Unit,
+    onRestoreQuarantined: (QuarantinedItem, android.net.Uri) -> Unit,
+    onDeleteQuarantined: (QuarantinedItem) -> Unit,
+    onVerifyQuarantined: (QuarantinedItem) -> Unit,
+    onClearScanHistory: () -> Unit,
+    onBuildScanReport: suspend () -> String,
+    onSetScheduledScan: (Boolean, Int) -> Unit,
+    onShowFeedback: (String) -> Unit
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -115,9 +138,22 @@ fun SecurityScreen(
         when (selectedSubTab) {
             0 -> ProtectionPostureTab(posture, vpnState, malwareBlocks, onAuditApps)
             1 -> AppAuditTab(appAudits, isAuditingApps, onAuditApps)
-            2 -> FileScanTab(fileScanResult, isScanning, onScanUri)
+            2 -> FileScanTab(fileScanResult, isScanning, scanProgress, onScanUri, onQuarantineLastScanned)
             3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl)
-            else -> HistoryTab(scanHistory)
+            else -> HistoryTab(
+                history = scanHistory,
+                summary = scanSummary,
+                quarantineItems = quarantineItems,
+                scheduledScanEnabled = scheduledScanEnabled,
+                scheduledScanIntervalHours = scheduledScanIntervalHours,
+                onRestoreQuarantined = onRestoreQuarantined,
+                onDeleteQuarantined = onDeleteQuarantined,
+                onVerifyQuarantined = onVerifyQuarantined,
+                onClearScanHistory = onClearScanHistory,
+                onBuildScanReport = onBuildScanReport,
+                onSetScheduledScan = onSetScheduledScan,
+                onShowFeedback = onShowFeedback
+            )
         }
     }
 }
@@ -401,7 +437,9 @@ private fun AppAuditCard(audit: AppRiskAuditor.AppRiskAudit) {
 private fun FileScanTab(
     result: SecurityScanRecord?,
     isScanning: Boolean,
-    onScanUri: (android.net.Uri, String) -> Unit
+    scanProgress: ScanProgress?,
+    onScanUri: (android.net.Uri, String) -> Unit,
+    onQuarantineLastScanned: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -449,7 +487,24 @@ private fun FileScanTab(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     if (isScanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (scanProgress != null && !scanProgress.isIndeterminate) {
+                                LinearProgressIndicator(
+                                    progress = { scanProgress.fraction },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = scanProgress?.let { "${it.percentLabel} · ${it.label}" } ?: "Scanning…",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     } else {
                         Button(onClick = { runCatching { picker.launch(arrayOf("*/*")) } }) {
                             Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -463,6 +518,33 @@ private fun FileScanTab(
 
         result?.let { record ->
             item { ScanResultCard(record) }
+            if (record.threatLevel != SecurityLevel.CLEAN) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Quarantine this file", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Moves a neutralised copy into app-private storage. The original is kept unless you " +
+                                    "explicitly choose to delete it, and Android may refuse that deletion.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = { onQuarantineLastScanned(false) }) {
+                                    Text("Quarantine copy")
+                                }
+                                Button(onClick = { onQuarantineLastScanned(true) }) {
+                                    Text("Quarantine & delete original")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -642,29 +724,198 @@ private fun ScanResultCard(record: SecurityScanRecord) {
 }
 
 @Composable
-private fun HistoryTab(history: List<SecurityScanRecord>) {
-    if (history.isEmpty()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(Icons.Default.AccessTime, contentDescription = null, tint = SkyBlueGlow, modifier = Modifier.size(48.dp))
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                "No scans yet this session. Scan a link, file, or run the app audit.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+private fun HistoryTab(
+    history: List<SecurityScanRecord>,
+    summary: ScanJournalSummary,
+    quarantineItems: List<QuarantinedItem>,
+    scheduledScanEnabled: Boolean,
+    scheduledScanIntervalHours: Int,
+    onRestoreQuarantined: (QuarantinedItem, android.net.Uri) -> Unit,
+    onDeleteQuarantined: (QuarantinedItem) -> Unit,
+    onVerifyQuarantined: (QuarantinedItem) -> Unit,
+    onClearScanHistory: () -> Unit,
+    onBuildScanReport: suspend () -> String,
+    onSetScheduledScan: (Boolean, Int) -> Unit,
+    onShowFeedback: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingReport by remember { mutableStateOf<String?>(null) }
+    var pendingRestore by remember { mutableStateOf<QuarantinedItem?>(null) }
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        val report = pendingReport
+        pendingReport = null
+        if (uri != null && report != null) {
+            scope.launch {
+                val written = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                            stream.write(report.toByteArray(Charsets.UTF_8))
+                        } != null
+                    }.getOrDefault(false)
+                }
+                onShowFeedback(
+                    if (written) "Scan report exported." else "Could not write the report to that location."
+                )
+            }
         }
-        return
     }
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        val item = pendingRestore
+        pendingRestore = null
+        if (uri != null && item != null) onRestoreQuarantined(item, uri)
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item(key = "journal-summary", contentType = "summary") {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Scan journal", style = MaterialTheme.typography.titleMedium)
+                    if (summary.total == 0) {
+                        Text(
+                            "No scan has been performed yet. Nothing here is a statement that the device is clean.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            "${summary.total} record(s) kept · ${summary.clean} clean · " +
+                                "${summary.suspicious} suspicious · ${summary.dangerous} dangerous",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "Files/APKs ${summary.fileScans} · Links ${summary.urlScans} · App audits ${summary.appAudits}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        summary.lastScanEpochMs?.let { last ->
+                            Text(
+                                "Last scan: " + DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                                    .format(Date(last)),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            scope.launch {
+                                pendingReport = onBuildScanReport()
+                                runCatching { exportLauncher.launch("adshield-scan-report.txt") }
+                                    .onFailure { onShowFeedback("Could not open the file picker.") }
+                            }
+                        }) { Text("Export report") }
+                        OutlinedButton(
+                            onClick = { showClearConfirm = true },
+                            enabled = summary.total > 0
+                        ) { Text("Clear history") }
+                    }
+                }
+            }
+        }
+
+        item(key = "scheduled-scan", contentType = "summary") {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Scheduled scan", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Audits installed apps and re-verifies quarantine hashes. Shared storage is not " +
+                                    "scanned unless you grant access to it.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = scheduledScanEnabled,
+                            onCheckedChange = { onSetScheduledScan(it, scheduledScanIntervalHours) }
+                        )
+                    }
+                    if (scheduledScanEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(12, 24, 168).forEach { hours ->
+                                FilterChip(
+                                    selected = scheduledScanIntervalHours == hours,
+                                    onClick = { onSetScheduledScan(true, hours) },
+                                    label = { Text(if (hours == 168) "Weekly" else "${hours}h", maxLines = 1) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item(key = "quarantine-header", contentType = "summary") {
+            Text(
+                "Quarantine (${quarantineItems.size})",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        if (quarantineItems.isEmpty()) {
+            item(key = "quarantine-empty", contentType = "summary") {
+                Text(
+                    "Nothing quarantined. Flagged files can be isolated from the Files tab after a scan.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        items(quarantineItems, key = { it.id }, contentType = { "quarantine-item" }) { item ->
+            QuarantineCard(
+                item = item,
+                onVerify = { onVerifyQuarantined(item) },
+                onRestore = {
+                    pendingRestore = item
+                    runCatching { restoreLauncher.launch(item.displayName) }
+                        .onFailure { onShowFeedback("Could not open the file picker.") }
+                },
+                onDelete = { onDeleteQuarantined(item) }
+            )
+        }
+
+        item(key = "history-header", contentType = "summary") {
+            Text(
+                "History",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+
+        if (history.isEmpty()) {
+            item(key = "history-empty", contentType = "summary") {
+                Text(
+                    "No scans recorded yet. Scan a link or file, or run the app audit.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
         items(history, key = { it.id }, contentType = { "scan-record" }) { record ->
             val tint = when (record.threatLevel) {
                 SecurityLevel.DANGEROUS -> com.adshield.pro.ui.theme.AlertRed
@@ -693,7 +944,9 @@ private fun HistoryTab(history: List<SecurityScanRecord>) {
                         )
                         Text(
                             DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                                .format(Date(record.timestampEpochMs)) + " • Risk ${record.riskScore}",
+                                .format(Date(record.timestampEpochMs)) +
+                                " • Risk ${record.riskScore} • ${record.scanSource.label}" +
+                                if (record.durationMs > 0) " • ${record.durationMs} ms" else "",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -707,5 +960,83 @@ private fun HistoryTab(history: List<SecurityScanRecord>) {
                 }
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear scan history?") },
+            text = { Text("This removes the recorded scan results. Quarantined files are kept.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearConfirm = false
+                    onClearScanHistory()
+                }) { Text("Clear history") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun QuarantineCard(
+    item: QuarantinedItem,
+    onVerify: () -> Unit,
+    onRestore: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                item.displayName,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "${item.threatLevel.name} · ${item.sizeBytes} bytes · " +
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                        .format(Date(item.quarantinedAtEpochMs)),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                if (item.originalRemoved) "Original deleted." else "Original still in its original location.",
+                style = MaterialTheme.typography.labelMedium,
+                color = if (item.originalRemoved) ElectricBlue else com.adshield.pro.ui.theme.WarningAmber
+            )
+            Text(
+                "SHA-256 ${item.sha256.take(16)}…",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TextButton(onClick = onVerify) { Text("Verify") }
+                TextButton(onClick = onRestore) { Text("Restore") }
+                TextButton(onClick = { confirmDelete = true }) { Text("Delete") }
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete quarantined copy?") },
+            text = { Text("This permanently removes the isolated copy of ${item.displayName}. This cannot be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Delete permanently") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } }
+        )
     }
 }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -131,7 +132,9 @@ class SecurityEngine @Inject constructor(
 
     // --- Installed app protection ---------------------------------------------
 
-    suspend fun auditInstalledApps(): List<AppRiskAuditor.AppRiskAudit> = withContext(Dispatchers.IO) {
+    suspend fun auditInstalledApps(
+        onProgress: (completed: Int, total: Int, currentTarget: String) -> Unit = { _, _, _ -> }
+    ): List<AppRiskAuditor.AppRiskAudit> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val apps = runCatching { pm.getInstalledApplications(PackageManager.GET_PERMISSIONS) }
             .getOrDefault(emptyList())
@@ -166,8 +169,11 @@ class SecurityEngine @Inject constructor(
                     pm.getPackageInfo(appInfo.packageName, 0).firstInstallTime
                 }.getOrDefault(0L)
             )
-        }.map { appAuditor.audit(it) }
-            .sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }.thenBy { it.profile.appName.lowercase() })
+        }.mapIndexed { index, profile ->
+            val audit = appAuditor.audit(profile)
+            onProgress(index + 1, apps.size, profile.appName)
+            audit
+        }.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }.thenBy { it.profile.appName.lowercase() })
     }
 
     // --- Security posture summary ----------------------------------------------
@@ -199,10 +205,13 @@ class SecurityEngine @Inject constructor(
     }
 }
 
+@Serializable
 enum class SecurityLevel { CLEAN, SUSPICIOUS, DANGEROUS }
 
+@Serializable
 enum class ScanKind { FILE, URL, APK, APP_AUDIT }
 
+@Serializable
 data class SecurityScanRecord(
     val id: Long,
     val kind: ScanKind,
@@ -212,7 +221,9 @@ data class SecurityScanRecord(
     val threatName: String?,
     val findings: List<String>,
     val recommendation: String,
-    val timestampEpochMs: Long
+    val timestampEpochMs: Long,
+    val scanSource: ScanSource = ScanSource.MANUAL,
+    val durationMs: Long = 0L
 )
 
 data class SecurityPosture(

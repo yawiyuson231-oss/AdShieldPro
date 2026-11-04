@@ -37,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -63,6 +64,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.PrivateSearch
+import com.adshield.pro.engine.browser.SearchProvider
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
@@ -76,11 +79,12 @@ fun BrowserScreen(
     onToggleSiteException: (String, Boolean) -> Unit,
     onUpdateBrowserPrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onAddCustomCosmeticSelector: (String) -> Unit,
+    onChangeSearchProvider: (SearchProvider) -> Unit,
     onShowFeedback: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var urlInput by remember { mutableStateOf("https://example.com") }
-    var currentPageUrl by remember { mutableStateOf("https://example.com") }
+    var urlInput by remember { mutableStateOf(settings.searchProvider.homeUrl) }
+    var currentPageUrl by remember { mutableStateOf(settings.searchProvider.homeUrl) }
     var pageLoadProgress by remember { mutableIntStateOf(100) }
     var blockedSubresources by remember { mutableLongStateOf(browserContentBlocker.getBlockedSubresourceCount()) }
     var blockedPopups by remember { mutableLongStateOf(browserContentBlocker.getBlockedPopupCount()) }
@@ -140,10 +144,17 @@ fun BrowserScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                         },
+                        placeholder = {
+                            Text(
+                                text = "Search ${settings.searchProvider.label} or enter address",
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1
+                            )
+                        },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(
                             onGo = {
-                                val normalizedUrl = normalizeNavigationInput(urlInput)
+                                val normalizedUrl = PrivateSearch.resolveInput(urlInput, settings.searchProvider)
                                 val sanitizedUrl = browserContentBlocker.sanitizeTrackingParameters(normalizedUrl)
                                 urlInput = sanitizedUrl
                                 webViewRef.value?.loadUrl(sanitizedUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
@@ -389,6 +400,28 @@ fun BrowserScreen(
                         }
                     }
 
+                    Text(
+                        text = "Private Search Provider",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SearchProvider.entries.forEach { provider ->
+                            FilterChip(
+                                selected = settings.searchProvider == provider,
+                                onClick = {
+                                    onChangeSearchProvider(provider)
+                                    onShowFeedback("Search provider set to ${provider.label}.")
+                                },
+                                label = { Text(provider.label, maxLines = 1) }
+                            )
+                        }
+                    }
+                    Text(
+                        text = settings.searchProvider.privacyNote,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
                     BrowserSwitchRow(
                         title = "Cosmetic Element Hiding",
                         subtitle = "Collapses ad placeholders & sponsored DOM containers",
@@ -521,16 +554,3 @@ private fun BrowserSwitchRow(
     }
 }
 
-private fun normalizeNavigationInput(raw: String): String {
-    val trimmed = raw.trim()
-    if (trimmed.startsWith("http://", ignoreCase = true) ||
-        trimmed.startsWith("https://", ignoreCase = true)
-    ) {
-        return trimmed
-    }
-    return if (trimmed.contains('.') && !trimmed.contains(' ')) {
-        "https://$trimmed"
-    } else {
-        "https://duckduckgo.com/?q=${Uri.encode(trimmed)}"
-    }
-}

@@ -18,6 +18,7 @@ import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.GameSessionRecord
 import com.adshield.pro.domain.model.GamingProfile
 import com.adshield.pro.domain.model.ProtectionMode
+import com.adshield.pro.engine.browser.SearchProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -61,7 +62,11 @@ data class AppSettingsState(
     val gameBoosterTempWarningCelsius: Int = 41,
     val gameSessionRecords: List<GameSessionRecord> = emptyList(),
     val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC,
-    val lastSmartBoostEpochMs: Long = 0L
+    val lastSmartBoostEpochMs: Long = 0L,
+    // --- Private search & scheduled scanning ---
+    val searchProvider: SearchProvider = SearchProvider.DUCKDUCKGO,
+    val scheduledScanEnabled: Boolean = false,
+    val scheduledScanIntervalHours: Int = 24
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -117,6 +122,11 @@ class UserPreferencesRepository @Inject constructor(
         val GAME_SESSIONS_JSON = stringPreferencesKey("game_sessions_json")
         val BATTERY_MODE = stringPreferencesKey("battery_mode")
         val LAST_SMART_BOOST_MS = longPreferencesKey("last_smart_boost_epoch_ms")
+
+        // Private search & scheduled scanning
+        val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
+        val SCHEDULED_SCAN_ENABLED = booleanPreferencesKey("scheduled_scan_enabled")
+        val SCHEDULED_SCAN_HOURS = intPreferencesKey("scheduled_scan_interval_hours")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -189,8 +199,22 @@ class UserPreferencesRepository @Inject constructor(
             gameBoosterTempWarningCelsius = prefs[Keys.GAME_TEMP_WARNING_C] ?: 41,
             gameSessionRecords = gameSessions,
             batteryMode = batteryMode,
-            lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L
+            lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L,
+            searchProvider = SearchProvider.fromName(prefs[Keys.SEARCH_PROVIDER]),
+            scheduledScanEnabled = prefs[Keys.SCHEDULED_SCAN_ENABLED] ?: false,
+            scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168)
         )
+    }
+
+    suspend fun setSearchProvider(provider: SearchProvider) {
+        context.adShieldDataStore.edit { it[Keys.SEARCH_PROVIDER] = provider.name }
+    }
+
+    suspend fun setScheduledScan(enabled: Boolean, intervalHours: Int) {
+        context.adShieldDataStore.edit {
+            it[Keys.SCHEDULED_SCAN_ENABLED] = enabled
+            it[Keys.SCHEDULED_SCAN_HOURS] = intervalHours.coerceIn(12, 168)
+        }
     }
 
     suspend fun getSettingsSnapshot(): AppSettingsState = settingsFlow.first()

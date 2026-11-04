@@ -82,6 +82,8 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `BrowserContentBlocker` | Tracking-parameter stripping, request blocking, site allowlists, cosmetic script generation, DNS-label-boundary third-party detection |
 | `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
+| `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
+| `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
@@ -99,7 +101,14 @@ Those cannot be exercised by JVM unit tests.
 6. Reboot the device with protection enabled to verify the boot receiver restores the tunnel.
 7. If the release build is used, confirm R8 did not strip Room/serialization metadata by
    opening **Statistics** and **Optimizer** (both read from Room/DataStore).
-8. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
+8. Run a file scan, quarantine the file, verify it, restore it to a new location and confirm the
+   SHA-256 matches; then delete the quarantined copy. Try "Quarantine & delete original" on a file
+   this app does not own and confirm the app reports that Android refused the deletion.
+9. Enable scheduled scanning, force the job (or wait for the period) and confirm a record appears
+   in Security → History with source "Scheduled".
+10. Switch the private search provider in Ad Blocker → Browser → shield controls, search from the
+    address bar, and confirm the chosen provider is used after an app restart.
+11. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
    the scroll-to-top button appears after scrolling, and the shield stops animating when the
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
