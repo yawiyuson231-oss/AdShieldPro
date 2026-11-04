@@ -65,12 +65,15 @@ public enum IOSBatteryAdapter {
             readingAt: now
         )
         #else
+        // Built for a platform without UIKit (CI compiles this package on macOS so the
+        // rules can be tested without a device). Same claims as the iOS branch: level
+        // unknown, nothing measured.
         return BatteryMath.snapshot(
             platform: "ios",
             percent: nil,
             isCharging: false,
             chargingLabel: "UIKit unavailable",
-            healthLabel: "Not exposed",
+            healthLabel: "Not exposed by iOS",
             readingAt: now
         )
         #endif
