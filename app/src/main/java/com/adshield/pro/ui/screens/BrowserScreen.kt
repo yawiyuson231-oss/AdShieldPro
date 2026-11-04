@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -184,6 +185,11 @@ fun BrowserScreen(
                                 tint = if (currentPageUrl.startsWith("https://")) EmeraldPrimary else WarningAmber,
                                 modifier = Modifier.size(16.dp)
                             )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { navigate(urlInput) }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search or navigate")
+                            }
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(

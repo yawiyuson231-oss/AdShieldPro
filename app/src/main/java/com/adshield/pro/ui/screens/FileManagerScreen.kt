@@ -68,6 +68,7 @@ import com.adshield.pro.ui.theme.ElectricBlue
 @Composable
 fun FileManagerScreen(
     listing: ManagedFileListing?,
+    canGoBack: Boolean,
     busy: Boolean,
     message: String?,
     error: String?,
@@ -122,7 +123,7 @@ fun FileManagerScreen(
         }
 
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onBack() }, enabled = listing.documentId != listing.documentId.substringBeforeLast('/')) {
+            IconButton(onClick = { onBack() }, enabled = canGoBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Parent folder")
             }
             Column(Modifier.weight(1f)) {
@@ -270,6 +271,7 @@ private fun ScanPanel(progress: FileScanProgress, onScan: () -> Unit) {
                     else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Text("${progress.current}/${progress.total} • ${progress.scanned} scanned • ${progress.skipped} skipped • ${progress.errors} errors")
                     progress.currentName?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) }
+                    if (progress.limitReached) Text("Scan bound reached: this tree was not fully scanned.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

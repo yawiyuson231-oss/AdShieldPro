@@ -28,7 +28,7 @@ class DirectMediaInspector @Inject constructor() {
                 initial, response.request.url, response.header("Content-Type"),
                 response.header("Content-Length")?.toLongOrNull(), response.header("Content-Disposition")
             )
-            if (response.code !in setOf(400, 403, 405, 501)) {
+            if (response.code !in setOf(400, 405, 501)) {
                 error("Media inspection failed with HTTP ${response.code}")
             }
         }

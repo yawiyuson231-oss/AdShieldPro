@@ -112,7 +112,8 @@ data class FileScanProgress(
     val currentName: String? = null,
     val scanned: Int = 0,
     val skipped: Int = 0,
-    val errors: Int = 0
+    val errors: Int = 0,
+    val limitReached: Boolean = false
 )
 
 data class DuplicateFileGroup(

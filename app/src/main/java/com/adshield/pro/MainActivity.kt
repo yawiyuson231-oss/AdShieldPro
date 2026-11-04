@@ -474,6 +474,7 @@ private fun CloudDestination(viewModel: CloudStorageViewModel = hiltViewModel())
 @Composable
 private fun FilesDestination(viewModel: FileManagerViewModel = hiltViewModel()) {
     val listing by viewModel.listing.collectAsStateWithLifecycle()
+    val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
@@ -482,6 +483,7 @@ private fun FilesDestination(viewModel: FileManagerViewModel = hiltViewModel()) 
     val duplicates by viewModel.duplicates.collectAsStateWithLifecycle()
     FileManagerScreen(
         listing = listing,
+        canGoBack = canGoBack,
         busy = busy,
         message = message,
         error = error,

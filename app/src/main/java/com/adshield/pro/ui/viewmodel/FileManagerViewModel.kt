@@ -27,6 +27,8 @@ class FileManagerViewModel @Inject constructor(
     private val stateStore = context.getSharedPreferences("infinity_file_manager", Context.MODE_PRIVATE)
     private val _listing = MutableStateFlow<ManagedFileListing?>(null)
     val listing = _listing.asStateFlow()
+    private val _canGoBack = MutableStateFlow(false)
+    val canGoBack = _canGoBack.asStateFlow()
     private val _busy = MutableStateFlow(false)
     val busy = _busy.asStateFlow()
     private val _message = MutableStateFlow<String?>(null)
@@ -49,6 +51,7 @@ class FileManagerViewModel @Inject constructor(
                         .onSuccess {
                             _listing.value = it
                             folderStack.add(it.documentId)
+                            _canGoBack.value = false
                         }
                 }
             }
@@ -64,6 +67,7 @@ class FileManagerViewModel @Inject constructor(
         }
         stateStore.edit().putString("tree_uri", tree.toString()).apply()
         folderStack.clear()
+        _canGoBack.value = false
         viewModelScope.launch {
             _busy.value = true
             runCatching { repository.list(tree) }
@@ -96,6 +100,7 @@ class FileManagerViewModel @Inject constructor(
             runCatching { repository.list(Uri.parse(current.treeUri), folder.documentId) }
                 .onSuccess {
                     folderStack.add(it.documentId)
+                    _canGoBack.value = true
                     _listing.value = it
                     _query.value = ""
                 }
@@ -107,6 +112,7 @@ class FileManagerViewModel @Inject constructor(
     fun goBack(): Boolean {
         if (folderStack.size <= 1) return false
         folderStack.removeAt(folderStack.lastIndex)
+        _canGoBack.value = folderStack.size > 1
         val current = _listing.value ?: return false
         val parentId = folderStack.last()
         viewModelScope.launch {
@@ -146,8 +152,10 @@ class FileManagerViewModel @Inject constructor(
                     _scanProgress.value = progress
                 }
             }.onSuccess { result ->
-                _scanProgress.value = _scanProgress.value.copy(running = false, scanned = result.records.size, skipped = result.skipped, errors = result.errors)
-                _message.value = "Security scan finished: ${result.records.size} scanned, ${result.skipped} skipped, ${result.errors} errors. Reports are saved in Security → History."
+                _scanProgress.value = _scanProgress.value.copy(running = false, scanned = result.records.size, skipped = result.skipped, errors = result.errors, limitReached = result.limitReached)
+                _message.value = "Security scan finished: ${result.records.size} scanned, ${result.skipped} individually skipped, ${result.errors} errors." +
+                    (if (result.limitReached) " The 250-file scan bound was reached; the tree was not fully scanned. " else " ") +
+                    "Reports are saved in Security → History."
             }.onFailure {
                 _scanProgress.value = _scanProgress.value.copy(running = false)
                 _error.value = it.message ?: "Folder scan failed"
@@ -164,7 +172,7 @@ class FileManagerViewModel @Inject constructor(
                 .onSuccess { groups ->
                     _duplicates.value = groups
                     _message.value = if (groups.isEmpty()) {
-                        "No duplicate content found among same-size candidates in the scanned tree."
+                        "No duplicate content found among same-size candidates within the 250-file bound."
                     } else {
                         "Found ${groups.size} duplicate-content group(s). Nothing was deleted."
                     }

@@ -19,7 +19,8 @@ import javax.inject.Singleton
 data class SafScanBatchResult(
     val records: List<SecurityScanRecord>,
     val skipped: Int,
-    val errors: Int
+    val errors: Int,
+    val limitReached: Boolean
 )
 
 @Singleton
@@ -113,15 +114,15 @@ class SafFileRepository @Inject constructor(
     ): SafScanBatchResult = withContext(Dispatchers.IO) {
         val collected = collectFiles(tree, rootDocumentId)
         val candidates = collected.files
-        onProgress(FileScanProgress(running = true, total = candidates.size, skipped = collected.truncated))
+        onProgress(FileScanProgress(running = true, total = candidates.size, skipped = collected.truncated, limitReached = collected.limitReached))
         val records = ArrayList<SecurityScanRecord>()
         var skipped = collected.truncated
         var errors = 0
         candidates.forEachIndexed { index, file ->
-            onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, skipped = skipped, errors = errors))
+            onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, skipped = skipped, errors = errors, limitReached = collected.limitReached))
             if (file.sizeBytes > MAX_SINGLE_SCAN_BYTES) {
                 skipped++
-                onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, scanned = records.size, skipped = skipped, errors = errors))
+                onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, scanned = records.size, skipped = skipped, errors = errors, limitReached = collected.limitReached))
                 return@forEachIndexed
             }
             try {
@@ -136,9 +137,9 @@ class SafFileRepository @Inject constructor(
             } catch (_: Throwable) {
                 errors++
             }
-            onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, scanned = records.size, skipped = skipped, errors = errors))
+            onProgress(FileScanProgress(running = true, current = index + 1, total = candidates.size, currentName = file.name, scanned = records.size, skipped = skipped, errors = errors, limitReached = collected.limitReached))
         }
-        SafScanBatchResult(records, skipped, errors)
+        SafScanBatchResult(records, skipped, errors, collected.limitReached)
     }
 
     suspend fun findDuplicates(tree: Uri, rootDocumentId: String): List<DuplicateFileGroup> = withContext(Dispatchers.IO) {
@@ -164,17 +165,21 @@ class SafFileRepository @Inject constructor(
         val visited = HashSet<String>()
         pending.add(rootDocumentId)
         var truncated = 0
+        var limitReached = false
         while (pending.isNotEmpty() && files.size < MAX_SCAN_FILES) {
             val id = pending.removeFirst()
             if (!visited.add(id)) continue
             val listing = runCatching { listBlocking(tree, id) }.getOrElse { continue }
             listing.forEach { file ->
                 if (file.isDirectory) pending.add(file.documentId)
-                else if (files.size < MAX_SCAN_FILES) files += file else truncated++
+                else if (files.size < MAX_SCAN_FILES) files += file else {
+                    truncated++
+                    limitReached = true
+                }
             }
         }
-        if (pending.isNotEmpty()) truncated++
-        return CollectedFiles(files, truncated)
+        if (pending.isNotEmpty()) limitReached = true
+        return CollectedFiles(files, truncated, limitReached)
     }
 
     private fun listBlocking(tree: Uri, documentId: String): List<ManagedFile> {
@@ -225,7 +230,7 @@ class SafFileRepository @Inject constructor(
         }
     }
 
-    private data class CollectedFiles(val files: List<ManagedFile>, val truncated: Int)
+    private data class CollectedFiles(val files: List<ManagedFile>, val truncated: Int, val limitReached: Boolean)
 
     companion object {
         private const val MAX_LISTING_ENTRIES = 1000
