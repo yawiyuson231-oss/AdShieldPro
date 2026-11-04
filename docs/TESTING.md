@@ -1,83 +1,94 @@
 # Testing
 
-Everything below runs locally with Node 22 and no network access.
+This repository holds two deliverables with separate suites:
+
+| Suite | Where | Run it |
+|---|---|---|
+| **Android app (Kotlin)** | this document | `./gradlew test` |
+| **Web platform (browser)** | [`WEB_TESTING.md`](WEB_TESTING.md) | `npm test` · `npm run verify` |
+
+This document describes how AdShield Pro is built and how its automated tests are run.
+
+## Requirements
+
+| Tool | Version used by the project |
+| --- | --- |
+| JDK | 17 or newer (build tested with JDK 21 toolchain config) |
+| Android SDK Platform | 37 (`compileSdk = 37`, `targetSdk = 36`) |
+| Android build-tools | installed automatically by AGP 9.4.1 |
+| Gradle | 9.7.1 via the committed wrapper (`./gradlew`) |
+| Android Gradle plugin | 9.4.1 (built-in Kotlin, no `kotlin-android` plugin) |
+| Kotlin / KSP | 2.4.21 / 2.3.13 |
+
+Set `ANDROID_HOME` (or add an `sdk.dir` line to `local.properties`) before building.
+
+## Build
 
 ```bash
-npm install      # dev dependency: jsdom (integration DOM only)
-npm test         # unit + integration suites
-npm run verify   # static architecture + honesty gates
-npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
+./gradlew :app:assembleDebug          # installable debug APK
+./gradlew :app:assembleRelease        # signed release APK (needs the keystore env vars below)
+./gradlew :app:bundleRelease          # Play Store AAB
 ```
 
-## 1. Layers
+Release signing is configured through environment variables or Gradle properties
+(see `docs/BUILD_AND_SIGNING_GUIDE.md`):
 
-| Layer | Location | What it proves |
-|---|---|---|
-| Unit | `tests/unit/*.test.mjs` | algorithms are correct in isolation, including negative cases |
-| Integration | `tests/integration/ui.test.mjs` | the real `app.js` boots in a real DOM (jsdom), driven through real clicks |
-| Static gates | `scripts/verify.mjs` | module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest |
+```bash
+export ADSHIELD_KEYSTORE_PATH=/path/to/release.jks
+export ADSHIELD_KEYSTORE_PASSWORD=…
+export ADSHIELD_KEY_ALIAS=…
+export ADSHIELD_KEY_PASSWORD=…
+```
 
-## 2. Coverage map (requirement → test)
+## Continuous integration
 
-| Requirement | Tests |
-|---|---|
-| Engine ladder, formats, wildcards, undo symmetry | `unit/engine.test.mjs` |
-| Production feed does not break working services | `unit/engine.test.mjs` (21 must-work hosts, real feed) |
-| DNS wire codec, hostile packets | `unit/codec.test.mjs` (hand-assembled packet + RFC vectors) |
-| TTL / negative cache / single-flight / LRU | `unit/cache.test.mjs` |
-| DoH JSON + wire, DoT codec, timeouts, breaker, fallback | `unit/dns-transport.test.mjs` |
-| DNSSEC honest classification | `unit/dns-transport.test.mjs` |
-| Full pipeline: filter-before-network, cache, dual-stack, error honesty | `unit/dns-client.test.mjs` |
-| Lexical features, IDN/punycode, typosquat, corpus false positives | `unit/lexical.test.mjs` |
-| Classifier determinism, holdout metrics, thresholds, serialization | `unit/classifier.test.mjs` |
-| Reputation weights, floors, guardrails, feedback, state round-trip | `unit/reputation.test.mjs` |
-| Firewall AI detectors (positive **and** negative), policy precedence | `unit/firewall.test.mjs` |
-| Monitor counters, buckets, percentiles, bounded memory | `unit/monitor.test.mjs` |
-| SHA-256, storage failures, feeds, backup/recovery, k-anonymity | `unit/infrastructure.test.mjs` |
-| Whole app: boot, navigation, AETHER, false positives, DNS lab, feeds, snapshots, XSS, capability honesty | `integration/ui.test.mjs` |
-| Architecture and claim policy | `scripts/verify.mjs` |
+`.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
+requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 
-## 3. Non-obvious tests worth knowing about
+1. `:app:compileDebugKotlin` — fails fast on toolchain problems
+2. `:app:assembleDebug` — APK packaging
+3. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore)
+4. `:app:testDebugUnitTest` — then asserts that exactly 18 tests executed and passed
+5. `:app:lintDebug` — hard gate, the build fails on any lint error
 
-- **XSS regression.** A backup file containing `<img src=x onerror=…>` is imported through the
-  real file input; the test asserts no `img`/`script` node exists and the payload appears as
-  literal text. This is the bug the previous version of `app.js` had.
-- **Compatibility gate.** The real 79k-rule light feed is loaded and 21 "must work" hosts
-  (video delivery, auth, payments, app stores, CDNs) are asserted unblocked.
-- **Negative detector tests.** Beaconing must ignore jittered traffic; tunnelling must ignore
-  normal CDN subdomains; rate anomaly must ignore steady traffic. A detector that only fires
-  in positive tests is not tested.
-- **Undo symmetry.** `addUserRule` / `removeUserRule` must restore the previous verdict.
-  (This caught a real `||` short-circuit bug that left the suffix rule behind.)
-- **Determinism.** Training twice with the same seed must produce identical metrics
-  (timing fields excluded).
-- **Honesty.** `verify.mjs` fails on fabricated claims and on any reappearance of the old
-  hardcoded `367,000` statistic that was not measured in this deployment.
+The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 
-## 4. Current results
+## Unit tests
 
-Run `npm test` and `npm run verify` for live numbers. At the time of writing:
+```bash
+./gradlew :app:testDebugUnitTest          # runs app/src/test/**
+./gradlew :app:testDebugUnitTest --tests 'com.adshield.pro.AdShieldEngineTestSuite'
+```
 
-- 161 unit tests, 18 integration tests — all passing.
-- Static verification: 75 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
-- Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
-  exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
-  repository archive being inside Chrome's guaranteed limit.
-- CNAME chain audit (`tests/unit/chain.test.mjs` + DNS-lab integration test): cloaking
-  detection, evidence strings, same-site and clean off-site paths, depth bound, and the
-  guarantee that the audit never blocks.
-- Power governor (`tests/unit/power.test.mjs`): band thresholds, interval clamping, subscriber
-  cleanup and the *unsupported* Battery Status API path (must degrade, not pretend).
-- Classifier holdout (measured in `tests/unit/classifier.test.mjs`, three-way split): AUC ≈ 0.86,
-  precision ≈ 0.986, specificity 0.898, recall ≈ 0.663 at threshold 0.96. The 0.9 specificity
-  target is not reached out-of-sample and the UI reports that instead of the target.
-- Base-rate precision (converted from recall/specificity): ≈ 0.06 at a 1% malicious base rate,
-  ≈ 0.42 at 10%. This is why the model is weighted 7/100 and can never block.
-- Engine throughput: > 2,000 evaluations/ms budget; the test asserts < 0.5 ms/op.
+HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
 
-## 5. What the suite does not cover
+`AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
+device-independent engine code directly, which is where all DNS, filtering and scoring
+logic lives:
 
-- Real network behaviour against live resolvers (tests use a deterministic fetch mock).
-- Real browser rendering/CSS (jsdom has no layout engine; charts degrade gracefully).
-- Service-worker runtime semantics (only its file list is verified statically).
-- Real-world feed drift (upstream content changes daily; the shrink guard is what protects you).
+| Area | Covered behaviour |
+| --- | --- |
+| `DnsPacketCodec` | RFC 1035 parsing of A/AAAA questions, compression pointers, malformed/cyclic packets, NXDOMAIN and `0.0.0.0`/`::` sinkhole synthesis, SERVFAIL synthesis, transaction-ID rewriting, TTL extraction |
+| UDP delivery limits | `fitResponseToUdpLimit` preserves ID/RCODE/question and sets TC=1 when an upstream answer cannot fit a single tunnel datagram; `udpPayloadCapacity` per IP version |
+| `IpPacketFraming` | IPv4/IPv6 UDP and TCP parsing, IPv4 header options, TCP options, fragmentation rejection, RFC 1071 / RFC 8200 checksums (verified to recompute to zero), and segmentation of large TCP DNS answers so no packet exceeds the tunnel MTU |
+| `UpstreamDnsResolver` | Upstream answers are only accepted when they are responses carrying the query's transaction ID; only NOERROR/NXDOMAIN answers are cacheable; cache keys are scoped to the active resolver endpoint; IPv6 fallback server list |
+| `FilterRuleEngine` | Protection-mode category gating, custom allow/block precedence, wildcards, hosts/Adblock list parsing, duplicate counting, HTML/binary rejection, conflict analysis, snapshot rollback, concurrent evaluation |
+| `BrowserContentBlocker` | Tracking-parameter stripping, request blocking, site allowlists, cosmetic script generation, DNS-label-boundary third-party detection |
+| `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
+
+Instrumentation (`androidTest`) and manual on-device checks are still required for anything
+that touches Android framework services — `VpnService` tunnel establishment, the WebView
+browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
+Those cannot be exercised by JVM unit tests.
+
+## Manual smoke test (device / emulator, API 29+)
+
+1. Install the debug APK, open the app, tap the shield and accept the VPN consent dialog.
+2. Open a browser and load a page; verify `Blocked` counters increase on the Home screen.
+3. Open **Statistics** and confirm queries appear in real time (requires detailed logging).
+4. Add a custom block rule (`||example.com^`) in **Ad Blocker → Rules** and confirm the domain
+   is blocked immediately without restarting protection.
+5. Switch protection modes and confirm blocking changes take effect without a tunnel restart.
+6. Reboot the device with protection enabled to verify the boot receiver restores the tunnel.
+7. If the release build is used, confirm R8 did not strip Room/serialization metadata by
+   opening **Statistics** and **Optimizer** (both read from Room/DataStore).

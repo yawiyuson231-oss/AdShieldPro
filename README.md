@@ -1,109 +1,204 @@
-# OmniShield X — AETHER AI Evolution (v5.0.1)
+# AdShield Pro 2.3.0 — Android DNS Ad & Tracker Protection
 
-A local-first DNS security, ad/tracker filtering and threat-intelligence platform that runs
-entirely in your browser. No backend, no accounts, no telemetry endpoint. Deployed as static
-files (GitHub Pages compatible); works offline once visited.
+[![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
-> **Honesty first.** This is DNS filtering plus explainable threat intelligence — not an
-> antivirus, not a VPN, and not universal ad blocking. Every capability, including the ones
-> that do **not** work here, is listed in [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) and in
-> the app's **Capabilities** page.
+AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+## Website and downloads
 
-## Quick start
+- **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
+  [docs/](docs), deployed by [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
+  One-time setup: repository **Settings → Pages → Source: GitHub Actions** (a repository admin has
+  to click it once; the deploy workflow reports it if it is still off).
+- **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
+- [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+
+### Publishing a release
+
+Every published build comes from one pipeline, [`.github/workflows/release.yml`](.github/workflows/release.yml):
 
 ```bash
-npm install        # jsdom, used only by the integration tests
-npm test           # 161 unit + 18 integration tests
-npm run verify     # static architecture & claim-policy gates
-npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
-npm run build:extension  # regenerate omnishield-x-extension.zip + assets/extension-facts.json
+# build the version currently in app/build.gradle.kts and publish tag v<versionName>
+gh workflow run "Release APK" --ref main
+
+# or publish a specific version: bump versionCode/versionName, commit, then
+git tag v2.3.1 && git push origin v2.3.1
 ```
 
-## What this release adds
+The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
+publishes it to GitHub Releases with a SHA-256 checksum, uploads `adshield-release.keystore` for
+future upgrade installs, and refreshes the GitHub Pages site. Re-running it for an existing tag
+replaces that release's APK assets instead of failing or creating a duplicate release.
+To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
+`ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
 
-This is an **upgrade of the existing application**, not a rebuild. The v4 filter engine,
-evaluation ladder, bundled feeds and Android policy format are preserved; every existing
-page still works.
 
-| Area | What is now real |
+## OmniShield X web platform (browser)
+
+The same repository ships the **OmniShield X — AETHER AI Evolution** web platform: a
+local-first DNS security, ad/tracker filtering and threat-intelligence app that runs entirely
+in the browser (no backend, no accounts, no telemetry endpoint). It is static files: open it
+over HTTP and it works offline after the first visit.
+
+```bash
+npm install               # jsdom, used only by the integration tests
+npm test                  # 161 unit + 18 integration tests
+npm run verify            # 75 static architecture & claim-policy gates
+npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
+npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
+```
+
+| Document | Contents |
 |---|---|
-| **AETHER AI** | Reputation scoring with 11 published signals (weights sum to 100), evidence floors, popularity/allowlist guardrails, per-signal feedback adaptation |
-| **Lexical model** | Multinomial Naive Bayes trained on-device from the bundled feeds, with holdout AUC/precision/recall/specificity shown in the UI |
-| **Typosquatting** | Damerau–Levenshtein with transpositions, homoglyph folding, RFC 3492 punycode decoding, brand-in-subdomain and brand-affix detection |
-| **DNS stack** | RFC 1035/6891 wire codec, DoH JSON + RFC 8484 wire transports, 5 real resolvers with health-based fallback and circuit breakers, TTL/negative cache with single-flight |
-| **DNSSEC** | Honest five-state assessment (validated upstream / signed-unverified / unsigned / bogus-suspected / unknown) |
-| **Firewall AI** | Beaconing, DNS tunnelling, rate-anomaly and fan-out detectors over real observation streams, with `monitor` as the safe default |
-| **Monitoring** | Live dashboard built from measured events only — no synthetic traffic |
-| **Feeds** | Conditional GET, structural validation, SHA-256 integrity, 40 % shrink guard, last-good retention |
-| **Recovery** | Hashed snapshot ring, write verification, schema migration v1→v3, newest-valid-first auto-recovery |
-| **Privacy** | k-anonymous local analytics (k = 10), salted hashes, retention limits, nothing uploaded |
-| **Offline** | Service worker caches the shell and bundled rules; never caches DoH |
+| [`docs/WEB_PLATFORM.md`](docs/WEB_PLATFORM.md) | Features, quick start, integration instructions |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map: DNS plumbing, AETHER, Firewall AI, recovery, power governor, extension builder |
+| [`docs/AETHER.md`](docs/AETHER.md) | Signal weights, evidence floors, calibration methodology and measured metrics |
+| [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this platform deliberately does **not** do, and why |
+| [`docs/WEB_TESTING.md`](docs/WEB_TESTING.md) | What the browser suite actually verifies |
 
-### Bugs fixed from v4
+Capabilities are also listed inside the app on the **Capabilities** page, including the rows
+that read *not implemented* — nothing there is aspirational.
 
-- **Broken test suite.** `engine.test.mjs` read `../app/src/main/assets/core_lite_ads.txt`,
-  a path from the Android repository that does not exist here — so this deployment had zero
-  effective test coverage. The suite now runs against `assets/`.
-- **Stored XSS.** `app.js` rendered imported backup JSON and user input with `innerHTML`.
-  The UI layer now uses `textContent` only; an integration test imports a hostile backup and
-  asserts it renders as literal text.
-- **Undo did not undo.** `removeUserRule` used `||` between two `Set.delete` calls, so the
-  suffix entry survived and the domain stayed allowlisted.
-- **Single-flight cache key.** `DnsCache.singleFlight` parsed the key as `name|type` while
-  `DnsCache.key` builds `TYPE|name`, so results were stored under the wrong key.
-- **Negative-TTL parsing.** The SOA minimum was only read from binary records, never from the
-  text form that DoH JSON actually returns.
-- **Misleading dashboard figures.** Rule counts copied from the Android APK were displayed for
-  files not present in this deployment; numbers are now measured at runtime.
+## App screenshots
 
-## Architecture at a glance
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/home-protection.jpg" alt="AdShield Pro home screen showing active DNS protection and statistics" width="280"><br><strong>Home protection</strong></td>
+    <td align="center"><img src="docs/images/smart-boost.jpg" alt="AdShield Pro Smart Boost device health screen" width="280"><br><strong>Smart Boost</strong></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/protection-profile.jpg" alt="AdShield Pro DNS activity and protection profiles" width="280"><br><strong>Activity and protection profiles</strong></td>
+    <td align="center"><img src="docs/images/dns-analytics.jpg" alt="AdShield Pro DNS analytics and live top apps" width="280"><br><strong>DNS analytics and live top apps</strong></td>
+  </tr>
+</table>
 
+## How it Works
+
+![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
+
+## What AdShield Pro does
+
+- **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
+- **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
+- **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.
+- **Use the built-in Privacy Browser:** Filter browser requests, remove common tracking query parameters, block pop-ups, manage third-party cookies, and apply cosmetic hiding rules inside this browser.
+- **See activity and statistics:** View DNS totals, allowed and blocked queries, recent local activity, trends, and a live top-app view when Android provides app attribution for a DNS request.
+- **Run AI Smart Boost:** Review memory, storage, battery, and temperature signals; safely clean eligible AdShield-owned temporary files; and optimize AdShield's own DNS cache and memory use. The “AI” feature name refers to local, rule-based analysis and recommendations; it does not call a cloud AI service. Android controls memory used by other apps, so Smart Boost does not promise to kill other apps or free their memory.
+- **Clean storage with review controls:** Quick, deep, scheduled, and custom scans distinguish safe app-owned temporary files from downloads, duplicate files, and APK installers that require user review or confirmation. Android scoped-storage rules limit which shared files the app can inspect.
+- **Use Game Booster and battery modes:** Select games and choose AdShield workload profiles that adjust its cache, background filter sync, and local logging behavior. Battery and thermal tools show device readings and can adapt AdShield's own background work; they do not override Android's system-wide power controls.
+- **Check for app updates:** Check GitHub Releases from Home or receive a background update notification when Android runs scheduled work. The app downloads the signed APK and opens Android's installer; users approve installation themselves.
+- **Keep settings on the device:** Settings, custom rules, and activity history are stored locally. Allowed DNS lookups are sent to the upstream DNS provider selected in the app, and that provider's privacy terms apply.
+
+## Building and testing
+
+Everything needed is pinned in the repository (Gradle 9.7.1 wrapper, AGP 9.4.1, Kotlin 2.4.21,
+`compileSdk = 37`, `minSdk = 29`). Install a JDK 17+ and Android SDK Platform 37, then:
+
+```bash
+./gradlew :app:assembleDebug        # debug APK
+./gradlew :app:testDebugUnitTest    # JVM unit test suite
+./gradlew :app:lintDebug            # Android Lint
 ```
-index.html  app.js  engine.js          shell, controller, deterministic filter ladder
-dns/       codec · cache · resolvers · dnssec · client
-aether/    reputation · classifier · typosquat · lexical · domain · data
-security/  firewall-ai · monitor · feedmanager · backup · privacy · sha256 · storage
-ui/dom.js  safe DOM construction (no innerHTML)
-tests/     161 unit + 18 integration   scripts/verify.mjs  static gates
+
+The JVM suite (`app/src/test/java/com/adshield/pro/AdShieldEngineTestSuite.kt`, 19 cases) covers DNS
+wire-format parsing, UDP/TCP packet framing and checksums, upstream response validation and cache
+policy, UDP truncation and TCP segmentation limits, the filter rule engine, the browser blocker, and
+in-app update asset selection (release APK over debug/split APKs).
+See [docs/TESTING.md](docs/TESTING.md) for the full matrix, signing requirements and the on-device
+smoke test checklist.
+
+## Download and project links
+
+- [Source code](https://github.com/yawiyuson231-oss/AdShieldPro)
+- [Latest releases and APK downloads](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+- [Privacy policy](https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md)
+- [Report a problem](https://github.com/yawiyuson231-oss/AdShieldPro/issues)
+
+AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Architecture + MVVM, Room SQLite, DataStore, WorkManager, Hilt, and Android `VpnService`**. DNS filtering can reduce requests to known ad, tracking, and malicious domains, but it cannot guarantee protection from every threat.
+
+---
+
+## Technical architecture
+
+### Layer 1 — Device-Wide Wire-Format DNS Engine (`engine/dns/`)
+- **`DnsPacketCodec.kt`**: Full RFC 1035 / RFC 3596 wire-format DNS parser and response synthesizer. Supports IPv4 (`A`) and IPv6 (`AAAA`), `CNAME`, `HTTPS`, `SVCB`, `TXT`, and `MX` queries. Hardened against truncated headers and malicious cyclic compression pointer loops (`0xC0`).
+- **`IpPacketFraming.kt`**: Full IPv4 and IPv6 packet parser and response builder supporting both **UDP (Port 53)** and **TCP (Port 53)** with RFC 1071 and RFC 8200 pseudo-header checksums.
+- **`UpstreamDnsResolver.kt`**:
+  - **DNS-over-HTTPS (DoH, RFC 8484)** via `application/dns-message` wireformat POST with bootstrap DNS resolution.
+  - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
+  - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
+  - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
+
+### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
+- **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.
+- **Loop Prevention**: Protects all upstream DoH, DoT, and UDP/TCP sockets via `VpnService.protect(socket)` and excludes `com.adshield.pro` from the tunnel.
+- **Per-App Split Tunneling**: Supports per-app VPN exclusion via `VpnService.Builder.addDisallowedApplication()`.
+- **Network Recovery & Boot Restoration**: Monitors Wi-Fi / Mobile Data transitions via `ConnectivityManager.NetworkCallback` and restores protection after device reboot via `BootCompletedReceiver`.
+
+### Layer 3 — Privacy Browser Content & Cosmetic Blocker (`engine/browser/BrowserContentBlocker.kt`)
+- Built-in Android `WebView` privacy browser (`ui/screens/BrowserScreen.kt`) with:
+  - Subresource ad & tracker request interception (`shouldInterceptRequest`)
+  - Cross-site tracking query parameter sanitizer (strips `fbclid`, `gclid`, `utm_*`, `msclkid`, `ttclid`, etc.)
+  - Background pop-up blocker (`onCreateWindow`)
+  - Cosmetic CSS + DOM element hiding for standard ad slots (`ins.adsbygoogle`, `[id^="div-gpt-ad"]`, `[data-ad-slot]`, etc.) plus custom CSS selectors
+  - Per-website allowlist exceptions, third-party cookie blocking, and one-tap cookie/storage wipe.
+
+### Layer 4 — Intelligent Lock-Free Filtering Rule Engine (`engine/filter/FilterRuleEngine.kt`)
+- Uses an immutable `FilterSnapshot` inside an `AtomicReference` for lock-free microsecond lookups and zero-restart hot updates.
+- Supports **Exact matching**, **$O(k)$ Subdomain suffix walk**, **Wildcard rules (`*`)**, and **Allowlist exceptions (`@@||domain^`)**.
+- Strict priority evaluation:
+  1. User Custom Allow Rules (`Priority 100`)
+  2. User Custom Block Rules (`Priority 90`)
+  3. System Safety Allowlist (`Priority 80`)
+  4. Active Filter Lists filtered by `ProtectionMode` (`Standard`, `Strict`, `Privacy`, `Custom`) (`Priority 50`)
+- Built-in **Duplicate & Conflict Analyzer** (`detectConflictsAndDuplicates`) and interactive **Live Domain Diagnostic Sandbox**.
+
+### Layer 5 — Atomic Filter List Updater (`data/repository/AdShieldRepository.kt` & `worker/FilterUpdateWorker.kt`)
+- Pre-configured with reputable filter sources (AdShield Core Bundled Baseline, AdGuard DNS Filter, OISD Small, HaGeZi Multi Light, URLHaus Malware Filter, StevenBlack Unified Hosts) + custom HTTPS filter URLs.
+- Validates downloaded lists (rejecting HTML, scripts, or binary payloads), strips duplicates, writes atomically via `.tmp` and `.bak` files, and automatically rolls back on failure.
+
+---
+
+## 2. Technical Limitations & Honest Disclosures
+
+1. **First-Party Multiplexed Streaming Ads:** Official YouTube, Facebook, TikTok, Instagram, and Twitch apps serve video/feed ads from the same first-party content delivery servers and TLS connections as legitimate videos. Blocking those domains via DNS would break video playback.
+2. **Hardcoded Encrypted DNS Apps:** Apps that ignore Android system DNS and use proprietary internal DoH/QUIC resolvers bypass local DNS VPNs unless configured to use system DNS.
+3. **External Third-Party Browser Cosmetic Filtering:** Due to Android process sandboxing, a standalone non-root app cannot inject cosmetic CSS into external third-party browsers; cosmetic DOM element hiding applies inside AdShield Pro's built-in Privacy Browser.
+
+---
+
+## 3. Project Structure
+
+```text
+PROJECT/
+├── app/
+│   ├── build.gradle.kts
+│   ├── proguard-rules.pro
+│   └── src/
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── assets/default_blocklist.txt
+│       │   └── java/com/adshield/pro/
+│       │       ├── AdShieldApplication.kt
+│       │       ├── MainActivity.kt
+│       │       ├── data/
+│       │       │   ├── local/db/ (Entities.kt, AdShieldDao.kt, AdShieldDatabase.kt)
+│       │       │   ├── local/preferences/UserPreferencesRepository.kt
+│       │       │   └── repository/AdShieldRepository.kt
+│       │       ├── di/AppModule.kt
+│       │       ├── domain/model/ (ProtectionModels.kt, RuleAndVpnModels.kt, StatsAndBillingModels.kt)
+│       │       ├── engine/
+│       │       │   ├── browser/BrowserContentBlocker.kt
+│       │       │   ├── dns/ (DnsPacketCodec.kt, IpPacketFraming.kt, UpstreamDnsResolver.kt)
+│       │       │   └── filter/FilterRuleEngine.kt
+│       │       ├── service/ (AdShieldVpnService.kt, BootCompletedReceiver.kt)
+│       │       ├── ui/
+│       │       │   ├── screens/ (HomeScreen, ActivityScreen, FiltersScreen, RulesScreen, BrowserScreen, SettingsScreen)
+│       │       │   ├── theme/Theme.kt
+│       │       │   └── viewmodel/AdShieldViewModel.kt
+│       │       └── worker/FilterUpdateWorker.kt
+│       └── test/java/com/adshield/pro/AdShieldEngineTestSuite.kt
+└── docs/
+    ├── BUILD_AND_SIGNING_GUIDE.md
+    ├── GOOGLE_PLAY_RELEASE_CHECKLIST.md
+    └── PRIVACY_POLICY.md
 ```
-
-Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·
-AETHER methodology: [`docs/AETHER.md`](docs/AETHER.md) ·
-Testing: [`docs/TESTING.md`](docs/TESTING.md).
-
-## Enforcement model (important)
-
-- **Only the deterministic engine blocks**, and only when a real rule matches
-  (yours, a feed's, or a list exception). Every block shows the matched rule and category.
-- **AETHER advises.** `advisoryIsEnforced` is always `false`; scores never cause a block.
-- **Firewall AI recommends.** It requires two independent signals (or your explicit deny
-  policy) before suggesting a block; the default is `monitor`.
-- Every action is reversible: allow/block from the UI, and false-positive reports undo cleanly.
-
-## Integrating with the Android core
-
-The shared contract is unchanged: the same rule files, the same JSON backup schema.
-
-1. In the Android app: *Settings → Configuration Backup* → export JSON.
-2. Here: **Backup & Sync → Import** to audit/patch rules, then **Export merged config**.
-3. Import the exported file back on any device. Custom rules, AETHER state (including model
-   weights) and firewall policies travel in the same file; schema migrations handle v1/v2.
-
-To feed real behavioural data into Firewall AI, export an observation log from the native
-core as `[{ "domain": "...", "app": "...", "timestamp": 0 }]` and use
-**Firewall AI → Import observation log**. Without that file the browser only analyses what it
-performed itself — it cannot capture other apps' traffic (see `docs/UNSUPPORTED.md` §1).
-
-## Data provenance
-
-- Bundled rule feeds: **HaGeZi DNS blocklists**, GPLv3 (<https://github.com/hagezi/dns-blocklists>).
-  The bundled light list contains 79,665 rules; its header states the upstream version and date.
-- `assets/core_supplement_ads.txt` — **hand-curated by this project** (136 apex ad/tracker
-  domains the light feed omits), with provenance and safety policy at the top of the file.
-- `assets/core_supplement_aggressive.txt` — optional, ships **disabled**, because it can break sites.
-- `aether/data.js` — curated popular-domain corpus, high-abuse TLD list and look-alike tables,
-  each documented as reference data rather than detections.
-
-## License
-
-GPL-3.0-or-later (inherited from the bundled GPLv3 feeds).

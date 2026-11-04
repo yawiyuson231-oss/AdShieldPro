@@ -201,7 +201,8 @@ export function verify() {
     JSON.stringify(pkg.dependencies || {}));
 
   /* 11. Documentation exists for the honest capability list. */
-  for (const doc of ['README.md', 'docs/ARCHITECTURE.md', 'docs/AETHER.md', 'docs/UNSUPPORTED.md', 'docs/TESTING.md']) {
+  for (const doc of ['README.md', 'docs/WEB_PLATFORM.md', 'docs/ARCHITECTURE.md', 'docs/AETHER.md',
+    'docs/UNSUPPORTED.md', 'docs/WEB_TESTING.md', 'docs/TESTING.md']) {
     add(`doc: ${doc}`, exists(doc) && statSync(abs(doc)).size > 400);
   }
 
