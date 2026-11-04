@@ -21,7 +21,7 @@ import { FeedManager, FEED_REGISTRY } from './security/feedmanager.js';
 import { BackupManager, SCHEMA_VERSION } from './security/backup.js';
 import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
-import { createStorage, IndexedDbAdapter } from './security/storage.js';
+import { createStorage, IndexedDbAdapter, MAX_FILE_BYTES, MAX_FILE_LABEL } from './security/storage.js';
 import { FileVault, setDefaultSinkVault } from './security/vault.js';
 import { SystemScanner, scanUrl } from './security/scan.js';
 import { DownloadQueue, parseMediaUrl, probeMedia, inspectRemote } from './security/media.js';
@@ -1646,7 +1646,8 @@ function renderScan() {
       ['Storage backend in use', state.vault?.storage?.name || 'unknown'],
       ['IndexedDB available', IndexedDbAdapter.detect() ? 'yes — large files and binary payloads are supported' : 'no — the cloud box falls back to localStorage (small files only)'],
       ['Files queued for this run', String(state.scanFiles.length)],
-      ['Bytes read per file', 'head window 4 KB, deep window 6 MB — files larger than that are scanned from their first 6 MB and their size is reported']
+      ['Bytes read per file', 'head window 4 KB, deep window 6 MB — files larger than that are scanned from their first 6 MB and their size is reported'],
+      ['Largest file accepted', `${MAX_FILE_LABEL} (${number(MAX_FILE_BYTES / 1048576)} MB) for the scan queue, the cloud box and transfers`]
     ])
   );
 
@@ -1769,8 +1770,14 @@ async function collectDroppedFiles(transfer) {
 function addScanFiles(files) {
   const list = [...files].filter(Boolean);
   if (!list.length) return;
-  state.scanFiles = [...state.scanFiles, ...list].slice(0, 2000);
-  toast(`${plural(list.length, 'file')} added to the scan queue (${plural(state.scanFiles.length, 'file')} queued).`, 'ok');
+  const tooBig = list.filter((file) => file.size > MAX_FILE_BYTES);
+  const accepted = list.filter((file) => file.size <= MAX_FILE_BYTES);
+  if (tooBig.length) {
+    toast(`${plural(tooBig.length, 'file')} skipped — the queue accepts files up to ${MAX_FILE_LABEL} (largest was ${bytes(Math.max(...tooBig.map((f) => f.size)))}).`, 'warn');
+  }
+  if (!accepted.length) { renderScan(); return; }
+  state.scanFiles = [...state.scanFiles, ...accepted].slice(0, 2000);
+  toast(`${plural(accepted.length, 'file')} added to the scan queue (${plural(state.scanFiles.length, 'file')} queued).`, 'ok');
   renderScan();
 }
 

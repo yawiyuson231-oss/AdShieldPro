@@ -444,6 +444,7 @@
       <div class="chips" id="scan-modules" style="margin-top:12px"></div>
       <div class="dropzone" id="scan-drop" style="margin-top:12px">
         Drop files or a folder here, or use the buttons below. Nothing is uploaded; bytes are read in this tab only.
+        Any file type up to <b>100 MB</b>. Files larger than the 6 MB scan window are inspected from their first 6 MB and their full size is reported.
         <div class="row" style="justify-content:center;margin-top:10px">
           <button id="scan-pick" type="button">Choose files…</button>
           <button id="scan-pick-folder" type="button">Choose a folder…</button>
@@ -501,7 +502,8 @@
       <p>Your files live in this browser's IndexedDB on this device — no server, no account, no
       upload. Add photos, videos, documents or audio, organise them in folders, preview them,
       download them again and verify they are unchanged with SHA-256. A passphrase lock encrypts
-      new files with AES-GCM.</p>
+      new files with AES-GCM. Files up to <b>100 MB</b> each, bounded by the browser's own storage
+      quota shown below.</p>
       <div class="row" style="margin-top:12px">
         <button class="primary" id="vault-upload" type="button">Add files…</button>
         <button id="vault-new-folder" type="button">New folder</button>
@@ -531,7 +533,7 @@
     <div class="card accent">
       <h2>Video &amp; music downloader</h2>
       <p>Paste a media URL. This checks the platform's real metadata endpoint and tells you
-      upfront whether its terms allow a download. Direct media files (MP4, WebM, MP3, M4A …) and
+      upfront whether its terms allow a download. Transfers are capped at <b>100 MB</b> per file. Direct media files (MP4, WebM, MP3, M4A …) and
       links whose server permits it are downloaded with pause, resume and cancel; completed files
       land in your cloud box. DRM-protected and paywalled sources are refused with the reason —
       never faked.</p>

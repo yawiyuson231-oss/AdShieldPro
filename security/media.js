@@ -18,6 +18,7 @@
  */
 import { createFileSink } from './vault.js';
 import { sha256Hex } from './sha256.js';
+import { MAX_FILE_BYTES } from './storage.js';
 
 /** Platform registry. `directDownload` reflects what the operator permits. */
 export const PLATFORMS = [
@@ -101,7 +102,7 @@ const FORMAT_LADDERS = {
   ]
 };
 
-const DEFAULT_MAX_BYTES = 512 * 1024 * 1024;
+const DEFAULT_MAX_BYTES = MAX_FILE_BYTES;
 
 /** Extension of a URL path, lower-cased, without the query string. */
 export function extensionOf(url) {
@@ -373,7 +374,7 @@ export class DownloadQueue {
       if (Number.isFinite(declared) && declared > 0) {
         task.size = response.status === 206 ? task.size : declared;
         const total = (response.status === 206 ? (task.size || 0) : declared);
-        if (total > this.maxBytes) throw new Error(`file is larger than the ${Math.round(this.maxBytes / 1024 / 1024)} MB limit`);
+        if (total > this.maxBytes) throw new Error(`file is larger than the ${Math.round(this.maxBytes / 1024 / 1024)} MB per-file limit — set a smaller range or download it directly`);
       }
 
       const factory = sinkFactory || this.createSink;

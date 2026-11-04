@@ -13,6 +13,12 @@
  * user) while keeping the exact same async contract.
  */
 
+/** Largest single file this build will accept, in bytes (100 MB). */
+export const MAX_FILE_BYTES = 100 * 1024 * 1024;
+
+/** Human label for the ceiling, used in messages and the UI. */
+export const MAX_FILE_LABEL = '100 MB';
+
 export class MemoryStorage {
   constructor(initial = {}) { this.map = new Map(Object.entries(initial)); this.failNext = null; this.name = 'memory'; }
   async getItem(key) {

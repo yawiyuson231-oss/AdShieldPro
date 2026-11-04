@@ -9,7 +9,7 @@
  * of pretending a write succeeded.
  */
 import { sha256Hex } from './sha256.js';
-import { IndexedDbAdapter } from './storage.js';
+import { IndexedDbAdapter, MAX_FILE_BYTES, MAX_FILE_LABEL } from './storage.js';
 
 const INDEX_KEY = 'vault:index';
 const FILE_PREFIX = 'vault:file:';
@@ -106,7 +106,7 @@ export class FileVault {
     if (!options.storage) throw new Error('FileVault requires a storage adapter');
     this.storage = options.storage;
     this.namespace = options.namespace || 'vault';
-    this.maxFileBytes = options.maxFileBytes ?? 1024 * 1024 * 1024;
+    this.maxFileBytes = options.maxFileBytes ?? MAX_FILE_BYTES;
     this.clock = options.clock || (() => Date.now());
     this.randomBytes = options.randomBytes || ((n) => globalThis.crypto.getRandomValues(new Uint8Array(n)));
     this.entries = [];
@@ -237,8 +237,13 @@ export class FileVault {
     }
     const isBlob = input instanceof Blob;
     const blob = isBlob ? input : new Blob([input ?? ''], { type: options.mime || 'text/plain' });
+    // The localStorage fallback caps out around 5 MB in total and base64 adds
+    // 33 %, so a large file there fails with an obscure quota error. Say so first.
+    if (this.storage.binarySafe === false && blob.size > 2 * 1024 * 1024) {
+      throw new Error(`This browser fell back to ${this.storage.name} (about 5 MB total, base64-encoded), so files above 2 MB cannot be stored. IndexedDB is required for larger files — check that storage is not blocked for this site.`);
+    }
     if (blob.size > this.maxFileBytes) {
-      throw new Error(`File is ${(blob.size / 1048576).toFixed(1)} MB; the per-file limit is ${(this.maxFileBytes / 1048576).toFixed(0)} MB.`);
+      throw new Error(`File is ${(blob.size / 1048576).toFixed(1)} MB; the per-file limit is ${this.maxFileBytes === MAX_FILE_BYTES ? MAX_FILE_LABEL : `${(this.maxFileBytes / 1048576).toFixed(0)} MB`}.`);
     }
     const name = String(options.name || (isBlob && input.name) || 'untitled').replace(/[/\\]/g, '_').slice(0, 180) || 'untitled';
     const mime = options.mime || blob.type || 'application/octet-stream';

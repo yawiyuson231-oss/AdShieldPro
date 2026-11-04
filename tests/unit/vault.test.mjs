@@ -192,3 +192,40 @@ test('a string-only backend gets base64, so binaries survive the localStorage fa
   const { blob } = await vault.read(entry.id);
   assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())], [...bytes]);
 });
+
+test('the per-file ceiling is 100 MB for the vault, the download queue and the UI', async () => {
+  const { MAX_FILE_BYTES, MAX_FILE_LABEL } = await import('../../security/storage.js');
+  const { DownloadQueue } = await import('../../security/media.js');
+  assert.equal(MAX_FILE_BYTES, 100 * 1024 * 1024);
+  assert.equal(MAX_FILE_LABEL, '100 MB');
+
+  // Defaults must agree with the shared constant — no drift between features.
+  const vault = new FileVault({ storage: new MemoryStorage() });
+  assert.equal(vault.maxFileBytes, MAX_FILE_BYTES);
+  const queue = new DownloadQueue({});
+  assert.equal(queue.maxBytes, MAX_FILE_BYTES);
+
+  // A file at the limit is refused with the human label, not a fabricated success.
+  const strict = vaultOf({ maxFileBytes: MAX_FILE_BYTES });
+  await strict.load();
+  // A real Blob whose reported size is one byte past the ceiling; the check runs
+  // before any bytes are read, so nothing is buffered.
+  const oversized = new Blob(['x'], { type: 'video/mp4' });
+  Object.defineProperty(oversized, 'size', { value: MAX_FILE_BYTES + 1 });
+  await assert.rejects(() => strict.put(oversized, { name: 'huge.mp4' }), /100 MB/);
+});
+
+test('the localStorage fallback refuses large files with a clear reason instead of a quota error', async () => {
+  class StringStorage extends MemoryStorage {
+    get binarySafe() { return false; }
+  }
+  const vault = new FileVault({ storage: new StringStorage(), clock: () => 1 });
+  await vault.load();
+  const big = new Blob([new Uint8Array(16)]);
+  Object.defineProperty(big, 'size', { value: 3 * 1024 * 1024 });
+  await assert.rejects(() => vault.put(big, { name: 'big.bin' }), /IndexedDB is required/);
+  // A 1 MB file still round-trips through base64 on that backend.
+  const small = await vault.put(new Blob([new Uint8Array(1024 * 1024)]), { name: 'small.bin' });
+  const { blob } = await vault.read(small.id);
+  assert.equal(blob.size, 1024 * 1024);
+});
