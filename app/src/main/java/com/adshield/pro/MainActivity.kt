@@ -369,6 +369,7 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onToggleSiteException = viewModel::toggleBrowserSiteException,
         onUpdateBrowserPrivacy = viewModel::updateBrowserPrivacySettings,
         onAddCustomCosmeticSelector = viewModel::addCustomCosmeticSelector,
+        onChangeSearchProvider = viewModel::setSearchProvider,
         onShowFeedback = viewModel::showFeedback
     )
 }
@@ -390,6 +391,10 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
     val fileScanResult by viewModel.fileScanResult.collectAsStateWithLifecycle()
     val isScanningSecurity by viewModel.isScanningSecurity.collectAsStateWithLifecycle()
     val securityHistory by viewModel.securityHistory.collectAsStateWithLifecycle()
+    val scanSummary by viewModel.scanSummary.collectAsStateWithLifecycle()
+    val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
+    val quarantineItems by viewModel.quarantineItems.collectAsStateWithLifecycle()
+    val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     SecurityScreen(
         posture = securityPosture,
         vpnState = vpnState,
@@ -400,9 +405,22 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         fileScanResult = fileScanResult,
         isScanning = isScanningSecurity,
         scanHistory = securityHistory,
+        scanSummary = scanSummary,
+        scanProgress = scanProgress,
+        quarantineItems = quarantineItems,
+        scheduledScanEnabled = settings.scheduledScanEnabled,
+        scheduledScanIntervalHours = settings.scheduledScanIntervalHours,
         onScanUrl = viewModel::scanUrl,
         onScanUri = viewModel::scanUri,
-        onAuditApps = viewModel::auditInstalledApps
+        onAuditApps = viewModel::auditInstalledApps,
+        onQuarantineLastScanned = viewModel::quarantineLastScannedFile,
+        onRestoreQuarantined = viewModel::restoreQuarantined,
+        onDeleteQuarantined = viewModel::deleteQuarantined,
+        onVerifyQuarantined = viewModel::verifyQuarantined,
+        onClearScanHistory = viewModel::clearScanHistory,
+        onBuildScanReport = viewModel::buildScanReport,
+        onSetScheduledScan = viewModel::setScheduledScan,
+        onShowFeedback = viewModel::showFeedback
     )
 }
 

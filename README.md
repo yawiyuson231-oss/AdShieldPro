@@ -1,4 +1,4 @@
-# AdShield Pro 2.6.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.7.0 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -77,6 +77,31 @@ that read *not implemented* — nothing there is aspirational.
 
 ![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
 
+## What's new in 2.7.0
+
+- **Private search** — the in-app browser's address bar now searches with your choice of
+  **DuckDuckGo** (default) or **Google**, persisted across restarts. Query terms are percent-encoded
+  so a term can never inject extra query parameters, and the existing DNT/GPC headers,
+  third-party cookie blocking and tracking-parameter stripping still apply. Choosing Google is
+  labelled honestly: Google still receives the query.
+- **Persistent scan journal** — scan results survive restarts (previously they were kept in memory
+  and capped at 30). Stores the most recent 200 records in a dedicated DataStore file so a finished
+  scan cannot trigger a settings-wide recomposition.
+- **Exportable threat reports** — one tap writes a plain-text report through the system file picker,
+  including real findings, scan source, duration and an explicit statement of the scanner's limits.
+- **Quarantine** — isolate a flagged file into app-private storage with a neutralised filename,
+  SHA-256 verified on ingest and re-verified on restore. Deleting the original is opt-in, and when
+  Android refuses the deletion the app says so instead of pretending it succeeded.
+- **Scheduled scanning** — an optional WorkManager job audits installed apps and re-verifies
+  quarantine hashes, notifying only when something is flagged.
+- **Real scan progress** — per-app progress during a device audit, indeterminate until the target
+  count is actually known.
+- **Duplicate-id crash fix** — scan ids used `System.currentTimeMillis()` while the history list
+  keyed on them; two scans in the same millisecond could crash the list. Ids are now strictly
+  increasing.
+- **Honest gaps** — private cloud storage, the universal downloader and a full SAF file manager are
+  registered as **not implemented** in the capability report rather than shown as working features.
+
 ## What's new in 2.6.0
 
 - **Cyber-console UI** — dark navy / electric-blue dashboard inspired by a security operations
@@ -145,7 +170,8 @@ Everything needed is pinned in the repository (Gradle 9.7.1 wrapper, AGP 9.4.1, 
 ```
 
 The JVM suite (`AdShieldEngineTestSuite`, `SecurityCenterTestSuite`, `BatteryIntelligenceTestSuite`,
-`AetherCoreTest`, `DashboardPresentationTest` and `CapabilityRegistryTest`) covers DNS
+`AetherCoreTest`, `DashboardPresentationTest`, `PrivateSearchTest`, `ScanJournalTest`
+and `CapabilityRegistryTest`) covers DNS
 wire-format parsing, UDP/TCP packet framing and checksums, upstream response validation and cache
 policy, UDP truncation and TCP segmentation limits, the filter rule engine, the browser blocker, and
 in-app update asset selection (release APK over debug/split APKs), the battery power/rate maths and

@@ -526,6 +526,79 @@ object CapabilityRegistry {
             "tools/check_ui_performance.py and DashboardPresentationTest"
         ),
         cap(
+            "private-search", "Private search with a choice of Google or DuckDuckGo", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.IMPLEMENTED, "engine/browser/PrivateSearch.kt", emptyList(),
+            listOf("User provider preference, address-bar input, existing tracking-parameter stripper"),
+            listOf(
+                "Choosing Google still sends the query to Google; the provider label says so",
+                "Search runs in this app's WebView only, not in external browsers"
+            ),
+            "PrivateSearchTest (encoding, injection, provider fallback, address resolution)"
+        ),
+        cap(
+            "scan-journal", "Persistent scan history with exportable threat reports", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "engine/security/ScanJournal.kt", emptyList(),
+            listOf("Real file/URL/APK/app-audit results persisted in a dedicated DataStore journal"),
+            listOf(
+                "Most recent 200 records are retained",
+                "An empty journal is reported as 'no scan performed', never as a clean device"
+            ),
+            "ScanJournalTest (unique ids, retention, round-trip, honest empty report)"
+        ),
+        cap(
+            "quarantine", "Quarantine with SHA-256 integrity verification", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "engine/security/QuarantineManager.kt", emptyList(),
+            listOf("User-selected file content, SHA-256 computed on ingest and re-checked on restore"),
+            listOf(
+                "Isolated copies live in app-private storage; they are not additionally encrypted at rest",
+                "Android often refuses to delete an original this app does not own — that outcome is reported, not assumed"
+            ),
+            "ScanJournalTest naming/traversal cases; manual device restore/delete check"
+        ),
+        cap(
+            "scheduled-scan", "Scheduled on-device security scan", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "worker/ScheduledScanWorker.kt", listOf(PERM_NOTIF),
+            listOf("WorkManager periodic job, PackageManager app audit, quarantine hash re-verification"),
+            listOf(
+                "Audits installed apps and quarantine only; shared storage is not scanned without a user grant",
+                "WorkManager timing is approximate and deferrable by the OS to save battery"
+            ),
+            "Manual device check; ScanJournalTest covers record/report shape"
+        ),
+        cap(
+            "private-cloud", "Private cloud storage box (upload/download/sync)", CapabilityArea.PLATFORM,
+            CapabilityStatus.PLANNED, "",
+            emptyList(),
+            listOf("Would need a WebDAV endpoint, Google Drive OAuth client, or an S3-compatible service"),
+            listOf(
+                "Not implemented: no backend is bundled and no account service is operated by this app",
+                "Requires user-supplied credentials or an OAuth client id before it can be enabled"
+            ),
+            "n/a — not implemented"
+        ),
+        cap(
+            "universal-downloader", "URL-based video/audio downloader", CapabilityArea.PLATFORM,
+            CapabilityStatus.PLANNED, "",
+            emptyList(),
+            listOf("Would need a download queue, format probing and a user-chosen save location"),
+            listOf(
+                "Not implemented yet",
+                "Will support direct/public media URLs and official APIs only; DRM, paywalls and access restrictions are never bypassed"
+            ),
+            "n/a — not implemented"
+        ),
+        cap(
+            "file-manager", "Full SAF file manager (browse/copy/move/compress)", CapabilityArea.PLATFORM,
+            CapabilityStatus.PLANNED, "",
+            emptyList(),
+            listOf("Would use Storage Access Framework tree and document URIs"),
+            listOf(
+                "Not implemented yet; single-file picking for scanning already works",
+                "Android scoped storage limits access to user-granted trees only"
+            ),
+            "n/a — not implemented"
+        ),
+        cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,
             CapabilityStatus.PLANNED, "",
             emptyList(), listOf("Would summarise telemetry, rule counts, last errors"),
