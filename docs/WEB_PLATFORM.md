@@ -1,4 +1,4 @@
-# OmniShield X web platform — AETHER AI Evolution (v5.0.1)
+# OmniShield X web platform — AETHER AI Evolution (v5.1.0)
 
 > Part of the [AdShield Pro repository](../README.md). The Android app lives in
 > [`app/`](../app); this document covers the browser platform that sits beside it.
@@ -16,7 +16,7 @@ files (GitHub Pages compatible); works offline once visited.
 
 ```bash
 npm install        # jsdom, used only by the integration tests
-npm test           # 166 unit + 19 integration tests
+npm test           # 220 unit + 31 integration tests
 npm run verify     # 86 static architecture, claim, artifact and packaging gates
 npm run lint       # house lint rules for shipped runtime code
 npm run stage      # assemble the deployable _site/ (site at /, app at /app/)
@@ -60,6 +60,15 @@ page still works.
   text form that DoH JSON actually returns.
 - **Misleading dashboard figures.** Rule counts copied from the Android APK were displayed for
   files not present in this deployment; numbers are now measured at runtime.
+
+## v5.1 screens (added to the existing UI, nothing redesigned)
+
+| Screen | What is real | What it refuses to pretend |
+|---|---|---|
+| **System Scan** | Byte inspection of files you pick or drop (magic bytes vs extension, embedded PE, dropper scripts, macro docs, zip-slip, EICAR, entropy), URL phishing scoring, vault re-hashing, configuration audit, JSON reports and run history | No installed-app enumeration, no whole-device file access, no unknown-malware detection |
+| **Private Search** | Five engines with their published privacy positions, per-engine URL building, tracking-parameter stripping, `noopener,noreferrer` opening with blocked-pop-up reporting, DuckDuckGo instant answers, local opt-out history | No in-app result pages (engines forbid it), no suggestion service, no anonymity claim |
+| **Cloud Box** | IndexedDB file storage with folders, tags, image/video/audio/PDF/text previews, SHA-256 verification, AES-GCM passphrase lock, quota reporting, 100 MB per file | No server sync, no passphrase recovery |
+| **Downloader** | Platform registry with what each permits, real oEmbed metadata, HEAD pre-flight (size, type, range support), resumable/pausable/cancellable streaming queue, completed files land in the Cloud Box | No YouTube/Spotify/Instagram extraction, no DRM circumvention, no transcoding |
 
 ## Architecture at a glance
 

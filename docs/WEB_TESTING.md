@@ -58,9 +58,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 166 unit tests, 19 integration tests — all passing.
+- 220 unit tests, 31 integration tests — all passing.
 - Static verification: 86 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
-- `npm run lint` — 25 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
+- `npm run lint` — 29 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.
@@ -78,10 +78,35 @@ Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 - Base-rate precision (converted from recall/specificity): ≈ 0.06 at a 1% malicious base rate,
   ≈ 0.42 at 10%. This is why the model is weighted 7/100 and can never block.
 - Engine throughput: > 2,000 evaluations/ms budget; the test asserts < 0.5 ms/op.
+- System scanner (`tests/unit/scan.test.mjs`): every fixture is built from explicit bytes —
+  the EICAR signature, a PE header renamed `.jpg`, a JPEG renamed `.pdf`, a crafted PNG
+  polyglot, PowerShell/`iwr|iex` droppers, a `.docm` macro file, a double extension, entropy
+  separation, unreadable files reported as errors, unavailable modules reported with the
+  reason, concurrent-run refusal, and a report that contains hashes but never file contents.
+- Cloud box (`tests/unit/vault.test.mjs`): byte-exact round-trips, digest verification,
+  folders/rename/move/tags/search, the 100 MB ceiling, a storage write failure surfacing as a
+  rejection, the index-corruption path, AES-GCM encryption (ciphertext must not contain the
+  plaintext; a wrong passphrase must fail; a locked vault must refuse reads), the base64 path
+  for string-only backends, and the localStorage fallback refusing large files with a reason.
+- Downloader (`tests/unit/media.test.mjs`): per-platform refusal reasons, real oEmbed parsing,
+  CORS failures reported as CORS failures, HEAD pre-flight, streaming progress, 404 →
+  `failed` (never a fabricated file), pause/resume using a real `Range` header, and a server
+  that ignores `Range` restarting from zero instead of corrupting the file.
+- Private search (`tests/unit/search.test.mjs`): per-engine URL construction, `!bang`
+  switching, tracking-parameter stripping, `noopener,noreferrer` opening plus blocked-pop-up
+  reporting, instant-answer parsing and its failure paths, and opt-out history that erases on
+  disable.
+- v5.1 screens in the real DOM (`tests/integration/features.test.mjs`): drives the actual
+  buttons — scan, search, vault upload/preview/rename/lock, downloader check/format/download —
+  and asserts on rendered output, including that unavailable modules render disabled.
 
 ## 5. What the suite does not cover
 
 - Real network behaviour against live resolvers (tests use a deterministic fetch mock).
 - Real browser rendering/CSS (jsdom has no layout engine; charts degrade gracefully).
 - Service-worker runtime semantics (only its file list is verified statically).
+- A real browser engine: no Chromium binary can be downloaded in the build sandbox, so the
+  DOM suite runs under jsdom. Canvas charts degrade (no 2D context) and `URL.createObjectURL`
+  is absent, which is why previews fall back to a data URL and the chart path is written to
+  no-op. **Rendering, CSS and real-blob behaviour still need a manual browser pass.**
 - Real-world feed drift (upstream content changes daily; the shrink guard is what protects you).

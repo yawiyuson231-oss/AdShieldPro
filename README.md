@@ -41,13 +41,29 @@ over HTTP and it works offline after the first visit.
 
 ```bash
 npm install               # jsdom, used only by the integration tests
-npm test                  # 166 unit + 19 integration tests
+npm test                  # 220 unit + 31 integration tests
 npm run lint              # house lint rules for the shipped runtime code
 npm run verify            # 86 static architecture, claim, artifact and packaging gates
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 npm run stage             # assemble _site/ exactly as the Pages workflow does
 ```
+
+### What the web platform adds in v5.1
+
+Four new screens, built from the existing card/row/pill vocabulary — no existing page,
+tab, colour or component was changed:
+
+| Screen | Real capability |
+|---|---|
+| **System Scan** | Byte inspection of granted files (disguised executables, dropper scripts, macro documents, zip-slip, EICAR), URL phishing scoring, vault re-hashing, configuration audit, JSON reports and history |
+| **Private Search** | DuckDuckGo, Google, Startpage, Brave and Mojeek with their published privacy positions, `!bang` switching, tracking-parameter stripping, `noopener,noreferrer`, in-app DuckDuckGo instant answers |
+| **Cloud Box** | On-device IndexedDB storage with folders, tags, previews, SHA-256 verification, AES-GCM passphrase lock and quota reporting — **100 MB per file** |
+| **Downloader** | Platform-aware URL checks against each service's real metadata, HEAD pre-flight, and a resumable/pausable/cancellable streaming queue for sources that permit downloading |
+
+Everything unavailable stays labelled unavailable on the **Capabilities** page: installed-app
+enumeration, whole-device file access, in-app results from engines that forbid embedding, and
+extraction from DRM-protected platforms are shown as *not implemented* with the reason.
 
 | Document | Contents |
 |---|---|

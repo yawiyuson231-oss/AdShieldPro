@@ -1,6 +1,6 @@
 {
   "artifact": "omnishield-x-extension.zip",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "rules": 30000,
   "uniqueDomains": 30000,
   "rulesets": 2,

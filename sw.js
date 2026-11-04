@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.1';
+const VERSION = 'omnishield-x-v5.1.0';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RULES_CACHE = `${VERSION}-rules`;
 
@@ -45,7 +45,11 @@ const SHELL_ASSETS = [
   './security/privacy.js',
   './security/power.js',
   './security/sha256.js',
-  './security/storage.js'
+  './security/storage.js',
+  './security/vault.js',
+  './security/scan.js',
+  './security/search.js',
+  './security/media.js'
 ];
 
 const RULES_ASSETS = ['./assets/core_lite_ads.txt'];

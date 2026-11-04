@@ -236,7 +236,7 @@ function buildState({ includeModel = false } = {}) {
   }
   return {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: '5.0.1',
+    appVersion: '5.1.0',
     savedAt: new Date().toISOString(),
     settings: { ...state.settings },
     customRules: state.customRules.map((r) => ({ pattern: r.pattern, isAllow: r.isAllow, rawPattern: r.pattern, ruleType: r.isAllow ? 'ALLOW' : 'BLOCK', matchType: 'SUFFIX', isEnabled: true })),
@@ -1426,7 +1426,7 @@ function exportMergedConfig() {
     ...(state.importedBackup || {}),
     ...buildState({ includeModel: true }),
     exportedAt: new Date().toISOString(),
-    exportedBy: 'OmniShield X web platform v5.0.1'
+    exportedBy: 'OmniShield X web platform v5.1.0'
   };
   download('omnishield-x-config.json', JSON.stringify(payload, null, 2));
   toast('Merged configuration exported.', 'ok');
@@ -1502,6 +1502,20 @@ const CAPABILITIES = [
   ['Privacy analytics with k-anonymity', 'works', 'infrastructure.test.mjs — privacy'],
   ['Battery/CPU-aware repaint scheduling', 'works', 'power.test.mjs — bands, clamping, honest unsupported path'],
   ['Battery Status API in every browser', 'partial', 'Chrome/Edge expose it; Safari does not. Falls back to the default cadence and says so'],
+  ['System scan: file byte inspection', 'works', 'scan.test.mjs — magic bytes vs extension, embedded PE, dropper scripts, macro docs, zip-slip, EICAR, entropy'],
+  ['System scan: URL / phishing analysis', 'works', 'scan.test.mjs — typosquat, IP lure, punycode, abuse TLDs, credential paths'],
+  ['System scan: integrity + configuration audit', 'works', 'scan.test.mjs — vault re-hash, resolver encryption, DNSSEC state, feed hashes'],
+  ['System scan: installed apps / whole device', 'not-implemented', 'A web page cannot enumerate installed apps or read the file system. Android scoped storage forbids it too; files must be granted explicitly'],
+  ['Private search with DuckDuckGo / Google / Startpage / Brave / Mojeek', 'works', 'search.test.mjs — per-engine URL construction, noopener,noreferrer, blocked-pop-up reporting'],
+  ['Private search: in-app results for any engine', 'not-implemented', 'Every engine refuses cross-origin result reads. Queries open in a new tab; only DuckDuckGo Instant Answers can be shown in-app'],
+  ['Search: tracking-parameter stripping', 'works', 'search.test.mjs — utm_*, fbclid, gclid, msclkid and the published list'],
+  ['Private cloud box on this device', 'works', 'vault.test.mjs — IndexedDB storage, folders, previews, SHA-256 verify, quotas'],
+  ['Cloud box: server-side sync between devices', 'not-implemented', 'No backend by design. Transfers are files you move yourself (Backup & Sync tab)'],
+  ['Cloud box: AES-GCM passphrase lock', 'works', 'vault.test.mjs — ciphertext excludes plaintext, wrong passphrase rejected, tag check on read'],
+  ['Cloud box: recover a lost passphrase', 'rejected', 'Never implemented — a recovery path would defeat the encryption'],
+  ['Universal downloader: direct media and permitted sources', 'works', 'media.test.mjs — streaming, real progress, pause/resume with Range, cancel, history'],
+  ['Universal downloader: YouTube / Spotify / Instagram extraction', 'not-implemented', 'Their terms forbid it and the streams are DRM-protected or signed manifests. The UI refuses with a reason instead of guessing'],
+  ['Universal downloader: server-side transcoding or format conversion', 'not-implemented', 'The browser stores the bytes the server sends; no transcoder runs here'],
   ['Passive capture of other apps\' traffic', 'not-implemented', 'Requires OS-level VPN (Android core); browsers cannot do this'],
   ['Antivirus / file scanning', 'not-implemented', 'This is DNS filtering, not an antivirus. Never claimed.'],
   ['Universal ad blocking (all apps, all browsers)', 'not-implemented', 'No technology can guarantee that; see capabilities notes'],
@@ -1527,7 +1541,9 @@ function renderStatus() {
       h('li', { text: 'DNSSEC trust is delegated to the upstream resolver\'s AD bit. OmniShield X does not verify signatures locally.' }),
       h('li', { text: 'Public suffix handling covers common multi-label ccTLD suffixes, not the full Public Suffix List.' }),
       h('li', { text: 'First-party advertising served from the site\'s own domain cannot be filtered by DNS.' }),
-      h('li', { text: 'Feed content is trusted as published by its maintainers (HaGeZi, GPLv3); a compromised upstream is mitigated by hash and shrink checks, not eliminated.' })
+      h('li', { text: 'Feed content is trusted as published by its maintainers (HaGeZi, GPLv3); a compromised upstream is mitigated by hash and shrink checks, not eliminated.' }),
+      h('li', { text: 'The private cloud box is this browser profile on this device. Clearing site data deletes it, and it is not synced anywhere — export the manifest or download files to keep copies.' }),
+      h('li', { text: 'A web page cannot enumerate other applications, read the whole device file system, or download media a platform forbids. Those rows are marked not implemented and the UI refuses rather than simulating them.' })
     )
   );
 }
