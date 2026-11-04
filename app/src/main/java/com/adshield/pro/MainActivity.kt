@@ -313,6 +313,7 @@ private fun HomeDestination(
     onOpenStatus: () -> Unit
 ) {
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val allTimeTotal by viewModel.allTimeTotalQueries.collectAsStateWithLifecycle()
     val allTimeBlocked by viewModel.allTimeBlockedQueries.collectAsStateWithLifecycle()
@@ -328,6 +329,7 @@ private fun HomeDestination(
     HomeScreen(
         vpnState = vpnState,
         settings = settings,
+        protectionStatus = protectionStatus,
         allTimeTotal = allTimeTotal,
         allTimeBlocked = allTimeBlocked,
         allTimeAllowed = allTimeAllowed,
@@ -667,6 +669,7 @@ private fun SettingsDestination(
         onToggleAppExclusion = viewModel::toggleAppExclusion,
         onSetAppDnsPolicy = viewModel::setAppDnsPolicy,
         onSetTransportProtected = viewModel::setTransportProtected,
+        protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
@@ -685,5 +688,5 @@ private fun StatusDestination(viewModel: AdShieldViewModel) {
     val deviceProfile = remember(configuration.screenWidthDp, configuration.smallestScreenWidthDp, batteryTelemetry) {
         viewModel.deviceProfile(configuration.screenWidthDp, configuration.smallestScreenWidthDp)
     }
-    CapabilitiesScreen(deviceProfile = deviceProfile)
+    CapabilitiesScreen(deviceProfile = deviceProfile, protectionStatus = protectionStatus)
 }

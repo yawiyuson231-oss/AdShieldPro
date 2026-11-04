@@ -58,6 +58,8 @@ import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
+import com.adshield.pro.ui.components.CompactStatusChip
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
@@ -78,6 +80,7 @@ fun SettingsScreen(
     onToggleAppExclusion: (String, Boolean) -> Unit,
     onSetAppDnsPolicy: (String, AppDnsPolicy) -> Unit,
     onSetTransportProtected: (NetworkTransportPolicy, Boolean) -> Unit,
+    protectionStatus: ProtectionPipelineStatus? = null,
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
@@ -118,10 +121,17 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text(
-                text = "Network, Apps & Privacy Settings",
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "Network, Apps & Privacy Settings",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (protectionStatus != null) {
+                    Spacer(Modifier.width(8.dp))
+                    CompactStatusChip(protectionStatus)
+                }
+            }
             Text(
                 text = "Configure Encrypted DNS, Per-App VPN Exclusions, and Backup/Restore",
                 style = MaterialTheme.typography.labelMedium,

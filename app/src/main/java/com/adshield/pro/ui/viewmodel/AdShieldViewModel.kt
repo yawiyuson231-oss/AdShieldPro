@@ -43,6 +43,8 @@ import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
+import com.adshield.pro.ui.model.ProtectionStatusEvaluator
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.data.repository.BatteryIntelligenceRepository
 import com.adshield.pro.data.repository.SecurityScanHistoryStore
@@ -84,6 +86,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -163,6 +168,26 @@ class AdShieldViewModel @Inject constructor(
     private val _isRunningDnsDiagnostics = MutableStateFlow(false)
     val isRunningDnsDiagnostics: StateFlow<Boolean> = _isRunningDnsDiagnostics.asStateFlow()
 
+    /**
+     * Live working status. The ticker only re-evaluates the pipeline; every value inside the
+     * snapshot is still read from real runtime state (VPN status, loaded rules, measured
+     * resolver latency and circuit state), never from a guess.
+     */
+    private val _statusTick = MutableStateFlow(0L)
+
+    val protectionStatus: StateFlow<ProtectionPipelineStatus> = combine(vpnState, settingsState, _statusTick) { vpn, settings, _ ->
+        ProtectionStatusEvaluator.evaluate(
+            vpn = vpn,
+            settings = settings,
+            health = upstreamDnsResolver.providerHealthSnapshots(),
+            nowMs = System.currentTimeMillis()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ProtectionStatusEvaluator.evaluate(VpnRuntimeState(), AppSettingsState(), emptyList(), System.currentTimeMillis())
+    )
+
     private val _isUpdatingFilters = MutableStateFlow(false)
     val isUpdatingFilters: StateFlow<Boolean> = _isUpdatingFilters.asStateFlow()
 
@@ -217,6 +242,12 @@ class AdShieldViewModel @Inject constructor(
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                _statusTick.value = System.currentTimeMillis()
+            }
+        }
         viewModelScope.launch {
             customRules.collect {
                 refreshRuleConflicts()
