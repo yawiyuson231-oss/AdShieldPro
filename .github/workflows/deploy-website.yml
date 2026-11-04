@@ -59,20 +59,30 @@ jobs:
           test -s app.js
           ls -l docs/index.html docs/PRIVACY_POLICY.md
 
-      # Pages must be turned on once with build_type=workflow. A repository admin can do that
-      # in Settings -> Pages; the default token cannot, so report it instead of failing silently.
-      - name: Ensure GitHub Pages is enabled
+      # Pages has to exist once with build_type=workflow. Creating it needs repository
+      # admin rights, which GITHUB_TOKEN cannot have, so this step only *reports* the
+      # state. It must not fail the run: an unenabled Pages site is a setup state, not
+      # a broken build, and failing here is what made every deploy after the first
+      # green run show up as a red X.
+      - name: Report Pages status
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
-            echo "::error::GitHub Pages is not enabled for this repository yet. A repository admin must open Settings -> Pages and set Source to \"GitHub Actions\", then re-run this workflow."
-            exit 1
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
+            echo "::notice title=Pages enabled::Pages site exists; this run will publish to it."
+          else
+            echo "::warning title=Pages not enabled::GitHub Pages is not enabled for this repository. A repository admin must open Settings -> Pages and set Source to \"GitHub Actions\" once. The site is fully built and uploaded by this run; the deploy step will be skipped."
           fi
-          echo "Pages is enabled."
 
+      # enablement: true asks the action to create the Pages site when it is missing.
+      # GITHUB_TOKEN usually cannot do that (it needs admin), so this step is allowed
+      # to fail and the run continues to build + upload the artifact either way.
       - name: Configure Pages
+        id: configure
+        continue-on-error: true
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -85,11 +95,37 @@ jobs:
         # precache target is missing from the staged tree.
         run: node scripts/stage-site.mjs --out _site
 
+      # Always upload: the artifact is the deliverable and stays downloadable from the
+      # run even when Pages is not switched on yet.
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
+      # Deploy only when Pages is actually available. A skipped deploy is honest;
+      # a failed one hides the fact that everything else succeeded.
       - name: Deploy to Pages
         id: pages
+        if: steps.configure.outcome == 'success'
         uses: actions/deploy-pages@v4
+
+      - name: Explain what happened
+        if: always()
+        env:
+          DEPLOY_OUTCOME: ${{ steps.pages.outcome }}
+          PAGE_URL: ${{ steps.pages.outputs.page_url }}
+        run: |
+          if [ "$DEPLOY_OUTCOME" = "success" ]; then
+            echo "::notice title=Deployed::Site published to ${PAGE_URL}"
+          else
+            {
+              echo "### Site built, deploy skipped"
+              echo ""
+              echo "The site was assembled and uploaded as a Pages artifact, but **GitHub Pages"
+              echo "is not enabled** for this repository, so nothing was published."
+              echo ""
+              echo "One-time fix (repository admin): **Settings → Pages → Source: GitHub Actions**."
+              echo "Then re-run this workflow. No code change is required."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning title=Deploy skipped::Enable Pages in Settings -> Pages (Source: GitHub Actions) to publish."
+          fi

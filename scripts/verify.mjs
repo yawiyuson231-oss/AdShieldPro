@@ -243,6 +243,13 @@ export function verify() {
     /node scripts\/stage-site\.mjs/.test(deployWorkflow) && /path:\s*_site/.test(deployWorkflow));
   add('the assembler publishes the web platform under /app/',
     /APP_DIRS/.test(read('scripts/stage-site.mjs')) && /app'/.test(read('scripts/stage-site.mjs')));
+  add('a disabled Pages site cannot fail the deploy run',
+    /id:\s*configure[\s\S]{0,120}continue-on-error:\s*true/.test(deployWorkflow)
+      && /if:\s*steps\.configure\.outcome == 'success'/.test(deployWorkflow),
+    'build + upload always run; deploy is skipped, not failed');
+  add('the deploy run explains the one-time Pages switch',
+    /Settings → Pages → Source: GitHub Actions/.test(deployWorkflow) && /GITHUB_STEP_SUMMARY/.test(deployWorkflow),
+    'step summary names the exact click path');
   add('the assembler verifies every service-worker precache target',
     /checkPrecache/.test(read('scripts/stage-site.mjs')) && /is not self-sufficient/.test(read('scripts/stage-site.mjs')));
 
