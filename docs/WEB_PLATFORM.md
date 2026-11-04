@@ -43,6 +43,7 @@ page still works.
 | **Recovery** | Hashed snapshot ring, write verification, schema migration v1→v3, newest-valid-first auto-recovery |
 | **Privacy** | k-anonymous local analytics (k = 10), salted hashes, retention limits, nothing uploaded |
 | **Offline** | Service worker caches the shell and bundled rules; never caches DoH |
+| **CyberShield console** | Threat-intelligence dashboard: dot-matrix world map with animated attack arcs, severity donut, live feed, detection-engine meter, attack vectors, asset health and a compliance report. Measured figures come from the live engine/monitor/model; the global telemetry is a deterministic, clearly-labelled simulation (see below) |
 
 ### Bugs fixed from v4
 
@@ -60,6 +61,26 @@ page still works.
   text form that DoH JSON actually returns.
 - **Misleading dashboard figures.** Rule counts copied from the Android APK were displayed for
   files not present in this deployment; numbers are now measured at runtime.
+
+## The CyberShield AI console
+
+**CyberShield** is the console page (`#cyber`, tab "CyberShield"). It is a dense operations
+dashboard — the kind of thing usually built from a screenshot — with one non-negotiable rule:
+**it never invents a number and calls it measured.**
+
+| Lane | Source | How it is presented |
+|---|---|---|
+| **Measured** | `engine.breakdown()`, `monitor.metrics()`, the trained lexical model | Rule counts, domains blocked, and model AUC are read from the running app and labelled *measured* |
+| **Simulated** | `cyber/telemetry.js` — seeded PRNG, fixed region and vector tables | Map arcs, the feed, threat volumes, asset inventory and compliance seals; every panel that uses them says *simulated* in its own body text |
+
+- `enforced` is always false: a simulated detection never blocks, scores or recommends anything.
+- The compliance panel links to a report that shows **not certified** and names the open gaps
+  rather than printing green ticks for audits nobody performed.
+- One `setInterval` drives the whole console and the canvas parks itself when the page is
+  hidden, when the tab is backgrounded, or when the visitor prefers reduced motion.
+- The world map (`cyber/map.js`) rasterises a polygon world description into a dot grid once
+  per resize and animates arcs with travelling heads; no GeoJSON is fetched, so the panel works
+  offline and adds nothing to the network budget.
 
 ## Architecture at a glance
 

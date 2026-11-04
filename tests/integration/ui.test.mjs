@@ -439,3 +439,128 @@ test('no page uses innerHTML or trusts file content as markup', () => {
   assert.equal(/insertAdjacentHTML/.test(appSource), false, 'app.js must not use insertAdjacentHTML');
   assert.equal(/\.innerHTML\s*=/.test(domSource), false, 'ui/dom.js must not assign innerHTML');
 });
+
+/* ------------------------------------------------------------------ */
+/* CyberShield AI console                                              */
+/* ------------------------------------------------------------------ */
+
+test('CyberShield console renders every panel of the dashboard', () => {
+  app.navigate('cyber');
+  const page = $('#page-cyber');
+  assert.ok(page, 'the console section must exist');
+  assert.equal(page.hidden, false);
+
+  // Every panel the reference layout asks for.
+  const panels = ['#cs-overview', '#cs-activity', '#cs-feed', '#cs-engine', '#cs-vectors', '#cs-assets', '#cs-compliance'];
+  for (const selector of panels) {
+    const panel = $(selector);
+    assert.ok(panel, `${selector} must be rendered`);
+    assert.ok(panel.textContent.trim().length > 30, `${selector} rendered too little content`);
+  }
+  assert.ok($('#cs-map'), 'the threat map canvas must exist');
+
+  // Headline figures from the art are present and unambiguous.
+  const overview = text('#cs-overview');
+  assert.match(overview, /Threat overview/i);
+  assert.match(overview, /Total threats/i);
+  assert.ok($('#cs-overview .cs-stat b'), 'statistics must show values');
+  assert.equal($('#cs-overview .cs-stat--total b').textContent.length > 0, true);
+
+  // Severity legend and donut.
+  assert.ok($('#cs-activity .cs-donut-wrap .cs-donut'), 'the severity donut must render');
+  assert.equal(win.document.querySelectorAll('#cs-activity .cs-donut__ring').length, 4,
+    'one ring per severity band');
+  const legend = text('#cs-activity');
+  for (const sev of ['Critical', 'High', 'Medium', 'Low']) assert.match(legend, new RegExp(sev, 'i'));
+
+  // Detection engine: four named signals and a processing meter.
+  const engine = text('#cs-engine');
+  for (const signal of ['Behaviour Analysis', 'Anomaly Detection', 'ML Classification', 'Threat Correlation']) {
+    assert.match(engine, new RegExp(signal));
+  }
+  assert.match(engine, /Processing/i);
+  assert.equal($('#cs-engine-progress') !== null, true);
+
+  // Attack vectors are ordered percentages.
+  assert.match(text('#cs-vectors'), /Top attack vectors/i);
+  assert.ok(win.document.querySelectorAll('#cs-vectors .cs-vector').length >= 5);
+
+  // Asset tiles: endpoints, cloud, network — each with a protected count.
+  const assets = text('#cs-assets');
+  for (const cls of ['Endpoints', 'Cloud Systems', 'Network']) assert.match(assets, new RegExp(cls));
+  assert.equal(win.document.querySelectorAll('#cs-assets .cs-asset').length, 3);
+
+  // Compliance seals and the call to action.
+  assert.match(text('#cs-compliance'), /Compliance status/i);
+  assert.equal(win.document.querySelectorAll('#cs-compliance .cs-seal').length, 4);
+  assert.match(text('#cs-compliance'), /View compliance report/i);
+
+  // Threat feed rows carry a severity tag, a title and a timestamp.
+  const rows = win.document.querySelectorAll('#cs-feed .cs-feed li');
+  assert.ok(rows.length >= 5, `feed should be seeded, found ${rows.length}`);
+  assert.ok(rows[0].querySelector('.cs-tag')?.textContent.trim().length > 0);
+  assert.ok(rows[0].querySelector('time')?.textContent.match(/\d{2}:\d{2}:\d{2}/));
+});
+
+test('CyberShield separates measured numbers from the labelled simulation', () => {
+  app.navigate('cyber');
+  const measuredRules = app.state.engine.breakdown().total;
+  const mapFoot = text('#cs-map-shell');
+  assert.ok(mapFoot.includes(Number(measuredRules).toLocaleString()),
+    'the map footer must show the real rule count loaded in this browser');
+
+  // Every panel built on synthetic telemetry says so in its own body text.
+  assert.match(text('#cs-overview'), /simulated/i);
+  assert.match(text('#cs-feed'), /simulated/i);
+  assert.match(text('#cs-compliance'), /not certified|Illustrative/i);
+  assert.match(text('#cs-engine'), /simulated|no packet inspection/i);
+});
+
+test('CyberShield console views are reachable and honest', () => {
+  app.navigate('cyber');
+  const buttons = [...win.document.querySelectorAll('#cs-nav [data-cs-view]')];
+  assert.equal(buttons.length, 8, 'the reference bar has eight sections');
+  assert.equal(buttons.filter((b) => b.getAttribute('aria-selected') === 'true').length, 1,
+    'exactly one console section may be selected');
+
+  for (const button of buttons) {
+    button.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const selected = [...win.document.querySelectorAll('#cs-nav [data-cs-view]')]
+      .filter((b) => b.getAttribute('aria-selected') === 'true');
+    assert.equal(selected.length, 1, `${button.dataset.csView} must be the only selection`);
+    assert.equal(selected[0], button);
+    assert.equal(button.getAttribute('aria-selected'), 'true');
+  }
+
+  app.state.cyber.showView('reports');
+  assert.match(text('#cs-view'), /not certified/i,
+    'the compliance report must not claim an audit that never happened');
+  assert.match(text('#cs-view'), /audit/i);
+
+  app.state.cyber.showView('dashboard');
+  assert.equal($('#cs-view').hidden, true, 'returning to the dashboard hides the drill-down');
+});
+
+test('leaving the console stops its timer and the map loop', async () => {
+  app.navigate('cyber');
+  const panelBefore = $('#cs-feed .cs-feed li')?.querySelector('time')?.textContent;
+  assert.ok(panelBefore);
+
+  // The timer must be parked the moment another page is shown.
+  app.navigate('dashboard');
+  const state = app.state.cyber;
+  assert.ok(state, 'the console instance survives navigation');
+  await new Promise((r) => setTimeout(r, 1800));
+  const rowsAfter = win.document.querySelectorAll('#cs-feed .cs-feed li').length;
+  assert.ok(rowsAfter <= 9, 'a hidden console must not keep appending rows');
+});
+
+test('the console is mounted lazily, not during boot', () => {
+  // renderAll() runs at boot; it must skip the console so no timer starts for
+  // a page the visitor has never opened.
+  const source = read('app.js');
+  assert.match(source, /if \(name === 'cyber'\) continue;/,
+    'renderAll must skip the console renderer');
+  assert.match(source, /state\.currentPage === 'cyber' && page !== 'cyber'\) pauseCyber\(\)/,
+    'navigation must pause the console when leaving it');
+});

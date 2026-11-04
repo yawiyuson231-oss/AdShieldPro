@@ -208,3 +208,17 @@ facts fetch resolves.
   `cache: 'no-store'`, and HTTPS-only endpoints.
 - The service worker never intercepts or caches cross-origin DoH traffic.
 - Imported configuration is treated as untrusted text and validated before use.
+
+## CyberShield AI console (`cyber/`)
+
+| Module | Responsibility |
+|---|---|
+| `cyber/dashboard.js` | Console controller: panel rendering, the single update timer, drill-down views (`Threats`, `Endpoints`, `Cloud`, `Network`, `Intelligence`, `Reports`, `Settings`), pause/resume on navigation and full teardown |
+| `cyber/map.js` | Canvas world map: polygon world description → dot grid, animated attack arcs with travelling heads, impact rings, shield core. Own animation loop, parked when hidden |
+| `cyber/telemetry.js` | Threat model: region/vector catalogues, deterministic PRNG (`mulberry32`), seeded scenario, synthetic event generator, and `measuredFrom(appState)` — the only bridge to real numbers |
+| `cyber/dashboard.css` | The console's design system, scoped under `#page-cyber` so it cannot leak into the other pages |
+
+Separation is deliberate: `telemetry.js` is the only module that invents data, and it exposes
+the measured lane through a separate function, so "is this number real?" is answerable by
+reading one import.
+

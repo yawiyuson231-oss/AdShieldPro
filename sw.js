@@ -45,7 +45,11 @@ const SHELL_ASSETS = [
   './security/privacy.js',
   './security/power.js',
   './security/sha256.js',
-  './security/storage.js'
+  './security/storage.js',
+  './cyber/dashboard.css',
+  './cyber/dashboard.js',
+  './cyber/map.js',
+  './cyber/telemetry.js'
 ];
 
 const RULES_ASSETS = ['./assets/core_lite_ads.txt'];

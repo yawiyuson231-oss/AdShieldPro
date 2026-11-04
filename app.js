@@ -23,6 +23,7 @@ import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
 import { createStorage } from './security/storage.js';
 import * as ui from './ui/dom.js';
+import { createCyberConsole } from './cyber/dashboard.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
 const BUNDLED = {
@@ -54,7 +55,8 @@ const state = {
   bundled: {},
   snapshotTimer: null,
   lastSnapshotId: null,
-  currentPage: 'dashboard'
+  currentPage: 'dashboard',
+  cyber: null
 };
 
 /* ------------------------------------------------------------------ */
@@ -326,6 +328,7 @@ async function ensureModel(force = false) {
 /* ------------------------------------------------------------------ */
 
 const PAGE_RENDERERS = {
+  cyber: renderCyber,
   dashboard: renderDashboard,
   aether: renderAether,
   dns: renderDns,
@@ -340,6 +343,9 @@ const PAGE_RENDERERS = {
 
 function navigate(page) {
   const focusOnNavigate = state.booted && state.currentPage !== page;
+  // Leaving the console must stop its timers: an invisible dashboard doing
+  // 1500 ms work is exactly the kind of background cost this app refuses.
+  if (state.currentPage === 'cyber' && page !== 'cyber') pauseCyber();
   state.currentPage = page;
   for (const section of document.querySelectorAll('.page')) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll('nav.tabs button')) {
@@ -374,7 +380,10 @@ function navigate(page) {
 }
 
 function renderAll() {
-  for (const render of Object.values(PAGE_RENDERERS)) {
+  // The console is mounted lazily by `navigate()`: booting it here would start
+  // its timers for a page the visitor is not looking at.
+  for (const [name, render] of Object.entries(PAGE_RENDERERS)) {
+    if (name === 'cyber') continue;
     try { Promise.resolve(render()).catch((err) => console.error('render failed', err)); } catch (err) { console.error('render failed', err); }
   }
 }
@@ -382,6 +391,37 @@ function renderAll() {
 document.querySelectorAll('nav.tabs button').forEach((button) => {
   button.addEventListener('click', () => navigate(button.dataset.page));
 });
+
+/* ------------------------------------------------------------------ */
+/* CyberShield AI console                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Mounts (once) and resumes the threat-intelligence console.
+ *
+ * The console owns a single timer and a canvas animation loop; both are
+ * paused by `navigate()` whenever another page is showing, so an idle tab
+ * costs nothing. Its simulated panels are labelled in the UI; anything it
+ * reports as measured is read from the live engine, monitor and model.
+ */
+function renderCyber() {
+  if (!state.cyber) {
+    state.cyber = createCyberConsole(state, {
+      reduced: globalThis.matchMedia
+        ? globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches
+        : false
+    });
+    if (!state.cyber) return;
+  }
+  // Only drive the loop while the console is the visible page.
+  if (state.currentPage === 'cyber') state.cyber.resume();
+  else state.cyber.pause();
+}
+
+/** Stops the console's timers when it is no longer the visible page. */
+function pauseCyber() {
+  if (state.cyber && state.currentPage !== 'cyber') state.cyber.pause();
+}
 
 /* ------------------------------------------------------------------ */
 /* Dashboard                                                           */
@@ -1654,5 +1694,6 @@ globalThis.__omnishield = {
   stop() {
     clearInterval(state.monitorTimer);
     try { state.power?.stop(); } catch { /* ignore */ }
+    try { state.cyber?.destroy(); } catch { /* ignore */ }
   }
 };

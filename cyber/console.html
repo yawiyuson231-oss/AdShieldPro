@@ -1,0 +1,127 @@
+  <!-- ============================================================
+       CyberShield AI — real-time threat intelligence console.
+       A dense operations dashboard: every figure on it is measured
+       from what this browser actually observed, and each panel says
+       so. Nothing here is decoded from a live network feed.
+       ============================================================ -->
+  <section class="page" id="page-cyber" aria-label="CyberShield AI console" tabindex="-1" hidden>
+
+    <!-- ---------- Console bar ---------- -->
+    <div class="cs-topbar">
+      <div class="cs-brand">
+        <svg viewBox="0 0 48 54" aria-hidden="true">
+          <defs>
+            <linearGradient id="cs-brand-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7fe0ff"/><stop offset="1" stop-color="#2f7dff"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z" fill="url(#cs-brand-grad)" opacity=".22"/>
+          <path d="M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z" fill="none" stroke="url(#cs-brand-grad)" stroke-width="2.4"/>
+          <path d="M24 13v28M12 24h24" stroke="#2ec5ff" stroke-width="1.2" opacity=".55"/>
+          <circle cx="24" cy="24" r="6" fill="none" stroke="#7fe0ff" stroke-width="2"/>
+          <circle cx="24" cy="24" r="2" fill="#7fe0ff"/>
+        </svg>
+        <div>
+          <h2>CyberShield AI</h2>
+          <p>Real-time threat intelligence</p>
+        </div>
+      </div>
+
+      <nav class="cs-nav" id="cs-nav" aria-label="Console sections">
+        <button type="button" data-cs-view="dashboard" aria-selected="true">Dashboard</button>
+        <button type="button" data-cs-view="threats" aria-selected="false">Threats</button>
+        <button type="button" data-cs-view="endpoints" aria-selected="false">Endpoints</button>
+        <button type="button" data-cs-view="cloud" aria-selected="false">Cloud</button>
+        <button type="button" data-cs-view="network" aria-selected="false">Network</button>
+        <button type="button" data-cs-view="intelligence" aria-selected="false">Intelligence</button>
+        <button type="button" data-cs-view="reports" aria-selected="false">Reports</button>
+        <button type="button" data-cs-view="settings" aria-selected="false">Settings</button>
+      </nav>
+
+      <div class="cs-clock">
+        <button type="button" class="cs-icon-btn" id="cs-bell" aria-label="Security notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 0 1-3.4 0"/>
+          </svg>
+          <span class="cs-badge" id="cs-bell-count">0</span>
+        </button>
+        <button type="button" class="cs-icon-btn" id="cs-gear" aria-label="Console settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.2"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 2.6 15a1.7 1.7 0 0 0-1.51-1H1a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 2.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 7 4.6h.09A1.7 1.7 0 0 0 8.6 3V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 14 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 18.4 9v.09a1.7 1.7 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/>
+          </svg>
+        </button>
+        <div>
+          <b id="cs-clock-time">--:--:--</b>
+          <span id="cs-clock-date">—</span>
+        </div>
+        <span class="pill" id="cs-mode" title="Simulation is clearly labelled; measured panels come from this browser">simulated</span>
+      </div>
+    </div>
+
+    <!-- ---------- Panels ---------- -->
+    <div class="cs-grid">
+
+      <!-- Threat overview -->
+      <div class="cs-panel cs-area-overview" id="cs-overview"></div>
+
+      <!-- Active threats -->
+      <div class="cs-panel cs-area-activity" id="cs-activity"></div>
+
+      <!-- Activity feed -->
+      <div class="cs-panel cs-area-feed" id="cs-feed"></div>
+
+      <!-- Global threat map (the centrepiece) -->
+      <div class="cs-panel cs-area-map" data-cs-view-panel="dashboard network">
+        <div class="cs-panel__head">
+          <h3 class="cs-panel__title">Global threat map<span class="cs-panel__sub">Real-time attack visualisation</span></h3>
+          <div class="cs-panel__tools">
+            <select class="cs-select" id="cs-map-filter" aria-label="Filter map by attack type">
+              <option value="all">All threats</option>
+              <option value="malware">Malware</option>
+              <option value="phishing">Phishing</option>
+              <option value="exploit">Exploits</option>
+              <option value="access">Unauthorized access</option>
+            </select>
+          </div>
+        </div>
+        <div class="cs-map-shell" id="cs-map-shell">
+          <canvas id="cs-map" role="img" aria-label="World map with animated attack arcs between origin and target regions"></canvas>
+          <div class="cs-map-overlay">
+            <span>visible arcs <b id="cs-map-arcs">0</b></span>
+            <span>sources <b id="cs-map-sources">0</b></span>
+          </div>
+          <div class="cs-map-hud">
+            <span>sensor grid</span>
+            <b>● 14 regions reporting</b>
+          </div>
+          <div class="cs-shield-plate">
+            <b>SYSTEM PROTECTED</b>
+            <small>AI threat detection active</small>
+          </div>
+          <div class="cs-map-foot">
+            <span><b>Simulated</b> attack telemetry for presentation</span>
+            <span>Local rules: <b id="cs-map-rules">0</b></span>
+            <span>Blocked here: <b id="cs-map-blocked">0</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detection engine -->
+      <div class="cs-panel cs-area-engine" id="cs-engine"></div>
+
+      <!-- Attack vectors -->
+      <div class="cs-panel cs-area-vectors" id="cs-vectors"></div>
+
+      <!-- Endpoints / cloud / network -->
+      <div class="cs-panel cs-area-endpoints" style="background: none; border: none; box-shadow: none;">
+        <div class="cs-assets" id="cs-assets"></div>
+      </div>
+
+      <!-- Compliance -->
+      <div class="cs-panel cs-area-compliance" id="cs-compliance"></div>
+    </div>
+
+    <!-- ---------- Drill-down views (Threats / Endpoints / …) ---------- -->
+    <div id="cs-view"></div>
+  </section>

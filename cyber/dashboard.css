@@ -1,0 +1,426 @@
+/* =============================================================
+   CyberShield AI — real-time threat intelligence dashboard.
+
+   Visual system: deep-space navy, hairline cyan borders, magenta
+   threat accents and glass panels. Every colour lives in a token
+   here so the console stays one design language.
+
+   Scoped under #page-cyber so it never leaks into the other pages.
+   ============================================================= */
+
+#page-cyber {
+  --cy-bg: #050a14;
+  --cy-panel: #070e1c;
+  --cy-panel-2: #0a1424;
+  --cy-panel-3: #0d1a2e;
+  --cy-line: #16304f;
+  --cy-line-soft: #102338;
+  --cy-text: #dce9f7;
+  --cy-dim: #7f9ab8;
+  --cy-dimmer: #5a7492;
+  --cy-cyan: #2ec5ff;
+  --cy-cyan-soft: #7fe0ff;
+  --cy-blue: #2f7dff;
+  --cy-green: #2ee6a0;
+  --cy-amber: #ffbf47;
+  --cy-red: #ff3b5c;
+  --cy-magenta: #ff2f7d;
+  --cy-violet: #8b5cf6;
+  --cy-mono: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+  --cy-radius: 10px;
+  color: var(--cy-text);
+}
+
+/* The console owns its own padding: a full-bleed control room, not a card stack. */
+#page-cyber.page {
+  gap: 14px;
+  margin-inline: calc(clamp(14px, 3.5vw, 34px) * -1);
+  padding: 14px clamp(14px, 3.5vw, 34px) 22px;
+  background:
+    radial-gradient(1200px 520px at 50% -18%, #0d2340aa, transparent 70%),
+    linear-gradient(180deg, #050a14, #040810 60%);
+  border-block: 1px solid var(--cy-line-soft);
+}
+
+/* ---------- Shared surfaces ---------- */
+.cs-panel {
+  position: relative;
+  display: flex; flex-direction: column;
+  background:
+    linear-gradient(180deg, #0a1526, #060d19);
+  border: 1px solid var(--cy-line);
+  border-radius: var(--cy-radius);
+  box-shadow: inset 0 1px 0 #1b3b6033, 0 14px 34px -26px #000;
+  min-width: 0;
+}
+.cs-panel::after {
+  /* hairline top glow, the signature of the reference */
+  content: "";
+  position: absolute; inset: 0 0 auto; height: 1px;
+  background: linear-gradient(90deg, transparent, #2ec5ff66, transparent);
+  border-radius: var(--cy-radius) var(--cy-radius) 0 0;
+  pointer-events: none;
+}
+.cs-panel__head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px 9px;
+  border-bottom: 1px solid var(--cy-line-soft);
+}
+.cs-panel__title {
+  font-size: 12px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  color: #eaf4ff; margin: 0; font-family: var(--cy-mono);
+}
+.cs-panel__sub {
+  display: block; font-size: 10px; letter-spacing: .07em; text-transform: none;
+  color: var(--cy-dim); font-weight: 400; font-family: inherit; margin-top: 2px;
+}
+.cs-panel__tools { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.cs-check {
+  width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid #2ee6a088; background: #2ee6a014; color: var(--cy-green);
+  font-size: 9px; line-height: 1;
+}
+.cs-panel__body { padding: 12px 14px 14px; min-width: 0; }
+.cs-panel__body--fill { flex: 1 1 auto; display: flex; flex-direction: column; padding: 0; }
+
+/* ---------- Status dot ---------- */
+.cs-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--cy-green); box-shadow: 0 0 8px var(--cy-green);
+  animation: cs-pulse 2.4s ease-in-out infinite;
+}
+.cs-dot--idle { background: var(--cy-amber); box-shadow: 0 0 8px var(--cy-amber); }
+@keyframes cs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* ---------- Top bar ---------- */
+.cs-topbar {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #081223, #060e1b);
+  border: 1px solid var(--cy-line);
+  border-radius: var(--cy-radius);
+  box-shadow: inset 0 1px 0 #1b3b6033;
+}
+.cs-brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.cs-brand svg { width: 34px; height: 34px; flex: none; filter: drop-shadow(0 0 10px #2ec5ff55); }
+.cs-brand h2 { font-size: 15.5px; font-weight: 700; letter-spacing: .02em; margin: 0; color: #f2f8ff; }
+.cs-brand p {
+  margin: 1px 0 0; font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--cy-dim); font-family: var(--cy-mono);
+}
+.cs-nav { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-inline: auto; }
+.cs-nav button {
+  background: none; border: 1px solid transparent; border-radius: 6px;
+  color: #a9c0d8; font-family: var(--cy-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; padding: 7px 11px; cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.cs-nav button:hover { color: #eaf4ff; background: #10223a; }
+.cs-nav button[aria-selected="true"] {
+  color: #eaf7ff;
+  background: linear-gradient(180deg, #14385c, #0e2740);
+  border-color: #2ec5ff88;
+  box-shadow: inset 0 0 0 1px #2ec5ff22, 0 0 18px -6px #2ec5ff88;
+}
+.cs-clock {
+  margin-left: auto; display: flex; align-items: center; gap: 12px;
+  font-family: var(--cy-mono); text-align: right;
+}
+.cs-clock b { display: block; font-size: 13px; font-weight: 600; color: #eaf4ff; letter-spacing: .06em; }
+.cs-clock span { display: block; font-size: 9.5px; color: var(--cy-dim); letter-spacing: .08em; }
+.cs-icon-btn {
+  position: relative; display: grid; place-items: center;
+  width: 32px; height: 32px; border-radius: 7px; padding: 0;
+  background: #0b1728; border: 1px solid var(--cy-line); color: #a9c0d8; cursor: pointer;
+}
+.cs-icon-btn:hover { color: #eaf4ff; border-color: #2ec5ff77; }
+.cs-icon-btn svg { width: 16px; height: 16px; }
+.cs-badge {
+  position: absolute; top: -5px; right: -5px; min-width: 15px; height: 15px; padding: 0 4px;
+  border-radius: 999px; background: var(--cy-red); color: #fff;
+  font: 700 9px/15px var(--cy-mono); text-align: center;
+  box-shadow: 0 0 10px #ff3b5c88;
+}
+
+/* ---------- The grid ---------- */
+.cs-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.72fr) minmax(0, 1.02fr);
+  grid-template-areas:
+    "overview  map        engine"
+    "activity  map        vectors"
+    "feed      endpoints  compliance";
+  align-items: stretch;
+}
+.cs-area-overview { grid-area: overview; }
+.cs-area-activity { grid-area: activity; }
+.cs-area-feed { grid-area: feed; }
+.cs-area-map { grid-area: map; }
+.cs-area-engine { grid-area: engine; }
+.cs-area-vectors { grid-area: vectors; }
+.cs-area-endpoints { grid-area: endpoints; }
+.cs-area-compliance { grid-area: compliance; }
+
+@media (max-width: 1180px) {
+  .cs-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "overview engine"
+      "map      map"
+      "activity vectors"
+      "feed     endpoints"
+      "compliance compliance";
+  }
+}
+@media (max-width: 760px) {
+  .cs-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "overview" "map" "engine" "activity" "vectors" "feed" "endpoints" "compliance";
+  }
+  .cs-topbar { gap: 10px; }
+  .cs-clock { width: 100%; margin-left: 0; justify-content: space-between; }
+}
+
+/* ---------- Overwatch helpers ---------- */
+.cs-eyebrow {
+  font-family: var(--cy-mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--cy-dim);
+}
+.cs-note {
+  font-size: 10.5px; line-height: 1.5; color: var(--cy-dimmer);
+  border-top: 1px dashed var(--cy-line-soft); margin-top: 10px; padding-top: 8px;
+}
+.cs-note b { color: var(--cy-dim); font-weight: 600; }
+
+/* ---------- Threat overview ---------- */
+.cs-spark {
+  border-radius: 8px; overflow: hidden; background: #050c17;
+  border: 1px solid var(--cy-line-soft); padding: 4px 4px 0;
+}
+.cs-spark svg { display: block; width: 100%; height: 86px; }
+.cs-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.cs-stat small {
+  display: block; font-family: var(--cy-mono); font-size: 8.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--cy-dim);
+}
+.cs-stat b {
+  display: block; font-family: var(--cy-mono); font-size: 20px; font-weight: 700;
+  letter-spacing: -.02em; margin-top: 2px; font-variant-numeric: tabular-nums;
+}
+.cs-stat i {
+  display: inline-flex; align-items: center; gap: 2px; font-style: normal;
+  font-family: var(--cy-mono); font-size: 9px; margin-top: 3px;
+}
+.cs-stat--total b { color: #eaf4ff; }
+.cs-stat--high b { color: var(--cy-red); }
+.cs-stat--medium b { color: var(--cy-amber); }
+.cs-stat--low b { color: var(--cy-green); }
+.cs-up { color: var(--cy-red); } .cs-down { color: var(--cy-green); } .cs-flat { color: var(--cy-dim); }
+@media (max-width: 420px) { .cs-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- Active threats donut ---------- */
+.cs-donut-wrap { display: grid; grid-template-columns: 116px 1fr; gap: 14px; align-items: center; }
+@media (max-width: 400px) { .cs-donut-wrap { grid-template-columns: 1fr; justify-items: center; } }
+.cs-donut { position: relative; width: 116px; height: 116px; }
+.cs-donut svg { display: block; transform: rotate(-90deg); }
+.cs-donut__ring { transition: stroke-dasharray .5s ease; }
+.cs-donut__center {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  font-family: var(--cy-mono);
+}
+.cs-donut__center b { font-size: 17px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.cs-donut__center small { font-size: 8px; letter-spacing: .14em; color: var(--cy-dim); text-transform: uppercase; }
+.cs-legend { display: grid; gap: 7px; font-size: 11.5px; }
+.cs-legend div { display: flex; align-items: center; gap: 8px; }
+.cs-legend i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.cs-legend span { color: var(--cy-dim); }
+.cs-legend b { margin-left: auto; font-family: var(--cy-mono); font-weight: 600; color: #eaf4ff; font-variant-numeric: tabular-nums; }
+
+/* ---------- Global threat map ---------- */
+.cs-map-shell {
+  position: relative; flex: 1 1 auto;
+  min-height: clamp(320px, 46vh, 560px);
+  border-radius: 0 0 var(--cy-radius) var(--cy-radius); overflow: hidden; background: #040a14;
+}
+.cs-map-shell canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
+.cs-map-overlay {
+  position: absolute; left: 12px; top: 10px; display: grid; gap: 3px;
+  font-family: var(--cy-mono); font-size: 9.5px; color: var(--cy-dim); pointer-events: none;
+}
+.cs-map-overlay b { color: #cfe6fb; font-weight: 600; }
+.cs-map-hud {
+  position: absolute; right: 12px; top: 10px; display: grid; gap: 3px; text-align: right;
+  font-family: var(--cy-mono); font-size: 9.5px; color: var(--cy-dim); pointer-events: none;
+}
+.cs-map-hud b { color: var(--cy-green); font-weight: 600; }
+.cs-select {
+  background: #0b1728; color: var(--cy-text); border: 1px solid var(--cy-line);
+  border-radius: 6px; padding: 5px 8px; font: 600 10.5px var(--cy-mono);
+  letter-spacing: .04em; cursor: pointer; max-width: 150px;
+}
+.cs-select:focus-visible { outline: 2px solid #2ec5ff88; outline-offset: 1px; }
+
+/* Shield + status plate under the map */
+.cs-shield-plate {
+  position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
+  pointer-events: none; display: grid; justify-items: center; gap: 3px;
+  padding: 7px 18px; border-radius: 6px;
+  background: #04101ccc; border: 1px solid #2ee6a077;
+  box-shadow: 0 0 22px -6px #2ee6a066, inset 0 0 22px -14px #2ee6a0;
+  backdrop-filter: blur(2px);
+}
+.cs-shield-plate b {
+  font-family: var(--cy-mono); font-size: 13px; font-weight: 700; letter-spacing: .16em;
+  color: #d8ffe9; text-shadow: 0 0 14px #2ee6a088;
+}
+.cs-shield-plate small {
+  font-family: var(--cy-mono); font-size: 8.5px; letter-spacing: .16em; color: #2ec5ff;
+  text-transform: uppercase;
+}
+.cs-map-foot {
+  position: absolute; inset: auto 0 0; display: flex; gap: 14px; flex-wrap: wrap;
+  padding: 7px 12px; font-family: var(--cy-mono); font-size: 9px; letter-spacing: .08em;
+  color: var(--cy-dimmer); background: linear-gradient(0deg, #040a14, transparent);
+  pointer-events: none;
+}
+.cs-map-foot b { color: var(--cy-dim); }
+
+/* ---------- Threat detection engine ---------- */
+.cs-engine { display: grid; gap: 12px; grid-template-columns: 118px 1fr; align-items: center; }
+.cs-brain { width: 118px; height: 118px; display: grid; place-items: center; position: relative; }
+.cs-brain svg { width: 100%; height: 100%; }
+.cs-brain__glow {
+  position: absolute; inset: 14%; border-radius: 50%;
+  background: radial-gradient(circle, #2ec5ff33, transparent 68%);
+  animation: cs-breathe 4s ease-in-out infinite;
+}
+@keyframes cs-breathe { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+.cs-signals { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.cs-signal { display: flex; align-items: center; gap: 9px; font-size: 11.5px; }
+.cs-signal__icon {
+  width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  border: 1px solid #2ec5ff55; background: #0c1e33; color: var(--cy-cyan);
+}
+.cs-signal__icon svg { width: 11px; height: 11px; }
+.cs-signal__label b { display: block; font-weight: 600; font-size: 11.5px; color: #e3eefb; }
+.cs-signal__label span {
+  display: block; font-family: var(--cy-mono); font-size: 9px; letter-spacing: .06em;
+  color: var(--cy-dimmer); text-transform: uppercase;
+}
+.cs-signal__pct {
+  margin-left: auto; font-family: var(--cy-mono); font-size: 10px; color: var(--cy-dim);
+  font-variant-numeric: tabular-nums;
+}
+.cs-meter { margin-top: 4px; }
+.cs-meter__row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  font-family: var(--cy-mono); font-size: 10px; color: var(--cy-dim); margin-bottom: 6px;
+}
+.cs-meter__row b { color: #d8ecff; font-weight: 600; }
+.cs-meter__track { height: 8px; border-radius: 999px; background: #0a1a2c; border: 1px solid var(--cy-line-soft); overflow: hidden; }
+.cs-meter__fill {
+  height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #1d6fd0, #2ec5ff 55%, #7fe0ff);
+  box-shadow: 0 0 12px #2ec5ff99; transition: width .5s ease;
+}
+@media (max-width: 1180px) and (min-width: 761px) { .cs-engine { grid-template-columns: 96px 1fr; } .cs-brain { width: 96px; height: 96px; } }
+
+/* ---------- Threat activity feed ---------- */
+.cs-feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 268px; overflow-y: auto; scrollbar-width: thin; }
+.cs-feed li {
+  display: grid; grid-template-columns: 62px 1fr auto; gap: 9px; align-items: start;
+  padding: 7px 8px; border-radius: 7px; background: #08121f; border: 1px solid #0f2338;
+  animation: cs-slide-in .3s ease-out;
+}
+@keyframes cs-slide-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.cs-feed b.title { display: block; font-size: 11.5px; font-weight: 600; color: #e6f0fb; line-height: 1.35; }
+.cs-feed code { display: block; font-family: var(--cy-mono); font-size: 9.5px; color: var(--cy-dimmer); margin-top: 2px; overflow-wrap: anywhere; }
+.cs-feed time { font-family: var(--cy-mono); font-size: 9.5px; color: var(--cy-dimmer); white-space: nowrap; }
+.cs-tag {
+  display: inline-block; padding: 2px 5px; border-radius: 3px; font-family: var(--cy-mono);
+  font-size: 8px; font-weight: 700; letter-spacing: .06em; text-align: center; text-transform: uppercase;
+  border: 1px solid; background: #0a1320;
+}
+.cs-tag--critical { color: #ff708c; border-color: #ff3b5c99; background: #ff3b5c1a; }
+.cs-tag--high { color: #ffa06b; border-color: #ff7a4599; background: #ff7a451a; }
+.cs-tag--medium { color: #ffd27a; border-color: #ffbf4799; background: #ffbf471a; }
+.cs-tag--low { color: #9fb4cc; border-color: #35506e; }
+
+/* ---------- Top attack vectors ---------- */
+.cs-vectors { display: grid; gap: 14px; }
+.cs-vector {
+  display: grid; grid-template-columns: minmax(96px, 1fr) minmax(60px, 1.5fr) auto;
+  gap: 10px; align-items: center;
+}
+.cs-vector__row { display: contents; }
+.cs-vector__row span { color: #cfdff0; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cs-vector__row b { font-family: var(--cy-mono); font-size: 11px; color: #eaf4ff; font-variant-numeric: tabular-nums; text-align: right; min-width: 42px; }
+.cs-vector__track { height: 9px; border-radius: 999px; background: #0a1a2c; border: 1px solid var(--cy-line-soft); overflow: hidden; }
+.cs-vector__fill { height: 100%; width: 0; border-radius: 999px; transition: width .6s cubic-bezier(.16,1,.3,1); }
+.cs-vector:nth-child(1) .cs-vector__fill { background: linear-gradient(90deg, #b3123a, #ff3b5c); box-shadow: 0 0 10px #ff3b5c88; }
+.cs-vector:nth-child(2) .cs-vector__fill { background: linear-gradient(90deg, #b3561a, #ff8a3d); box-shadow: 0 0 10px #ff8a3d88; }
+.cs-vector:nth-child(3) .cs-vector__fill { background: linear-gradient(90deg, #a1711b, #ffbf47); box-shadow: 0 0 10px #ffbf4788; }
+.cs-vector:nth-child(4) .cs-vector__fill { background: linear-gradient(90deg, #0d6b63, #2ee6a0); box-shadow: 0 0 10px #2ee6a088; }
+.cs-vector:nth-child(5) .cs-vector__fill { background: linear-gradient(90deg, #4a3a9e, #8b5cf6); box-shadow: 0 0 10px #8b5cf688; }
+.cs-vector:nth-child(n+6) .cs-vector__fill { background: linear-gradient(90deg, #2a4a6b, #5d86ab); }
+
+/* ---------- Endpoints / cloud / network ---------- */
+.cs-assets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 520px) { .cs-assets { grid-template-columns: 1fr; } }
+.cs-asset {
+  position: relative; border: 1px solid var(--cy-line-soft); border-radius: 9px;
+  background: linear-gradient(180deg, #0a1626, #060e1a); padding: 10px 11px 8px; min-width: 0;
+}
+.cs-asset__head { display: flex; align-items: center; gap: 6px; font-family: var(--cy-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--cy-dim); }
+.cs-asset__head .cs-dot { margin-left: auto; }
+.cs-asset__body { display: flex; align-items: center; gap: 9px; margin: 9px 0 6px; }
+.cs-asset__icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; color: var(--cy-cyan); }
+.cs-asset__icon svg { width: 26px; height: 26px; }
+.cs-asset__count small { display: block; font-family: var(--cy-mono); font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cy-green); }
+.cs-asset__count b { display: block; font-family: var(--cy-mono); font-size: 19px; font-weight: 700; color: #fff; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.cs-asset__risk { margin-left: auto; text-align: right; font-family: var(--cy-mono); font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--cy-dimmer); }
+.cs-asset__risk b { display: block; font-size: 15px; font-weight: 700; color: var(--cy-red); font-variant-numeric: tabular-nums; }
+.cs-asset svg.trend { display: block; width: 100%; height: 26px; }
+
+/* ---------- Compliance ---------- */
+.cs-compliance { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .cs-compliance { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cs-seal { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.cs-seal__ring {
+  width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  border: 1px solid #2ec5ff44;
+  background: radial-gradient(circle, #10395c66, #071523 70%);
+}
+.cs-seal__ring::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  border: 1px dashed #2ec5ff33;
+  animation: cs-spin 18s linear infinite;
+}
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+.cs-seal__ring svg { width: 24px; height: 24px; color: var(--cy-cyan); }
+.cs-seal strong { font-size: 10px; font-weight: 700; color: #eaf4ff; letter-spacing: .03em; }
+.cs-seal small { font-family: var(--cy-mono); font-size: 8px; letter-spacing: .07em; color: var(--cy-green); text-transform: uppercase; }
+.cs-compliance__cta { margin-top: 12px; }
+.cs-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+  padding: 9px 14px; border-radius: 7px; cursor: pointer;
+  font-family: var(--cy-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: #cfe9ff; background: linear-gradient(180deg, #102a45, #0a1c2e);
+  border: 1px solid #2ec5ff55; transition: .16s;
+}
+.cs-btn:hover { color: #fff; border-color: #2ec5ffaa; box-shadow: 0 0 20px -6px #2ec5ff88; }
+.cs-btn--sm { width: auto; padding: 6px 11px; font-size: 9.5px; }
+
+/* ---------- Behaviour: scanning → settled ---------- */
+.cs-signal[data-state="scanning"] .cs-signal__icon { animation: cs-scan 1.4s ease-in-out infinite; }
+@keyframes cs-scan {
+  0%, 100% { box-shadow: 0 0 0 0 #2ec5ff00; border-color: #2ec5ff55; }
+  50% { box-shadow: 0 0 0 4px #2ec5ff1a; border-color: #2ec5ffcc; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #page-cyber *, #page-cyber *::before, #page-cyber *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

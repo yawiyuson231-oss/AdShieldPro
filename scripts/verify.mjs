@@ -38,7 +38,8 @@ const MODULE_FILES = [
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
   'security/monitor.js', 'security/firewall-ai.js', 'security/feedmanager.js',
-  'security/backup.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js'
+  'security/backup.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js',
+  'cyber/dashboard.js', 'cyber/map.js', 'cyber/telemetry.js'
 ];
 
 export function verify() {
@@ -162,9 +163,23 @@ export function verify() {
   add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
-  add('every page section has an accessible name',
-    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === 10,
-    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of 10`);
+  const namedSections = (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length;
+  const allSections = (htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length;
+  add('every page section has an accessible name', namedSections === allSections && allSections >= 10,
+    `${namedSections} of ${allSections}`);
+
+  /* 9b-ii. The CyberShield console must stay wired end to end: tab, section,
+        renderer, stylesheet and service-worker precache. A partial wiring is
+        exactly how a blank tab ships. */
+  add('CyberShield tab, section and renderer are all present',
+    /data-page="cyber"/.test(htmlA11y) && /id="page-cyber"/.test(htmlA11y)
+      && /^\s{2}cyber:\s*renderCyber/m.test(read('app.js')),
+    'tab + <section> + PAGE_RENDERERS entry');
+  add('CyberShield stylesheet is linked and precached',
+    /href="cyber\/dashboard\.css"/.test(htmlA11y) && /'\.\/cyber\/dashboard\.css'/.test(read('sw.js')));
+  add('CyberShield console labels its simulated panels',
+    /simulated/i.test(read('cyber/dashboard.js')) && /simulated/i.test(read('cyber/telemetry.js')),
+    'measured vs simulated lanes are named in the UI');
   add('a skip link targets the main landmark',
     /class="skip-link" href="#main"/.test(htmlA11y) && /<main id="main"/.test(htmlA11y));
 

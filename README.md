@@ -57,6 +57,11 @@ npm run stage             # assemble _site/ exactly as the Pages workflow does
 | [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this platform deliberately does **not** do, and why |
 | [`docs/WEB_TESTING.md`](docs/WEB_TESTING.md) | What the browser suite actually verifies |
 
+The platform includes a **CyberShield AI** console (`#cyber`): a threat-intelligence dashboard with
+an animated dot-matrix world map, severity donut, live detection feed, attack-vector mix and an
+honest compliance report. Measured figures are read from the live engine, monitor and model; the
+global telemetry is a seeded simulation and is labelled as such in every panel that uses it.
+
 Capabilities are also listed inside the app on the **Capabilities** page, including the rows
 that read *not implemented* — nothing there is aspirational.
 
