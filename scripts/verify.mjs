@@ -286,6 +286,9 @@ export function verify() {
   add('shipped docs rewrite their relative links for the site root',
     /rewriteDocLinks/.test(read('scripts/stage-site.mjs')),
     'no docs/*.md link 404s when served from the root');
+  add('the published branch carries a .nojekyll marker',
+    /writeNoJekyll/.test(read('scripts/stage-site.mjs')) && /\.nojekyll/.test(read('scripts/stage-site.mjs')),
+    'Jekyll would silently drop underscore paths from a branch publish');
   add('the deploy publishes a gh-pages fallback that needs no admin click',
     /gh-pages/.test(deployWorkflow) && /contents:\s*write/.test(deployWorkflow),
     'branch publish + Pages in one run');

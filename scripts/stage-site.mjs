@@ -144,6 +144,21 @@ export function rewriteDocLinks({ from, to, root }) {
   return { rewritten, broken };
 }
 
+/**
+ * A branch-published site is built by GitHub's own Pages pipeline, which runs
+ * Jekyll unless told not to. Jekyll silently drops every path that starts with
+ * an underscore, so `assets/_foo` or any such directory would vanish from the
+ * published site while still working in a local static server. `.nojekyll` is
+ * the documented opt-out and costs nothing on hosts that ignore it.
+ *
+ * @param {string} out
+ * @returns {boolean} whether the marker was written
+ */
+export function writeNoJekyll(out) {
+  writeFileSync(resolve(out, '.nojekyll'), '');
+  return existsSync(resolve(out, '.nojekyll'));
+}
+
 function directorySize(dir) {
   let total = 0;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -167,6 +182,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const out = outIndex !== -1 ? process.argv[outIndex + 1] : '_site';
   try {
     const result = stageSite({ out });
+    writeNoJekyll(result.out);
     console.log(`staged ${relative(ROOT, result.out) || result.out} — app ${(result.appBytes / 1048576).toFixed(2)} MB in ${result.files} files`);
     console.log(`${result.precache} precached assets verified · /app/ contains ${result.copied.length} entries`);
   } catch (err) {
