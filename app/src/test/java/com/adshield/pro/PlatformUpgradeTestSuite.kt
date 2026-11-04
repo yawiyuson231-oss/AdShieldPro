@@ -676,8 +676,8 @@ class PlatformUpgradeTestSuite {
         // Changing an existing rule's RuleType (BLOCK -> ALLOW) on `||ads.example.com^` must Strip `@@` / `||` cleanly
         val parsedAllow = engine.validateAndParseRuleInput(
             rawInput = "||ads.example.com^",
-            forcedType = RuleType.ALLOW,
-            forcedMatchType = RuleMatchType.SUBDOMAIN
+            explicitType = RuleType.ALLOW,
+            explicitMatchType = RuleMatchType.SUBDOMAIN
         ).getOrThrow()
         assertEquals(RuleType.ALLOW, parsedAllow.ruleType)
         assertEquals("ads.example.com", parsedAllow.normalizedPattern)
