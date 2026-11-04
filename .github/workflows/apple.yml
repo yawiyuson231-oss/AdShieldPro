@@ -1,0 +1,50 @@
+name: Apple battery core
+
+# Compiles and tests the iOS library on a macOS runner.
+#
+# This is what makes the iOS target verifiable without an Apple developer account: a
+# Swift package needs no signing, no provisioning profile and no App Store enrolment to
+# build and test. The shipping app needs an Xcode project and a certificate, which is a
+# separate step documented in docs/IOS.md.
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/apple.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+  workflow_dispatch:
+
+jobs:
+  swift-test:
+    name: swift test (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        working-directory: ios
+        run: swift build -v
+
+      - name: Test
+        working-directory: ios
+        run: swift test --enable-test-discovery 2>/dev/null || swift test
+
+      - name: Summarise the test run
+        if: always()
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          echo "### Apple battery core" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Package: \`ios/Package.swift\` (iOS 16 / macOS 13)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The library holds the measurement and alert rules; it is compiled and" >> "$GITHUB_STEP_SUMMARY"
+          echo "tested here on every change. The app shell that wraps it is added in" >> "$GITHUB_STEP_SUMMARY"
+          echo "Xcode and needs an Apple developer account to sign." >> "$GITHUB_STEP_SUMMARY"

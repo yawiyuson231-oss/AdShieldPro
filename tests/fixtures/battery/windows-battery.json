@@ -1,0 +1,4 @@
+{
+  "_comment": "Get-CimInstance Win32_Battery | ConvertTo-Json -Compress, single object.",
+  "json": "{\"Name\":\"DELL 7V69Y53\",\"EstimatedChargeRemaining\":74,\"BatteryStatus\":1,\"DesignVoltage\":11400,\"Chemistry\":6}"
+}

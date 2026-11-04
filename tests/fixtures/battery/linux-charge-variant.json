@@ -1,0 +1,13 @@
+{
+  "_comment": "Driver exposing charge_*/current_now instead of energy_*; also a Charging state with a positive current.",
+  "files": {
+    "BAT1/type": "Battery",
+    "BAT1/present": "1",
+    "BAT1/status": "Charging",
+    "BAT1/charge_now": "3200000",
+    "BAT1/charge_full": "5000000",
+    "BAT1/voltage_now": "4200000",
+    "BAT1/current_now": "1500000",
+    "BAT1/health": "Good"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "_comment": "Captured shape of /sys/class/power_supply/BAT0 on a ThinkPad (energy_* variant).",
+  "files": {
+    "BAT0/type": "Battery",
+    "BAT0/present": "1",
+    "BAT0/status": "Discharging",
+    "BAT0/capacity": "62",
+    "BAT0/energy_now": "24500000",
+    "BAT0/energy_full": "39500000",
+    "BAT0/voltage_now": "3900000",
+    "BAT0/current_now": "-812000",
+    "BAT0/temp": "314",
+    "BAT0/health": "Good",
+    "AC/type": "Mains",
+    "AC/online": "0"
+  }
+}

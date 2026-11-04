@@ -1,0 +1,11 @@
++-o AppleSmartBattery  <class AppleSmartBattery, id 0x100000abc, registered, matched, active, busy 0, retain 9>
+    {
+      "CurrentAmperage" = -1187
+      "Voltage" = 11934
+      "Temperature" = 3072
+      "AppleRawCurrentCapacity" = 4338
+      "AppleRawMaxCapacity" = 7000
+      "IsCharging" = No
+      "ExternalConnected" = Yes
+      "PermanentFailureStatus" = 0
+    }

@@ -41,6 +41,9 @@ object BatteryHealthNotifier {
     private const val KEY_CURRENT_ALERT_MS = "last_current_alert_ms"
     private const val KEY_CHARGE_DONE_CYCLE = "charge_done_cycle"
 
+    // -1L, not 0L: 0 is a valid timestamp argument, so it cannot double as "never
+    // alerted" or the first alert would be suppressed when the clock starts at 0.
+    private const val NEVER = -1L
     private const val TEMP_ALERT_COOLDOWN_MS = 30 * 60 * 1000L
     private const val CURRENT_ALERT_COOLDOWN_MS = 45 * 60 * 1000L
     private const val TEMP_REALERT_DELTA_C = 2.0f
@@ -149,11 +152,11 @@ object BatteryHealthNotifier {
 
         // --- 3. Heat -------------------------------------------------------------
         if (tempMeasured && temp >= settings.batteryTempWarningCelsius) {
-            val lastAt = prefs.getLong(KEY_LAST_TEMP_ALERT_MS, 0L)
+            val lastAt = prefs.getLong(KEY_LAST_TEMP_ALERT_MS, NEVER)
             val lastValue = prefs.getFloat(KEY_LAST_TEMP_ALERT_VALUE, 0f)
-            val cooled = nowMs - lastAt >= TEMP_ALERT_COOLDOWN_MS
-            val heatingUp = temp >= lastValue + TEMP_REALERT_DELTA_C
-            if (lastAt == 0L || cooled || heatingUp) {
+            val cooled = lastAt == NEVER || nowMs - lastAt >= TEMP_ALERT_COOLDOWN_MS
+            val heatingUp = lastAt != NEVER && temp >= lastValue + TEMP_REALERT_DELTA_C
+            if (lastAt == NEVER || cooled || heatingUp) {
                 post(
                     context, ID_HEAT, ALERTS_CHANNEL_ID,
                     title = String.format(Locale.US, "Heat alert — %.1f°C", temp),
@@ -173,8 +176,8 @@ object BatteryHealthNotifier {
             snapshot.currentSource == MeasurementSource.MEASURED &&
             snapshot.currentMilliAmps < -settings.batteryCurrentAlertMilliAmps
         ) {
-            val lastAt = prefs.getLong(KEY_CURRENT_ALERT_MS, 0L)
-            if (nowMs - lastAt >= CURRENT_ALERT_COOLDOWN_MS) {
+            val lastAt = prefs.getLong(KEY_CURRENT_ALERT_MS, NEVER)
+            if (lastAt == NEVER || nowMs - lastAt >= CURRENT_ALERT_COOLDOWN_MS) {
                 post(
                     context, ID_CURRENT, HEALTH_CHANNEL_ID,
                     title = "Heavy battery draw — ${-snapshot.currentMilliAmps} mA",
