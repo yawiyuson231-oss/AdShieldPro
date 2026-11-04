@@ -104,7 +104,8 @@ class ScanJournalTest {
         assertEquals(1, summary.clean)
         assertEquals(1, summary.suspicious)
         assertEquals(2, summary.dangerous)
-        assertEquals(2, summary.flagged)
+        // flagged = suspicious + dangerous = 1 + 2
+        assertEquals(3, summary.flagged)
         assertEquals(2, summary.fileScans)
         assertEquals(1, summary.urlScans)
         assertEquals(1, summary.appAudits)
