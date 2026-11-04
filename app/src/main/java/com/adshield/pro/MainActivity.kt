@@ -658,6 +658,7 @@ private fun SettingsDestination(
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
     val dnsDiagnosticReport by viewModel.dnsDiagnosticReport.collectAsStateWithLifecycle()
     val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
@@ -688,5 +689,6 @@ private fun StatusDestination(viewModel: AdShieldViewModel) {
     val deviceProfile = remember(configuration.screenWidthDp, configuration.smallestScreenWidthDp, batteryTelemetry) {
         viewModel.deviceProfile(configuration.screenWidthDp, configuration.smallestScreenWidthDp)
     }
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     CapabilitiesScreen(deviceProfile = deviceProfile, protectionStatus = protectionStatus)
 }
