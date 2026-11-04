@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">OmniShield X</string>
+    <string name="vpn_notification_channel_name">OmniShield X Protection Status</string>
+    <string name="vpn_notification_channel_desc">Displays real-time local VPN and DNS ad-blocking status</string>
+    <string name="vpn_session_name">OmniShield X Local DNS Firewall</string>
+    <string name="in_app_ad_skip_desc">Skips and closes video ads in YouTube and apps you allow. Taps only ad buttons (Skip/Close) — nothing else.</string>
+</resources>

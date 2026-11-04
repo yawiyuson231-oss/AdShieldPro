@@ -1,0 +1,873 @@
+package com.adshield.pro.ui.screens
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Policy
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.adshield.pro.data.local.preferences.AppSettingsState
+import com.adshield.pro.data.local.preferences.DarkThemePreference
+import com.adshield.pro.domain.model.AppExclusionInfo
+import com.adshield.pro.domain.model.DnsProtocol
+import com.adshield.pro.domain.model.DnsProviderPreset
+import com.adshield.pro.domain.model.DnsResolverConfig
+import com.adshield.pro.ui.theme.CyberCyan
+import com.adshield.pro.ui.theme.AlertRed
+import com.adshield.pro.ui.theme.ElectricBlue
+import com.adshield.pro.ui.theme.WarningAmber
+import kotlinx.coroutines.launch
+
+@Composable
+fun SettingsScreen(
+    showAboutScreen: Boolean,
+    onOpenAbout: () -> Unit,
+    onCloseAbout: () -> Unit,
+    settings: AppSettingsState,
+    installedApps: List<AppExclusionInfo>,
+    onUpdateResolverConfig: (DnsResolverConfig) -> Unit,
+    onLoadInstalledApps: () -> Unit,
+    onToggleAppExclusion: (String, Boolean) -> Unit,
+    onToggleAutoStartBoot: (Boolean) -> Unit,
+    onChangeThemePreference: (DarkThemePreference) -> Unit,
+    onExportBackupJson: suspend () -> String,
+    onRestoreBackupJson: (String) -> Unit,
+    shadowVerdicts: List<String> = emptyList(),
+    onToggleShadowMode: (Boolean) -> Unit = {},
+    onReportFalsePositive: (String) -> Unit = {},
+    onToggleInAppAdSkip: (Boolean) -> Unit = {},
+    onSaveAdSkipExtraPackages: (String) -> Unit = {},
+    onToggleEncryptedDnsBypass: (Boolean) -> Unit = {},
+    onToggleHeuristicShield: (Boolean) -> Unit = {},
+    onToggleCheckNewDomains: (Boolean) -> Unit = {},
+    onToggleInAppAdSkipUniversal: (Boolean) -> Unit = {},
+    onToggleResolverAutoTune: (Boolean) -> Unit = {},
+    dnsSpeedStats: String? = null
+) {
+    if (showAboutScreen) {
+        AboutScreen(onBack = onCloseAbout)
+        return
+    }
+
+    var showAppExclusionDialog by remember { mutableStateOf(false) }
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
+    var backupJsonBuffer by remember { mutableStateOf("") }
+
+    var customDohInput by remember(settings.resolverConfig) {
+        mutableStateOf(settings.resolverConfig.customDohUrl)
+    }
+    var customDotInput by remember(settings.resolverConfig) {
+        mutableStateOf(settings.resolverConfig.customDotHost)
+    }
+    var customIpv4Input by remember(settings.resolverConfig) {
+        mutableStateOf(settings.resolverConfig.customPrimaryIpv4)
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Text(
+                text = "Network, Apps & Privacy Settings",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Text(
+                text = "Configure Encrypted DNS, Per-App VPN Exclusions, and Backup/Restore",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // Encrypted DNS Protocol & Resolver Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Dns, contentDescription = null, tint = CyberCyan)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Encrypted Upstream DNS Protocol",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    DnsProtocol.entries.forEach { protocol ->
+                        val selected = settings.resolverConfig.protocol == protocol
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onUpdateResolverConfig(settings.resolverConfig.copy(protocol = protocol))
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = {
+                                    onUpdateResolverConfig(settings.resolverConfig.copy(protocol = protocol))
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = protocol.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = protocol.description,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "DNS-over-QUIC: not active in this build because no audited QUIC transport is bundled. Use DoH or DoT; apps using their own DoQ resolver may bypass OS DNS filtering.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WarningAmber
+                    )
+                    Text(
+                        text = "Encrypted failover and automatic resolver selection run only when Speed mode and Autonomous response are both enabled, and stop under Manual override. Custom resolvers are never silently replaced.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Upstream DNS Provider (With Privacy Disclosure):",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    DnsProviderPreset.entries.forEach { preset ->
+                        val selected = settings.resolverConfig.preset == preset
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) {
+                                ElectricBlue.copy(alpha = 0.14f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onUpdateResolverConfig(settings.resolverConfig.copy(preset = preset))
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = preset.displayName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (selected) ElectricBlue else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = preset.primaryIpv4,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = CyberCyan
+                                    )
+                                }
+                                Text(
+                                    text = preset.providerSummary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "Privacy: ${preset.privacyDisclosure}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (settings.resolverConfig.preset == DnsProviderPreset.CUSTOM) {
+                        OutlinedTextField(
+                            value = customDohInput,
+                            onValueChange = { customDohInput = it },
+                            label = { Text("Custom DoH Endpoint (https://...)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = customDotInput,
+                            onValueChange = { customDotInput = it },
+                            label = { Text("Custom DoT Hostname (Port 853)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = customIpv4Input,
+                            onValueChange = { customIpv4Input = it },
+                            label = { Text("Custom Primary IPv4 Address") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Button(
+                            onClick = {
+                                onUpdateResolverConfig(
+                                    settings.resolverConfig.copy(
+                                        customDohUrl = customDohInput,
+                                        customDotHost = customDotInput,
+                                        customPrimaryIpv4 = customIpv4Input
+                                    )
+                                )
+                            }
+                        ) {
+                            Text("Save Custom Resolver")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = "IPv6 Dual-Stack DNS Routing",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Filters both IPv4 (A) and IPv6 (AAAA) DNS queries",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.resolverConfig.enableIpv6,
+                            onCheckedChange = {
+                                onUpdateResolverConfig(settings.resolverConfig.copy(enableIpv6 = it))
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Per-App VPN Controls & Streaming Compatibility Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Apps, contentDescription = null, tint = ElectricBlue)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Per-App VPN Controls (Split Tunneling)",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "${settings.excludedAppPackages.size} app(s) currently excluded from VPN filtering",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Exclude specific banking, VoIP, or Android Auto applications if they require direct local LAN access. Also displays compatibility notes for streaming apps (YouTube, TikTok, Facebook).",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            onLoadInstalledApps()
+                            showAppExclusionDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Manage Per-App VPN Exclusions")
+                    }
+                }
+            }
+        }
+
+        // Background Lifecycle & Visual Theme Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Power, contentDescription = null, tint = ElectricBlue)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Auto-Restore Protection on Reboot",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "Automatically resumes foreground VPN after device restart",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = settings.autoStartOnBoot,
+                            onCheckedChange = onToggleAutoStartBoot
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Palette, contentDescription = null, tint = CyberCyan)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Interface Theme:",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        DarkThemePreference.entries.forEach { pref ->
+                            FilterChip(
+                                selected = settings.darkThemeMode == pref,
+                                onClick = { onChangeThemePreference(pref) },
+                                label = {
+                                    Text(
+                                        text = pref.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            // --- Zero-Breakage Engine (Module 7) ---
+            var falsePositiveInput by remember { mutableStateOf("") }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.HealthAndSafety, contentDescription = null, tint = ElectricBlue)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Zero-Breakage Engine", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Connectivity watchdog suspends filter lists automatically if breakage is detected and restores them when the internet is healthy again. Custom rules and video/banking protection always stay on.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Shadow Mode", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Report risky list rules instead of enforcing them. Validate, then allowlist what you need.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.shadowModeEnabled, onCheckedChange = onToggleShadowMode)
+                    }
+                    if (shadowVerdicts.isNotEmpty()) {
+                        Text("Latest shadow reports:", style = MaterialTheme.typography.labelSmall)
+                        shadowVerdicts.take(3).forEach { line ->
+                            Text("• $line", style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    HorizontalDivider()
+                    Text("Site or app broken? Report it — the domain is allowlisted instantly.", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = falsePositiveInput,
+                            onValueChange = { falsePositiveInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("broken-domain.example") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(
+                            onClick = {
+                                onReportFalsePositive(falsePositiveInput)
+                                falsePositiveInput = ""
+                            },
+                            enabled = falsePositiveInput.isNotBlank()
+                        ) { Text("Fix") }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Universal video ad-skip (any app)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Applies the same strict skip rules to every app on the device, not just YouTube. Bare buttons like Skip/✕/Close without ad evidence are never tapped, ad buttons (Download, Shop now) are never tapped, and system UIs (dialer, keyboard, launcher, settings) are excluded entirely.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.inAppAdSkipUniversal, onCheckedChange = onToggleInAppAdSkipUniversal)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Speed mode (auto-fastest resolver)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Every 15 minutes, the fastest RELIABLE resolver is chosen from your real measured query latencies — only switches if 25%+ faster with 90%+ success. Never touches a custom resolver, never sends synthetic traffic.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.resolverAutoTune, onCheckedChange = onToggleResolverAutoTune)
+                    }
+                    if (dnsSpeedStats != null) {
+                        Text(
+                            dnsSpeedStats,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Strict Heuristic Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "In Strict mode, blocks random-looking names (DGA), lookalike brand domains, and (opt-in) domains registered in the last 30 days. Balanced mode only observes these. A blocked site is one tap to allow and report.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockHeuristicThreats, onCheckedChange = onToggleHeuristicShield)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Check new domains (Strict)", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Looks up domain registration age via RDAP when Strict mode is on (2s cap, cached 6h). Domains with unknown age are never blocked. Uses network only when enabled.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.checkNewDomains, onCheckedChange = onToggleCheckNewDomains)
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("DNSSEC — what happens", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Learn more: your chosen resolver (Cloudflare, Google, Quad9, AdGuard) validates DNSSEC signatures before answering, and OmniShield passes the validated answer through untouched. Tampered answers from non-validating paths are rejected upstream. OmniShield does not re-validate signatures itself — it relies on the encrypted, validating resolver you select.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Encrypted-DNS Bypass Shield", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Sinks DoH provider bootstraps (Chrome Secure DNS, Firefox DoH, SDK resolvers) so apps fall back to the filtered system DNS. Your own selected provider is never blocked.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(checked = settings.blockEncryptedDnsBypass, onCheckedChange = onToggleEncryptedDnsBypass)
+                    }
+                    Text(
+                        "False positives reported: ${settings.falsePositiveReportCount}  •  Auto-recoveries: ${settings.autoRecoveryCount}",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+        item {
+            // --- In-App Ad Defense (works beyond DNS) ---
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var serviceGranted by remember {
+                mutableStateOf(com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context))
+            }
+            var extraPkgsInput by remember(settings.adSkipExtraPackages) {
+                mutableStateOf(settings.adSkipExtraPackages.joinToString(", "))
+            }
+            val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+            androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+                val obs = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                        serviceGranted = com.adshield.pro.service.InAppAdSkipService.isEnabledOnSystem(context)
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(obs)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+            }
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Block, contentDescription = null, tint = AlertRed)
+                        Spacer(Modifier.width(8.dp))
+                        Text("In-App Ad Defense", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    }
+                    Text(
+                        "Skips and closes video ads INSIDE apps (YouTube apps by default) — the only non-root way to touch in-app ads. Websites are covered by the built-in browser engine. OmniShield taps ONLY ad buttons (Skip/Close) — never play, links, or downloads.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Auto-skip in apps", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                if (serviceGranted) "Accessibility service: ACTIVE" else "Accessibility service: not enabled — required",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (serviceGranted) androidx.compose.ui.graphics.Color(0xFF34D399) else WarningAmber
+                            )
+                        }
+                        Switch(
+                            checked = settings.inAppAdSkipEnabled,
+                            onCheckedChange = { enabled ->
+                                onToggleInAppAdSkip(enabled)
+                                if (enabled && !serviceGranted) {
+                                    runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    HorizontalDivider()
+                    Text("Add more video apps (package names, comma-separated):", style = MaterialTheme.typography.bodySmall)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = extraPkgsInput,
+                            onValueChange = { extraPkgsInput = it },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            placeholder = { Text("com.example.video, tv.example.app") },
+                            textStyle = MaterialTheme.typography.bodySmall
+                        )
+                        Button(onClick = { onSaveAdSkipExtraPackages(extraPkgsInput) }) { Text("Save") }
+                    }
+                    Text(
+                        "Ads skipped so far: ${settings.inAppAdsSkippedCount} • Engine only taps buttons a human could — nothing is modified, typed, or opened.",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+        // Backup & Restore + Privacy Policy Disclosures Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Configuration Backup & Privacy Disclosures",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    backupJsonBuffer = onExportBackupJson()
+                                    showBackupDialog = true
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Backup / Restore")
+                        }
+
+                        OutlinedButton(
+                            onClick = { showPrivacyPolicyDialog = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Policy, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Privacy Policy")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenAbout),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Info, contentDescription = null, tint = ElectricBlue)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("About Us", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Version, privacy, and project links",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = "Open About Us", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
+
+    if (showAppExclusionDialog) {
+        var appSearch by remember { mutableStateOf("") }
+        val filteredApps = remember(installedApps, appSearch) {
+            installedApps.filter {
+                appSearch.isBlank() ||
+                    it.appName.contains(appSearch, ignoreCase = true) ||
+                    it.packageName.contains(appSearch, ignoreCase = true)
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showAppExclusionDialog = false },
+            title = { Text("Per-App VPN Exclusions") },
+            text = {
+                Column(modifier = Modifier.height(420.dp)) {
+                    OutlinedTextField(
+                        value = appSearch,
+                        onValueChange = { appSearch = it },
+                        label = { Text("Search installed apps") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(filteredApps, key = { it.packageName }) { app ->
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = app.appName,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
+                                            Text(
+                                                text = app.packageName,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Switch(
+                                            checked = app.isExcludedFromVpn,
+                                            onCheckedChange = { excluded ->
+                                                onToggleAppExclusion(app.packageName, excluded)
+                                            }
+                                        )
+                                    }
+
+                                    if (app.compatibilityNote != null) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.Top) {
+                                            Icon(
+                                                imageVector = Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = WarningAmber,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = app.compatibilityNote,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = WarningAmber
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAppExclusionDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
+
+    if (showBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackupDialog = false },
+            title = { Text("Backup & Restore Configuration (JSON)") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Copy the JSON below to save your custom rules, protection mode, and exclusions, or paste a saved JSON backup to restore:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = backupJsonBuffer,
+                        onValueChange = { backupJsonBuffer = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRestoreBackupJson(backupJsonBuffer)
+                        showBackupDialog = false
+                    }
+                ) {
+                    Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Restore JSON")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackupDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    if (showPrivacyPolicyDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrivacyPolicyDialog = false },
+            title = { Text("Privacy, Security & Google Play Data Safety") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "1. Local-Only VpnService Processing: OmniShield X Infinity uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "2. Zero HTTPS Interception or Root Certificates: OmniShield X Infinity never installs a CA certificate and never decrypts or inspects HTTPS payloads.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "3. Zero Browsing Data Collection or Sale: All DNS query logs and statistics are stored strictly inside your local SQLite database and can be disabled or wiped at any time.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "4. DNS Protocol Disclosure: Allowed DNS queries use your selected DoH, DoT, or unencrypted UDP/TCP resolver. If DoH or DoT fails, DNS returns SERVFAIL rather than silently switching to plaintext.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "5. Encrypted DNS Bypass Limitation: Applications that use hardcoded proprietary DoH/QUIC resolvers may bypass OS DNS routing unless configured to use system DNS.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPrivacyPolicyDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}

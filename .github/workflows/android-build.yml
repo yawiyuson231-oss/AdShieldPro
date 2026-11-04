@@ -1,0 +1,97 @@
+name: Android development verification
+
+# Development-only gate. This workflow never publishes a GitHub release or a production APK.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/6e646e9c-adshieldpro
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_TESTS: '118'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Static source checks
+        run: |
+          set -euo pipefail
+          python3 tools/check_kotlin_syntax.py app/src
+          git diff --check
+
+      - name: Compile and package debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --console=plain --stacktrace :app:compileDebugKotlin :app:assembleDebug
+
+      - name: JVM unit tests
+        run: ./gradlew --no-daemon --console=plain --stacktrace :app:testDebugUnitTest
+
+      - name: Assert complete test contract
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, xml.etree.ElementTree as ET
+          paths = glob.glob('app/build/test-results/**/*.xml', recursive=True)
+          paths += glob.glob('/tmp/adshield_pro_build/app/test-results/**/*.xml', recursive=True)
+          by_name = {os.path.basename(p): p for p in paths}
+          if not by_name:
+              sys.exit('No JUnit XML found; tests did not run')
+          total = failures = errors = skipped = 0
+          for path in by_name.values():
+              root = ET.parse(path).getroot()
+              total += int(root.attrib.get('tests', 0))
+              failures += int(root.attrib.get('failures', 0))
+              errors += int(root.attrib.get('errors', 0))
+              skipped += int(root.attrib.get('skipped', 0))
+          expected = int(os.environ['EXPECTED_TESTS'])
+          print(f'tests={total} failures={failures} errors={errors} skipped={skipped} expected={expected}')
+          if total != expected or failures or errors or skipped:
+              sys.exit('Unit-test contract failed')
+          PY
+
+      - name: Android lint (hard gate)
+        run: ./gradlew --no-daemon --console=plain --stacktrace :app:lintDebug
+
+      - name: Inspect development APK
+        run: |
+          set -euo pipefail
+          APK="$(ls app/build/outputs/apk/debug/*.apk | head -1)"
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
+          unzip -l "$APK" | grep -qE 'classes[0-9]*\.dex'
+          unzip -l "$APK" | grep -q 'resources.arsc'
+          unzip -l "$APK" | grep -q 'assets/core_max_ads.txt'
+          unzip -l "$APK" | grep -q 'assets/core_max_threats.txt'
+          sha256sum "$APK"
+
+      - name: Upload development APK and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: omnishield-x-infinity-development
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/reports/**
+            app/build/test-results/**
+          if-no-files-found: ignore
