@@ -121,10 +121,11 @@ object DnsAnomalyScorer {
 
             if (allowedCount >= 3) {
                 val anomaly = scoreDomain(domain, recentLogs)
-                val risk = DomainRiskAnalyzer.analyze(domain)
-                val combined = maxOf(anomaly.anomalyScore, risk.score)
+                val riskFindings = DomainRiskAnalyzer.analyze(domain)
+                val riskScore = DomainRiskAnalyzer.riskScore(riskFindings)
+                val combined = maxOf(anomaly.anomalyScore, riskScore)
                 if (combined >= 50) {
-                    val why = (risk.reasons + anomaly.reasons).firstOrNull() ?: "high lexical anomaly score"
+                    val why = (riskFindings.map { it.explanation } + anomaly.reasons).firstOrNull() ?: "high lexical anomaly score"
                     suggestions.add(
                         RuleSuggestion(
                             domain = domain,
@@ -135,8 +136,8 @@ object DnsAnomalyScorer {
                     )
                 }
             } else if (blockedCount >= 8) {
-                val risk = DomainRiskAnalyzer.analyze(domain)
-                if (risk.score == 0 && entries.none { it.category?.name == "MALWARE" }) {
+                val riskFindings = DomainRiskAnalyzer.analyze(domain)
+                if (DomainRiskAnalyzer.riskScore(riskFindings) == 0 && entries.none { it.category?.name == "MALWARE" }) {
                     suggestions.add(
                         RuleSuggestion(
                             domain = domain,

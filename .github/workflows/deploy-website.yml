@@ -30,7 +30,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: npm
 
       - name: Check the site files are present
         run: |
@@ -41,7 +40,7 @@ jobs:
           test -s sw.js
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Assemble the site (marketing at /, web platform at /app/)
         run: node scripts/stage-site.mjs --out _site
