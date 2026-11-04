@@ -1,10 +1,13 @@
-# AdShield Pro v2.3 — APK & Signed AAB Release Build Instructions
+# OmniShield X Infinity 5.0 — APK & Signed AAB Release Build Instructions
+
+> Building a package is not production certification. Do not publish until development CI and the
+> physical-device checklist pass on the exact source revision.
 
 ## 1. Environment Prerequisites
 
-- **JDK:** Java 17 or Java 21 (AGP 9.4 requires JDK 17+)
-- **Android SDK:** API 37 (`compileSdk = 37`, `targetSdk = 36`, `minSdk = 29`); install with `sdkmanager "platforms;android-37"` if missing.
-- **Gradle:** Gradle 9.7.1 Wrapper (`.\gradlew.bat`), AGP 9.4.1, Kotlin 2.4.21
+- **JDK:** Java 17
+- **Android SDK:** API 36 (`compileSdk = 36`, `targetSdk = 36`, `minSdk = 29`); install with `sdkmanager "platforms;android-36"` if missing.
+- **Gradle:** Gradle 8.11.1 Wrapper (`.\gradlew.bat`), AGP 8.9.3, Kotlin 2.0.21
 
 ---
 

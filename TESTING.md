@@ -1,17 +1,19 @@
-# Build & Test Guide
+# OmniShield X Infinity 5.0 — Build & Test Guide
 
-This document describes how AdShield Pro is built and how its automated tests are run.
+This document describes the Android app in this branch. The expanded device checklist is in
+[`docs/TESTING.md`](docs/TESTING.md); current capability limits are in
+[`docs/OMNISHIELD_INFINITY_STATUS.md`](docs/OMNISHIELD_INFINITY_STATUS.md).
 
 ## Requirements
 
 | Tool | Version used by the project |
 | --- | --- |
-| JDK | 17 or newer (build tested with JDK 21 toolchain config) |
-| Android SDK Platform | 37 (`compileSdk = 37`, `targetSdk = 36`) |
-| Android build-tools | installed automatically by AGP 9.4.1 |
-| Gradle | 9.7.1 via the committed wrapper (`./gradlew`) |
-| Android Gradle plugin | 9.4.1 (built-in Kotlin, no `kotlin-android` plugin) |
-| Kotlin / KSP | 2.4.21 / 2.3.13 |
+| JDK | 17 |
+| Android SDK Platform | 36 (`compileSdk = 36`, `targetSdk = 36`, `minSdk = 29`) |
+| Android build-tools | installed automatically by AGP |
+| Gradle | 8.11.1 via the committed wrapper (`./gradlew`) |
+| Android Gradle plugin | 8.9.3 |
+| Kotlin / KSP | 2.0.21 / 2.0.21-1.0.28 |
 
 Set `ANDROID_HOME` (or add an `sdk.dir` line to `local.properties`) before building.
 
@@ -35,16 +37,18 @@ export ADSHIELD_KEY_PASSWORD=…
 
 ## Continuous integration
 
-`.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
-requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
+`.github/workflows/android-build.yml` runs on pushes to this development branch and pull requests
+to `main`. It installs JDK 17 and runs, in order:
 
-1. `:app:compileDebugKotlin` — fails fast on toolchain problems
-2. `:app:assembleDebug` — APK packaging
-3. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore)
-4. `:app:testDebugUnitTest` — then asserts that exactly 18 tests executed and passed
-5. `:app:lintDebug` — hard gate, the build fails on any lint error
+1. Static Kotlin source/diff checks
+2. `:app:compileDebugKotlin` and `:app:assembleDebug`
+3. `:app:testDebugUnitTest`, then asserts exactly 125 tests executed with no failure/error/skip
+4. `:app:lintDebug` — hard gate
+5. APK DEX/manifest/resource/bundled-list inspection
 
-The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
+The debug APK and reports are uploaded as `omnishield-x-infinity-development`. This workflow never
+publishes a release or signs a production APK. R8/resource shrinking still require a separately
+signed release verification, and physical-device checks remain mandatory.
 
 ## Unit tests
 

@@ -215,7 +215,7 @@ class GameTurboEngine @Inject constructor(
     fun thermalGuardSummary(): String {
         return runCatching {
             val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 val headroom = pm.getThermalHeadroom(1)
                 when {
                     headroom >= 6f -> "Cool: ${(headroom * 10).toInt() / 10.0f}°C thermal headroom — full sustained performance available"

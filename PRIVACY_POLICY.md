@@ -1,7 +1,7 @@
-# AdShield Pro v2.3 — Privacy Policy & Google Play Data Safety Disclosure
+# OmniShield X Infinity 5.0 — Privacy Policy & Google Play Data Safety Disclosure
 
-**Effective Date:** October 24, 2026  
-**Application:** AdShield Pro (`com.adshield.pro`)
+**Effective Date:** November 4, 2026
+**Application:** OmniShield X Infinity (`com.adshield.pro`)
 
 ---
 
@@ -33,6 +33,12 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - **Google Public DNS (`8.8.8.8`)** — Subject to the [Google Public DNS Privacy Notice](https://developers.google.com/speed/public-dns/privacy).
 - **Custom DNS Resolver** — Subject to the privacy policy of the operator you configure.
 
+If encrypted failover is enabled through Speed mode and Autonomous response, a failed known
+provider's query may be retried with another known encrypted provider and therefore disclosed to
+that operator. Manual override stops new autonomous resolver changes. Custom resolvers are never
+replaced by this failover. There is no plaintext fallback from DoH/DoT; exhausted encrypted
+candidates return SERVFAIL.
+
 ---
 
 ## 4. Local Activity Logging & User Deletion Controls
@@ -40,7 +46,9 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - **Optional Local Logging:** Per-domain DNS query logs (`dns_logs` SQLite table) are stored **exclusively on your device** and can be toggled off at any time in the **Activity** tab.
 - **Automatic Retention Pruning:** Local DNS logs are automatically purged after your selected retention window (`1`, `7`, or `30` days).
 - **One-Tap Data Deletion:** Tapping **Clear History** in the **Activity** tab permanently deletes all local DNS logs and historical statistics from your device.
-- **Platform Backups:** App-private data is excluded from Android cloud backup and device transfer. The manual JSON configuration export does not include DNS query history.
+- **Security History & Quarantine:** Security Center keeps the newest 100 local scan records. A user-confirmed file quarantine is a bounded, SHA-256-verified copy in app-private storage; deleting a quarantined copy does not claim to erase an original that Android's document provider refused to remove.
+- **Battery & Network Diagnostics:** Battery telemetry, foreground-derived history, charging sessions, connectivity state and local DNS events are processed on-device. The app does not include analytics or crash-reporting SDKs.
+- **Platform Backups:** App-private data is excluded from Android cloud backup and device transfer. The manual JSON configuration export does not include DNS query history, security history or quarantine contents.
 
 ---
 
