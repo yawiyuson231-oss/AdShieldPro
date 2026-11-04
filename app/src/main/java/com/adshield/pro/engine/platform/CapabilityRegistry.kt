@@ -367,10 +367,15 @@ object CapabilityRegistry {
         ),
         cap(
             "battery-alerts", "High-temperature and charging-complete alerts", CapabilityArea.BATTERY,
-            CapabilityStatus.PARTIAL, "engine/battery/BatteryDiagnostics.kt", listOf(PERM_NOTIF),
-            listOf("Diagnostics severity + battery broadcasts"),
-            listOf("Warnings surface on the Battery screen when the app is open; a background alert worker is not shipped yet"),
-            "Manual: heat the device and open Battery"
+            CapabilityStatus.IMPLEMENTED, "engine/battery/BatteryAlertPolicy.kt", listOf(PERM_NOTIF),
+            listOf("ACTION_BATTERY_CHANGED via a runtime receiver owned by the VPN service, plus the diagnostic rule chain"),
+            listOf(
+                "Notifications are delivered while protection is running; a stopped service registers no listener",
+                "Raised once per episode with hysteresis, so a 0.5 °C wobble cannot spam the notification shade",
+                "A missing temperature sensor raises no alert — the policy states the sensor is absent instead of assuming 'cool'",
+                "Android 13+ additionally needs POST_NOTIFICATIONS; without it nothing is posted and the Battery screen says so"
+            ),
+            "BatteryAlertPolicyTest (8 cases) plus a manual device check: charge a warm device to full"
         ),
 
         // ------------------------------------------------------ MAINTENANCE
@@ -527,10 +532,14 @@ object CapabilityRegistry {
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(), listOf("Would summarise telemetry, rule counts, last errors"),
-            listOf("Not implemented yet; must scrub identifiers before shipping"),
-            "n/a — planned"
+            CapabilityStatus.IMPLEMENTED, "engine/platform/DiagnosticReport.kt",
+            emptyList(),
+            listOf("Aggregate counters, measured configuration choices and device facts from public APIs"),
+            listOf(
+                "Contains no DNS history, domain names, app names, user rules or file paths — enforced by redaction and asserted in the JVM suite",
+                "A snapshot taken at export time, not a live monitor; the limits are stated inside the report itself"
+            ),
+            "PlatformFeaturesTestSuite.testReportCarriesNoIdentifiers and related report cases"
         )
     )
 

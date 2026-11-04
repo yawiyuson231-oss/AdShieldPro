@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import com.adshield.pro.BuildConfig
+import com.adshield.pro.engine.platform.DiagnosticReport
 import androidx.lifecycle.viewModelScope
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
@@ -126,6 +128,74 @@ class AdShieldViewModel @Inject constructor(
 
     val allTimeAllowedQueries: StateFlow<Long> = repository.allTimeAllowedQueriesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    /**
+     * Battery alert preference. Stored in the prefs file the notification receiver reads, so the
+     * switch here and the notifications that actually post can never disagree.
+     */
+    private val alertPrefs = appContext.getSharedPreferences("adshield_settings", android.content.Context.MODE_PRIVATE)
+
+    private val _batteryAlertsEnabled = MutableStateFlow(alertPrefs.getBoolean(KEY_BATTERY_ALERTS, true))
+    val batteryAlertsEnabled: StateFlow<Boolean> = _batteryAlertsEnabled.asStateFlow()
+
+    fun setBatteryAlertsEnabled(enabled: Boolean) {
+        alertPrefs.edit().putBoolean(KEY_BATTERY_ALERTS, enabled).apply()
+        _batteryAlertsEnabled.value = enabled
+        // Changing the switch re-arms the latches: a user who turns alerts back on expects the
+        // next real episode to notify, not to be swallowed by a latch from before the change.
+        com.adshield.pro.service.BatteryAlertReceiver.resetLatches(appContext)
+        showFeedback(if (enabled) "Battery alerts enabled." else "Battery alerts disabled — no notifications will be posted.")
+    }
+
+    /**
+     * Builds the scrubbed diagnostic report. Counters come from the live flows; nothing that
+     * identifies a domain, app or person is included (see DiagnosticReport).
+     */
+    suspend fun exportDiagnosticReportJson(): String {
+        val vpn = vpnState.value
+        val settings = settingsState.value
+        // Read the live engine snapshot directly — the same numbers the Status screen shows.
+        val snapshot = filterRuleEngine.getCurrentSnapshot()
+        val blockRules = snapshot.filterListSubdomains.size + snapshot.filterListExact.size +
+            snapshot.filterListWildcards.size + snapshot.customBlockExact.size + snapshot.customBlockSubdomain.size
+        val allowRules = snapshot.builtInAllowSubdomains.size + snapshot.customAllowExact.size + snapshot.customAllowSubdomain.size
+        val report = DiagnosticReport.build(
+            clockMillis = System.currentTimeMillis(),
+            build = DiagnosticReport.BuildInfo(
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                applicationId = BuildConfig.APPLICATION_ID
+            ),
+            environment = DiagnosticReport.environmentOf(appContext),
+            counters = DiagnosticReport.Counters(
+                protectionActive = vpn.status == VpnStatus.CONNECTED,
+                protectionMode = vpn.activeMode.name,
+                totalRules = snapshot.totalLoadedRules,
+                blockRules = blockRules,
+                allowRules = allowRules,
+                userRules = customRules.value.size,
+                lookupsToday = vpn.sessionTotalQueries,
+                blockedToday = vpn.sessionBlockedQueries,
+                errorsToday = if (vpn.lastError != null) 1L else 0L,
+                upstreamTransport = settings.resolverConfig.protocol.label,
+                resolversConfigured = 1,
+                lastFeedSyncAgeHours = settings.lastFilterUpdateEpochMs.takeIf { it > 0L }?.let {
+                    ((System.currentTimeMillis() - it) / 3_600_000L).coerceAtLeast(0L)
+                },
+                lastErrorCategory = vpn.lastError?.substringBefore(':')?.takeIf { it.isNotBlank() }
+            )
+        )
+        // Persist a copy in app-private storage as well, so the user keeps a record even if the
+        // dialog is dismissed. The failure is surfaced rather than ignored.
+        DiagnosticReport.writeTo(appContext, report).onFailure {
+            showFeedback("Report built, but could not be saved: ${it.message}")
+        }
+        return DiagnosticReport.toJson(report)
+    }
+
+    private companion object {
+        const val KEY_BATTERY_ALERTS = "battery_alerts_enabled"
+    }
 
     val customRules: StateFlow<List<CustomRule>> = repository.customRulesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

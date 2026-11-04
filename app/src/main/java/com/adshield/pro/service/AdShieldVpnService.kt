@@ -74,9 +74,15 @@ class AdShieldVpnService : VpnService() {
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    private var batteryAlertsRegistered = false
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // Battery alerts need a live ACTION_BATTERY_CHANGED listener; the tunnel is the one
+        // component that is guaranteed to be running while the user relies on the app, so it
+        // owns the registration (an app-level manifest receiver cannot receive this broadcast).
+        batteryAlertsRegistered = BatteryAlertReceiver.register(this)
         upstreamDnsResolver.bindVpnSocketProtectors(
             protectTcp = { socket -> protect(socket) },
             protectUdp = { datagramSocket -> protect(datagramSocket) }
@@ -600,6 +606,7 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        batteryAlertsRegistered = false
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
         }

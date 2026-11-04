@@ -528,6 +528,7 @@ private fun SettingsDestination(
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val batteryAlertsEnabled by viewModel.batteryAlertsEnabled.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
@@ -540,7 +541,10 @@ private fun SettingsDestination(
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,
-        onRestoreBackupJson = viewModel::restoreFullBackupJson
+        onRestoreBackupJson = viewModel::restoreFullBackupJson,
+        batteryAlertsEnabled = batteryAlertsEnabled,
+        onToggleBatteryAlerts = viewModel::setBatteryAlertsEnabled,
+        onExportDiagnosticReport = viewModel::exportDiagnosticReportJson
     )
 }
 

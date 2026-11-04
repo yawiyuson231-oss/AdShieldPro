@@ -1,6 +1,7 @@
 package com.adshield.pro.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 import com.adshield.pro.domain.model.AppExclusionInfo
@@ -75,7 +77,10 @@ fun SettingsScreen(
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
-    onRestoreBackupJson: (String) -> Unit
+    onRestoreBackupJson: (String) -> Unit,
+    batteryAlertsEnabled: Boolean = true,
+    onToggleBatteryAlerts: (Boolean) -> Unit = {},
+    onExportDiagnosticReport: suspend () -> String = { "" }
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -85,6 +90,8 @@ fun SettingsScreen(
     var showAppExclusionDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
     var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var reportJsonBuffer by remember { mutableStateOf("") }
     var backupJsonBuffer by remember { mutableStateOf("") }
 
     var customDohInput by remember(settings.resolverConfig) {
@@ -456,6 +463,65 @@ fun SettingsScreen(
             }
         }
 
+        // Diagnostics & battery alerts card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Diagnostics & Battery Alerts",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Battery notifications", fontSize = 13.sp)
+                            Text(
+                                text = "Heat, charge-complete and critically-low warnings raised from measured values " +
+                                    "while protection is running. One notification per episode, never a reminder loop.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = batteryAlertsEnabled,
+                            onCheckedChange = onToggleBatteryAlerts
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                reportJsonBuffer = onExportDiagnosticReport()
+                                showReportDialog = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Export diagnostic report")
+                    }
+
+                    Text(
+                        text = "The report contains aggregate counters and device facts only — no DNS history, " +
+                            "domain names, app names or file paths. It states this inside the file.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenAbout),
@@ -564,6 +630,37 @@ fun SettingsScreen(
                 TextButton(onClick = { showAppExclusionDialog = false }) {
                     Text("Done")
                 }
+            }
+        )
+    }
+
+    if (showReportDialog) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("Diagnostic report (JSON)") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                ) {
+                    Text(
+                        text = "Copy this text or share it with support. It contains counters and environment " +
+                            "facts only — no history, domains, app names or file paths.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SelectionContainer {
+                        Text(text = reportJsonBuffer, fontSize = 10.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showReportDialog = false },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Close") }
             }
         )
     }
