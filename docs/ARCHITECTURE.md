@@ -20,7 +20,7 @@ security/           firewall AI, monitor, feeds, backup, privacy, sha256, storag
 assets/             bundled rule feeds (GPLv3, HaGeZi) + curated supplements + icon
 sw.js               offline caching (never caches DoH)
 scripts/verify.mjs  static architecture + honesty-claim verification
-tests/              unit (153) + integration (16) + static gates
+tests/              unit (153) + integration (17) + static gates
 ```
 
 ## 2. Data flow of a single lookup
@@ -127,6 +127,11 @@ never a guess.
   measured latency percentiles. Metrics are derived from recorded events only.
 - `privacy.js` — salted SHA-256 bucket hashes, k-anonymity suppression (k = 10),
   date-bucket retention. No hostname is ever persisted or reported in clear.
+- The dashboard's **Measure filtering cost** control runs 5,000 real
+  `engine.evaluate()` calls with `performance.now()` and reports p50/p05-in-µs
+  latency and throughput measured on the user's device. The result is kept in
+  state so the once-per-second repaint cannot erase it, and it is never a
+  hard-coded benchmark.
 - `power.js` — `PowerGovernor` derives the repaint cadence from the Battery Status API
   (1x charging/normal, 2x below 25 %, 4x below 10 %, clamped to 250 ms–60 s). It touches
   only the monitor timer — never a verdict, score or rule. When the API is missing (Safari,

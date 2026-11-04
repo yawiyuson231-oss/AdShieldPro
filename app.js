@@ -22,7 +22,7 @@ import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
 import { createStorage } from './security/storage.js';
 import * as ui from './ui/dom.js';
-import { h, mount, pill, note, empty, kpi, table, kv, number, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
+import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
 const BUNDLED = {
   lite: { file: 'assets/core_lite_ads.txt', category: 'ADS', source: 'core_lite_ads', label: 'HaGeZi Multi LIGHT (bundled)' },
@@ -41,6 +41,8 @@ const state = {
   backups: null,
   analytics: null,
   settings: { aggressiveTier: false, autoUpdateFeeds: true, monitorRefreshMs: 1000 },
+  lastBenchmark: null,
+  benchmarkRunning: false,
   power: null,
   powerInfo: null,
   customRules: [],
@@ -415,8 +417,35 @@ function renderDashboard() {
       ['Rule set memory', `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round((estimateRuleMemory(breakdown.total) / breakdown.total))} bytes per rule)`],
       ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background']
     ]),
+    h('div', { class: 'row', style: { marginTop: '10px' } },
+      h('button', {
+        class: 'sm',
+        text: state.benchmarkRunning ? 'Measuring…' : 'Measure filtering cost',
+        disabled: state.benchmarkRunning,
+        onclick: () => {
+          if (state.benchmarkRunning) return;
+          state.benchmarkRunning = true;
+          renderDashboard();
+          // Yield once so the busy state paints before the loop blocks the thread.
+          setTimeout(() => {
+            let result = null;
+            try { result = runEngineBenchmark(); } catch (err) { result = { ok: false, reason: err.message }; }
+            state.lastBenchmark = result;
+            state.benchmarkRunning = false;
+            // The dashboard repaints every second; render from state so a measured
+            // result survives the next tick instead of vanishing.
+            renderBenchmark(result);
+            renderDashboard();
+          }, 20);
+        }
+      }),
+      h('span', { class: 'tiny muted', text: 'Runs 5,000 real evaluations on this device' })
+    ),
+    h('div', { id: 'dash-bench', style: { marginTop: '8px' } }),
     h('p', { class: 'small muted', style: { marginTop: '8px' }, text: 'The monitor loop is the only recurring timer in this app. It is skipped entirely in a hidden tab and slowed on low battery when the browser exposes battery state. Nothing here affects what is filtered.' })
   );
+
+  renderBenchmark(state.lastBenchmark);
 
   const categories = breakdown.categories || {};
   const maxCategory = Math.max(1, ...Object.values(categories));
@@ -508,11 +537,11 @@ function analyseDomain(input) {
       h('header', {},
         h('h4', { text: signal.label }),
         h('span', { class: `pill ${signal.contribution >= 15 ? 'bad' : signal.contribution > 0 ? 'warn' : ''}` },
-          `${signal.contribution} pts · weight ${signal.weight}/${signal.baseWeight}${signal.weightMultiplier < 1 ? ` ×${signal.weightMultiplier}` : ''}`)
+          `${plural(signal.contribution, 'point')} · weight ${signal.weight}/${signal.baseWeight}${signal.weightMultiplier < 1 ? ` ×${signal.weightMultiplier}` : ''}`)
       ),
       h('p', { class: 'evidence', text: signal.evidence }),
       signal.contributions?.length
-        ? h('p', { class: 'tiny mono', text: `model tokens: ${signal.contributions.map((c) => `${c.token} (${c.weight > 0 ? '+' : ''}${c.weight})`).join(', ')}` })
+        ? h('p', { class: 'tiny mono', text: `deciding tokens (log-odds): ${signal.contributions.map((c) => `${c.token} (${c.weight > 0 ? '+' : ''}${c.weight})`).join(', ')}` })
         : null
     ))
     : [empty('No signal produced evidence for this hostname. That is not proof of safety — it only means nothing we can see matched.')];
@@ -964,6 +993,55 @@ function renderMonitor() {
  */
 function estimateRuleMemory(totalRules) {
   return Math.round((Number(totalRules) || 0) * 120);
+}
+
+/**
+ * Measures this device's actual filtering cost: evaluates a deterministic sample
+ * of the loaded rule set and reports per-op latency plus throughput. Nothing is
+ * cached or estimated — the number shown is the number measured just now.
+ */
+function runEngineBenchmark(iterations = 5000) {
+  const domains = [...state.engine.filterSubdomains.keys()];
+  if (!domains.length) return { ok: false, reason: 'no rules loaded, so there is nothing to measure' };
+  const sample = domains.slice(0, Math.min(iterations, domains.length));
+  const samples = new Float64Array(sample.length);
+  const startedAt = performance.now();
+  for (let i = 0; i < sample.length; i++) {
+    const t0 = performance.now();
+    state.engine.evaluate(sample[i]);
+    samples[i] = performance.now() - t0;
+  }
+  const totalMs = performance.now() - startedAt;
+  const sorted = Array.from(samples).sort((a, b) => a - b);
+  const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+  return {
+    ok: true,
+    evaluated: sample.length,
+    totalMs: Math.round(totalMs * 100) / 100,
+    perSecond: Math.round(sample.length / (totalMs / 1000)),
+    p50us: Math.round(pct(0.5) * 1000),
+    p95us: Math.round(pct(0.95) * 1000),
+    meanUs: Math.round((totalMs * 1000 / sample.length) * 10) / 10,
+    measuredAt: new Date().toISOString()
+  };
+}
+
+function renderBenchmark(result) {
+  const node = document.getElementById('dash-bench');
+  if (!node) return;
+  if (!result) { mount(node, empty('No benchmark run yet. It measures your device, not a marketing claim.')); return; }
+  if (!result.ok) { mount(node, note(result.reason, 'warn')); return; }
+  mount(node,
+    kv([
+      ['Evaluations measured', `${number(result.evaluated)} (sampled from the loaded rule set)`],
+      ['Total time', `${result.totalMs} ms`],
+      ['Mean per evaluation', `${result.meanUs} µs`],
+      ['p50 / p95', `${result.p50us} µs / ${result.p95us} µs`],
+      ['Throughput', `${number(result.perSecond)} evaluations/second`],
+      ['Measured', relativeTime(result.measuredAt)]
+    ]),
+    note('Measured on this device just now, using performance.now() around real engine.evaluate() calls. Rule matching is a Set/Map walk; no network or model inference is involved.', 'info')
+  );
 }
 
 function startMonitorLoop() {

@@ -202,6 +202,25 @@ test('power governor is honest about support and only changes repaint cadence', 
   assert.match(resources, /estimate/i, 'memory figures must be labelled as estimates');
 });
 
+test('the filtering-cost benchmark reports measured numbers', async () => {
+  app.navigate('dashboard');
+  const button = [...win.document.querySelectorAll('#dash-resources button')]
+    .find((b) => /Measure filtering cost/.test(b.textContent));
+  assert.ok(button, 'the benchmark control must exist');
+  button.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  const out = text('#dash-bench');
+  assert.match(out, /Evaluations measured/);
+  assert.match(out, /\d+ evaluations\/second/, 'throughput must be a measured number');
+  assert.match(out, /µs/, 'latency must be shown in microseconds');
+  assert.match(out, /Measured on this device just now/);
+  // The dashboard repaints on the monitor loop; a measured result must survive it.
+  await new Promise((resolve) => setTimeout(resolve, 1300));
+  assert.match(text('#dash-bench'), /evaluations\/second/,
+    'a measured benchmark must survive the next dashboard repaint');
+});
+
 test('AETHER blocks a feed-listed ad domain and explains why', () => {
   app.navigate('aether');
   $('#aether-input').value = 'ads.doubleclick.net';

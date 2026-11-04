@@ -186,7 +186,12 @@ test('classifier evidence is capped, labelled and low-weight', () => {
   const modelSignal = report.signals.find((s) => s.id === 'classifier');
   if (modelSignal) {
     assert.ok(modelSignal.baseWeight <= 10, 'the lexical model must stay a minor signal');
-    assert.match(modelSignal.evidence, /operating threshold/);
+    assert.match(modelSignal.evidence, /calibrated threshold/);
+    assert.match(modelSignal.evidence, /cannot see page content/i,
+      'the classifier signal must state what it cannot see');
+    assert.ok(modelSignal.contributions.length > 0, 'deciding tokens must be shipped for the UI');
+    assert.ok(!/Top tokens/.test(modelSignal.evidence),
+      'token weights are rendered from contributions, not duplicated inside the prose');
     assert.ok(Array.isArray(modelSignal.contributions));
   }
   // Whatever happens, the model alone must not reach a block recommendation.

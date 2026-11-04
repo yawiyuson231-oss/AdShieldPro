@@ -219,9 +219,10 @@ export class ReputationEngine {
       if (prediction.score >= threshold) {
         // Strength scales with how far past the calibrated threshold it sits.
         const strength = clamp01((prediction.score - threshold) / Math.max(0.001, 1 - threshold));
-        const top = prediction.contributions.slice(0, 3).map((c) => `${c.token} (${c.weight > 0 ? '+' : ''}${c.weight})`);
+        // Token weights travel in `contributions` and are rendered once by the UI;
+        // repeating them in the prose produced a duplicated, noisy line.
         add('classifier', strength,
-          `Lexical model score ${prediction.score.toFixed(3)} >= operating threshold ${threshold}. Top tokens: ${top.join(', ') || 'none'}.`,
+          `Lexical model score ${prediction.score.toFixed(3)} is at or above the calibrated threshold ${threshold}. This is a naming-style signal only: it cannot see page content, certificates or traffic.`,
           { modelScore: prediction.score, threshold, contributions: prediction.contributions.slice(0, 5) });
       }
     }

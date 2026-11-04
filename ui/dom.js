@@ -225,4 +225,16 @@ export function setBusy(button, busy, busyLabel = 'Working…') {
   }
 }
 
-export default { h, clear, mount, pill, note, empty, kpi, table, kv, buttons, number, bytes, relativeTime, drawSeries, toast, download, setBusy };
+export default { h, clear, mount, pill, note, empty, kpi, table, kv, buttons, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy };
+
+/**
+ * Counted nouns, so the UI never prints "1 points".
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} [pluralForm]
+ */
+export function plural(count, singular, pluralForm) {
+  const value = Number(count);
+  const word = value === 1 ? singular : (pluralForm || `${singular}s`);
+  return `${count} ${word}`;
+}

@@ -389,12 +389,14 @@
   <section class="page" id="page-extension" hidden>
     <div class="card accent">
       <h2>Browser extension (Chrome / Edge / Brave, Manifest V3)</h2>
-      <p>A real extension generated from the same intelligence core: declarative-net-request block rules
-      from the bundled ad/tracker feeds, plus cosmetic hiding on top sites.</p>
+      <p>A real extension built by <code>npm run build:extension</code> from the same intelligence core:
+      static declarative-net-request block rules generated from the bundled ad/tracker feeds, plus cosmetic
+      hiding on top sites. The archive is reproducible — rerunning the builder produces identical bytes.</p>
       <ul style="padding-left:20px; margin-top:8px">
         <li>Download <code>omnishield-x-extension.zip</code> from this site's root and unzip it.</li>
         <li>Open <code>chrome://extensions</code> → enable <b>Developer mode</b> → <b>Load unpacked</b> → select the folder.</li>
-        <li>Pin the 🛡 icon; the popup shows real per-tab block counts from the extension's own counters.</li>
+        <li>Pin the 🛡 icon. The popup shows per-tab counts from the browser's own matched-rule events when
+        the browser exposes them (unpacked installs do); otherwise it prints “—” and the reason instead of a zero.</li>
       </ul>
       <p style="margin-top:8px"><span class="pill info">Privacy</span> No servers, no analytics, no accounts. Rules are local files.</p>
       <p style="margin-top:8px" class="small muted">The extension cannot filter other apps, and it cannot filter
