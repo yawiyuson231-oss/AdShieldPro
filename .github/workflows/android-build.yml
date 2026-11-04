@@ -43,7 +43,16 @@ jobs:
       - name: Compile and package debug APK
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --console=plain --stacktrace :app:compileDebugKotlin :app:assembleDebug
+          set +e
+          ./gradlew --no-daemon --console=plain --stacktrace :app:compileDebugKotlin :app:assembleDebug > build.log 2>&1
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E '^e:|^FAILURE:|^> |error:|Exception:' build.log | tail -60 | while IFS= read -r line; do
+              echo "::error::${line//'%'/'%25'}"
+            done
+            tail -80 build.log
+          fi
+          exit "$STATUS"
 
       - name: JVM unit tests
         run: ./gradlew --no-daemon --console=plain --stacktrace :app:testDebugUnitTest
