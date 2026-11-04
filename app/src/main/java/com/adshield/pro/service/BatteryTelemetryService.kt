@@ -225,6 +225,9 @@ class BatteryTelemetryService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "adshield_battery_monitor"
+
+        /** Action sent by the notification's own "Stop" button. */
+        const val ACTION_STOP = "com.adshield.pro.action.STOP_BATTERY_MONITOR"
         private const val NOTIFICATION_ID = 6100
         private const val SAMPLE_INTERVAL_MS = 5_000L
 
