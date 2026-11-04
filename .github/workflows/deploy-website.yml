@@ -86,6 +86,29 @@ jobs:
       # enablement: true asks the action to create the Pages site when it is missing.
       # GITHUB_TOKEN usually cannot do that (it needs admin), so this step is allowed
       # to fail and the run continues to build + upload the artifact either way.
+      # Creating the Pages site requires repository admin, which the default
+      # workflow token is not. If an admin has stored a token with the Pages
+      # permission as `PAGES_TOKEN`, create/enable the site here so the rest of
+      # this run deploys for real instead of stopping at the branch publish.
+      - name: Enable Pages (needs the optional PAGES_TOKEN secret)
+        id: enable
+        if: ${{ env.PAGES_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
+        run: |
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
+          auth="Authorization: Bearer ${PAGES_TOKEN}"
+          if [ "$(curl -s -o /dev/null -w '%{http_code}' -H "$auth" "$API")" = "200" ]; then
+            echo "Pages is already enabled."
+          else
+            code=$(curl -s -o /tmp/pages.json -w '%{http_code}' -X POST "$API" \
+              -H "$auth" -H 'Accept: application/vnd.github+json' \
+              -d '{"build_type":"workflow"}')
+            echo "create Pages -> HTTP ${code}"
+            [ "$code" = "201" ] || cat /tmp/pages.json
+          fi
+
       - name: Configure Pages
         id: configure
         continue-on-error: true
@@ -144,14 +167,27 @@ jobs:
           if [ "$DEPLOY_OUTCOME" = "success" ]; then
             echo "::notice title=Deployed::Site published to ${PAGE_URL}"
           else
+            WHO=$(git remote get-url origin | sed -E 's#.*[:/]([^/]+)/([^/]+?)(\.git)?$#\1#')
+            REPO=$(git remote get-url origin | sed -E 's#.*[:/]([^/]+)/([^/]+?)(\.git)?$#\2#')
             {
-              echo "### Site built, deploy skipped"
+              echo "### Site built and published to the \`gh-pages\` branch"
               echo ""
-              echo "The site was assembled and uploaded as a Pages artifact, but **GitHub Pages"
-              echo "is not enabled** for this repository, so nothing was published."
+              echo "GitHub Pages itself is off for this repository. Turning it on needs a"
+              echo "repository **admin**, and this workflow's token is not one, so no code"
+              echo "change can do it. The site is therefore published to the \`gh-pages\`"
+              echo "branch, which any static host can serve as-is."
               echo ""
-              echo "One-time fix (repository admin): **Settings → Pages → Source: GitHub Actions**."
-              echo "Then re-run this workflow. No code change is required."
+              echo "**Two clicks to finish (one time, as a repository admin):**"
+              echo ""
+              echo "1. Create a fine-grained personal access token with **Pages: read and write**"
+              echo "   on this repository, and save it as the secret \`PAGES_TOKEN\`."
+              echo "   (<https://github.com/settings/personal-access-tokens/new>)"
+              echo "2. Open **Settings → Pages → Source: GitHub Actions** — or simply re-run this"
+              echo "   workflow once \`PAGES_TOKEN\` exists; it creates the Pages site for you."
+              echo ""
+              echo "Until then the built site remains downloadable from the artifact below,"
+              echo "and it is live on the \`gh-pages\` branch at"
+              echo "<https://github.com/${WHO}/${REPO}/tree/gh-pages>."
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::warning title=Deploy skipped::Enable Pages in Settings -> Pages (Source: GitHub Actions) to publish."
           fi

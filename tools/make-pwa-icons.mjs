@@ -74,6 +74,10 @@ function shieldAt(px, py) {
   if (Math.abs(x) > halfW) return 0;
   if (y < top) return 0;
   if (y <= shoulder) return 1;
+  // Below the point the shape has ended. Without this the exact centre column
+  // (x === 0) still satisfies the taper and paints a one-pixel line running
+  // from the tip to the edge of the icon.
+  if (y > bottom) return 0;
   // Lower half: a shield curve, not a triangle. The sides stay wide until the
   // last third, then sweep into a rounded point (`t^1.7` shaped power curve).
   const t = (y - shoulder) / (bottom - shoulder);
@@ -140,10 +144,32 @@ function iconPixel(px, py, size, { maskable = false } = {}) {
   return [Math.round(colour[0]), Math.round(colour[1]), Math.round(colour[2]), 255];
 }
 
+/**
+ * 4x4 supersampling. The shapes above are hard boolean tests, so sampling once
+ * per pixel leaves stair-stepped edges on the shield curve — very visible at
+ * 512px where the icon is the app's face on a home screen.
+ */
+function antialiased(px, py, size, options) {
+  const N = 4;
+  let r = 0; let g = 0; let b = 0; let a = 0;
+  for (let sy = 0; sy < N; sy++) {
+    for (let sx = 0; sx < N; sx++) {
+      const [sr, sg, sb, sa] = iconPixel(px + (sx + 0.5) / N, py + (sy + 0.5) / N, size, options);
+      const w = sa / 255;
+      r += sr * w; g += sg * w; b += sb * w; a += sa;
+    }
+  }
+  const total = N * N;
+  const alpha = a / total;
+  if (alpha <= 0) return [0, 0, 0, 0];
+  const weight = (a / 255) || 1;
+  return [Math.round(r / weight), Math.round(g / weight), Math.round(b / weight), Math.round(alpha)];
+}
+
 const targets = [
-  ['assets/icon-192.png', 192, (x, y, s) => iconPixel(x, y, s)],
-  ['assets/icon-512.png', 512, (x, y, s) => iconPixel(x, y, s)],
-  ['assets/icon-maskable-512.png', 512, (x, y, s) => iconPixel(x, y, s, { maskable: true })]
+  ['assets/icon-192.png', 192, (x, y, s) => antialiased(x, y, s)],
+  ['assets/icon-512.png', 512, (x, y, s) => antialiased(x, y, s)],
+  ['assets/icon-maskable-512.png', 512, (x, y, s) => antialiased(x, y, s, { maskable: true })]
 ];
 
 for (const [file, size, shade] of targets) {
