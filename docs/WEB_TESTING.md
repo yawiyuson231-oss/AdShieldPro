@@ -58,14 +58,18 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 161 unit tests, 18 integration tests — all passing.
-- Static verification: 75 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
+- 166 unit tests, 19 integration tests — all passing.
+- Static verification: 86 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
+- `npm run lint` — 25 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.
 - CNAME chain audit (`tests/unit/chain.test.mjs` + DNS-lab integration test): cloaking
   detection, evidence strings, same-site and clean off-site paths, depth bound, and the
   guarantee that the audit never blocks.
+- Deploy assembler (`tests/unit/stage.test.mjs`): the staged tree contains the app at
+  `/app/`, tests/`node_modules`/`package.json` never leak into it, a missing service-worker
+  precache target fails the build, and the published ZIP version matches the app.
 - Power governor (`tests/unit/power.test.mjs`): band thresholds, interval clamping, subscriber
   cleanup and the *unsupported* Battery Status API path (must degrade, not pretend).
 - Classifier holdout (measured in `tests/unit/classifier.test.mjs`, three-way split): AUC ≈ 0.86,

@@ -185,6 +185,13 @@ test('navigation state is exposed to assistive technology, not just CSS', () => 
     assert.ok(others.every((s) => !s.hasAttribute('aria-current')),
       'hidden sections must not claim to be current');
   }
+  // Focus follows navigation, and the skip link reaches the main landmark.
+  app.navigate('monitor');
+  assert.equal(win.document.activeElement?.id, 'page-monitor',
+    'keyboard focus must move to the page that was opened');
+  assert.ok($('.skip-link'), 'a skip link must exist for keyboard users');
+  assert.equal($('.skip-link').getAttribute('href'), '#main');
+  assert.equal($('#main').id, 'main');
   assert.equal($('#boot-status').getAttribute('role'), 'status',
     'boot status must be a live region so readiness is announced');
   assert.equal($('#toasts').getAttribute('aria-live'), 'polite');
@@ -325,6 +332,17 @@ test('DNS lab refuses to invent an answer for an unresolvable name', async () =>
   const out = text('#dns-result');
   assert.match(out, /NXDOMAIN|not resolved/i);
   assert.equal(out.includes('93.184.216.34'), false, 'must not leak another domain\'s answer');
+});
+
+test('Firewall AI shows the thresholds it actually runs with', () => {
+  app.navigate('firewall');
+  const out = text('#fw-state');
+  assert.match(out, /Detector thresholds/);
+  for (const key of ['beaconCvThreshold', 'tunnelUniqueRatio', 'rateZThreshold', 'fanoutThreshold']) {
+    assert.ok(out.includes(key), `${key} must be shown — the docs promise the thresholds are visible`);
+  }
+  assert.match(out, /at least two independent indicators/,
+    'the two-signal rule must be stated next to the thresholds');
 });
 
 test('Firewall AI self-test exercises every detector with labelled fixtures', () => {

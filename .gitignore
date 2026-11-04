@@ -28,3 +28,6 @@ package-lock.json
 *.log
 .cache/
 coverage/
+
+# Locally assembled deploy tree (scripts/stage-site.mjs)
+_site/

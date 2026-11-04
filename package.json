@@ -9,9 +9,11 @@
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
     "test:integration": "node --test \"tests/integration/*.test.mjs\"",
     "verify": "node scripts/verify.mjs",
-    "ci": "npm test && npm run verify",
+    "ci": "npm run lint && npm test && npm run verify",
     "serve": "python3 -m http.server 8080 --bind 0.0.0.0",
-    "build:extension": "node scripts/build-extension.mjs"
+    "build:extension": "node scripts/build-extension.mjs",
+    "lint": "node scripts/lint.mjs",
+    "stage": "node scripts/stage-site.mjs"
   },
   "engines": {
     "node": ">=20"

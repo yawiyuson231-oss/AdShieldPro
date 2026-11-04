@@ -14,7 +14,7 @@
  *     bounded so a signal can never be tuned to zero and evidence can never be
  *     fully silenced.
  */
-import { POPULAR_SET, HIGH_ABUSE_TLDS } from './data.js';
+import { POPULAR_SET } from './data.js';
 import { extractFeatures, describeFeatures } from './lexical.js';
 import { findImpersonation, SEVERITY } from './typosquat.js';
 import { registrableDomain } from './domain.js';

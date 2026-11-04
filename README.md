@@ -41,10 +41,12 @@ over HTTP and it works offline after the first visit.
 
 ```bash
 npm install               # jsdom, used only by the integration tests
-npm test                  # 161 unit + 18 integration tests
-npm run verify            # 75 static architecture & claim-policy gates
+npm test                  # 166 unit + 19 integration tests
+npm run lint              # house lint rules for the shipped runtime code
+npm run verify            # 86 static architecture, claim, artifact and packaging gates
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
+npm run stage             # assemble _site/ exactly as the Pages workflow does
 ```
 
 | Document | Contents |

@@ -181,6 +181,24 @@ download:
   facts file has not drifted. `tests/unit/extension.test.mjs` tests the selection,
   capping, ZIP round-trip and manifest generation against synthetic feeds.
 
+## 9c. Publishing (`scripts/stage-site.mjs`, `.github/workflows/deploy-website.yml`)
+
+One artifact, two entry points. The workflow calls `node scripts/stage-site.mjs`, which
+builds `_site/` deterministically:
+
+- `_site/` ← `docs/` (the existing marketing site and APK links, unchanged),
+- `_site/app/` ← the web platform (`index.html`, `app.js`, `engine.js`, `sw.js`, the
+  `ui/`, `dns/`, `aether/`, `security/`, `assets/` trees, and the extension ZIP),
+- anything development-only (`tests/`, `node_modules/`, `package.json`) is rejected if it
+  appears in `/app/`,
+- every entry in the service worker's precache list is checked against the staged tree, so a
+  missing module fails the deploy instead of producing an app that cannot start offline.
+
+The same script runs locally (`npm run stage`), and `tests/unit/stage.test.mjs` asserts that
+the real repository stages and that a missing precache target is caught. The staged app was
+also booted under a `/app/` base URL in a DOM harness: 79,739 rules load and the extension
+facts fetch resolves.
+
 ## 10. Security posture of the app itself
 
 - No `innerHTML`, no `eval`, no `document.write` anywhere in the UI (enforced by

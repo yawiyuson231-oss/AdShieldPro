@@ -16,8 +16,10 @@ files (GitHub Pages compatible); works offline once visited.
 
 ```bash
 npm install        # jsdom, used only by the integration tests
-npm test           # 161 unit + 18 integration tests
-npm run verify     # static architecture & claim-policy gates
+npm test           # 166 unit + 19 integration tests
+npm run verify     # 86 static architecture, claim, artifact and packaging gates
+npm run lint       # house lint rules for shipped runtime code
+npm run stage      # assemble the deployable _site/ (site at /, app at /app/)
 npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
 npm run build:extension  # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 ```

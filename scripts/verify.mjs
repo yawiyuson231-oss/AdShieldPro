@@ -18,6 +18,7 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
 import { inspect as inspectExtension, MAX_STATIC_RULES } from './build-extension.mjs';
+import { lint as lintRuntime } from './lint.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const abs = (p) => resolve(ROOT, p);
@@ -161,6 +162,11 @@ export function verify() {
   add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
+  add('every page section has an accessible name',
+    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === 10,
+    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of 10`);
+  add('a skip link targets the main landmark',
+    /class="skip-link" href="#main"/.test(htmlA11y) && /<main id="main"/.test(htmlA11y));
 
   /* 9c. The shipped extension is a real archive built from reviewed sources. */
   const ext = inspectExtension({ root: ROOT });
@@ -192,6 +198,38 @@ export function verify() {
   add('the monitor loop is started by the governor, not separately',
     !/^\s*startMonitorLoop\(\);$/m.test(bootBody),
     'no duplicate timer install during boot');
+
+  /* 9e. House lint rules for shipped runtime code. */
+  const lintResult = lintRuntime(ROOT);
+  add('runtime code passes the house lint rules', lintResult.ok,
+    lintResult.ok ? `${lintResult.files.length} files` : lintResult.findings.map((f) => `${f.rule}@${f.file}`).join(', '));
+  add('no orphan modules in the shipped tree', !lintResult.findings.some((f) => f.rule === 'no-orphan-module'),
+    `${lintResult.reachable.length} modules reachable`);
+
+  /* 9f. Workflow files must stay loadable: a multi-line double-quoted `run`
+        scalar silently made ci.yml invalid to Actions. */
+  for (const wf of ['ci.yml', 'deploy-website.yml']) {
+    const path = `.github/workflows/${wf}`;
+    if (!exists(path)) continue;
+    const text = read(path);
+    const brokenScalar = text.split('\n').some((line) => {
+      const match = /^\s*run:\s*(.*)$/.exec(line);
+      if (!match) return false;
+      const value = match[1].trim();
+      if (!value.startsWith('"')) return false;
+      // A quoted scalar must open and close on the same line.
+      const quotes = (value.match(/"/g) || []).length;
+      return quotes % 2 !== 0;
+    });
+    add(`workflow ${wf} has no unclosed quoted run scalar`, !brokenScalar);
+  }
+  const deployWorkflow = read('.github/workflows/deploy-website.yml');
+  add('deploy workflow assembles the site with the checked-in script',
+    /node scripts\/stage-site\.mjs/.test(deployWorkflow) && /path:\s*_site/.test(deployWorkflow));
+  add('the assembler publishes the web platform under /app/',
+    /APP_DIRS/.test(read('scripts/stage-site.mjs')) && /app'/.test(read('scripts/stage-site.mjs')));
+  add('the assembler verifies every service-worker precache target',
+    /checkPrecache/.test(read('scripts/stage-site.mjs')) && /is not self-sufficient/.test(read('scripts/stage-site.mjs')));
 
   /* 10. Package scripts point at real test globs. */
   const pkg = JSON.parse(read('package.json'));

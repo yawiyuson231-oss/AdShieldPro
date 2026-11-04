@@ -191,6 +191,13 @@
   }
   .toast.ok { border-left-color: var(--ok); } .toast.warn { border-left-color: var(--amber); } .toast.bad { border-left-color: var(--red); }
   @keyframes slide-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .skip-link {
+    position: absolute; left: -9999px; top: 0; z-index: 10;
+    background: #1c2b47; color: #e8f0ff; padding: 8px 14px; border-radius: 0 0 8px 0;
+    text-decoration: none; font-weight: 600;
+  }
+  .skip-link:focus { left: 0; outline: 3px solid #5aa2ff; }
+  .page:focus { outline: none; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
   }
@@ -211,6 +218,7 @@
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="top">
   <div class="shield" aria-hidden="true">🛡</div>
   <h1>OmniShield X <small>AETHER AI Evolution · v5.0.1 · local-first DNS security platform</small></h1>
@@ -233,8 +241,8 @@
   <button type="button" data-page="status">Capabilities</button>
 </nav>
 
-<main>
-  <section class="page" id="page-dashboard">
+<main id="main" tabindex="-1">
+  <section class="page" id="page-dashboard" aria-label="Dashboard" tabindex="-1">
     <div class="grid k4" id="dash-kpis"></div>
     <div class="card accent" id="dash-aether"></div>
     <div class="grid k2">
@@ -245,7 +253,7 @@
     <div class="card" id="dash-integrity"></div>
   </section>
 
-  <section class="page" id="page-aether" hidden>
+  <section class="page" id="page-aether" aria-label="AETHER AI" tabindex="-1" hidden>
     <div class="card accent">
       <h2>AETHER — domain intelligence &amp; reputation</h2>
       <p>Type any hostname. Every point of the score is attributed to a named signal with its evidence.
@@ -262,7 +270,7 @@
     <div class="card" id="aether-feedback"></div>
   </section>
 
-  <section class="page" id="page-dns" hidden>
+  <section class="page" id="page-dns" aria-label="DNS Lab" tabindex="-1" hidden>
     <div class="card accent">
       <h2>DNS resolution lab — encrypted transports, DNSSEC, caching</h2>
       <p>Runs the real pipeline: filter → cache → DoH (JSON or RFC 8484 wire) → DNSSEC assessment.
@@ -285,7 +293,7 @@
     </div>
   </section>
 
-  <section class="page" id="page-firewall" hidden>
+  <section class="page" id="page-firewall" aria-label="Firewall AI" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Firewall AI Advance — behavioural detection</h2>
       <p>Domain-by-domain filtering cannot see a beacon. This engine analyses timing and naming
@@ -312,7 +320,7 @@
     </div>
   </section>
 
-  <section class="page" id="page-monitor" hidden>
+  <section class="page" id="page-monitor" aria-label="Live Monitor" tabindex="-1" hidden>
     <div class="grid k4" id="mon-kpis"></div>
     <div class="card">
       <h2>Requests processed <span class="pill" id="mon-live">live</span></h2>
@@ -327,7 +335,7 @@
     <div class="card" id="mon-events"></div>
   </section>
 
-  <section class="page" id="page-feeds" hidden>
+  <section class="page" id="page-feeds" aria-label="Feeds" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Threat intelligence feeds</h2>
       <p>Bundled feeds ship with the app. Online updates are validated before they can replace the active copy:
@@ -341,7 +349,7 @@
     <div class="card" id="feeds-list"></div>
   </section>
 
-  <section class="page" id="page-privacy" hidden>
+  <section class="page" id="page-privacy" aria-label="Privacy" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Privacy-preserving analytics</h2>
       <p>These statistics are computed and stored on this device only. Hostnames are kept as salted SHA-256
@@ -355,7 +363,7 @@
     <div class="card" id="privacy-note"></div>
   </section>
 
-  <section class="page" id="page-sync" hidden>
+  <section class="page" id="page-sync" aria-label="Backup & Sync" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Backup, recovery &amp; policy sync</h2>
       <p>Snapshots are hashed with SHA-256 and written before any risky operation. On startup the platform
@@ -386,7 +394,7 @@
     </div>
   </section>
 
-  <section class="page" id="page-extension" hidden>
+  <section class="page" id="page-extension" aria-label="Browser extension" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Browser extension (Chrome / Edge / Brave, Manifest V3)</h2>
       <p>A real extension built by <code>npm run build:extension</code> from the same intelligence core:
@@ -406,7 +414,7 @@
     <div class="card" id="extension-facts"></div>
   </section>
 
-  <section class="page" id="page-status" hidden>
+  <section class="page" id="page-status" aria-label="Capabilities" tabindex="-1" hidden>
     <div class="card accent">
       <h2>Capability matrix — what actually works here</h2>
       <p>Every row below is verified by the automated test suite or is an explicit limitation.

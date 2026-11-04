@@ -55,6 +55,8 @@ jobs:
         run: |
           test -s docs/index.html
           grep -q "AdShield Pro" docs/index.html
+          test -s index.html
+          test -s app.js
           ls -l docs/index.html docs/PRIVACY_POLICY.md
 
       # Pages must be turned on once with build_type=workflow. A repository admin can do that
@@ -72,37 +74,17 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Assemble the site
-        run: |
-          set -euo pipefail
-          rm -rf _site
-          mkdir -p _site
-          # 1. The existing marketing site keeps the domain root.
-          cp -a docs/. _site/
-          # 2. The web platform is staged under /app/. Only files the browser
-          #    actually needs are copied: no tests, no build scripts, no node_modules.
-          mkdir -p _site/app
-          cp -a index.html app.js engine.js sw.js manifest.webmanifest _site/app/
-          cp -a ui dns aether security assets _site/app/
-          rm -rf _site/app/node_modules
-          # 3. Fail loudly if the staged app is not self-sufficient.
-          test -s _site/app/index.html
-          test -s _site/app/app.js
-          test -s _site/app/assets/core_lite_ads.txt
-          test -s _site/app/omnishield-x-extension.zip || cp -a omnishield-x-extension.zip _site/app/
-          test -s _site/app/sw.js
-          # Every module the service worker precaches must be present after staging.
-          node - <<'NODE'
-          const { readFileSync, existsSync } = require('node:fs');
-          const sw = readFileSync('_site/app/sw.js', 'utf8');
-          const listed = [...sw.matchAll(/'(\.\/[^']+)'/g)].map((m) => m[1]);
-          const missing = listed.filter((url) => url !== './' && !existsSync('_site/app/' + url.slice(2)));
-          if (missing.length) {
-            console.error('missing precached asset(s): ' + missing.join(', '));
-            process.exit(1);
-          }
-          console.log('staged ' + listed.length + ' precached assets');
-          NODE
+        # Single source of truth: scripts/stage-site.mjs builds _site/ (marketing
+        # site at /, web platform at /app/) and fails if any service-worker
+        # precache target is missing from the staged tree.
+        run: node scripts/stage-site.mjs --out _site
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

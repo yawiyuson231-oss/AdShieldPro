@@ -10,7 +10,7 @@
  */
 import { OmniShieldFilterEngine } from './engine.js';
 import { DnsClient } from './dns/client.js';
-import { RESOLVERS, RESOLVER_BY_ID, DotTransport } from './dns/resolvers.js';
+import { RESOLVERS, DotTransport } from './dns/resolvers.js';
 import { auditChain } from './dns/chain.js';
 import { Aether } from './aether/index.js';
 import { DomainClassifier } from './aether/classifier.js';
@@ -339,6 +339,7 @@ const PAGE_RENDERERS = {
 };
 
 function navigate(page) {
+  const focusOnNavigate = state.booted && state.currentPage !== page;
   state.currentPage = page;
   for (const section of document.querySelectorAll('.page')) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll('nav.tabs button')) {
@@ -350,7 +351,14 @@ function navigate(page) {
     else button.removeAttribute('aria-current');
   }
   const section = document.getElementById(`page-${page}`);
-  if (section) section.setAttribute('aria-current', 'true');
+  if (section) {
+    section.setAttribute('aria-current', 'true');
+    // Move focus to the new page so keyboard and screen-reader users are not
+    // left behind on the tab they just pressed.
+    if (focusOnNavigate) {
+      try { section.focus({ preventScroll: true }); } catch { section.focus(); }
+    }
+  }
   for (const other of document.querySelectorAll('.page')) {
     if (other !== section) other.removeAttribute('aria-current');
   }
@@ -867,8 +875,32 @@ function renderFirewall() {
       + 'The browser cannot passively capture other applications\' traffic — that requires the Android VPN core — so this list only reflects what OmniShield X itself performed or was given.'),
     snapshot.policies.length
       ? table(['App', 'Denied', 'Allowed'], snapshot.policies.map((p) => [p.app, p.deny.join(', ') || '—', p.allow.join(', ') || '—']))
-      : empty('No per-app policies set. Safe default: monitor only, never auto-block.')
+      : empty('No per-app policies set. Safe default: monitor only, never auto-block.'),
+    h('h2', { style: { marginTop: '14px' }, text: 'Detector thresholds (as configured, not as marketed)' }),
+    table(['Detector', 'Threshold'], firewallThresholdRows()),
+    h('p', { class: 'small muted', style: { marginTop: '8px' },
+      text: 'These are the live values used by the detectors above. Blocks require at least two independent indicators, and the safe default remains monitor-only.' })
   );
+}
+
+/**
+ * Renders DEFAULT_CONFIG as a readable list. The numbers come from the module,
+ * not from a copy of the docs, so the UI cannot drift from the behaviour.
+ */
+function firewallThresholdRows() {
+  const rows = [];
+  for (const [key, value] of Object.entries(FW_CONFIG)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [sub, subValue] of Object.entries(value)) {
+        rows.push([`${key}.${sub}`, String(subValue)]);
+      }
+    } else if (!Array.isArray(value)) {
+      rows.push([key, String(value)]);
+    } else {
+      rows.push([key, value.length ? value.join(', ') : '—']);
+    }
+  }
+  return rows;
 }
 
 function runFirewallSelfTest() {
