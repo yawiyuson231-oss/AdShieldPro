@@ -97,7 +97,7 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/lint.log :app:lintDebug
 
-      - name: Assert unit tests actually ran (19 cases)
+      - name: Assert unit tests actually ran
         run: |
           python3 - <<'EOF'
           import glob, sys, xml.etree.ElementTree as ET
@@ -115,9 +115,12 @@ jobs:
                   print('  PASS' if len(case.findall('failure')) == 0 and len(case.findall('error')) == 0
                         else '  FAIL', case.get('name'))
           print(f'tests={total} failures={failures} errors={errors} skipped={skipped}')
-          expected = 19
-          if total != expected or failures or errors:
-              sys.exit(f'expected {expected} passing tests, got total={total} failures={failures} errors={errors}')
+          # A hardcoded count silently rots every time a test is added, which makes the
+          # guard the thing that breaks. Assert the floor instead: the suite must have
+          # grown past the original 19 cases and must never pass by running nothing.
+          expected_min = 19
+          if total < expected_min or failures or errors:
+              sys.exit(f'expected at least {expected_min} passing tests, got total={total} failures={failures} errors={errors}')
           EOF
 
       - name: Assert the debug APK is a real, installable package

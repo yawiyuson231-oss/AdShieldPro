@@ -61,7 +61,16 @@ data class AppSettingsState(
     val gameBoosterTempWarningCelsius: Int = 41,
     val gameSessionRecords: List<GameSessionRecord> = emptyList(),
     val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC,
-    val lastSmartBoostEpochMs: Long = 0L
+    val lastSmartBoostEpochMs: Long = 0L,
+    // --- Battery health notifications ---
+    // Off by default: a monitoring app that starts posting notifications without
+    // being asked is exactly the behaviour this app filters out.
+    val batteryNotificationsEnabled: Boolean = false,
+    val batteryLowPercentThreshold: Int = 20,
+    val batteryFullPercentThreshold: Int = 100,
+    val batteryTempWarningCelsius: Int = 41,
+    val batteryCurrentAlertMilliAmps: Int = 1800,
+    val batteryNotifyOnChargeComplete: Boolean = true
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -117,6 +126,14 @@ class UserPreferencesRepository @Inject constructor(
         val GAME_SESSIONS_JSON = stringPreferencesKey("game_sessions_json")
         val BATTERY_MODE = stringPreferencesKey("battery_mode")
         val LAST_SMART_BOOST_MS = longPreferencesKey("last_smart_boost_epoch_ms")
+
+        // Battery health notifications
+        val BATTERY_NOTIFS_ENABLED = booleanPreferencesKey("battery_notifications_enabled")
+        val BATTERY_LOW_PERCENT = intPreferencesKey("battery_low_percent_threshold")
+        val BATTERY_FULL_PERCENT = intPreferencesKey("battery_full_percent_threshold")
+        val BATTERY_TEMP_WARNING_C = intPreferencesKey("battery_temp_warning_celsius")
+        val BATTERY_CURRENT_ALERT_MA = intPreferencesKey("battery_current_alert_milliamps")
+        val BATTERY_NOTIFY_CHARGE_DONE = booleanPreferencesKey("battery_notify_charge_complete")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -189,7 +206,13 @@ class UserPreferencesRepository @Inject constructor(
             gameBoosterTempWarningCelsius = prefs[Keys.GAME_TEMP_WARNING_C] ?: 41,
             gameSessionRecords = gameSessions,
             batteryMode = batteryMode,
-            lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L
+            lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L,
+            batteryNotificationsEnabled = prefs[Keys.BATTERY_NOTIFS_ENABLED] ?: false,
+            batteryLowPercentThreshold = prefs[Keys.BATTERY_LOW_PERCENT] ?: 20,
+            batteryFullPercentThreshold = prefs[Keys.BATTERY_FULL_PERCENT] ?: 100,
+            batteryTempWarningCelsius = prefs[Keys.BATTERY_TEMP_WARNING_C] ?: 41,
+            batteryCurrentAlertMilliAmps = prefs[Keys.BATTERY_CURRENT_ALERT_MA] ?: 1800,
+            batteryNotifyOnChargeComplete = prefs[Keys.BATTERY_NOTIFY_CHARGE_DONE] ?: true
         )
     }
 
@@ -371,6 +394,28 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setBatteryMode(mode: BatteryMode) {
         context.adShieldDataStore.edit { prefs ->
             prefs[Keys.BATTERY_MODE] = mode.name
+        }
+    }
+
+    suspend fun updateBatteryNotificationSettings(
+        enabled: Boolean,
+        lowPercent: Int,
+        fullPercent: Int,
+        tempWarningCelsius: Int,
+        currentAlertMilliAmps: Int,
+        notifyOnChargeComplete: Boolean
+    ) {
+        context.adShieldDataStore.edit { prefs ->
+            // Thresholds are clamped to ranges that are actually useful: a low
+            // warning above 50% fires constantly, and a temperature warning that
+            // can be set below normal operating temperature fires on every device.
+            val low = lowPercent.coerceIn(5, 50)
+            prefs[Keys.BATTERY_NOTIFS_ENABLED] = enabled
+            prefs[Keys.BATTERY_LOW_PERCENT] = low
+            prefs[Keys.BATTERY_FULL_PERCENT] = fullPercent.coerceIn(low + 10, 100)
+            prefs[Keys.BATTERY_TEMP_WARNING_C] = tempWarningCelsius.coerceIn(35, 55)
+            prefs[Keys.BATTERY_CURRENT_ALERT_MA] = currentAlertMilliAmps.coerceIn(500, 5000)
+            prefs[Keys.BATTERY_NOTIFY_CHARGE_DONE] = notifyOnChargeComplete
         }
     }
 }

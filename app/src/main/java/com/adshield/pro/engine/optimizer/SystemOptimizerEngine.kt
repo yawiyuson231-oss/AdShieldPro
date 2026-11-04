@@ -27,6 +27,7 @@ import com.adshield.pro.domain.model.JunkCandidateItem
 import com.adshield.pro.domain.model.JunkCategory
 import com.adshield.pro.domain.model.JunkCleanMode
 import com.adshield.pro.domain.model.JunkScanReport
+import com.adshield.pro.domain.model.MeasurementSource
 import com.adshield.pro.domain.model.OptimizationPredictor
 import com.adshield.pro.domain.model.PerformanceBottleneck
 import com.adshield.pro.domain.model.RamOptimizationResult
@@ -134,7 +135,7 @@ class RuleBasedOptimizationPredictor : OptimizationPredictor {
             penaltyPoints += 25
             bottlenecks.add(
                 PerformanceBottleneck(
-                    title = "Elevated Battery Temperature (${String.format(Locale.US, "%.1f°C", battery.temperatureCelsius)})",
+                    title = "Elevated Battery Temperature (${String.format(Locale.US, "%.1f°C", battery.effectiveTemperatureCelsius)})",
                     detail = "Thermal status: ${battery.thermalStatusLabel}. High heat can trigger CPU/GPU thermal throttling.",
                     severity = BottleneckSeverity.HIGH,
                     recommendedAction = "Switch to Battery Saver mode to pause background syncs and reduce disk writes."
@@ -287,6 +288,9 @@ class SystemOptimizerEngine @Inject constructor(
         val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, 100)?.coerceAtLeast(1) ?: 100
         val batteryPct = if (level >= 0) ((level * 100) / scale).coerceIn(0, 100) else 80
 
+        // The battery extra is the *cell* temperature. It is only a measurement when
+        // the extra is actually present; a missing extra must not read as 31 °C.
+        val batteryTempMeasured = BatteryTelemetry.isTemperatureExtraPresent(intent)
         val tempTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 310) ?: 310
         val tempCelsius = (tempTenths / 10.0f).coerceIn(0f, 80f)
 
@@ -305,6 +309,17 @@ class SystemOptimizerEngine @Inject constructor(
 
         val rawVoltage = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
         val voltageMv = if (rawVoltage in 1..20) rawVoltage * 1000 else rawVoltage
+
+        // Current is measured, not inferred: mA, settled against the charging state.
+        val currentReading = BatteryTelemetry.readCurrent(context, isCharging)
+        val currentMeasured = currentReading.source == MeasurementSource.MEASURED
+        val powerMw = BatteryTelemetry.computePowerMilliWatts(voltageMv, currentReading.milliAmps, currentMeasured)
+        val chargeCounterMah = BatteryTelemetry.readChargeCounterMilliAmpHours(context)
+        val energyMwh = BatteryTelemetry.computeEnergyMilliWattHours(chargeCounterMah, voltageMv)
+
+        // Chip temperature comes from a different sensor than the cell. Absent on
+        // devices whose vendor restricted /sys/class/thermal, and then it says so.
+        val socReading = BatteryTelemetry.readSocTemperature()
 
         val health = intent?.getIntExtra(BatteryManager.EXTRA_HEALTH, BatteryManager.BATTERY_HEALTH_UNKNOWN)
             ?: BatteryManager.BATTERY_HEALTH_UNKNOWN
@@ -335,29 +350,62 @@ class SystemOptimizerEngine @Inject constructor(
             else -> "Nominal"
         }
 
-        val isOverheating = tempCelsius >= 41.0f ||
+        // Decision temperature prefers the cell (the sensor that actually limits
+        // fast charging); the SoC reading is a fallback only when the cell is absent.
+        val decisionTemp = if (batteryTempMeasured) tempCelsius else (socReading?.first ?: tempCelsius)
+        val isOverheating = decisionTemp >= 41.0f ||
             health == BatteryManager.BATTERY_HEALTH_OVERHEAT ||
             thermalStatus >= PowerManager.THERMAL_STATUS_MODERATE
         val isLowBattery = batteryPct <= 20
 
         synchronized(temperatureTrend) {
             if (temperatureTrend.size >= 20) temperatureTrend.removeFirst()
-            temperatureTrend.addLast(tempCelsius)
+            temperatureTrend.addLast(decisionTemp)
+        }
+
+        val heatSourceLine = when {
+            batteryTempMeasured && socReading != null && socReading.first - tempCelsius >= 5f ->
+                "The CPU/SoC is ${String.format(Locale.US, "%.1f", socReading.first - tempCelsius)}°C hotter than the battery — this heat is workload, not the cell."
+            batteryTempMeasured -> "Heat source: battery cell."
+            socReading != null -> "Heat source: ${socReading.second} (battery cell not reported)."
+            else -> "No temperature sensor is readable on this device."
         }
 
         val recs = mutableListOf<String>()
         if (isOverheating) {
-            recs.add("High temperature detected (${String.format(Locale.US, "%.1f°C", tempCelsius)}). Avoid heavy 3D gaming while fast-charging and switch AdShield to Battery Saver mode.")
+            recs.add("High temperature detected (${String.format(Locale.US, "%.1f°C", decisionTemp)}). Avoid heavy 3D gaming while fast-charging and switch AdShield to Battery Saver mode.")
         }
         if (isLowBattery && !isCharging) {
             recs.add("Battery is at $batteryPct%. Enable Battery Saver mode to defer background blocklist updates and reduce disk logging.")
         }
         if (recs.isEmpty()) {
-            recs.add("Battery temperature (${String.format(Locale.US, "%.1f°C", tempCelsius)}) and voltage (${voltageMv} mV) are within normal operating limits.")
+            val temperatureText = if (batteryTempMeasured) {
+                String.format(Locale.US, "%.1f°C", tempCelsius)
+            } else {
+                "not reported"
+            }
+            recs.add("Battery cell temperature ($temperatureText) and voltage ($voltageMv mV) are within normal operating limits.")
         }
+        // Always last: which sensor is actually hot, even when nothing is wrong.
+        recs.add(heatSourceLine)
 
         val vpnState = repository.vpnRuntimeState.value
         val adShieldImpact = "Event-driven TUN DNS loop • 0 polling wakeups • Avg lookup ${vpnState.averageLatencyMs} ms"
+
+        // One honest sentence about what the measured current means right now.
+        val drawLabel = when {
+            !currentMeasured -> "This device does not report battery current."
+            currentReading.milliAmps > 0 -> String.format(
+                Locale.US, "Charging at %d mA%s",
+                currentReading.milliAmps,
+                powerMw?.let { String.format(Locale.US, " (%.1f W into the battery)", it / 1000f) } ?: ""
+            )
+            else -> String.format(
+                Locale.US, "Drawing %d mA%s",
+                -currentReading.milliAmps,
+                powerMw?.let { String.format(Locale.US, " (%.1f W from the battery)", -it / 1000f) } ?: ""
+            )
+        }
 
         return BatteryThermalSnapshot(
             batteryPercent = batteryPct,
@@ -370,7 +418,16 @@ class SystemOptimizerEngine @Inject constructor(
             isOverheating = isOverheating,
             isLowBattery = isLowBattery,
             adShieldBatteryImpactSummary = adShieldImpact,
-            recommendations = recs
+            recommendations = recs,
+            currentMilliAmps = currentReading.milliAmps,
+            currentSource = currentReading.source,
+            batteryTemperatureSource = if (batteryTempMeasured) MeasurementSource.MEASURED else MeasurementSource.UNAVAILABLE,
+            socTemperatureCelsius = socReading?.first,
+            socTemperatureSourceLabel = socReading?.second ?: "Unavailable on this device",
+            powerMilliWatts = powerMw,
+            chargeCounterMilliAmpHours = chargeCounterMah,
+            energyMilliWattHours = energyMwh,
+            measuredDrawLabel = drawLabel
         )
     }
 
@@ -795,7 +852,7 @@ class SystemOptimizerEngine @Inject constructor(
 
         // 4. Check thermal state before game launch
         val battery = readBatteryThermalSnapshot()
-        if (battery.temperatureCelsius >= settings.gameBoosterTempWarningCelsius) {
+        if (battery.effectiveTemperatureCelsius >= settings.gameBoosterTempWarningCelsius) {
             actions.add(
                 "Thermal Warning: Battery is at ${String.format(Locale.US, "%.1f°C", battery.temperatureCelsius)} " +
                     "(threshold ${settings.gameBoosterTempWarningCelsius}°C). Lower in-game graphics or unplug charger to reduce thermal throttling."

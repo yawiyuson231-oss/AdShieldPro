@@ -1,5 +1,11 @@
 <resources>
     <string name="app_name">AdShield Pro</string>
+    <string name="battery_channel_monitor_name">Battery monitor</string>
+    <string name="battery_channel_monitor_desc">Live measured current, charge and temperature while the Optimizer is open</string>
+    <string name="battery_channel_health_name">Battery level and charging</string>
+    <string name="battery_channel_health_desc">Low battery, charge complete and heavy-draw alerts from measured values</string>
+    <string name="battery_channel_heat_name">Battery heat alerts</string>
+    <string name="battery_channel_heat_desc">Warnings when the battery cell or the chip gets hot</string>
     <string name="vpn_notification_channel_name">AdShield Protection Status</string>
     <string name="vpn_notification_channel_desc">Displays real-time local VPN and DNS ad-blocking status</string>
     <string name="vpn_session_name">AdShield Pro Local DNS Firewall</string>

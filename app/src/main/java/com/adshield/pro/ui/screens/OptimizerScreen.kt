@@ -43,6 +43,8 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Warning
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.BatteryThermalSnapshot
+import com.adshield.pro.domain.model.MeasurementSource
 import com.adshield.pro.domain.model.BottleneckSeverity
 import com.adshield.pro.domain.model.DeviceHealthAssessment
 import com.adshield.pro.domain.model.GameAppInfo
@@ -136,7 +139,9 @@ fun OptimizerScreen(
     onToggleFavoriteGame: (String, Boolean) -> Unit,
     onUpdateGamingSettings: (GamingProfile, Boolean, Int) -> Unit,
     onTriggerGameBoost: (String?, String?) -> Unit,
-    onSelectBatteryMode: (BatteryMode) -> Unit
+    onSelectBatteryMode: (BatteryMode) -> Unit,
+    onUpdateBatteryNotifications: (Boolean, Int, Int, Int, Int, Boolean) -> Unit = { _, _, _, _, _, _ -> },
+    onSendBatteryTestNotification: () -> Unit = {}
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val tabs = OptimizerSubTab.entries
@@ -221,7 +226,9 @@ fun OptimizerScreen(
                     settings = settings,
                     battery = batterySnapshot,
                     tempTrend = temperatureTrend,
-                    onSelectBatteryMode = onSelectBatteryMode
+                    onSelectBatteryMode = onSelectBatteryMode,
+                    onUpdateBatteryNotifications = onUpdateBatteryNotifications,
+                    onSendBatteryTestNotification = onSendBatteryTestNotification
                 )
             }
         }
@@ -1379,7 +1386,9 @@ private fun BatteryThermalTabContent(
     settings: AppSettingsState,
     battery: BatteryThermalSnapshot,
     tempTrend: List<Float>,
-    onSelectBatteryMode: (BatteryMode) -> Unit
+    onSelectBatteryMode: (BatteryMode) -> Unit,
+    onUpdateBatteryNotifications: (Boolean, Int, Int, Int, Int, Boolean) -> Unit,
+    onSendBatteryTestNotification: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -1455,18 +1464,80 @@ private fun BatteryThermalTabContent(
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
-                        label = "Temperature",
-                        value = String.format(Locale.US, "%.1f°C", battery.temperatureCelsius),
+                        label = "Current",
+                        value = if (battery.currentSource == MeasurementSource.MEASURED) {
+                            String.format(Locale.US, "%+d mA", battery.currentMilliAmps)
+                        } else {
+                            "n/a"
+                        },
+                        sub = when {
+                            battery.currentSource != MeasurementSource.MEASURED -> "Not reported by this device"
+                            battery.powerMilliWatts != null ->
+                                String.format(Locale.US, "%.2f W", battery.powerMilliWatts / 1000f)
+                            else -> "Voltage unavailable"
+                        },
+                        accent = if (battery.currentSource == MeasurementSource.MEASURED) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Heat is reported per sensor: the battery cell and the chip are
+                // different readings, and on many phones the one that gets hot is
+                // not the one the battery extra reports.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MiniTelemetryPill(
+                        modifier = Modifier.weight(1f),
+                        label = "Battery cell",
+                        value = if (battery.batteryTemperatureSource == MeasurementSource.MEASURED) {
+                            String.format(Locale.US, "%.1f°C", battery.temperatureCelsius)
+                        } else {
+                            "n/a"
+                        },
                         sub = battery.thermalStatusLabel,
                         accent = if (battery.isOverheating) AlertRed else WarningAmber
                     )
                     MiniTelemetryPill(
                         modifier = Modifier.weight(1f),
-                        label = "Voltage",
-                        value = "${battery.voltageMillivolts} mV",
-                        sub = "Health: ${battery.healthStatusLabel}",
-                        accent = CyberCyan
+                        label = "Chip (SoC)",
+                        value = battery.socTemperatureCelsius?.let {
+                            String.format(Locale.US, "%.1f°C", it)
+                        } ?: "n/a",
+                        sub = if (battery.socTemperatureCelsius != null) {
+                            "Measured thermal zone"
+                        } else {
+                            "Hidden by this device"
+                        },
+                        accent = if ((battery.socTemperatureCelsius ?: 0f) >= 60f) AlertRed else CyberCyan
                     )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = battery.measuredDrawLabel,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        battery.chargeCounterMilliAmpHours?.let { mah ->
+                            Text(
+                                text = "Remaining charge: $mah mAh" +
+                                    (battery.energyMilliWattHours?.let { " • stored energy $it mWh" } ?: ""),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "Source: ${if (battery.currentSource == MeasurementSource.MEASURED) "measured sensor" else "unavailable"} • Voltage ${battery.voltageMillivolts} mV",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Button(
@@ -1480,6 +1551,16 @@ private fun BatteryThermalTabContent(
                 }
             }
         }
+
+        // Battery health alerts. Everything here is opt-in and built from the
+        // measured readings shown above, so the thresholds the user sets map onto
+        // numbers they can actually see on this screen.
+        BatteryNotificationSettingsCard(
+            settings = settings,
+            battery = battery,
+            onUpdateBatteryNotifications = onUpdateBatteryNotifications,
+            onSendBatteryTestNotification = onSendBatteryTestNotification
+        )
 
         // 4 Selectable Battery Modes Card
         Card(
@@ -1675,6 +1756,190 @@ private fun MetricTrendLineChart(
         }
         if (count > 1) {
             drawPath(path = path, color = lineColor, style = Stroke(width = 2.5.dp.toPx()))
+        }
+    }
+}
+
+/**
+ * Opt-in battery alert settings.
+ *
+ * The alert text is generated by [com.adshield.pro.service.BatteryHealthNotifier]
+ * from the same measured snapshot rendered on this screen; this card only edits the
+ * thresholds. A "send test" button exists because an alert feature nobody can try
+ * is indistinguishable from one that does not work.
+ */
+@Composable
+private fun BatteryNotificationSettingsCard(
+    settings: AppSettingsState,
+    battery: BatteryThermalSnapshot,
+    onUpdateBatteryNotifications: (Boolean, Int, Int, Int, Int, Boolean) -> Unit,
+    onSendBatteryTestNotification: () -> Unit
+) {
+    val context = LocalContext.current
+    val enabled = settings.batteryNotificationsEnabled
+
+    // Android 13+ requires runtime consent; requesting it when the switch is turned
+    // on is the only moment the prompt makes sense.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        onUpdateBatteryNotifications(
+            true,
+            settings.batteryLowPercentThreshold,
+            settings.batteryFullPercentThreshold,
+            settings.batteryTempWarningCelsius,
+            settings.batteryCurrentAlertMilliAmps,
+            settings.batteryNotifyOnChargeComplete
+        )
+        if (!granted) {
+            // The setting still saves; the notifier stays quiet until permission exists.
+            android.widget.Toast.makeText(
+                context,
+                "Alerts saved, but Android needs notification permission to show them.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    fun commit(
+        notifications: Boolean = enabled,
+        low: Int = settings.batteryLowPercentThreshold,
+        full: Int = settings.batteryFullPercentThreshold,
+        temp: Int = settings.batteryTempWarningCelsius,
+        current: Int = settings.batteryCurrentAlertMilliAmps,
+        chargeDone: Boolean = settings.batteryNotifyOnChargeComplete
+    ) = onUpdateBatteryNotifications(notifications, low, full, temp, current, chargeDone)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Battery alerts",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Notifications from measured readings — what you see above is what you get.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { checked ->
+                        if (checked && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.POST_NOTIFICATIONS
+                            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            commit(notifications = checked)
+                        }
+                    }
+                )
+            }
+
+            if (enabled) {
+                SettingStepper(
+                    label = "Low battery alert",
+                    valueLabel = "${settings.batteryLowPercentThreshold}%",
+                    onDecrease = { commit(low = settings.batteryLowPercentThreshold - 5) },
+                    onIncrease = { commit(low = settings.batteryLowPercentThreshold + 5) }
+                )
+                SettingStepper(
+                    label = "Full charge alert",
+                    valueLabel = "${settings.batteryFullPercentThreshold}%",
+                    onDecrease = { commit(full = settings.batteryFullPercentThreshold - 5) },
+                    onIncrease = { commit(full = settings.batteryFullPercentThreshold + 5) }
+                )
+                SettingStepper(
+                    label = "Heat alert",
+                    valueLabel = "${settings.batteryTempWarningCelsius}°C",
+                    onDecrease = { commit(temp = settings.batteryTempWarningCelsius - 1) },
+                    onIncrease = { commit(temp = settings.batteryTempWarningCelsius + 1) }
+                )
+                SettingStepper(
+                    label = "Heavy draw alert",
+                    valueLabel = "${settings.batteryCurrentAlertMilliAmps} mA",
+                    onDecrease = { commit(current = settings.batteryCurrentAlertMilliAmps - 100) },
+                    onIncrease = { commit(current = settings.batteryCurrentAlertMilliAmps + 100) }
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Alert when charging completes",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Switch(
+                        checked = settings.batteryNotifyOnChargeComplete,
+                        onCheckedChange = { commit(chargeDone = it) }
+                    )
+                }
+
+                Text(
+                    text = if (battery.currentSource == MeasurementSource.MEASURED) {
+                        "Heavy draw uses the measured current: now ${battery.currentMilliAmps} mA."
+                    } else {
+                        "This device does not report battery current, so the heavy-draw alert stays off."
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedButton(
+                    onClick = onSendBatteryTestNotification,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Send a test alert")
+                }
+            }
+        }
+    }
+}
+
+/** Compact +/- stepper used by the battery alert thresholds. */
+@Composable
+private fun SettingStepper(
+    label: String,
+    valueLabel: String,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDecrease, modifier = Modifier.size(32.dp)) {
+                Text("−", fontWeight = FontWeight.Bold)
+            }
+            Text(
+                text = valueLabel,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(64.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            IconButton(onClick = onIncrease, modifier = Modifier.size(32.dp)) {
+                Text("+", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

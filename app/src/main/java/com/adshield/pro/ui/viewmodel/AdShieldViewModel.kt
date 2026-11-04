@@ -46,6 +46,7 @@ import com.adshield.pro.service.AdShieldVpnService
 import com.adshield.pro.ui.UpdatePromptActivity
 import com.adshield.pro.update.GitHubReleaseClient
 import com.adshield.pro.worker.FilterUpdateWorker
+import com.adshield.pro.service.BatteryHealthNotifier
 import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -388,6 +389,66 @@ class AdShieldViewModel @Inject constructor(
             refreshSystemTelemetry()
             loadInstalledGames()
             showFeedback(actions.firstOrNull() ?: "Game Booster applied.")
+        }
+    }
+
+    /**
+     * Persists the battery-notification preferences. Enabling them on Android 13+
+     * also needs POST_NOTIFICATIONS; the screen requests it, and until it is granted
+     * the evaluator returns early instead of posting silently-failing notifications.
+     */
+    fun updateBatteryNotificationSettings(
+        enabled: Boolean,
+        lowPercent: Int,
+        fullPercent: Int,
+        tempWarningCelsius: Int,
+        currentAlertMilliAmps: Int,
+        notifyOnChargeComplete: Boolean
+    ) {
+        viewModelScope.launch {
+            preferencesRepository.updateBatteryNotificationSettings(
+                enabled = enabled,
+                lowPercent = lowPercent,
+                fullPercent = fullPercent,
+                tempWarningCelsius = tempWarningCelsius,
+                currentAlertMilliAmps = currentAlertMilliAmps,
+                notifyOnChargeComplete = notifyOnChargeComplete
+            )
+            if (enabled) {
+                BatteryHealthNotifier.ensureChannels(appContext)
+                // Fire an immediate evaluation so the user sees the feature working
+                // instead of wondering whether it took effect.
+                val snapshot = optimizerEngine.readBatteryThermalSnapshot()
+                val settings = preferencesRepository.getSettingsSnapshot()
+                val posted = BatteryHealthNotifier.evaluate(appContext, snapshot, settings)
+                showFeedback(
+                    when {
+                        !BatteryHealthNotifier.canPostNotifications(appContext) ->
+                            "Battery alerts enabled — allow notifications to receive them."
+                        posted.isNotEmpty() -> "Battery alerts enabled. ${posted.first()} sent now."
+                        else -> "Battery alerts enabled. You are within all thresholds right now."
+                    }
+                )
+            } else {
+                showFeedback("Battery alerts turned off.")
+            }
+        }
+    }
+
+    /** Tests the alert path with the current measured reading. */
+    fun sendBatteryTestNotification() {
+        viewModelScope.launch {
+            if (!BatteryHealthNotifier.canPostNotifications(appContext)) {
+                showFeedback("Allow notifications for AdShield Pro first.")
+                return@launch
+            }
+            BatteryHealthNotifier.ensureChannels(appContext)
+            val snapshot = optimizerEngine.readBatteryThermalSnapshot()
+            val posted = BatteryHealthNotifier.postTestNotification(appContext, snapshot)
+            showFeedback(
+                if (posted) "Test notification sent — ${BatteryHealthNotifier.buildLine(snapshot)}"
+                else "Could not post a notification on this device."
+            )
         }
     }
 

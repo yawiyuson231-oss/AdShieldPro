@@ -23,6 +23,7 @@ import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.domain.model.JunkCleanMode
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
+import com.adshield.pro.service.BatteryHealthNotifier
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -46,14 +47,19 @@ class SmartOptimizationWorker @AssistedInject constructor(
             return Result.success()
         }
 
-        // 2. Pause nonessential maintenance during low-battery or overheating conditions
+        // 2. Battery health alerts run on their own schedule, below, and must not be
+        //    skipped just because maintenance is deferred -- that is exactly when a
+        //    low-battery or heat warning matters most.
         val battery = optimizerEngine.readBatteryThermalSnapshot()
+        runCatching { BatteryHealthNotifier.evaluate(appContext, battery, settings) }
+
+        // 3. Pause nonessential maintenance during low-battery or overheating conditions
         if ((battery.isLowBattery && !battery.isCharging) || battery.isOverheating) {
             optimizerEngine.runAutoBatteryOptimize()
             return Result.success()
         }
 
-        // 3. Automatically clean only safe, AdShield-owned temporary files
+        // 4. Automatically clean only safe, AdShield-owned temporary files
         val scanReport = optimizerEngine.scanJunkFiles(
             mode = JunkCleanMode.DEEP_SCAN,
             excludedPaths = settings.excludedJunkPaths
@@ -66,10 +72,10 @@ class SmartOptimizationWorker @AssistedInject constructor(
             )
         }
 
-        // 4. Trim expired DNS cache entries & expired SQLite logs safely
+        // 5. Trim expired DNS cache entries & expired SQLite logs safely
         optimizerEngine.optimizeRam()
 
-        // 5. Notify user only if storage is low or large user-confirmable junk is detected
+        // 6. Notify user only if storage is low or large user-confirmable junk is detected
         val storage = optimizerEngine.readStorageMetrics()
         if (storage.isLowStorage || scanReport.confirmationRequiredBytes >= 25L * 1024L * 1024L) {
             postMaintenanceRecommendationNotification(
