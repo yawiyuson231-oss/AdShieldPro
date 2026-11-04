@@ -9,7 +9,8 @@ import test from 'node:test';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
-  DomainClassifier, tokenizeDomain, computeAuc, classificationMetrics, mulberry32
+  DomainClassifier, tokenizeDomain, computeAuc, classificationMetrics, mulberry32,
+  precisionAtPrevalence
 } from '../../aether/classifier.js';
 import { POPULAR_DOMAINS } from '../../aether/data.js';
 import { OmniShieldFilterEngine } from '../../engine.js';
@@ -89,10 +90,34 @@ test('training is deterministic and reports real holdout metrics', () => {
   assert.ok(metricsA.atThreshold.precision >= 0.95, `precision regressed to ${metricsA.atThreshold.precision}`);
   assert.ok(metricsA.atThreshold.specificity >= 0.85, `specificity regressed to ${metricsA.atThreshold.specificity}`);
   assert.ok(metricsA.atThreshold.recall >= 0.6, `recall regressed to ${metricsA.atThreshold.recall}`);
-  assert.equal(metricsA.trainSize + metricsA.holdoutSize, 6000 + negatives.length,
-    'train and holdout must together account for every example (no leakage by omission)');
+  assert.equal(metricsA.fitSize + metricsA.tuneSize + metricsA.holdoutSize, 6000 + negatives.length,
+    'fit, tuning and holdout splits must together account for every example (no leakage by omission)');
+  assert.equal(metricsA.tuningSize, metricsA.tuneSize, 'tuning split size must be reported consistently');
+  assert.equal(metricsA.atThreshold.calibratedOn, 'tuning-split',
+    'the operating point must be chosen on the tuning split, never on the holdout');
+  assert.notEqual(metricsA.atThreshold.threshold, 0.5,
+    'a calibrated threshold must come from the sweep');
   assert.ok(metricsA.trainMs >= 0, 'training time is measured, not estimated');
   assert.equal(metricsA.featureMode, 'hybrid');
+});
+
+test('precision is reported at realistic base rates, not just the corpus ratio', () => {
+  // Perfect ranking on a positive-heavy corpus produces a flattering precision.
+  // Converting through recall/specificity at a realistic prevalence is honest.
+  const atOnePercent = precisionAtPrevalence(0.66, 0.9, 0.01);
+  const atTenPercent = precisionAtPrevalence(0.66, 0.9, 0.1);
+  assert.ok(atOnePercent < 0.1, `precision at 1% base rate should be low, got ${atOnePercent}`);
+  assert.ok(atTenPercent > atOnePercent, 'precision must improve as prevalence rises');
+  assert.ok(precisionAtPrevalence(1, 1, 0.5) === 1, 'a perfect model is perfect at any base rate');
+  assert.throws(() => precisionAtPrevalence(0.5, 0.5, 0), /prevalence/);
+  assert.throws(() => precisionAtPrevalence(0.5, 0.5, 1), /prevalence/);
+
+  const metrics = new DomainClassifier().train({ positives: samplePositives(6000), negatives: [...POPULAR_DOMAINS] });
+  const at = metrics.atThreshold;
+  assert.ok(at.precisionAtPrevalence, 'operating point must carry base-rate precision');
+  assert.ok(at.precisionAtPrevalence[0.01] < at.precision,
+    'base-rate precision must be lower than the corpus-ratio precision (honesty gate)');
+  assert.ok(at.balancedAccuracy <= 1 && at.balancedAccuracy > 0.5, 'balanced accuracy must be measured');
 });
 
 test('known legitimate domains stay below the operating threshold', () => {

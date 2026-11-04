@@ -1,6 +1,6 @@
 {
   "name": "omnishield-x-web",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "private": true,
   "description": "OmniShield X — AETHER AI Evolution: DNS security, ad/tracker filtering, privacy and autonomous defense. Static, local-first web platform.",
   "type": "module",

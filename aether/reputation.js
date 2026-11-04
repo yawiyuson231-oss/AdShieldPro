@@ -27,17 +27,17 @@ import { registrableDomain } from './domain.js';
  * lexical coincidence can drive a verdict.
  */
 export const SIGNAL_WEIGHTS = Object.freeze({
-  threatFeedMatch: 40,
-  feedMatch: 20,
-  typosquat: 10,
+  threatFeedMatch: 38,
+  feedMatch: 18,
+  typosquat: 16,
   classifier: 7,
-  homoglyph: 5,
+  homoglyph: 6,
   threatTokens: 6,
-  dga: 4,
-  lexical: 3,
+  dga: 3,
+  lexical: 2,
   highAbuseTld: 2,
   altTld: 1,
-  newness: 2
+  newness: 1
 });
 
 /**
@@ -53,7 +53,23 @@ export const SIGNAL_WEIGHTS = Object.freeze({
  */
 export const EVIDENCE_FLOORS = Object.freeze({
   threatFeed: { score: 80, reason: 'Domain is listed in a curated malware/phishing threat feed.' },
-  adFeed: { score: 40, reason: 'Domain is listed in a curated advertising/tracking feed. This is a privacy risk, not malware.' }
+  adFeed: { score: 40, reason: 'Domain is listed in a curated advertising/tracking feed. This is a privacy risk, not malware.' },
+  homoglyphImpersonation: {
+    score: 55,
+    reason: 'The registrable name is a look-alike spelling of a well-known brand (homoglyph/substitution).'
+  },
+  brandInForeignDomain: {
+    score: 55,
+    reason: "A well-known brand appears in the subdomain of a registrable domain that brand does not own."
+  },
+  brandAffix: {
+    score: 45,
+    reason: 'The registrable name combines a well-known brand with an account-security word.'
+  },
+  typosquatNearMiss: {
+    score: 30,
+    reason: 'The registrable name is one edit away from a well-known brand. That is a common squatting pattern, but also a plausible independent registration — treat as "unusual", not proven malicious.'
+  }
 });
 
 export const SIGNAL_LABELS = Object.freeze({
@@ -75,6 +91,9 @@ export const VERDICTS = Object.freeze([
   { min: 70, id: 'likely-malicious', label: 'Likely malicious', action: 'recommend-block' },
   { min: 45, id: 'suspicious', label: 'Suspicious', action: 'monitor' },
   { min: 20, id: 'watch', label: 'Unusual', action: 'monitor' },
+  // Any non-zero score means *something* fired, so the label must not claim
+  // "no evidence" (it previously did for scores 1-19, contradicting itself).
+  { min: 1, id: 'minimal', label: 'Minimal evidence', action: 'allow' },
   { min: 0, id: 'clean', label: 'No evidence of risk', action: 'allow' }
 ]);
 
@@ -179,8 +198,10 @@ export class ReputationEngine {
 
     // ---- Typosquat ------------------------------------------------------
     const squat = findImpersonation(name);
+    let impersonationKind = null;
     if (squat.matches.length) {
       const strongest = squat.matches[0];
+      impersonationKind = strongest.kind;
       add('typosquat', strongest.severity / SEVERITY.HIGH,
         strongest.explanation, { matches: squat.matches.slice(0, 3) });
       if (strongest.kind === 'homoglyph') {
@@ -239,6 +260,12 @@ export class ReputationEngine {
     const floors = [];
     if (matchedThreatFeed) floors.push({ id: 'threat-feed', ...EVIDENCE_FLOORS.threatFeed });
     if (matchedAdFeed) floors.push({ id: 'ad-feed', ...EVIDENCE_FLOORS.adFeed });
+    if (impersonationKind === 'homoglyph') floors.push({ id: 'homoglyph-impersonation', ...EVIDENCE_FLOORS.homoglyphImpersonation });
+    if (impersonationKind === 'brand-in-subdomain') floors.push({ id: 'brand-in-foreign-domain', ...EVIDENCE_FLOORS.brandInForeignDomain });
+    if (impersonationKind === 'brand-affix') floors.push({ id: 'brand-affix', ...EVIDENCE_FLOORS.brandAffix });
+    if (impersonationKind === 'typosquat' || impersonationKind === 'keyboard-typo') {
+      floors.push({ id: 'typosquat-near-miss', ...EVIDENCE_FLOORS.typosquatNearMiss });
+    }
 
     let score = rawScore;
     for (const floor of floors) score = Math.max(score, floor.score);

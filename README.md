@@ -1,4 +1,4 @@
-# OmniShield X — AETHER AI Evolution (v5.0.0)
+# OmniShield X — AETHER AI Evolution (v5.0.1)
 
 A local-first DNS security, ad/tracker filtering and threat-intelligence platform that runs
 entirely in your browser. No backend, no accounts, no telemetry endpoint. Deployed as static

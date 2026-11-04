@@ -76,7 +76,7 @@ async function boot() {
     state.monitor = new SecurityMonitor();
     state.analytics = new PrivateAnalytics({ storage: state.storage });
     await state.analytics.load();
-    state.feeds = new FeedManager({ storage: state.storage, onEvent: (e) => { if (e.ok === false) console.warn('[feeds]', e); } });
+    state.feeds = new FeedManager({ storage: state.storage, onEvent: (e) => { if (e.ok === false) console.debug('[feeds]', e.reason, e.detail); } });
     state.backups = new BackupManager({ storage: state.storage, maxSnapshots: 4 });
 
     setBootStatus('loading rule sets…', 'info');
@@ -196,7 +196,7 @@ function buildState({ includeModel = false } = {}) {
   }
   return {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: '5.0.0',
+    appVersion: '5.0.1',
     savedAt: new Date().toISOString(),
     settings: { ...state.settings },
     customRules: state.customRules.map((r) => ({ pattern: r.pattern, isAllow: r.isAllow, rawPattern: r.pattern, ruleType: r.isAllow ? 'ALLOW' : 'BLOCK', matchType: 'SUFFIX', isEnabled: true })),
@@ -363,7 +363,7 @@ function renderDashboard() {
   mount('#dash-kpis',
     kpi(number(breakdown.total), 'block rules active in this browser'),
     kpi(number(breakdown.blockDomains), 'filtered domains'),
-    kpi(number(breakdown.exceptions + breakdown.safetyEntries), 'explicit exceptions & safety entries'),
+    kpi(number(breakdown.safetyEntries), 'safety allowlist entries (never blocked)'),
     kpi(clf.isTrained ? clf.metrics.auc.toFixed(3) : '—', 'AETHER model AUC (held-out)', clf.isTrained ? 'ok' : 'warn')
   );
 
@@ -581,12 +581,17 @@ function renderAetherModel() {
     h('h2', {}, 'Lexical model', pill(`AUC ${m.auc}`, m.auc >= 0.85 ? 'ok' : 'warn'), pill(`threshold ${m.operatingThreshold}`, 'info')),
     table(['Metric', 'Held-out value', 'Meaning'], [
       ["AUC (ROC)", String(m.auc), 'Ranking quality across all thresholds; 0.5 is random'],
-      ['Operating threshold', String(m.operatingThreshold), `Chosen so held-out specificity ≥ ${m.targetSpecificity}`],
+      ['Operating threshold', String(m.operatingThreshold), m.atThreshold?.unreachable
+        ? `Target specificity ${m.targetSpecificity} was not reached out-of-sample (holdout ${m.atThreshold.specificity}); the tuning split chose the conservative maximum`
+        : `Chosen on the tuning split for specificity ≥ ${m.targetSpecificity}`],
       ['Precision at operating point', String(at.precision ?? '—'), 'Of domains it flags, how many were truly in the ad/threat corpus'],
       ['Recall at operating point', String(at.recall ?? '—'), 'Of ad/threat domains, how many it flags'],
       ['Specificity at operating point', String(at.specificity ?? '—'), 'Of legitimate domains, how many stay below the threshold'],
-      ['Best F1 (sweep)', String(m.bestF1), `At threshold ${m.bestThreshold} — reported for reference, not used`],
-      ['Training / holdout', `${number(m.trainSize)} / ${number(m.holdoutSize)}`, 'Holdout is never used for training'],
+      ['Balanced accuracy', String(at.balancedAccuracy ?? '—'), 'Mean of recall and specificity — immune to the corpus ratio'],
+      ['Precision at 1% base rate', String(at.precisionAtPrevalence?.[0.01] ?? '—'), 'If 1 in 100 domains were malicious, this is the chance a flagged domain really is'],
+      ['Precision at 10% base rate', String(at.precisionAtPrevalence?.[0.1] ?? '—'), 'Same conversion at a threat-heavy base rate'],
+      ['Best F1 (sweep)', String(m.bestF1), `At threshold ${m.bestThreshold} — reference only; F1 flatters a positive-heavy corpus, so it is not used`],
+      ['Fit / tuning / holdout', `${number(m.fitSize ?? m.trainSize)} / ${number(m.tuneSize ?? m.tuningSize)} / ${number(m.holdoutSize)}`, 'Three-way split: threshold is tuned on the middle split, reported on the holdout'],
       ['Vocabulary', number(m.vocabSize), 'Character n-gram and word tokens'],
       ['Training time', `${m.trainMs} ms`, `On this device at ${new Date().toLocaleTimeString()}`]
     ]),
@@ -595,6 +600,7 @@ function renderAetherModel() {
       pill(m.binary ? 'presence features' : 'count features', 'info'),
       pill(m.featureMode, 'info')
     ),
+    (m.atThreshold?.unreachable ? note(`Calibration note: ${m.atThreshold.reason || `the ${m.targetSpecificity} specificity target was not reached out-of-sample`}. Measured holdout specificity is ${m.atThreshold.specificity} and recall ${m.atThreshold.recall} at threshold ${m.operatingThreshold}. The model's weight stays at 7/100 regardless.`, 'warn') : null),
     note(`Honest limitation: the model only sees the characters of a hostname. It cannot see page content, certificates, WHOIS, or traffic. `
       + `Measured on this device, ${m.atThreshold?.fp ?? '—'} of ${m.atThreshold?.negatives ?? '—'} held-out legitimate domains were flagged — which is why its weight is 7/100 and why known-popular domains are hard-capped by a guardrail.`, 'warn')
   );
@@ -1161,7 +1167,7 @@ function exportMergedConfig() {
     ...(state.importedBackup || {}),
     ...buildState({ includeModel: true }),
     exportedAt: new Date().toISOString(),
-    exportedBy: 'OmniShield X web platform v5.0.0'
+    exportedBy: 'OmniShield X web platform v5.0.1'
   };
   download('omnishield-x-config.json', JSON.stringify(payload, null, 2));
   toast('Merged configuration exported.', 'ok');

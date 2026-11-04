@@ -21,17 +21,17 @@ how each number is produced, and where it is weak. The UI displays these same fa
 
 | Signal | Weight | What it measures | Weakness |
 |---|---|---|---|
-| `threatFeedMatch` | 40 | rule in a curated malware/phishing feed | feed quality is upstream's responsibility |
-| `feedMatch` | 20 | rule in a curated ad/tracker feed | ads are not malware; classified separately |
-| `typosquat` | 10 | OSA distance / homoglyph / brand-affix to a known brand | short brands and dictionary words collide |
+| `threatFeedMatch` | 38 | rule in a curated malware/phishing feed | feed quality is upstream's responsibility |
+| `feedMatch` | 18 | rule in a curated ad/tracker feed | ads are not malware; classified separately |
+| `typosquat` | 16 | OSA distance / homoglyph / brand-affix to a known brand | short brands and dictionary words collide |
 | `classifier` | 7 | lexical Naive Bayes score | sees only the hostname string |
+| `homoglyph` | 6 | look-alike characters (paypa1, g00gle, Cyrillic аpple) | IDN legitimately exists |
 | `threatTokens` | 6 | account-security vocabulary in the name | legitimate login pages also match |
-| `homoglyph` | 5 | mixed scripts / look-alike characters | IDN legitimately exists |
-| `dga` | 4 | entropy + consonant runs + digit ratio | modern DGAs defeat it |
-| `lexical` | 3 | hyphens, depth, label length, digits | CDNs use these patterns |
+| `dga` | 3 | entropy + consonant runs + digit ratio | modern DGAs defeat it |
+| `lexical` | 2 | hyphens, depth, label length, digits | CDNs use these patterns |
 | `highAbuseTld` | 2 | TLD appears in public abuse rankings | many legitimate services use them |
-| `newness` | 2 | first observed < 24 h ago (local observation store) | says nothing about intent |
 | `altTld` | 1 | brand name on a non-canonical TLD | large brands own many TLDs |
+| `newness` | 1 | first observed < 24 h ago (local observation store) | says nothing about intent |
 
 ### Evidence floors
 
@@ -40,6 +40,11 @@ establishes a minimum score (`EVIDENCE_FLOORS`):
 
 - malware/phishing feed match → **80/100** ("high confidence")
 - ad/tracker feed match → **40/100** (privacy risk, explicitly *not* malware)
+- homoglyph impersonation of a known brand → **55/100** ("suspicious")
+- brand inside a subdomain of a domain it does not own → **55/100**
+- brand combined with an account-security word → **45/100**
+- one-edit brand typo (`gogle.com`) → **30/100** ("unusual") — deliberately *not* a block
+  recommendation, because independent near-miss registrations exist
 
 Floors are listed in the report (`floors[]`), explained in the summary line, and overridden
 by guardrails.
@@ -48,7 +53,8 @@ by guardrails.
 
 | Score | Verdict | Advisory action |
 |---|---|---|
-| 0–19 | No evidence of risk | allow |
+| 0 | No evidence of risk | allow |
+| 1–19 | Minimal evidence | allow |
 | 20–44 | Unusual | monitor |
 | 45–69 | Suspicious | monitor |
 | 70–89 | Likely malicious | recommend block |
@@ -67,17 +73,41 @@ Presence (Bernoulli-style) counting, Laplace smoothing α = 0.1, equal class pri
 **Vocabulary selection.** Tokens are ranked by *normalised class imbalance × log support*
 rather than raw frequency. Frequency ranking is dominated by the much larger positive
 corpus and discards the tokens that distinguish legitimate domains — that mistake was made,
-measured, and fixed (AUC 0.826 → 0.904 with α 1.0 → 0.1 + discriminative ranking).
+measured, and fixed (α 1.0 → 0.1 plus discriminative ranking took AUC from 0.826 to 0.904
+under the earlier two-way split; the numbers quoted below are the current three-way ones).
 
-**Evaluation.** Seeded 75/25 split; the holdout is never used for training. Reported:
-confusion matrix, precision, recall, F1, specificity, accuracy, AUC (tie-aware Mann-Whitney),
-and a best-F1 sweep. The **operating threshold** is chosen on the holdout as the highest
-threshold whose specificity still meets the target (0.9), so the model's operating point is
-a measured false-positive constraint, not a guess.
+**Evaluation.** Seeded **three-way split**: fit / tuning / holdout (60 / 20 / 20). The token
+counts and likelihoods are fit on the fit split, the **operating threshold is chosen on the
+tuning split** (highest threshold whose specificity still meets the 0.9 target), and every
+headline number — precision, recall, specificity, F1, AUC (tie-aware Mann-Whitney), the
+confusion matrix and the best-F1 sweep — is measured once on the **holdout**, which never
+influences selection.
 
-**Measured on this repository's data** (`npm test` → `tests/unit/classifier.test.mjs`):
-AUC ≈ 0.90, precision ≈ 0.99, specificity ≈ 0.92 at the operating point, with recall ≈ 0.75.
-Those floors are asserted by tests; a regression fails CI.
+Selecting the threshold on the holdout was the earlier design, and it made the reported
+specificity an in-sample number (the target could be "met" while the holdout actually sat
+below it). It is now impossible to report a target the holdout did not earn: when the
+holdout specificity lands under the target, `atThreshold.unreachable` is set with a reason
+string and the UI prints it instead of the target.
+
+**Evidence damping.** Scores are `sigmoid(prior + ΣΔ / tokens^0.25)`. Un-damped binary NB
+pins to 1.0 on long hostnames (a 12-token name multiplies every log-likelihood ratio), which
+destroys any fixed threshold. The exponent 0.25 was chosen on the **tuning** AUC (0.8786 vs
+0.8778 at 0.5 and 0.8693 at 1.0); the holdout was not consulted.
+
+**Measured on this repository's data** (holdout, `tests/unit/classifier.test.mjs`):
+AUC ≈ 0.857, precision ≈ 0.986, specificity 0.898, recall ≈ 0.663, F1 ≈ 0.793 at the
+operating threshold 0.96. Balanced accuracy is 0.780. The 0.9 specificity target is **not** reached out-of-sample
+(0.898 — one held-out legitimate domain short), and the UI says so. Recall at that operating
+point is 0.66, which is exactly why the classifier carries only 7/100 of the reputation
+score and never blocks on its own. Floors asserted by tests: AUC ≥ 0.85, precision ≥ 0.95,
+specificity ≥ 0.85, recall ≥ 0.6; a regression fails CI.
+
+**Base-rate honesty.** The evaluation corpus is roughly 11:1 positive-to-negative, so its
+precision of 0.986 is not the precision you would see on real traffic. The engine converts
+recall and specificity into precision at plausible base rates and shows both in the UI:
+**0.062 at a 1% base rate** and **0.419 at a 10% base rate**. In other words, on ordinary
+browsing a flagged domain is usually *not* malicious — which is precisely why this score is
+7/100 of the reputation total and why it can never block, allowlist or enforce anything.
 
 **Known weakness, stated in the UI.** The model only sees characters. Legitimate but
 unfamiliar domains (`myblog.example`) can score as "ad-like". That is why its weight is 7/100,

@@ -1,4 +1,4 @@
-# OmniShield X — Architecture (v5.0.0, AETHER AI Evolution)
+# OmniShield X — Architecture (v5.0.1, AETHER AI Evolution)
 
 This document describes the shipped code. Every claim here is backed by a module in the
 repository and by a test in `tests/`.

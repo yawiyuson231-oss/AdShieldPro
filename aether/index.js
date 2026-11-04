@@ -14,7 +14,7 @@
  */
 import { OmniShieldFilterEngine } from '../engine.js';
 import { ReputationEngine, SIGNAL_WEIGHTS, verdictFor } from './reputation.js';
-import { DomainClassifier } from './classifier.js';
+import { DomainClassifier, precisionAtPrevalence } from './classifier.js';
 import { POPULAR_DOMAINS } from './data.js';
 
 const MAX_OBSERVATIONS = 50000;
@@ -221,5 +221,5 @@ export class Aether {
   }
 }
 
-export { ReputationEngine, DomainClassifier, SIGNAL_WEIGHTS };
+export { ReputationEngine, DomainClassifier, SIGNAL_WEIGHTS, precisionAtPrevalence };
 export default Aether;

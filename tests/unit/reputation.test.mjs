@@ -44,7 +44,8 @@ test('published weights sum to exactly 100', () => {
 
 test('verdict bands are ordered and cover the whole range', () => {
   assert.equal(verdictFor(0).id, 'clean');
-  assert.equal(verdictFor(19).id, 'clean');
+  assert.equal(verdictFor(1).id, 'minimal', 'a non-zero score must never claim "no evidence"');
+  assert.equal(verdictFor(19).id, 'minimal');
   assert.equal(verdictFor(20).id, 'watch');
   assert.equal(verdictFor(45).id, 'suspicious');
   assert.equal(verdictFor(70).id, 'likely-malicious');
@@ -111,6 +112,30 @@ test('malware-category feeds weigh more than ad feeds', () => {
   assert.ok(['likely-malicious', 'high-confidence'].includes(verdictFor(mal.score).id),
     `threat feed verdict was ${verdictFor(mal.score).id}`);
   assert.match(ad.floors[0].reason, /privacy risk, not malware/);
+});
+
+test('brand impersonation is scored as suspicious, with the reason shown', () => {
+  const rep = new ReputationEngine();
+  const cases = [
+    ['paypa1.com', 'homoglyph-impersonation'],
+    ['micros0ft.com', 'homoglyph-impersonation'],
+    ['paypal-login.com', 'brand-affix'],
+    ['paypal.com.verify.tk', 'brand-in-foreign-domain']
+  ];
+  for (const [domain, floorId] of cases) {
+    const report = rep.analyze(domain);
+    assert.equal(report.floors[0]?.id, floorId, `${domain} floor was ${JSON.stringify(report.floors)}`);
+    assert.ok(report.score >= 45, `${domain} scored only ${report.score}`);
+    assert.ok(['suspicious', 'likely-malicious', 'high-confidence'].includes(report.verdict),
+      `${domain} verdict was ${report.verdict}`);
+    assert.match(report.summary, /look-alike|brand|combines/i);
+  }
+  // The real brand stays clean, and a one-edit typo is "unusual" but not "malicious".
+  assert.equal(rep.analyze('paypal.com').score, 0);
+  const typo = rep.analyze('gogle.com');
+  assert.equal(typo.floors[0]?.id, 'typosquat-near-miss');
+  assert.equal(typo.verdict, 'watch');
+  assert.notEqual(typo.action, 'recommend-block', 'a near-miss typo must not recommend a block');
 });
 
 test('AETHER never enforces its own advisory', () => {
