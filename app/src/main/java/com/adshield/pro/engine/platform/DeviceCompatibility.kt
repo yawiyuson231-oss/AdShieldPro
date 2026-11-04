@@ -18,11 +18,18 @@ object DeviceCompatibility {
 
     enum class FormFactor { PHONE, LARGE_PHONE, TABLET, FOLDABLE }
 
-    /** Coarse screen class from the shortest width in dp, the way Android itself buckets windows. */
+    /**
+     * Coarse screen class from window width and smallest width, in dp:
+     *  - tablet: smallest width >= 600dp (Android's own tablet bucket);
+     *  - foldable open: wide window (>= 600dp) whose shortest side is still phone-plus
+     *    (>= 380dp) — a landscape phone keeps its ~360dp shortest side and is NOT a foldable;
+     *  - large phone: 412dp-class modern phones and any landscape phone window;
+     *  - phone: everything narrower.
+     */
     fun formFactor(screenWidthDp: Int, smallestWidthDp: Int): FormFactor = when {
         smallestWidthDp >= 600 -> FormFactor.TABLET
-        screenWidthDp >= 600 -> FormFactor.FOLDABLE
-        screenWidthDp >= 480 -> FormFactor.LARGE_PHONE
+        screenWidthDp >= 600 && smallestWidthDp >= 380 -> FormFactor.FOLDABLE
+        screenWidthDp >= 400 || smallestWidthDp >= 400 -> FormFactor.LARGE_PHONE
         else -> FormFactor.PHONE
     }
 
@@ -88,7 +95,9 @@ object DeviceCompatibility {
      * plausible range for a phone/laptop battery. Vendor blobs sometimes emit 0, 255 or absurd
      * values; those are rejected so the UI can say "unavailable" instead of showing nonsense.
      */
-    fun isPlausibleTemperature(celsius: Float?): Boolean = celsius != null && celsius > -20f && celsius < 90f
+    // Exactly 0°C is a common driver stub ("no sensor"), not a real battery reading.
+    fun isPlausibleTemperature(celsius: Float?): Boolean =
+        celsius != null && celsius != 0f && celsius > -20f && celsius < 90f
 
     fun isPlausibleVoltage(volts: Float?): Boolean = volts != null && volts > 2.5f && volts < 5.5f
 

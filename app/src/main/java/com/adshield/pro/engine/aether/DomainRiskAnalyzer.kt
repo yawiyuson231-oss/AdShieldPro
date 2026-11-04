@@ -43,7 +43,14 @@ object DomainRiskAnalyzer {
         if (trimmed.isEmpty()) return ""
         val withoutScheme = trimmed.substringAfter("://", trimmed)
         val hostPart = withoutScheme.substringBefore('/').substringBefore('?').substringBefore('#')
-        return hostPart.substringAfterLast('@').trimEnd('.').lowercase()
+        val authority = hostPart.substringAfterLast('@')
+        // Strip the port, keeping IPv6 literals intact: "[::1]:8443" -> "::1".
+        val host = if (authority.startsWith("[")) {
+            authority.substringAfter('[').substringBefore(']')
+        } else {
+            authority.substringBefore(':')
+        }
+        return host.trimEnd('.').lowercase()
     }
 
     fun analyze(rawTarget: String): List<Finding> {

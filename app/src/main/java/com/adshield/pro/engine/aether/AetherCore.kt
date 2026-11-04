@@ -9,7 +9,8 @@ import com.adshield.pro.domain.model.RuleCategory
  * One place decides what to do with a DNS query, a URL or an app, from evidence that is always
  * traceable to a list, a user rule or a named heuristic. It is deliberately conservative:
  *
- *  - a curated threat-list/user-rule match is the only thing that yields VERIFIED + BLOCK;
+ *  - a curated list match (threat intel, ad/tracker lists) or a user rule yields VERIFIED;
+ *    threat intel carries higher confidence than ad lists, and only verified items block;
  *  - heuristics alone can never block, they only produce SUSPECTED + ALLOW_AND_REVIEW;
  *  - a user allow rule outranks every heuristic (false-positive reduction);
  *  - unknown is a first-class answer, not a guess.
@@ -43,10 +44,16 @@ object AetherCore {
         val evidence = ArrayList<Evidence>()
 
         // 1. Filter engine evidence (the engine already applied user allow > user block > lists).
+        // Source names come from FilterRuleEngine: "User Allowlist", "User Blocklist",
+        // "User Custom Rule", "System Safety Allowlist", list names, or the bare "Allowed"
+        // default when nothing matched. The bare default is NOT evidence of anything.
         if (evaluation.isBlocked) {
             val category = evaluation.matchedCategory ?: RuleCategory.ADS
+            val source = evaluation.sourceName
+            val isUserRule = source.contains("custom", ignoreCase = true) ||
+                source.contains("user block", ignoreCase = true)
             val kind = when {
-                evaluation.sourceName.contains("custom", ignoreCase = true) -> EvidenceKind.USER_BLOCK
+                isUserRule -> EvidenceKind.USER_BLOCK
                 category == RuleCategory.MALWARE -> EvidenceKind.THREAT_LIST
                 else -> EvidenceKind.AD_LIST
             }
@@ -57,17 +64,32 @@ object AetherCore {
             }
             evidence += Evidence(
                 kind = kind,
-                source = evaluation.sourceName.ifBlank { "Filter engine" },
+                source = source.ifBlank { "Filter engine" },
                 confidence = confidence,
-                explanation = "Matched ${category.displayName.lowercase()} rule from ${evaluation.sourceName.ifBlank { "the active lists" }}"
+                explanation = "Matched ${category.displayName.lowercase()} rule from ${source.ifBlank { "the active lists" }}"
             )
-        } else if (evaluation.sourceName.contains("allow", ignoreCase = true)) {
-            evidence += Evidence(
-                kind = if (evaluation.sourceName.contains("custom", ignoreCase = true)) EvidenceKind.USER_ALLOW else EvidenceKind.SAFE_ALLOWLIST,
-                source = evaluation.sourceName,
-                confidence = 100,
-                explanation = "Explicitly allowed by ${evaluation.sourceName}"
-            )
+        } else {
+            val source = evaluation.sourceName
+            val isUserAllow = source.contains("user allow", ignoreCase = true) ||
+                (source.contains("custom", ignoreCase = true) && source.contains("allow", ignoreCase = true))
+            val isCuratedAllow = source.contains("allowlist", ignoreCase = true) ||
+                source.contains("allow list", ignoreCase = true)
+            when {
+                isUserAllow -> evidence += Evidence(
+                    kind = EvidenceKind.USER_ALLOW,
+                    source = source,
+                    confidence = 100,
+                    explanation = "Explicitly allowed by $source"
+                )
+                isCuratedAllow -> evidence += Evidence(
+                    kind = EvidenceKind.SAFE_ALLOWLIST,
+                    source = source,
+                    confidence = 100,
+                    explanation = "Explicitly allowed by $source"
+                )
+                // "Allowed" / "Allowed (no rule match)": nothing matched, so there is no
+                // evidence and confidence must stay 0 — unknown is a first-class answer.
+            }
         }
 
         // 2. Heuristics (never enough on their own to verify a threat).
@@ -181,10 +203,13 @@ object AetherCore {
     ): ThreatAssessment {
         val trimmed = evidence.take(MAX_EVIDENCE)
         val hasUserAllow = trimmed.any { it.kind == EvidenceKind.USER_ALLOW }
+        // Curated lists verify a block: threat intel, the user's own block rule, and the
+        // ad/tracker lists (weaker confidence than threat intel, but still a list match).
         val verifiedItem = trimmed.firstOrNull {
             it.kind == EvidenceKind.THREAT_LIST || it.kind == EvidenceKind.USER_BLOCK ||
-                (it.kind == EvidenceKind.SAFE_ALLOWLIST && false)
+                it.kind == EvidenceKind.AD_LIST
         }
+        val curatedAllow = trimmed.firstOrNull { it.kind == EvidenceKind.SAFE_ALLOWLIST }
         val riskScore = aggregateRisk(trimmed, heuristicScore)
         val confidence = aggregateConfidence(trimmed)
 
@@ -206,6 +231,16 @@ object AetherCore {
                 target, ThreatVerdict.VERIFIED, blocked, riskScore, confidence, trimmed,
                 if (blocked == AetherAction.BLOCK) "Blocked automatically: verified by ${verifiedItem.source}."
                 else "Automatic blocking is set to Manual, so this was reported instead of blocked.",
+                nowEpochMs
+            )
+        }
+
+        // 2b. A curated system allowlist is a verified answer too — an ALLOW. Heuristics do
+        // not override curated exceptions, mirroring the engine's own priority ladder.
+        if (curatedAllow != null) {
+            return ThreatAssessment(
+                target, ThreatVerdict.ALLOWED, AetherAction.ALLOW, riskScore.coerceAtMost(30), confidence,
+                trimmed, "Allowed by ${curatedAllow.source} — heuristics do not override curated exceptions.",
                 nowEpochMs
             )
         }
