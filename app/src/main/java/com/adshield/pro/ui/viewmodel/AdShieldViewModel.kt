@@ -73,6 +73,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -970,7 +971,7 @@ class AdShieldViewModel @Inject constructor(
         topBlockedDomains
     ) { runtime, logs, apps, blocked ->
         LiveNetworkModel.snapshot(runtime, logs, apps, blocked)
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         LiveNetworkModel.snapshot(

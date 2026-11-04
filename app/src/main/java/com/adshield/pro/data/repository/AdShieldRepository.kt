@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -88,7 +89,7 @@ class AdShieldRepository @Inject constructor(
     private val _liveTopApps = MutableStateFlow<Map<String, AppDnsActivity>>(emptyMap())
     val liveTopAppsFlow: Flow<List<AppDnsActivity>> = _liveTopApps.map { apps ->
         apps.values.sortedWith(compareByDescending<AppDnsActivity> { it.totalQueries }.thenByDescending { it.blockedQueries })
-    }
+    }.flowOn(Dispatchers.Default)
 
     val settingsFlow: Flow<AppSettingsState> = prefs.settingsFlow
 
@@ -107,7 +108,7 @@ class AdShieldRepository @Inject constructor(
                 protocolUsed = entity.protocolUsed
             )
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     val topBlockedDomainsFlow: Flow<List<DomainBlockCount>> = dao.observeTopBlockedDomains(15)
     val sourceEffectivenessFlow: Flow<List<SourceEffectiveness>> = dao.observeSourceEffectiveness()

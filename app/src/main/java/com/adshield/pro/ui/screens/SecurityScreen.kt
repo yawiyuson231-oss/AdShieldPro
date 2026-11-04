@@ -332,10 +332,11 @@ private fun AppAuditTab(
             }
         }
         LazyColumn(
+            modifier = Modifier.weight(1f),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            items(audits, key = { it.profile.packageName }) { audit ->
+            items(audits, key = { it.profile.packageName }, contentType = { "app-audit" }) { audit ->
                 AppAuditCard(audit)
             }
         }
@@ -649,7 +650,7 @@ private fun HistoryTab(history: List<SecurityScanRecord>) {
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(Icons.Default.MusicNote, contentDescription = null, tint = SkyBlueGlow, modifier = Modifier.size(48.dp))
+            Icon(Icons.Default.AccessTime, contentDescription = null, tint = SkyBlueGlow, modifier = Modifier.size(48.dp))
             Spacer(modifier = Modifier.height(10.dp))
             Text(
                 "No scans yet this session. Scan a link, file, or run the app audit.",
@@ -664,7 +665,7 @@ private fun HistoryTab(history: List<SecurityScanRecord>) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(history, key = { it.id }) { record ->
+        items(history, key = { it.id }, contentType = { "scan-record" }) { record ->
             val tint = when (record.threatLevel) {
                 SecurityLevel.DANGEROUS -> com.adshield.pro.ui.theme.AlertRed
                 SecurityLevel.SUSPICIOUS -> com.adshield.pro.ui.theme.WarningAmber

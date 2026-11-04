@@ -1,4 +1,4 @@
-# AdShield Pro 2.5.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.6.0 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -77,6 +77,22 @@ that read *not implemented* — nothing there is aspirational.
 
 ![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
 
+## What's new in 2.6.0
+
+- **Cyber-console UI** — dark navy / electric-blue dashboard inspired by a security operations
+  console: animated local protection shield, block-mix donut, attack-vector bars, real activity
+  feed and privacy badges that say what the build actually does. No fake global attack map,
+  enterprise endpoint counts or compliance certifications.
+- **Smoother scrolling** — Home and Live are lazy, keyed lists; tabs collect their own state so an
+  idle tab cannot recompose the whole app; repeated rows declare content types; long screens get a
+  scroll-to-top control.
+- **Idle-safe motion** — the shield animates only while the tunnel is connected and traffic is
+  recent, respects system animation settings, and reads animation state inside Canvas drawing
+  instead of recomposing the tree every frame.
+- **Dashboard honesty tests** — new JVM cases lock counter scope, clamping, event labels, motion
+  gating and stable live-event ids. CI now discovers every `@Test` case and requires all of them
+  to run and pass.
+
 ## What's new in 2.5.0
 
 - **Aether AI decision core** — every block/allow is now an explainable verdict: VERIFIED (curated
@@ -128,14 +144,14 @@ Everything needed is pinned in the repository (Gradle 9.7.1 wrapper, AGP 9.4.1, 
 ./gradlew :app:lintDebug            # Android Lint
 ```
 
-The JVM suite (82 cases across `AdShieldEngineTestSuite`, `SecurityCenterTestSuite`,
-`BatteryIntelligenceTestSuite`, `AetherCoreTest` and `CapabilityRegistryTest`) covers DNS
+The JVM suite (`AdShieldEngineTestSuite`, `SecurityCenterTestSuite`, `BatteryIntelligenceTestSuite`,
+`AetherCoreTest`, `DashboardPresentationTest` and `CapabilityRegistryTest`) covers DNS
 wire-format parsing, UDP/TCP packet framing and checksums, upstream response validation and cache
 policy, UDP truncation and TCP segmentation limits, the filter rule engine, the browser blocker, and
 in-app update asset selection (release APK over debug/split APKs), the battery power/rate maths and
 its no-fabrication rules, the Aether decision table (no verdict without evidence), the live
-dashboard model, cross-device feature gates for API 29–37, and the capability registry's honesty
-constraints.
+dashboard model, dashboard counter/motion honesty rules, cross-device feature gates for API 29–37,
+and the capability registry's honesty constraints.
 See [docs/TESTING.md](docs/TESTING.md) for the full matrix, signing requirements and the on-device
 smoke test checklist.
 

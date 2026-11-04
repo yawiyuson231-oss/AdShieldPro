@@ -177,8 +177,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 )
             }
 
-            items(links.size) { index ->
-                val link = links[index]
+            items(links, key = { it.url }, contentType = { "about-link" }) { link ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

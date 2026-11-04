@@ -588,7 +588,7 @@ private fun SessionsSection(sessions: List<BatterySession>, onClearSessions: () 
             return
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(sessions.take(20)) { session ->
+            items(sessions.take(20), key = { it.id }, contentType = { "battery-session" }) { session ->
                 SessionCard(session)
             }
         }

@@ -45,11 +45,15 @@ export ADSHIELD_KEY_PASSWORD=…
 `.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
 requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 
-1. `:app:compileDebugKotlin` — fails fast on toolchain problems
-2. `:app:assembleDebug` — APK packaging
-3. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore)
-4. `:app:testDebugUnitTest` — then asserts that exactly 18 tests executed and passed
-5. `:app:lintDebug` — hard gate, the build fails on any lint error
+1. Capability matrix freshness check (`tools/generate_capability_matrix.py --check`)
+2. UI performance gates (`tools/check_ui_performance.py`)
+3. `:app:compileDebugKotlin` — fails fast on toolchain problems
+4. `:app:assembleDebug` — APK packaging
+5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
+   universal ABI gate (`tools/check_universal_release.py`)
+6. `:app:testDebugUnitTest` — then discovers every `@Test` case in `app/src/test` and asserts the
+   JUnit XML reports the same number, with zero failures/errors/skips
+7. `:app:lintDebug` — hard gate, the build fails on any lint error
 
 The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 
@@ -64,7 +68,9 @@ HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
 
 `AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
 device-independent engine code directly, which is where all DNS, filtering and scoring
-logic lives:
+logic lives. `AetherCoreTest`, `BatteryIntelligenceTestSuite`, `DashboardPresentationTest`,
+`SecurityCenterTestSuite` and `CapabilityRegistryTest` cover the decision core, battery/thermal
+rules, dashboard honesty/motion rules, security scoring and capability-report constraints:
 
 | Area | Covered behaviour |
 | --- | --- |
@@ -75,6 +81,7 @@ logic lives:
 | `FilterRuleEngine` | Protection-mode category gating, custom allow/block precedence, wildcards, hosts/Adblock list parsing, duplicate counting, HTML/binary rejection, conflict analysis, snapshot rollback, concurrent evaluation |
 | `BrowserContentBlocker` | Tracking-parameter stripping, request blocking, site allowlists, cosmetic script generation, DNS-label-boundary third-party detection |
 | `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
+| `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
@@ -92,3 +99,7 @@ Those cannot be exercised by JVM unit tests.
 6. Reboot the device with protection enabled to verify the boot receiver restores the tunnel.
 7. If the release build is used, confirm R8 did not strip Room/serialization metadata by
    opening **Statistics** and **Optimizer** (both read from Room/DataStore).
+8. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
+   the scroll-to-top button appears after scrolling, and the shield stops animating when the
+   tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
+   options and confirm the shield renders statically.

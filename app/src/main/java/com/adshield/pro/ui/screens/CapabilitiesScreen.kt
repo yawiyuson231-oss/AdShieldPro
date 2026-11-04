@@ -89,7 +89,7 @@ fun CapabilitiesScreen(deviceProfile: DeviceProfile? = null) {
                     modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
                 )
             }
-            items(caps, key = { it.id }) { capability ->
+            items(caps, key = { it.id }, contentType = { "capability" }) { capability ->
                 CapabilityCard(capability)
             }
         }

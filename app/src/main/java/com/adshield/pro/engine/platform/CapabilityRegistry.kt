@@ -451,7 +451,7 @@ object CapabilityRegistry {
         cap(
             "regression-suite", "Automated JVM regression suite in CI", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, ".github/workflows/android-build.yml", emptyList(),
-            listOf("56 JUnit cases, exact-count assertion"),
+            listOf("JUnit XML from :app:testDebugUnitTest; CI discovers @Test cases and asserts all ran and passed"),
             listOf("JVM only; no connected-device instrumentation tests in CI yet"),
             "CI: Android build & test"
         ),
@@ -507,9 +507,23 @@ object CapabilityRegistry {
         cap(
             "adaptive-navigation", "Bottom navigation adapts to phone, tablet and landscape widths", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "MainActivity.kt", emptyList(),
-            listOf("LocalConfiguration screen width, scrollable NavigationBar row"),
-            listOf("Seven destinations scroll on narrow phones instead of clipping; tablets show all at once"),
+            listOf("LocalConfiguration screen width, lazy scrollable NavigationBar row"),
+            listOf("Nine destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
+        ),
+        cap(
+            "cyber-dashboard", "Cyber-console Home dashboard with real device counters", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/HomeScreen.kt", emptyList(),
+            listOf("Daily aggregates, recent DNS log, resolver state, protection mode"),
+            listOf("Reference-inspired layout only; no fictional enterprise endpoints, global attack map or compliance certifications"),
+            "DashboardPresentationTest overview/event/motion cases"
+        ),
+        cap(
+            "lazy-scrolling", "Lazy keyed lists and isolated tab state for smoother scrolling", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "MainActivity.kt", emptyList(),
+            listOf("LazyColumn/LazyRow item keys and content types, per-destination StateFlow collection, Canvas draw-state animation"),
+            listOf("Static gates and CI build guard the structure; frame timing still needs on-device profiling"),
+            "tools/check_ui_performance.py and DashboardPresentationTest"
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,

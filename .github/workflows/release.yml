@@ -148,6 +148,11 @@ jobs:
           echo "ADSHIELD_KEYSTORE_PATH=${KEYSTORE}" >> "$GITHUB_ENV"
           keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASS" | tail -3
 
+      - name: UI performance and lazy-list gates
+        run: |
+          chmod +x tools/check_ui_performance.py
+          python3 tools/check_ui_performance.py
+
       - name: JVM unit tests
         run: |
           chmod +x gradlew
@@ -248,6 +253,9 @@ jobs:
           ## What is in this build
           - On-device DNS filtering over Android VpnService (no root): ad, tracker and threat lists,
             custom block/allow rules, protection modes, background list sync.
+          - Cyber-console dashboard: dark navy/electric-blue threat overview, animated local
+            shield, block-mix donut, attack-vector bars and a real DNS activity feed — no
+            fictional enterprise endpoints or compliance badges.
           - Aether AI decision core: explainable VERIFIED / SUSPECTED / UNKNOWN verdicts with
             evidence and a user-controlled autonomy ceiling, plus a live network dashboard fed
             only by this device's real DNS log.
@@ -258,6 +266,8 @@ jobs:
           - Activity, statistics and per-app DNS analytics; AI Smart Boost, storage cleaning,
             Game Booster and battery/thermal tools — all local, no cloud AI.
           - In-app update checks against this repository's own releases.
+          - Smoother scrolling: lazy keyed lists, per-tab state isolation, draw-state animation
+            that stops when idle, and a scroll-to-top control on long dashboards.
 
           ## Universal build
           One APK for every device: any native helper library (AndroidX graphics-path,

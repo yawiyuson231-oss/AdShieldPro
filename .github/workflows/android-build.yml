@@ -63,6 +63,11 @@ jobs:
           chmod +x tools/generate_capability_matrix.py
           python3 tools/generate_capability_matrix.py --check
 
+      - name: UI performance and lazy-list gates
+        run: |
+          chmod +x tools/check_ui_performance.py
+          python3 tools/check_ui_performance.py
+
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |
           set -o pipefail
@@ -112,10 +117,15 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/lint.log :app:lintDebug
 
-      - name: Assert unit tests actually ran (82 cases)
+      - name: Assert every discovered unit test ran and passed
         run: |
           python3 - <<'EOF'
-          import glob, sys, xml.etree.ElementTree as ET
+          import glob, re, sys, xml.etree.ElementTree as ET
+          from pathlib import Path
+          expected = sum(
+              len(re.findall(r'^\s*@Test\b', path.read_text(encoding='utf-8'), re.MULTILINE))
+              for path in Path('app/src/test').rglob('*.kt')
+          )
           files = glob.glob('app/build/test-results/testDebugUnitTest/TEST-*.xml')
           if not files:
               sys.exit('no JUnit XML produced: the test task did not run any tests')
@@ -129,10 +139,11 @@ jobs:
               for case in root.iter('testcase'):
                   print('  PASS' if len(case.findall('failure')) == 0 and len(case.findall('error')) == 0
                         else '  FAIL', case.get('name'))
-          print(f'tests={total} failures={failures} errors={errors} skipped={skipped}')
-          expected = 82
-          if total != expected or failures or errors:
-              sys.exit(f'expected {expected} passing tests, got total={total} failures={failures} errors={errors}')
+          print(f'tests={total} expected={expected} failures={failures} errors={errors} skipped={skipped}')
+          if expected == 0:
+              sys.exit('no @Test cases discovered in app/src/test')
+          if total != expected or failures or errors or skipped:
+              sys.exit(f'expected {expected} passing tests, got total={total} failures={failures} errors={errors} skipped={skipped}')
           EOF
 
       - name: Assert the debug APK is a real, installable package

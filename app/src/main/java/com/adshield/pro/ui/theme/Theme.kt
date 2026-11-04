@@ -15,11 +15,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 
-// Brand Colors — Deep Navy & Emerald Protection Palette
-val DeepNavyBackground = Color(0xFF07101E)
-val NavySurface = Color(0xFF0E1B30)
-val NavySurfaceVariant = Color(0xFF152642)
-val NavyBorder = Color(0xFF1E3558)
+// Brand colors — cyber-console navy, electric blue and signal cyan.
+// Emerald remains the protection/success accent; red and amber are reserved for risk.
+val DeepNavyBackground = Color(0xFF020813)
+val NavySurface = Color(0xFF061221)
+val NavySurfaceVariant = Color(0xFF0A1B30)
+val NavyBorder = Color(0xFF12365A)
 
 val EmeraldPrimary = Color(0xFF10B981)
 val EmeraldGlow = Color(0xFF34D399)
@@ -27,7 +28,7 @@ val EmeraldDark = Color(0xFF059669)
 
 val AlertRed = Color(0xFFEF4444)
 val WarningAmber = Color(0xFFF59E0B)
-val CyberCyan = Color(0xFF06B6D4)
+val CyberCyan = Color(0xFF22D3EE)
 val PurpleAccent = Color(0xFF8B5CF6)
 
 // Security Center accents (phishing / threat-scan surfaces)
@@ -39,11 +40,11 @@ val TextSecondaryDark = Color(0xFF94A3B8)
 
 // Elevation surfaces (Material 3 surface-container roles) so that Cards, Sheets and
 // NavigationBar pick up the navy ladder instead of the framework's neutral default.
-private val NavyContainerLowest = Color(0xFF050D18)
-private val NavyContainerLow = Color(0xFF0A1524)
-private val NavyContainer = Color(0xFF0E1B30)
-private val NavyContainerHigh = Color(0xFF152642)
-private val NavyContainerHighest = Color(0xFF1C3050)
+private val NavyContainerLowest = Color(0xFF01050C)
+private val NavyContainerLow = Color(0xFF040D1A)
+private val NavyContainer = Color(0xFF061221)
+private val NavyContainerHigh = Color(0xFF0A1B30)
+private val NavyContainerHighest = Color(0xFF102744)
 
 private val SlateContainerLowest = Color(0xFFFFFFFF)
 private val SlateContainerLow = Color(0xFFF8FAFC)
@@ -52,11 +53,11 @@ private val SlateContainerHigh = Color(0xFFE2E8F0)
 private val SlateContainerHighest = Color(0xFFCBD5E1)
 
 private val AdShieldDarkColorScheme = darkColorScheme(
-    primary = EmeraldPrimary,
-    onPrimary = Color(0xFF022C22),
-    primaryContainer = Color(0xFF064E3B),
-    onPrimaryContainer = Color(0xFFA7F3D0),
-    inversePrimary = EmeraldDark,
+    primary = ElectricBlue,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF0B2B66),
+    onPrimaryContainer = Color(0xFFDCEBFF),
+    inversePrimary = SkyBlueGlow,
     secondary = CyberCyan,
     onSecondary = Color(0xFF083344),
     secondaryContainer = Color(0xFF164E63),
@@ -71,7 +72,7 @@ private val AdShieldDarkColorScheme = darkColorScheme(
     onSurface = TextPrimaryDark,
     surfaceVariant = NavySurfaceVariant,
     onSurfaceVariant = TextSecondaryDark,
-    surfaceTint = EmeraldPrimary,
+    surfaceTint = ElectricBlue,
     surfaceDim = Color(0xFF040B14),
     surfaceBright = NavySurfaceVariant,
     surfaceContainerLowest = NavyContainerLowest,
@@ -86,7 +87,7 @@ private val AdShieldDarkColorScheme = darkColorScheme(
     errorContainer = Color(0xFF7F1D1D),
     onErrorContainer = Color(0xFFFEE2E2),
     outline = NavyBorder,
-    outlineVariant = Color(0xFF16283F),
+    outlineVariant = Color(0xFF0B2038),
     scrim = Color(0xFF000000)
 )
 
@@ -189,11 +190,11 @@ val AdShieldTypography = MaterialDefaults.copy(
 
 /** Rounded, modern corner treatment used by cards, sheets and dialogs. */
 val AdShieldShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(22.dp)
 )
 
 @Composable

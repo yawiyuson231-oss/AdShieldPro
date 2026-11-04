@@ -28,6 +28,7 @@ object LiveNetworkModel {
     data class CategorySlice(val lane: TrafficLane, val count: Long, val shareOfTotal: Float)
 
     data class LiveEvent(
+        val id: Long,
         val timestampEpochMs: Long,
         val domain: String,
         val lane: TrafficLane,
@@ -92,6 +93,7 @@ object LiveNetworkModel {
 
         val events = logs.take(40).map { record ->
             LiveEvent(
+                id = record.id,
                 timestampEpochMs = record.timestampEpochMs,
                 domain = record.domain,
                 lane = when {
@@ -111,7 +113,7 @@ object LiveNetworkModel {
 
         val emptyReason = when {
             !connected -> "Protection is off, so no DNS traffic is flowing through AdShield."
-            total == 0L -> "Protection is on and the tunnel is idle — nothing has been logged yet on this session."
+            total == 0L -> "Protection is on and the tunnel is idle — nothing has been logged yet in the recent log window."
             else -> null
         }
 
@@ -167,12 +169,12 @@ object LiveNetworkModel {
         )
         latencies.isEmpty() -> ConnectionHealth(
             "Waiting for traffic",
-            "Tunnel is up; no DNS latency has been measured yet in this session.",
+            "Tunnel is up; no DNS latency has been measured yet in the recent log window.",
             true
         )
         latencies.average() < 120 -> ConnectionHealth(
             "Healthy",
-            "Average DNS latency ${latencies.average().toInt()} ms across ${latencies.size} queries.",
+            "Average DNS latency ${latencies.average().toInt()} ms across ${latencies.size} recent queries.",
             true
         )
         latencies.average() < 400 -> ConnectionHealth(
