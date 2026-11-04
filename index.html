@@ -248,6 +248,7 @@ p { overflow-wrap: break-word; }
 .section-title {
   margin: 16px 0 18px;
   font-size: clamp(1.85rem, 5vw, 4.4rem);
+  text-wrap: balance; overflow-wrap: break-word;
   font-weight: 700; line-height: 1.06; letter-spacing: -.04em;
 }
 .section-title--xl { font-size: clamp(2.1rem, 6.5vw, 5.8rem); }
@@ -260,18 +261,21 @@ p { overflow-wrap: break-word; }
 
 /* Word splitting */
 .word {
-  display: inline-block; opacity: 0; transform: translate3d(0, .55em, 0); filter: blur(6px);
-  transition: opacity .8s var(--ease-out), transform .9s var(--ease-out), filter .8s var(--ease-out);
+  display: inline-block; max-width: 100%; overflow-wrap: break-word;
+  opacity: 0; transform: translate3d(0, .55em, 0);
+  transition: opacity .8s var(--ease-out), transform .9s var(--ease-out);
   transition-delay: calc(var(--i, 0) * 55ms + var(--d, 0ms));
+  will-change: opacity, transform;
 }
-.is-visible .word, .is-visible.word { opacity: 1; transform: none; filter: none; }
+.is-visible .word, .is-visible.word { opacity: 1; transform: none; will-change: auto; }
 
 /* Reveal */
 [data-reveal] { opacity: 0; transform: translate3d(0, 42px, 0); transition: opacity 1s var(--ease-out), transform 1.1s var(--ease-out); transition-delay: calc(var(--i, 0) * 90ms); }
 [data-reveal="zoom"] { transform: scale(.92) translate3d(0, 30px, 0); }
 [data-reveal="right"] { transform: translate3d(60px, 0, 0); }
 [data-reveal="line"] { transform: scaleX(0); }
-[data-reveal].is-visible { opacity: 1; transform: none; }
+[data-reveal] { will-change: opacity, transform; }
+[data-reveal].is-visible { opacity: 1; transform: none; will-change: auto; }
 [data-split-words][data-reveal] { opacity: 1; transform: none; }
 
 /* ---------- Hero ---------- */
@@ -297,6 +301,7 @@ p { overflow-wrap: break-word; }
   perspective: 600px;
   white-space: nowrap;
   max-width: 100%;
+  overflow-wrap: normal;
 }
 .hero-logo .char {
   display: inline-block; opacity: 0; transform-origin: 50% 100%; transform: translate3d(0, 60%, 0) rotateX(-80deg);
@@ -309,6 +314,7 @@ p { overflow-wrap: break-word; }
 .hero-tagline {
   display: block; margin-top: clamp(14px, 2vw, 22px); max-width: 640px;
   font-size: clamp(1.1rem, 2.2vw, 2.05rem); font-weight: 600; line-height: 1.2; letter-spacing: -.02em; text-transform: uppercase;
+  text-wrap: balance; overflow-wrap: break-word;
 }
 .hero-tagline .word { --d: 650ms; }
 .hero-intro { max-width: 560px; margin: 0; color: var(--muted); font-size: clamp(.95rem, 1.4vw, 1.14rem); }
