@@ -212,7 +212,9 @@ data class SecurityScanRecord(
     val threatName: String?,
     val findings: List<String>,
     val recommendation: String,
-    val timestampEpochMs: Long
+    val timestampEpochMs: Long,
+    /** A user-granted SAF URI, when deletion/quarantine can be offered without broad storage access. */
+    val sourceUri: String? = null
 )
 
 data class SecurityPosture(

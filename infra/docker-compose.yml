@@ -1,0 +1,79 @@
+name: omnishield-infinity
+
+# Selected baseline architecture: Nextcloud Community + PostgreSQL + Caddy HTTPS.
+# Host/volume capacity and Nextcloud user quotas determine actual storage. Nothing here
+# creates or advertises 1 TB. Supply all values in .env before deployment.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [infinity_internal]
+    expose: ["5432"]
+
+  nextcloud:
+    image: nextcloud:30-apache
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${DOMAIN:?set DOMAIN in .env}
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: ${DOMAIN}
+      TRUSTED_PROXIES: caddy
+      PHP_MEMORY_LIMIT: 512M
+      PHP_UPLOAD_LIMIT: 10G
+    volumes:
+      - nextcloud_data:/var/www/html
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/status.php || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks: [infinity_internal]
+    expose: ["80"]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      nextcloud:
+        condition: service_started
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [infinity_internal]
+
+volumes:
+  postgres_data:
+  nextcloud_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  infinity_internal:
+    driver: bridge

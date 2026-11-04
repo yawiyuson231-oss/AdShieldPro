@@ -33,6 +33,7 @@ import com.adshield.pro.domain.model.FilterEvaluationResult
 import com.adshield.pro.domain.model.FilterListSource
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
+import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
 import com.adshield.pro.engine.browser.BrowserContentBlocker
@@ -62,6 +63,10 @@ fun AdBlockerHubScreen(
     onToggleSiteException: (String, Boolean) -> Unit,
     onUpdateBrowserPrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onAddCustomCosmeticSelector: (String) -> Unit,
+    onUpdatePrivateSearch: (SearchProvider, Boolean, Boolean, Boolean, Boolean) -> Unit,
+    onRecordSearch: (String) -> Unit,
+    onClearSearchHistory: () -> Unit,
+    onFetchSearchSuggestions: (String, (List<String>) -> Unit) -> Unit,
     onShowFeedback: (String) -> Unit
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
@@ -149,6 +154,10 @@ fun AdBlockerHubScreen(
                     onToggleSiteException = onToggleSiteException,
                     onUpdateBrowserPrivacy = onUpdateBrowserPrivacy,
                     onAddCustomCosmeticSelector = onAddCustomCosmeticSelector,
+                    onUpdatePrivateSearch = onUpdatePrivateSearch,
+                    onRecordSearch = onRecordSearch,
+                    onClearSearchHistory = onClearSearchHistory,
+                    onFetchSearchSuggestions = onFetchSearchSuggestions,
                     onShowFeedback = onShowFeedback
                 )
             }

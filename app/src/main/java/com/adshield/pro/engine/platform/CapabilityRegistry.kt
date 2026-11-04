@@ -27,6 +27,9 @@ enum class CapabilityArea(val label: String) {
     AI_INTELLIGENCE("On-device intelligence"),
     BATTERY("Battery & power"),
     DEVICE_MAINTENANCE("Device maintenance"),
+    CLOUD_STORAGE("Private cloud & Infinity storage"),
+    FILE_MANAGEMENT("SAF file management"),
+    DOWNLOADS("Direct media downloads"),
     UPDATES("Updates & supply chain"),
     PLATFORM("Platform & operations")
 }
@@ -508,7 +511,7 @@ object CapabilityRegistry {
             "adaptive-navigation", "Bottom navigation adapts to phone, tablet and landscape widths", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "MainActivity.kt", emptyList(),
             listOf("LocalConfiguration screen width, lazy scrollable NavigationBar row"),
-            listOf("Nine destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
+            listOf("Twelve destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
         ),
         cap(
@@ -524,6 +527,118 @@ object CapabilityRegistry {
             listOf("LazyColumn/LazyRow item keys and content types, per-destination StateFlow collection, Canvas draw-state animation"),
             listOf("Static gates and CI build guard the structure; frame timing still needs on-device profiling"),
             "tools/check_ui_performance.py and DashboardPresentationTest"
+        ),
+        cap(
+            "private-search-providers", "Google and DuckDuckGo private-search workspace", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "engine/browser/PrivateSearch.kt", listOf(PERM_INTERNET),
+            listOf("User-entered queries sent to the selected external HTTPS provider"),
+            listOf("The selected provider receives searches and network metadata; no anonymity claim is made; WebView behavior needs a device smoke test"),
+            "InfinityCoreTestSuite.testPrivateSearch_selectsProviderAndUpgradesCleartextNavigation plus manual browser test"
+        ),
+        cap(
+            "private-search-history", "Search-only history, opt-in suggestions and private WebView cleanup", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "data/local/preferences/UserPreferencesRepository.kt", listOf(PERM_INTERNET),
+            listOf("DataStore search settings/history; provider suggestion JSON only when explicitly enabled"),
+            listOf("Private mode is not a separate OS profile; cleanup clears WebView session data, while providers still receive requests"),
+            "Manual: enable private mode, search, leave Browser, and inspect history/cookies"
+        ),
+        cap(
+            "scan-persistence", "Persistent scan reports and confirmation-based SAF deletion", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.PARTIAL, "data/repository/SecurityScanHistoryStore.kt", emptyList(),
+            listOf("Room security_scans table and user-granted SAF document URIs"),
+            listOf("Deletion depends on provider support; scan coverage remains limited to accessible files and local signatures/structural checks"),
+            "Manual: scan a document, restart the app, verify its report, then confirm deletion"
+        ),
+        cap(
+            "aether-report-explainer", "AETHER deterministic security-report explanations", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/SecurityReportExplainer.kt", emptyList(),
+            listOf("Persisted SecurityScanRecord evidence only"),
+            listOf("Deterministic summarizer, not a generative model; cannot independently delete files or change settings"),
+            "InfinityCoreTestSuite.testAetherReportExplainer_usesOnlyRecordedEvidenceAndCannotAuthorizeDeletion"
+        ),
+        cap(
+            "webdav-files", "Authenticated Nextcloud/WebDAV file operations and streaming transfers", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "engine/storage/WebDavClient.kt", listOf(PERM_INTERNET),
+            listOf("HTTPS PROPFIND, MKCOL, PUT, GET, MOVE and DELETE responses"),
+            listOf("Requires a user-supplied compatible server and credentials; live server interoperability is not verified in this sandbox"),
+            "InfinityCoreTestSuite.testWebDavXml_parsesRealMultistatusEntriesAndQuota plus manual Nextcloud test"
+        ),
+        cap(
+            "infinity-verified-capacity", "Unified capacity from online quota-verified providers only", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "domain/model/InfinityModels.kt", listOf(PERM_INTERNET),
+            listOf("DAV quota-available-bytes and quota-used-bytes from successful health checks"),
+            listOf("Offline and quota-unreported providers are excluded; this is aggregation, not distributed striping or replication"),
+            "InfinityCoreTestSuite.testCapacityAggregation_countsOnlyOnlineProvidersWithMeasuredQuota"
+        ),
+        cap(
+            "provider-credential-encryption", "Android Keystore encryption for storage-provider passwords", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "data/repository/ProviderCredentialStore.kt", emptyList(),
+            listOf("AndroidKeyStore AES-GCM keys and app-private ciphertext preferences"),
+            listOf("Keystore behavior, device lock backup behavior and key invalidation require real-device testing"),
+            "Manual: reconnect after process restart and inspect that preferences contain ciphertext only"
+        ),
+        cap(
+            "nextcloud-public-sharing", "Nextcloud OCS public-link creation and downloaded file previews", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "data/repository/CloudStorageRepository.kt", listOf(PERM_INTERNET),
+            listOf("Nextcloud OCS Share API and FileProvider cache URIs"),
+            listOf("Generic WebDAV has no standard public-share API; previews download up to 256 MiB and need an installed viewer"),
+            "InfinityCoreTestSuite.testWebDavXml_parsesOnlyHttpsNextcloudShareLinks plus manual Nextcloud share test"
+        ),
+        cap(
+            "nextcloud-server-infrastructure", "Open-source Nextcloud/PostgreSQL backend deployment manifests", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "infra/docker-compose.yml", listOf(PERM_INTERNET),
+            listOf("Operator-supplied Nextcloud Community, PostgreSQL, HTTPS reverse proxy and persistent volumes"),
+            listOf("External host, domain, backups and secrets are required; no capacity is provisioned by the repository alone"),
+            "Deployment required: follow docs/INFINITY_ARCHITECTURE.md and run health/quota verification"
+        ),
+        cap(
+            "distributed-striping", "Distributed file striping, replication and automatic recovery across providers", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PLANNED, "",
+            listOf(PERM_INTERNET), listOf("Would require a coordinated metadata/erasure-coding backend"),
+            listOf("Not implemented: independent provider aggregation must not be presented as distributed redundancy"),
+            "n/a — architecture only"
+        ),
+        cap(
+            "s3-ceph-backends", "S3-compatible, SeaweedFS and Ceph storage adapters", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PLANNED, "",
+            listOf(PERM_INTERNET), listOf("Would require operator-supplied S3-compatible infrastructure"),
+            listOf("Not enabled to avoid installing overlapping storage systems; Nextcloud/WebDAV is the selected first backend"),
+            "n/a — external infrastructure and adapter required"
+        ),
+        cap(
+            "saf-universal-files", "SAF file/folder management, import, preview, share and search", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("DocumentsContract trees explicitly granted by the user and external viewer/share apps"),
+            listOf("No other-app sandbox access or all-files permission; providers may not support every mutation"),
+            "Manual device test: grant a tree, import, rename, preview, share and delete a test document"
+        ),
+        cap(
+            "saf-folder-scanning", "Bounded recursive folder scans with live per-file progress", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("User-granted SAF documents and the existing FileThreatScanner/ApkAnalyzer"),
+            listOf("At most 250 files per run; files over 512 MiB and unreadable items are skipped/reported; periodic background scans are not scheduled"),
+            "Manual device test: scan a tree containing EICAR and a clean file, then inspect persisted history"
+        ),
+        cap(
+            "saf-duplicates", "SHA-256 duplicate-content grouping without automatic deletion", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("Content hashes of same-size candidates in a user-granted tree"),
+            listOf("Recursive candidate set is bounded to 250 files; unreadable candidates are omitted rather than guessed"),
+            "Manual device test: duplicate a document and verify that only identical hashes are grouped"
+        ),
+        cap(
+            "direct-media-downloads", "Direct HTTPS media inspection, system downloads and history", CapabilityArea.DOWNLOADS,
+            CapabilityStatus.PARTIAL, "data/repository/DirectDownloadRepository.kt", listOf(PERM_INTERNET),
+            listOf("HTTP HEAD/one-byte Range metadata and Android DownloadManager status"),
+            listOf("No website extractor, DRM/authentication bypass or manual pause/resume; server and SAF destination compatibility need device tests"),
+            "InfinityCoreTestSuite.testDirectMediaInput_enforcesHttpsAndSafeFileNames plus manual direct MP4 test"
+        ),
+        cap(
+            "download-integrity", "Downloaded size checks and optional publisher SHA-256 verification", CapabilityArea.DOWNLOADS,
+            CapabilityStatus.PARTIAL, "data/repository/DirectDownloadRepository.kt", emptyList(),
+            listOf("Measured destination bytes, server-declared length and optional user-supplied digest"),
+            listOf("A locally computed digest without a publisher reference does not establish authenticity"),
+            "Manual: verify a direct file with correct and deliberately incorrect SHA-256 values"
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,

@@ -18,6 +18,8 @@ import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.GameSessionRecord
 import com.adshield.pro.domain.model.GamingProfile
 import com.adshield.pro.domain.model.ProtectionMode
+import com.adshield.pro.domain.model.SearchHistoryEntry
+import com.adshield.pro.domain.model.SearchProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -49,6 +51,12 @@ data class AppSettingsState(
     val browserBlockThirdPartyCookies: Boolean = true,
     val browserJavaScriptEnabled: Boolean = true,
     val customCosmeticSelectors: Set<String> = emptySet(),
+    val searchProvider: SearchProvider = SearchProvider.DUCKDUCKGO,
+    val privateBrowsingEnabled: Boolean = false,
+    val searchHistoryEnabled: Boolean = true,
+    val searchSuggestionsEnabled: Boolean = false,
+    val automaticSearchHistoryDeletion: Boolean = false,
+    val searchHistory: List<SearchHistoryEntry> = emptyList(),
     // --- Phone Optimizer & AI Smart Boost Settings ---
     val smartAutoOptimizeEnabled: Boolean = true,
     val autoJunkCleanIntervalHours: Int = 24,
@@ -103,6 +111,12 @@ class UserPreferencesRepository @Inject constructor(
         val BROWSER_BLOCK_3P_COOKIES = booleanPreferencesKey("browser_block_3p_cookies")
         val BROWSER_JS_ENABLED = booleanPreferencesKey("browser_js_enabled")
         val CUSTOM_COSMETIC_SELECTORS = stringSetPreferencesKey("custom_cosmetic_selectors")
+        val SEARCH_PROVIDER = stringPreferencesKey("private_search_provider")
+        val PRIVATE_BROWSING = booleanPreferencesKey("private_browsing_enabled")
+        val SEARCH_HISTORY = booleanPreferencesKey("search_history_enabled")
+        val SEARCH_SUGGESTIONS = booleanPreferencesKey("search_suggestions_enabled")
+        val AUTO_DELETE_SEARCH_HISTORY = booleanPreferencesKey("automatic_search_history_deletion")
+        val SEARCH_HISTORY_JSON = stringPreferencesKey("search_history_json")
 
         // Optimizer & Smart Boost keys
         val SMART_AUTO_OPTIMIZE = booleanPreferencesKey("smart_auto_optimize_enabled")
@@ -152,6 +166,13 @@ class UserPreferencesRepository @Inject constructor(
             runCatching { json.decodeFromString<List<GameSessionRecord>>(raw) }.getOrDefault(emptyList())
         } ?: emptyList()
 
+        val searchProvider = runCatching {
+            SearchProvider.valueOf(prefs[Keys.SEARCH_PROVIDER] ?: SearchProvider.DUCKDUCKGO.name)
+        }.getOrDefault(SearchProvider.DUCKDUCKGO)
+        val searchHistory = prefs[Keys.SEARCH_HISTORY_JSON]?.let { raw ->
+            runCatching { json.decodeFromString<List<SearchHistoryEntry>>(raw) }.getOrDefault(emptyList())
+        } ?: emptyList()
+
         AppSettingsState(
             vpnShouldRemainActive = prefs[Keys.VPN_ACTIVE] ?: false,
             autoStartOnBoot = prefs[Keys.AUTO_START_BOOT] ?: true,
@@ -178,6 +199,12 @@ class UserPreferencesRepository @Inject constructor(
             browserBlockThirdPartyCookies = prefs[Keys.BROWSER_BLOCK_3P_COOKIES] ?: true,
             browserJavaScriptEnabled = prefs[Keys.BROWSER_JS_ENABLED] ?: true,
             customCosmeticSelectors = prefs[Keys.CUSTOM_COSMETIC_SELECTORS] ?: emptySet(),
+            searchProvider = searchProvider,
+            privateBrowsingEnabled = prefs[Keys.PRIVATE_BROWSING] ?: false,
+            searchHistoryEnabled = prefs[Keys.SEARCH_HISTORY] ?: true,
+            searchSuggestionsEnabled = prefs[Keys.SEARCH_SUGGESTIONS] ?: false,
+            automaticSearchHistoryDeletion = prefs[Keys.AUTO_DELETE_SEARCH_HISTORY] ?: false,
+            searchHistory = searchHistory,
             smartAutoOptimizeEnabled = prefs[Keys.SMART_AUTO_OPTIMIZE] ?: true,
             autoJunkCleanIntervalHours = prefs[Keys.AUTO_JUNK_CLEAN_HOURS] ?: 24,
             excludedJunkPaths = prefs[Keys.EXCLUDED_JUNK_PATHS] ?: emptySet(),
@@ -290,6 +317,42 @@ class UserPreferencesRepository @Inject constructor(
             current.remove(selector)
             prefs[Keys.CUSTOM_COSMETIC_SELECTORS] = current
         }
+    }
+
+    // --- Private search controls ---
+
+    suspend fun updatePrivateSearchOptions(
+        provider: SearchProvider,
+        privateMode: Boolean,
+        historyEnabled: Boolean,
+        suggestionsEnabled: Boolean,
+        automaticDeletion: Boolean
+    ) {
+        context.adShieldDataStore.edit { prefs ->
+            prefs[Keys.SEARCH_PROVIDER] = provider.name
+            prefs[Keys.PRIVATE_BROWSING] = privateMode
+            prefs[Keys.SEARCH_HISTORY] = historyEnabled
+            prefs[Keys.SEARCH_SUGGESTIONS] = suggestionsEnabled
+            prefs[Keys.AUTO_DELETE_SEARCH_HISTORY] = automaticDeletion
+        }
+    }
+
+    suspend fun recordSearch(entry: SearchHistoryEntry) {
+        val snapshot = getSettingsSnapshot()
+        if (!snapshot.searchHistoryEnabled || snapshot.privateBrowsingEnabled) return
+        context.adShieldDataStore.edit { prefs ->
+            val existing = prefs[Keys.SEARCH_HISTORY_JSON]?.let { raw ->
+                runCatching { json.decodeFromString<List<SearchHistoryEntry>>(raw) }.getOrDefault(emptyList())
+            } ?: emptyList()
+            val updated = (listOf(entry) + existing.filterNot {
+                it.query.equals(entry.query, ignoreCase = true) && it.provider == entry.provider
+            }).take(50)
+            prefs[Keys.SEARCH_HISTORY_JSON] = json.encodeToString(updated)
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.adShieldDataStore.edit { it[Keys.SEARCH_HISTORY_JSON] = "[]" }
     }
 
     // --- Optimizer Persistence Methods ---

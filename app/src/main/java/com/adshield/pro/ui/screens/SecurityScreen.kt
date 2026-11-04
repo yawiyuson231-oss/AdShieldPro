@@ -1,5 +1,6 @@
 package com.adshield.pro.ui.screens
 
+import android.content.Intent
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.engine.aether.SecurityReportExplainer
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.ScanKind
 import com.adshield.pro.engine.security.SecurityLevel
@@ -88,7 +91,9 @@ fun SecurityScreen(
     scanHistory: List<SecurityScanRecord>,
     onScanUrl: (String) -> Unit,
     onScanUri: (android.net.Uri, String) -> Unit,
-    onAuditApps: () -> Unit
+    onAuditApps: () -> Unit,
+    onDeleteScannedDocument: (SecurityScanRecord) -> Unit,
+    onClearHistory: () -> Unit
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -115,9 +120,9 @@ fun SecurityScreen(
         when (selectedSubTab) {
             0 -> ProtectionPostureTab(posture, vpnState, malwareBlocks, onAuditApps)
             1 -> AppAuditTab(appAudits, isAuditingApps, onAuditApps)
-            2 -> FileScanTab(fileScanResult, isScanning, onScanUri)
+            2 -> FileScanTab(fileScanResult, isScanning, onScanUri, onDeleteScannedDocument)
             3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl)
-            else -> HistoryTab(scanHistory)
+            else -> HistoryTab(scanHistory, onClearHistory)
         }
     }
 }
@@ -401,7 +406,8 @@ private fun AppAuditCard(audit: AppRiskAuditor.AppRiskAudit) {
 private fun FileScanTab(
     result: SecurityScanRecord?,
     isScanning: Boolean,
-    onScanUri: (android.net.Uri, String) -> Unit
+    onScanUri: (android.net.Uri, String) -> Unit,
+    onDeleteScannedDocument: (SecurityScanRecord) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -409,6 +415,14 @@ private fun FileScanTab(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }.recoverCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
             val name = queryDisplayName(context, uri) ?: "selected_file"
             onScanUri(uri, name)
         }
@@ -462,7 +476,7 @@ private fun FileScanTab(
         }
 
         result?.let { record ->
-            item { ScanResultCard(record) }
+            item { ScanResultCard(record, onDeleteScannedDocument) }
         }
     }
 }
@@ -585,7 +599,11 @@ private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolea
 }
 
 @Composable
-private fun ScanResultCard(record: SecurityScanRecord) {
+private fun ScanResultCard(
+    record: SecurityScanRecord,
+    onDeleteScannedDocument: (SecurityScanRecord) -> Unit
+) {
+    var showDeleteConfirmation by remember(record.id) { mutableStateOf(false) }
     val (tint, label) = when (record.threatLevel) {
         SecurityLevel.DANGEROUS -> com.adshield.pro.ui.theme.AlertRed to "THREAT DETECTED"
         SecurityLevel.SUSPICIOUS -> com.adshield.pro.ui.theme.WarningAmber to "SUSPICIOUS"
@@ -631,18 +649,36 @@ private fun ScanResultCard(record: SecurityScanRecord) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (record.kind == ScanKind.FILE && record.threatLevel != SecurityLevel.CLEAN) {
+            if (record.kind == ScanKind.FILE && record.sourceUri != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = { /* deletion handled from Deep Cleaner */ }) {
-                    Text("Tip: delete it from Optimizer → Junk Cleaner")
+                TextButton(onClick = { showDeleteConfirmation = true }) {
+                    Text("Delete source document…")
                 }
             }
         }
     }
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = { Text("Delete ${record.target}?") },
+            text = {
+                Text("AdShield will ask the storage provider to permanently delete this user-selected document. This cannot be undone by AdShield. The provider may not support deletion.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmation = false
+                    onDeleteScannedDocument(record)
+                }) { Text("Delete permanently", color = com.adshield.pro.ui.theme.AlertRed) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun HistoryTab(history: List<SecurityScanRecord>) {
+private fun HistoryTab(history: List<SecurityScanRecord>, onClearHistory: () -> Unit) {
     if (history.isEmpty()) {
         Column(
             modifier = Modifier
@@ -660,11 +696,37 @@ private fun HistoryTab(history: List<SecurityScanRecord>) {
         }
         return
     }
+    val aiSummary = SecurityReportExplainer.summarize(history)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item(key = "aether-report-summary") {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("AETHER evidence summary", style = MaterialTheme.typography.titleMedium, color = SkyBlueGlow)
+                    Spacer(Modifier.height(6.dp))
+                    Text(aiSummary.headline, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(aiSummary.explanation, style = MaterialTheme.typography.bodyMedium)
+                    aiSummary.recommendedActions.forEach { action ->
+                        Text("• $action", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 5.dp))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Deterministic on-device explanation only. It cannot delete files, install apps, or change security settings.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        item(key = "clear-scan-history") {
+            OutlinedButton(onClick = onClearHistory, modifier = Modifier.fillMaxWidth()) {
+                Text("Clear persisted scan history")
+            }
+        }
         items(history, key = { it.id }, contentType = { "scan-record" }) { record ->
             val tint = when (record.threatLevel) {
                 SecurityLevel.DANGEROUS -> com.adshield.pro.ui.theme.AlertRed

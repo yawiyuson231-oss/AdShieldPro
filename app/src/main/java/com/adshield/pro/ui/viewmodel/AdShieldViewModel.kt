@@ -33,6 +33,8 @@ import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
+import com.adshield.pro.domain.model.SearchHistoryEntry
+import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.domain.model.SmartBoostResult
 import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.StorageMetrics
@@ -40,12 +42,14 @@ import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.data.repository.BatteryIntelligenceRepository
+import com.adshield.pro.data.repository.SecurityScanHistoryStore
 import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnostics
 import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.SearchSuggestionClient
 import com.adshield.pro.engine.platform.DeviceProfiler
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -98,7 +102,9 @@ class AdShieldViewModel @Inject constructor(
     private val optimizerEngine: SystemOptimizerEngine,
     private val securityEngine: SecurityEngine,
     private val batteryRepository: BatteryIntelligenceRepository,
-    private val deviceProfiler: DeviceProfiler
+    private val deviceProfiler: DeviceProfiler,
+    private val scanHistoryStore: SecurityScanHistoryStore,
+    private val searchSuggestionClient: SearchSuggestionClient
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -723,6 +729,52 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun updatePrivateSearchOptions(
+        provider: SearchProvider,
+        privateMode: Boolean,
+        historyEnabled: Boolean,
+        suggestionsEnabled: Boolean,
+        automaticDeletion: Boolean
+    ) {
+        viewModelScope.launch {
+            preferencesRepository.updatePrivateSearchOptions(
+                provider, privateMode, historyEnabled, suggestionsEnabled, automaticDeletion
+            )
+        }
+    }
+
+    fun recordSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            preferencesRepository.recordSearch(
+                SearchHistoryEntry(
+                    query = trimmed.take(500),
+                    provider = settingsState.value.searchProvider,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun clearSearchHistory() {
+        viewModelScope.launch { preferencesRepository.clearSearchHistory() }
+    }
+
+    fun fetchSearchSuggestions(query: String, onResult: (List<String>) -> Unit) {
+        val settings = settingsState.value
+        if (!settings.searchSuggestionsEnabled) {
+            onResult(emptyList())
+            return
+        }
+        viewModelScope.launch {
+            val suggestions = runCatching {
+                searchSuggestionClient.fetch(query, settings.searchProvider)
+            }.getOrDefault(emptyList())
+            onResult(suggestions)
+        }
+    }
+
     fun addCustomCosmeticSelector(selector: String) {
         viewModelScope.launch {
             preferencesRepository.addCustomCosmeticSelector(selector)
@@ -798,8 +850,8 @@ class AdShieldViewModel @Inject constructor(
     private val _isScanningSecurity = MutableStateFlow(false)
     val isScanningSecurity: StateFlow<Boolean> = _isScanningSecurity.asStateFlow()
 
-    private val _securityHistory = MutableStateFlow<List<SecurityScanRecord>>(emptyList())
-    val securityHistory: StateFlow<List<SecurityScanRecord>> = _securityHistory.asStateFlow()
+    val securityHistory: StateFlow<List<SecurityScanRecord>> = scanHistoryStore.history
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun scanUrl(rawUrl: String) {
         val trimmed = rawUrl.trim()
@@ -826,7 +878,7 @@ class AdShieldViewModel @Inject constructor(
                 recommendation = verdict.recommendation,
                 timestampEpochMs = System.currentTimeMillis()
             )
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            scanHistoryStore.record(record)
             _isScanningSecurity.value = false
         }
     }
@@ -836,7 +888,7 @@ class AdShieldViewModel @Inject constructor(
             _isScanningSecurity.value = true
             val record = securityEngine.scanFile(file)
             _fileScanResult.value = record
-            _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+            scanHistoryStore.record(record)
             refreshSecurityPosture()
             _isScanningSecurity.value = false
             showFeedback(scanFeedback(record, record.target))
@@ -848,8 +900,10 @@ class AdShieldViewModel @Inject constructor(
             _isScanningSecurity.value = true
             val record = securityEngine.scanUriContent(uri, displayName)
             if (record != null) {
-                _fileScanResult.value = record
-                _securityHistory.value = (listOf(record) + _securityHistory.value).take(30)
+                val persistedRecord = record.copy(sourceUri = uri.toString())
+                _fileScanResult.value = persistedRecord
+                scanHistoryStore.record(persistedRecord)
+                refreshSecurityPosture()
                 showFeedback(scanFeedback(record, displayName))
             } else {
                 showFeedback("Could not read the selected file for scanning.")
@@ -883,6 +937,37 @@ class AdShieldViewModel @Inject constructor(
             threatSignatures = signatures,
             vpnActive = vpnActive
         )
+    }
+
+    fun deleteScannedDocument(record: SecurityScanRecord) {
+        val source = record.sourceUri
+        if (source == null) {
+            showFeedback("This report has no deletable SAF document. Use the file manager to grant access first.")
+            return
+        }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val rows = appContext.contentResolver.delete(Uri.parse(source), null, null)
+                    if (rows <= 0) error("The storage provider did not delete the document")
+                }
+            }
+            result.fold(
+                onSuccess = {
+                    scanHistoryStore.remove(record.id)
+                    if (_fileScanResult.value?.id == record.id) _fileScanResult.value = null
+                    showFeedback("Deleted the selected document. This action cannot be undone by AdShield.")
+                },
+                onFailure = { showFeedback("Delete failed; the original remains: ${it.message ?: "storage provider error"}") }
+            )
+        }
+    }
+
+    fun clearSecurityHistory() {
+        viewModelScope.launch {
+            scanHistoryStore.clear()
+            showFeedback("Persisted security scan history cleared.")
+        }
     }
 
     private fun scanFeedback(record: SecurityScanRecord, label: String): String = when (record.threatLevel) {

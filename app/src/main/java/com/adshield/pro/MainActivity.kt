@@ -31,6 +31,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Security
@@ -71,6 +74,9 @@ import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.BatteryScreen
 import com.adshield.pro.ui.screens.CapabilitiesScreen
+import com.adshield.pro.ui.screens.CloudStorageScreen
+import com.adshield.pro.ui.screens.DownloaderScreen
+import com.adshield.pro.ui.screens.FileManagerScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
@@ -80,6 +86,9 @@ import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
+import com.adshield.pro.ui.viewmodel.CloudStorageViewModel
+import com.adshield.pro.ui.viewmodel.DownloaderViewModel
+import com.adshield.pro.ui.viewmodel.FileManagerViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
@@ -87,6 +96,9 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     SECURITY("Security", Icons.Default.Security),
+    FILES("Files", Icons.Default.Folder),
+    CLOUD("Cloud", Icons.Default.Cloud),
+    DOWNLOADS("Downloads", Icons.Default.Download),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     BATTERY("Battery", Icons.Default.BatteryChargingFull),
     STATISTICS("Statistics", Icons.Default.Analytics),
@@ -234,6 +246,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
+                MainNavDestination.FILES -> FilesDestination()
+                MainNavDestination.CLOUD -> CloudDestination()
+                MainNavDestination.DOWNLOADS -> DownloadsDestination()
                 MainNavDestination.OPTIMIZER -> OptimizerDestination(viewModel)
                 MainNavDestination.BATTERY -> BatteryDestination(viewModel)
                 MainNavDestination.STATISTICS -> StatisticsDestination(viewModel)
@@ -369,6 +384,10 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onToggleSiteException = viewModel::toggleBrowserSiteException,
         onUpdateBrowserPrivacy = viewModel::updateBrowserPrivacySettings,
         onAddCustomCosmeticSelector = viewModel::addCustomCosmeticSelector,
+        onUpdatePrivateSearch = viewModel::updatePrivateSearchOptions,
+        onRecordSearch = viewModel::recordSearch,
+        onClearSearchHistory = viewModel::clearSearchHistory,
+        onFetchSearchSuggestions = viewModel::fetchSearchSuggestions,
         onShowFeedback = viewModel::showFeedback
     )
 }
@@ -402,7 +421,112 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         scanHistory = securityHistory,
         onScanUrl = viewModel::scanUrl,
         onScanUri = viewModel::scanUri,
-        onAuditApps = viewModel::auditInstalledApps
+        onAuditApps = viewModel::auditInstalledApps,
+        onDeleteScannedDocument = viewModel::deleteScannedDocument,
+        onClearHistory = viewModel::clearSecurityHistory
+    )
+}
+
+@Composable
+private fun CloudDestination(viewModel: CloudStorageViewModel = hiltViewModel()) {
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val capacity by viewModel.capacity.collectAsStateWithLifecycle()
+    val selectedProviderId by viewModel.selectedProviderId.collectAsStateWithLifecycle()
+    val currentPath by viewModel.currentPath.collectAsStateWithLifecycle()
+    val objects by viewModel.objects.collectAsStateWithLifecycle()
+    val query by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val operation by viewModel.operation.collectAsStateWithLifecycle()
+    val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
+    val preview by viewModel.preview.collectAsStateWithLifecycle()
+    CloudStorageScreen(
+        providers = providers,
+        capacity = capacity,
+        selectedProviderId = selectedProviderId,
+        currentPath = currentPath,
+        objects = objects,
+        searchQuery = query,
+        operation = operation,
+        shareLink = shareLink,
+        preview = preview,
+        onSelectProvider = viewModel::selectProvider,
+        onCloseProvider = viewModel::closeProvider,
+        onRegisterProvider = viewModel::registerProvider,
+        onRemoveProvider = viewModel::removeProvider,
+        onCheckProvider = viewModel::checkProvider,
+        onRefresh = viewModel::refresh,
+        onOpenFolder = viewModel::openFolder,
+        onGoToParent = viewModel::goToParent,
+        onGoToPath = viewModel::goToPath,
+        onSearchQuery = viewModel::setSearchQuery,
+        onCreateFolder = viewModel::createFolder,
+        onRename = viewModel::rename,
+        onDelete = viewModel::delete,
+        onUpload = viewModel::upload,
+        onDownload = viewModel::download,
+        onPreview = viewModel::preview,
+        onClearPreview = viewModel::clearPreview,
+        onCreateShare = viewModel::createPublicShare,
+        onClearShare = viewModel::clearShareLink,
+        onClearOperation = viewModel::clearOperationMessage
+    )
+}
+
+@Composable
+private fun FilesDestination(viewModel: FileManagerViewModel = hiltViewModel()) {
+    val listing by viewModel.listing.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
+    val duplicates by viewModel.duplicates.collectAsStateWithLifecycle()
+    FileManagerScreen(
+        listing = listing,
+        busy = busy,
+        message = message,
+        error = error,
+        query = query,
+        scanProgress = scanProgress,
+        duplicates = duplicates,
+        onOpenTree = viewModel::openTree,
+        onRefresh = viewModel::refresh,
+        onOpenFolder = viewModel::openFolder,
+        onBack = viewModel::goBack,
+        onQuery = viewModel::setQuery,
+        onCreateFolder = viewModel::createFolder,
+        onRename = viewModel::rename,
+        onDelete = viewModel::delete,
+        onImport = viewModel::importDocument,
+        onScan = viewModel::scanTree,
+        onFindDuplicates = viewModel::findDuplicates,
+        onClearMessages = viewModel::clearMessages
+    )
+}
+
+@Composable
+private fun DownloadsDestination(viewModel: DownloaderViewModel = hiltViewModel()) {
+    val inspection by viewModel.inspection.collectAsStateWithLifecycle()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val allowMetered by viewModel.allowMetered.collectAsStateWithLifecycle()
+    DownloaderScreen(
+        inspection = inspection,
+        downloads = downloads,
+        busy = busy,
+        message = message,
+        error = error,
+        allowMetered = allowMetered,
+        onInspect = viewModel::inspect,
+        onEnqueue = viewModel::enqueue,
+        onAllowMetered = viewModel::setAllowMetered,
+        onCancel = viewModel::cancel,
+        onDeleteHistory = viewModel::deleteHistory,
+        onVerify = viewModel::verify,
+        onStartUpdates = viewModel::startProgressUpdates,
+        onStopUpdates = viewModel::stopProgressUpdates,
+        onClearMessages = viewModel::clearMessages
     )
 }
 

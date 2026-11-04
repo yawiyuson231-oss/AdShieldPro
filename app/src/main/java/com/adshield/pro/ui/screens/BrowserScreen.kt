@@ -14,6 +14,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -48,11 +51,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,7 +67,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.adshield.pro.data.local.preferences.AppSettingsState
+import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.PrivateSearch
+import kotlinx.coroutines.delay
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
@@ -76,6 +84,10 @@ fun BrowserScreen(
     onToggleSiteException: (String, Boolean) -> Unit,
     onUpdateBrowserPrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onAddCustomCosmeticSelector: (String) -> Unit,
+    onUpdatePrivateSearch: (SearchProvider, Boolean, Boolean, Boolean, Boolean) -> Unit,
+    onRecordSearch: (String) -> Unit,
+    onClearSearchHistory: () -> Unit,
+    onFetchSearchSuggestions: (String, (List<String>) -> Unit) -> Unit,
     onShowFeedback: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -86,6 +98,9 @@ fun BrowserScreen(
     var blockedPopups by remember { mutableLongStateOf(browserContentBlocker.getBlockedPopupCount()) }
     var strippedTrackers by remember { mutableLongStateOf(browserContentBlocker.getStrippedTrackerParamCount()) }
     var showBrowserShieldSheet by remember { mutableStateOf(false) }
+    var searchSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var appliedPrivateMode by remember { mutableStateOf(settings.privateBrowsingEnabled) }
+    val latestSettings = rememberUpdatedState(settings)
 
     val currentHost = remember(currentPageUrl) {
         runCatching { Uri.parse(currentPageUrl).host?.lowercase()?.removePrefix("www.") }.getOrNull() ?: ""
@@ -96,16 +111,46 @@ fun BrowserScreen(
 
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
 
+    val navigate: (String) -> Unit = { rawInput ->
+        runCatching {
+            if (PrivateSearch.isSearchQuery(rawInput)) onRecordSearch(rawInput)
+            val target = PrivateSearch.navigationTarget(rawInput, settings.searchProvider)
+            val sanitized = browserContentBlocker.sanitizeTrackingParameters(target)
+            urlInput = sanitized
+            searchSuggestions = emptyList()
+            webViewRef.value?.loadUrl(sanitized, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+        }.onFailure { onShowFeedback(it.message ?: "Enter a valid search or HTTPS address") }
+    }
+
+    LaunchedEffect(urlInput, settings.searchProvider, settings.searchSuggestionsEnabled) {
+        if (settings.searchSuggestionsEnabled && PrivateSearch.isSearchQuery(urlInput)) {
+            val requested = urlInput
+            delay(350)
+            onFetchSearchSuggestions(requested) { results ->
+                if (urlInput == requested) searchSuggestions = results
+            }
+        } else {
+            searchSuggestions = emptyList()
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             // Tear the WebView down with the composition. Leaving it alive keeps the Activity
             // context, its clients and any running page timers reachable, which is a leak.
             webViewRef.value?.let { webView ->
                 webView.stopLoading()
+                if (latestSettings.value.privateBrowsingEnabled) {
+                    webView.clearHistory()
+                    webView.clearCache(true)
+                    CookieManager.getInstance().removeAllCookies(null)
+                    WebStorage.getInstance().deleteAllData()
+                }
                 (webView.parent as? ViewGroup)?.removeView(webView)
                 webView.destroy()
             }
             webViewRef.value = null
+            if (latestSettings.value.automaticSearchHistoryDeletion) onClearSearchHistory()
         }
     }
 
@@ -142,12 +187,7 @@ fun BrowserScreen(
                         },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
                         keyboardActions = KeyboardActions(
-                            onGo = {
-                                val normalizedUrl = normalizeNavigationInput(urlInput)
-                                val sanitizedUrl = browserContentBlocker.sanitizeTrackingParameters(normalizedUrl)
-                                urlInput = sanitizedUrl
-                                webViewRef.value?.loadUrl(sanitizedUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
-                            }
+                            onGo = { navigate(urlInput) }
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -161,6 +201,33 @@ fun BrowserScreen(
                             imageVector = Icons.Default.Tune,
                             contentDescription = "Browser Shield Controls",
                             tint = EmeraldPrimary
+                        )
+                    }
+                }
+
+                if (searchSuggestions.isNotEmpty()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        searchSuggestions.take(3).forEach { suggestion ->
+                            TextButton(onClick = { navigate(suggestion) }) {
+                                Text(suggestion, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchProvider.entries.forEach { provider ->
+                        FilterChip(
+                            selected = settings.searchProvider == provider,
+                            onClick = {
+                                onUpdatePrivateSearch(
+                                    provider,
+                                    settings.privateBrowsingEnabled,
+                                    settings.searchHistoryEnabled,
+                                    settings.searchSuggestionsEnabled,
+                                    settings.automaticSearchHistoryDeletion
+                                )
+                            },
+                            label = { Text(provider.label) }
                         )
                     }
                 }
@@ -229,8 +296,13 @@ fun BrowserScreen(
                     webViewRef.value = webView
                     webView.settings.apply {
                         javaScriptEnabled = appSettings.browserJavaScriptEnabled
-                        domStorageEnabled = true
+                        domStorageEnabled = !appSettings.privateBrowsingEnabled
                         databaseEnabled = false
+                        cacheMode = if (appSettings.privateBrowsingEnabled) {
+                            android.webkit.WebSettings.LOAD_NO_CACHE
+                        } else {
+                            android.webkit.WebSettings.LOAD_DEFAULT
+                        }
                         setSupportMultipleWindows(true) // Enables WebChromeClient.onCreateWindow pop-up interception
                         javaScriptCanOpenWindowsAutomatically = false
                         mediaPlaybackRequiresUserGesture = true
@@ -239,10 +311,10 @@ fun BrowserScreen(
                     }
 
                     val cookieManager = CookieManager.getInstance()
-                    cookieManager.setAcceptCookie(true)
+                    cookieManager.setAcceptCookie(!appSettings.privateBrowsingEnabled)
                     cookieManager.setAcceptThirdPartyCookies(
                         webView,
-                        !appSettings.browserBlockThirdPartyCookies
+                        !appSettings.privateBrowsingEnabled && !appSettings.browserBlockThirdPartyCookies
                     )
 
                     webView.webViewClient = object : WebViewClient() {
@@ -327,10 +399,25 @@ fun BrowserScreen(
             },
             update = { webView ->
                 webView.settings.javaScriptEnabled = appSettings.browserJavaScriptEnabled
-                CookieManager.getInstance().setAcceptThirdPartyCookies(
+                webView.settings.domStorageEnabled = !appSettings.privateBrowsingEnabled
+                webView.settings.cacheMode = if (appSettings.privateBrowsingEnabled) {
+                    android.webkit.WebSettings.LOAD_NO_CACHE
+                } else {
+                    android.webkit.WebSettings.LOAD_DEFAULT
+                }
+                val cookies = CookieManager.getInstance()
+                cookies.setAcceptCookie(!appSettings.privateBrowsingEnabled)
+                cookies.setAcceptThirdPartyCookies(
                     webView,
-                    !appSettings.browserBlockThirdPartyCookies
+                    !appSettings.privateBrowsingEnabled && !appSettings.browserBlockThirdPartyCookies
                 )
+                if (appliedPrivateMode != appSettings.privateBrowsingEnabled) {
+                    appliedPrivateMode = appSettings.privateBrowsingEnabled
+                    webView.clearHistory()
+                    webView.clearCache(true)
+                    cookies.removeAllCookies(null)
+                    WebStorage.getInstance().deleteAllData()
+                }
             }
         )
     }
@@ -348,11 +435,71 @@ fun BrowserScreen(
                 }
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
                         text = "Built-in WebView protections apply to pages opened inside AdShield Pro Browser. (Note: Non-root Android apps cannot inject cosmetic CSS into external third-party browsers.)",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    BrowserSwitchRow(
+                        title = "Private browsing mode",
+                        subtitle = "No search history, DOM storage, cache or cookies; cleared when leaving. External sites and providers still receive requests.",
+                        checked = settings.privateBrowsingEnabled,
+                        onCheckedChange = {
+                            onUpdatePrivateSearch(
+                                settings.searchProvider, it, settings.searchHistoryEnabled,
+                                settings.searchSuggestionsEnabled, settings.automaticSearchHistoryDeletion
+                            )
+                        }
+                    )
+                    BrowserSwitchRow(
+                        title = "Search suggestions",
+                        subtitle = "Opt in: typed queries are sent to ${settings.searchProvider.label} for suggestions",
+                        checked = settings.searchSuggestionsEnabled,
+                        onCheckedChange = {
+                            onUpdatePrivateSearch(
+                                settings.searchProvider, settings.privateBrowsingEnabled,
+                                settings.searchHistoryEnabled, it, settings.automaticSearchHistoryDeletion
+                            )
+                        }
+                    )
+                    BrowserSwitchRow(
+                        title = "Save search history",
+                        subtitle = "Stores search text locally, not every visited page; private mode overrides this",
+                        checked = settings.searchHistoryEnabled,
+                        onCheckedChange = {
+                            onUpdatePrivateSearch(
+                                settings.searchProvider, settings.privateBrowsingEnabled, it,
+                                settings.searchSuggestionsEnabled, settings.automaticSearchHistoryDeletion
+                            )
+                        }
+                    )
+                    BrowserSwitchRow(
+                        title = "Delete history when leaving Browser",
+                        subtitle = "Automatically clears locally saved searches",
+                        checked = settings.automaticSearchHistoryDeletion,
+                        onCheckedChange = {
+                            onUpdatePrivateSearch(
+                                settings.searchProvider, settings.privateBrowsingEnabled,
+                                settings.searchHistoryEnabled, settings.searchSuggestionsEnabled, it
+                            )
+                        }
+                    )
+                    if (settings.searchHistory.isNotEmpty()) {
+                        Text("Recent local searches", style = MaterialTheme.typography.titleSmall)
+                        settings.searchHistory.take(5).forEach { entry ->
+                            Text("• ${entry.query}", maxLines = 1, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    TextButton(onClick = onClearSearchHistory) { Text("Clear search history") }
+                    Text(
+                        "Privacy boundary: ${settings.searchProvider.label} receives searches and can observe network metadata. Tracking protection and private mode do not make external search anonymous.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = WarningAmber
                     )
 
                     if (currentHost.isNotEmpty()) {
@@ -518,19 +665,5 @@ private fun BrowserSwitchRow(
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-private fun normalizeNavigationInput(raw: String): String {
-    val trimmed = raw.trim()
-    if (trimmed.startsWith("http://", ignoreCase = true) ||
-        trimmed.startsWith("https://", ignoreCase = true)
-    ) {
-        return trimmed
-    }
-    return if (trimmed.contains('.') && !trimmed.contains(' ')) {
-        "https://$trimmed"
-    } else {
-        "https://duckduckgo.com/?q=${Uri.encode(trimmed)}"
     }
 }
