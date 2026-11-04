@@ -56,6 +56,7 @@ import com.adshield.pro.engine.battery.BatteryReading
 import com.adshield.pro.engine.battery.BatteryReadingSource
 import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.battery.BatteryTelemetry
+import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.SkyBlueGlow
@@ -105,6 +106,35 @@ fun BatteryScreen(
                 minutesToEmpty = minutesToEmpty,
                 onDetect = onDetect
             )
+        }
+        val temperature = telemetry.temperatureCelsius.rawValue
+        if (temperature != null && (temperature >= 40f || telemetry.health.name == "OVERHEAT")) {
+            item {
+                val critical = temperature >= 45f || telemetry.health.name == "OVERHEAT"
+                Surface(
+                    color = (if (critical) AlertRed else WarningAmber).copy(alpha = 0.14f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.WarningAmber, null, tint = if (critical) AlertRed else WarningAmber)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                if (critical) "High battery temperature" else "Battery temperature warning",
+                                color = if (critical) AlertRed else WarningAmber,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "%.1f°C measured by Android. %s".format(temperature,
+                                    if (critical) "Stop heavy use or charging and let the device cool safely."
+                                    else "Reduce heavy workload and monitor charging temperature."),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
         item {
             BatteryMetricCard(telemetry = telemetry, healthScore = healthScore)

@@ -63,7 +63,22 @@ jobs:
           exit "$STATUS"
 
       - name: JVM unit tests
-        run: ./gradlew --no-daemon --console=plain --stacktrace :app:testDebugUnitTest
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain :app:testDebugUnitTest > tests.log 2>&1
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E 'FAILED|expected|Assertion|Exception|^e:' tests.log | tail -60 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            {
+              printf 'Android JVM tests failed. Log excerpt:\n\n```text\n'
+              tail -c 55000 tests.log
+              printf '\n```\n'
+            } > test-failure-context.md
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@test-failure-context.md || true
+          fi
+          exit "$STATUS"
 
       - name: Assert complete test contract
         run: |
