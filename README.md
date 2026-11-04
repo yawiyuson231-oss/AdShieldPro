@@ -30,6 +30,30 @@ To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BAS
 `ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
 
 
+## Battery monitor on every platform
+
+Measured battery telemetry — current in mA, watts, and battery-cell vs chip temperature
+reported separately — with opt-in alerts, on Android, Windows, macOS and Linux, plus a
+compiled-and-tested iOS core.
+
+```bash
+npm run battery:once   # one reading as JSON
+npm run battery        # keep monitoring, native notifications
+```
+
+| Platform | Measured current | Cell temperature |
+|---|---|---|
+| Android | yes | yes (chip too, where the vendor allows) |
+| Linux | yes (`current_now`) | if the driver exposes `temp` |
+| macOS | yes (`CurrentAmperage`) | yes |
+| Windows | no public API — reported as unavailable | no |
+| iOS | not available to App Store apps | no |
+
+Nothing is estimated. Where a platform cannot measure a value the app says so, and an
+alert that needs it stays disabled with the reason shown. See
+[`docs/PLATFORMS.md`](docs/PLATFORMS.md) for the full matrix and
+[`docs/BATTERY_TELEMETRY.md`](docs/BATTERY_TELEMETRY.md) for the measurement rules.
+
 ## Chrome extension
 
 The repository also ships a Manifest V3 ad-blocking extension built from the same bundled rule
@@ -42,6 +66,7 @@ produces is inside Chrome's static-rule limit.
 | [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this project deliberately does **not** do, and why |
 | [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) | Data handling |
 | [`docs/BATTERY_TELEMETRY.md`](docs/BATTERY_TELEMETRY.md) | Where every battery reading comes from: mA, watts, cell vs chip temperature, alerts |
+| [`docs/PLATFORMS.md`](docs/PLATFORMS.md) | Android, Windows, macOS, Linux and iOS: what each can measure, and what it cannot |
 | [`docs/TESTING.md`](docs/TESTING.md) | Android test suite |
 | [`docs/BUILD_AND_SIGNING_GUIDE.md`](docs/BUILD_AND_SIGNING_GUIDE.md) | Signing and release builds |
 
@@ -184,6 +209,9 @@ PROJECT/
 │       │       │   └── viewmodel/AdShieldViewModel.kt
 │       │       └── worker/FilterUpdateWorker.kt
 │       └── test/java/com/adshield/pro/AdShieldEngineTestSuite.kt
+├── desktop/                        # Cross-platform battery monitor (no npm dependencies)
+│   └── src/ (core/, adapters/, main.js)
+├── ios/                            # Swift package: battery core for Apple platforms
 ├── extension/src/                  # Manifest V3 sources shipped in the extension ZIP
 ├── assets/                         # Bundled filter feeds + extension icon
 ├── scripts/build-extension.mjs     # Reproducible extension builder
