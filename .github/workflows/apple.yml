@@ -33,8 +33,13 @@ jobs:
         run: swift build -v
 
       - name: Test
+        id: test
         working-directory: ios
-        run: swift test --enable-test-discovery 2>/dev/null || swift test
+        # Tee the output so a failure can be shown in the step summary even when the
+        # Actions log endpoint is unavailable.
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee /tmp/swift-test.log
 
       - name: Summarise the test run
         if: always()
@@ -48,3 +53,13 @@ jobs:
           echo "The library holds the measurement and alert rules; it is compiled and" >> "$GITHUB_STEP_SUMMARY"
           echo "tested here on every change. The app shell that wraps it is added in" >> "$GITHUB_STEP_SUMMARY"
           echo "Xcode and needs an Apple developer account to sign." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f /tmp/swift-test.log ]; then
+            {
+              echo ""
+              echo "#### Test output (last 40 lines)"
+              echo ""
+              echo '```'
+              tail -40 /tmp/swift-test.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

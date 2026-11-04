@@ -98,6 +98,7 @@ final class BatteryMathTests: XCTestCase {
         XCTAssertFalse(bare.contains("0 mA"), bare)
     }
 
+    @MainActor
     func testIOSSnapshotAdmitsWhatUIKitDoesNotExpose() {
         let snapshot = IOSBatteryAdapter.readSnapshot()
         XCTAssertEqual(snapshot.platform, "ios")
