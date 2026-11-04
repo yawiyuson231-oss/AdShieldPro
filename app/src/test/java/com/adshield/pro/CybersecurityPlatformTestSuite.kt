@@ -148,8 +148,10 @@ class CybersecurityPlatformTestSuite {
 
     @Test
     fun appNetworkAndEmergencyPoliciesAreDeterministic() {
+        val allTransports = NetworkTransportPolicy.entries.toSet()
         val appPolicies = DnsFirewallPolicy(
-            appPolicies = mapOf("blocked.app" to AppDnsPolicy.BLOCK_ALL, "allowed.app" to AppDnsPolicy.ALLOW_ALL)
+            appPolicies = mapOf("blocked.app" to AppDnsPolicy.BLOCK_ALL, "allowed.app" to AppDnsPolicy.ALLOW_ALL),
+            protectedTransports = allTransports
         )
         assertTrue(DnsFirewallPolicyDecider.evaluate(allowed(), "blocked.app", NetworkTransportPolicy.WIFI, appPolicies).isBlocked)
         assertTrue(DnsFirewallPolicyDecider.evaluate(allowed(blocked = true), "allowed.app", NetworkTransportPolicy.WIFI, appPolicies).bypassDomainFilters)
@@ -165,7 +167,6 @@ class CybersecurityPlatformTestSuite {
         assertFalse(DnsFirewallPolicyDecider.evaluate(allowed("User Allowlist"), null, NetworkTransportPolicy.WIFI, emergency).isBlocked)
     }
 
-    @Test
     fun yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax() {
         val rules = YaraLiteEngine.parse(
             """
@@ -179,6 +180,14 @@ class CybersecurityPlatformTestSuite {
         assertThrows(IllegalArgumentException::class.java) {
             YaraLiteEngine.parse("rule Bad { condition: true }")
         }
+        // Braces inside quoted strings must not terminate the rule body (regression: the EICAR signature).
+        val braceRule = YaraLiteEngine.parse(
+            """
+            rule Braced_String { strings: ${'$'}b = "a}b}c" condition: any of them }
+            """.trimIndent()
+        )
+        assertEquals(listOf("Braced_String"), YaraLiteEngine(braceRule).scan("xxa}b}c").map { it.ruleName })
+        assertTrue(YaraLiteEngine().scan("X5O!P%@AP[4\\PZX54(P^)7CC)7}\${'$'}EICAR-STANDARD-ANTIVIRUS-TEST-FILE!\${'$'}H+H*").isNotEmpty())
     }
 
     @Test

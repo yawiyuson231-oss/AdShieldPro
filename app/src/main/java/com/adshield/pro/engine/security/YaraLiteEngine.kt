@@ -70,19 +70,28 @@ class YaraLiteEngine(
     companion object {
         private const val MAX_RULE_TEXT = 1_048_576
         private const val MAX_RULES = 128
-        private val RULE_REGEX = Regex("\\brule\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\{(.*?)\\}", RegexOption.DOT_MATCHES_ALL)
+        private val RULE_HEADER_REGEX = Regex("\\brule\\s+([A-Za-z_][A-Za-z0-9_]*)")
         private val QUOTED_REGEX = Regex("\\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*\"((?:\\\\.|[^\"\\\\])*)\"\\s*([^\\r\\n]*)")
         private val HEX_REGEX = Regex("\\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*\\{([^}]*)\\}\\s*([^\\r\\n]*)")
 
         fun parse(ruleText: String): List<Rule> {
             require(ruleText.length <= MAX_RULE_TEXT) { "YARA rule bundle exceeds 1 MiB" }
             val sanitized = ruleText.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
-            val matches = RULE_REGEX.findAll(sanitized).take(MAX_RULES + 1).toList()
-            require(matches.size <= MAX_RULES) { "Too many YARA rules" }
-            require(matches.isNotEmpty()) { "No supported YARA rules found" }
-            return matches.map { match ->
-                val name = match.groupValues[1]
-                val body = match.groupValues[2]
+            val blocks = mutableListOf<Pair<String, String>>()
+            var cursor = 0
+            while (true) {
+                val header = RULE_HEADER_REGEX.find(sanitized, cursor) ?: break
+                val open = sanitized.indexOf('{', header.range.last + 1)
+                if (open < 0) break
+                val close = matchingBrace(sanitized, open)
+                if (close < 0) break
+                blocks += header.groupValues[1] to sanitized.substring(open + 1, close)
+                cursor = close + 1
+                if (blocks.size > MAX_RULES) break
+            }
+            require(blocks.isNotEmpty()) { "No supported YARA rules found" }
+            require(blocks.size <= MAX_RULES) { "Too many YARA rules" }
+            return blocks.map { (name, body) ->
                 val section = Regex("\\bstrings\\s*:(.*?)\\bcondition\\s*:(.*)", RegexOption.DOT_MATCHES_ALL)
                     .find(body) ?: throw IllegalArgumentException("Rule $name requires strings and condition sections")
                 val stringSection = section.groupValues[1]
@@ -96,6 +105,25 @@ class YaraLiteEngine(
                 require(condition != Condition.AT_LEAST || count <= patterns.size) { "Rule $name condition exceeds string count" }
                 Rule(name, patterns, condition, count)
             }
+        }
+
+        private fun matchingBrace(text: String, openIndex: Int): Int {
+            var depth = 0
+            var inString = false
+            var index = openIndex
+            while (index < text.length) {
+                when (val char = text[index]) {
+                    '\\' -> index++
+                    '"' -> inString = !inString
+                    '{' -> if (!inString) depth++
+                    '}' -> if (!inString) {
+                        depth--
+                        if (depth == 0) return index
+                    }
+                }
+                index++
+            }
+            return -1
         }
 
         private fun parseQuoted(match: MatchResult): StringPattern {
