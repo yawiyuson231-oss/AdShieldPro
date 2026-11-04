@@ -168,7 +168,7 @@ class SafFileRepository @Inject constructor(
             val id = pending.removeFirst()
             if (!visited.add(id)) continue
             val listing = runCatching { listBlocking(tree, id) }.getOrElse { continue }
-            listing.files.forEach { file ->
+            listing.forEach { file ->
                 if (file.isDirectory) pending.add(file.documentId)
                 else if (files.size < MAX_SCAN_FILES) files += file else truncated++
             }

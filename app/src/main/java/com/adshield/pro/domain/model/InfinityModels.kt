@@ -149,8 +149,8 @@ data class DirectDownload(
 
 data class InspectedMedia(
     val url: String,
-    finalUrl: String,
-    fileName: String,
-    mimeType: String,
-    sizeBytes: Long?
+    val finalUrl: String,
+    val fileName: String,
+    val mimeType: String,
+    val sizeBytes: Long?
 )

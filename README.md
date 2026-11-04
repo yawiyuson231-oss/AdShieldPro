@@ -60,6 +60,35 @@ npm run stage             # assemble _site/ exactly as the Pages workflow does
 Capabilities are also listed inside the app on the **Capabilities** page, including the rows
 that read *not implemented* — nothing there is aspirational.
 
+## OMNISHIELD X INFINITY native upgrade
+
+The existing Android interface now also includes three integrated workspaces, without replacing the
+original DNS, security, optimizer, battery, statistics, settings, or browser modules:
+
+- **Cloud / Infinity** — authenticated Nextcloud/WebDAV folders, streaming upload/download, preview,
+  rename/delete, Nextcloud public sharing, Android-Keystore-encrypted passwords, and unified capacity
+  calculated only from online providers that return real DAV quota values.
+- **Files** — user-granted SAF trees, import/export through Android providers, preview/share,
+  create/rename/delete, current-folder search, SHA-256 duplicate grouping, and bounded recursive scans
+  with live progress and persistent reports.
+- **Downloads** — direct permitted HTTPS media inspection, MP4/WebM/supported audio downloads through
+  Android DownloadManager, destination selection, system queue/history, cancellation, and integrity
+  checks. Website extraction, DRM bypass, and universal-site support are deliberately not claimed.
+- **Private search and AETHER** — Google/DuckDuckGo provider selection, opt-in suggestions, local
+  history controls and private WebView cleanup in the existing Browser; deterministic AETHER summaries
+  of persisted security evidence in Security → History.
+
+A real open-source Nextcloud Community + PostgreSQL + Caddy baseline is provided in [`infra/`](infra).
+It requires an operator-owned host, domain, credentials, disks, quotas, and backups; merely cloning the
+repository provisions no storage and grants no free capacity. Distributed striping/replication,
+S3/Ceph adapters, and periodic folder scanning are explicitly listed as remaining work.
+
+| Infinity document | Contents |
+| --- | --- |
+| [`docs/INFINITY_ARCHITECTURE.md`](docs/INFINITY_ARCHITECTURE.md) | Component boundaries, server deployment, WebDAV URL, capacity semantics, security and backup requirements |
+| [`docs/INFINITY_VERIFICATION.md`](docs/INFINITY_VERIFICATION.md) | Feature-by-feature implementation/test status, evidence, external requirements and remaining issues |
+| [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
+
 ## App screenshots
 
 <table>
