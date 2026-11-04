@@ -22,3 +22,12 @@ signing.properties
 # Node dependencies and logs
 node_modules/
 npm-debug.log*
+
+package-lock.json
+.DS_Store
+*.log
+.cache/
+coverage/
+
+# Locally assembled deploy tree (scripts/stage-site.mjs)
+_site/

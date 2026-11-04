@@ -31,6 +31,35 @@ replaces that release's APK assets instead of failing or creating a duplicate re
 To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
 `ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
 
+
+## OmniShield X web platform (browser)
+
+The same repository ships the **OmniShield X — AETHER AI Evolution** web platform: a
+local-first DNS security, ad/tracker filtering and threat-intelligence app that runs entirely
+in the browser (no backend, no accounts, no telemetry endpoint). It is static files: open it
+over HTTP and it works offline after the first visit.
+
+```bash
+npm install               # jsdom, used only by the integration tests
+npm test                  # 166 unit + 19 integration tests
+npm run lint              # house lint rules for the shipped runtime code
+npm run verify            # 86 static architecture, claim, artifact and packaging gates
+npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
+npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
+npm run stage             # assemble _site/ exactly as the Pages workflow does
+```
+
+| Document | Contents |
+|---|---|
+| [`docs/WEB_PLATFORM.md`](docs/WEB_PLATFORM.md) | Features, quick start, integration instructions |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map: DNS plumbing, AETHER, Firewall AI, recovery, power governor, extension builder |
+| [`docs/AETHER.md`](docs/AETHER.md) | Signal weights, evidence floors, calibration methodology and measured metrics |
+| [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this platform deliberately does **not** do, and why |
+| [`docs/WEB_TESTING.md`](docs/WEB_TESTING.md) | What the browser suite actually verifies |
+
+Capabilities are also listed inside the app on the **Capabilities** page, including the rows
+that read *not implemented* — nothing there is aspirational.
+
 ## App screenshots
 
 <table>

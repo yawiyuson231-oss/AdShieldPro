@@ -1,0 +1,163 @@
+# OmniShield X — Supplement: AD & TRACKER apex domains
+# Source: hand-curated by this project. NOT an upstream feed.
+# License: GPLv3 (same as the rest of the bundle)
+# [CATEGORY:ADS]
+#
+# WHY THIS FILE EXISTS
+# The bundled HaGeZi "Light" feed is size-optimised: it lists many *subdomains*
+# (ad.ae.doubleclick.net, b.scorecardresearch.com) but not always the apex
+# (doubleclick.net). That leaves apex-level requests unfiltered. This supplement
+# closes that gap with well-known advertising / measurement infrastructure only.
+#
+# SAFETY POLICY
+# Every entry below is an advertising, attribution or measurement network.
+# No entry is a login, payment, CDN, app-store, OS-update, video-delivery or
+# authentication domain. Domains that are known to *carry site functionality*
+# (e.g. tag managers, payment SDKs, Google APIs) are deliberately excluded and
+# live in the optional "aggressive" supplement instead, which ships disabled.
+#
+# Ad serving / ad exchange
+||doubleclick.net^
+||googleadservices.com^
+||googlesyndication.com^
+||2mdn.net^
+||adnxs.com^
+||appnexus.com^
+||rubiconproject.com^
+||pubmatic.com^
+||openx.net^
+||casalemedia.com^
+||adform.net^
+||smartadserver.com^
+||criteo.com^
+||criteo.net^
+||teads.tv^
+||sharethrough.com^
+||taboola.com^
+||outbrain.com^
+||revcontent.com^
+||mgid.com^
+||yieldmo.com^
+||indexww.com^
+||sovrn.com^
+||lijit.com^
+||gumgum.com^
+||amazon-adsystem.com^
+||adsrvr.org^
+||360yield.com^
+||bidswitch.net^
+||tremorhub.com^
+||spotxchange.com^
+||yieldlab.net^
+||adzerk.net^
+||media.net^
+||contextweb.com^
+||conversantmedia.com^
+||triplelift.com^
+||zedo.com^
+||exponential.com^
+||undertone.com^
+||sitescout.com^
+||advertising.com^
+||advertising365.com^
+#
+# Measurement / attribution / audience
+||scorecardresearch.com^
+||quantserve.com^
+||quantcount.com^
+||comscore.com^
+||moatads.com^
+||moatpixel.com^
+||doubleverify.com^
+||adsafeprotected.com^
+||nielsen.com^
+||imrworldwide.com^
+||kantar.com^
+||chartbeat.com^
+||chartbeat.net^
+||parsely.com^
+||newrelic.com^
+||nr-data.net^
+||hotjar.com^
+||hotjar.io^
+||fullstory.com^
+||mouseflow.com^
+||luckyorange.com^
+||inspectlet.com^
+||smartlook.com^
+||crazyegg.com^
+||clarity.ms^
+||mixpanel.com^
+||amplitude.com^
+||segment.io^
+||segment.com^
+||heapanalytics.com^
+||kissmetrics.com^
+||statcounter.com^
+||histats.com^
+#
+# Data brokers / identity graphs
+||bluekai.com^
+||demdex.net^
+||everesttech.net^
+||omtrdc.net^
+||krxd.net^
+||exelator.com^
+||agkn.com^
+||mathtag.com^
+||rlcdn.com^
+||tapad.com^
+||zeotap.com^
+||liveramp.com^
+||adsymptotic.com^
+||adroll.com^
+||bidr.io^
+||crwdcntrl.net^
+||narrative.io^
+||id5-sync.com^
+||liadm.com^
+||pippio.com^
+||aaxads.com^
+#
+# Mobile / in-app advertising SDK endpoints
+||applovin.com^
+||applvn.com^
+||unityads.unity3d.com^
+||vungle.com^
+||chartboost.com^
+||ironsrc.com^
+||supersonicads.com^
+||inmobi.com^
+||adcolony.com^
+||startapp.com^
+||tapjoy.com^
+||fyber.com^
+||smaato.net^
+||mopub.com^
+||adsmoloco.com^
+||moloco.com^
+||mintegral.com^
+||pangle.io^
+||pangleglobal.com^
+||appnext.com^
+||liftoff.io^
+||digitalturbine.com^
+||kochava.com^
+||adjust.com^
+||appsflyer.com^
+||branch.io^
+||singular.net^
+||tenjin.io^
+#
+# Tracking pixels / analytics endpoints commonly seen in page loads
+||google-analytics.com^
+||analytics.google.com^
+||clicky.com^
+||go-mpulse.net^
+||mpulse.net^
+||bounceexchange.com^
+||bouncex.net^
+||optimizely.com^
+||vwo.com^
+||abtasty.com^
+||dynamicyield.com^

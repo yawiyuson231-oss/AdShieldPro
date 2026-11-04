@@ -1,0 +1,29 @@
+# OmniShield X — OPTIONAL "aggressive" supplement (SHIPS DISABLED BY DEFAULT)
+# License: GPLv3
+# [CATEGORY:ADS]
+#
+# READ THIS FIRST
+# These domains are tracking infrastructure, but they are also load-bearing for
+# some websites and apps. Blocking them can break page rendering, checkout flows,
+# SSO or in-app scripts. That is exactly why OmniShield X does NOT enable this
+# file by default: the platform must never trade working functionality for a
+# bigger block counter.
+#
+# Enable it only if you accept breakage, and expect to use the per-domain
+# "Allow" button when a site fails. Every block from this tier is labelled
+# "AGGRESSIVE" in the UI so you always know why a page broke.
+||googletagmanager.com^
+||googletagservices.com^
+||google-analytics.com^
+||facebook.net^
+||connect.facebook.net^
+||static.ads-twitter.com^
+||analytics.tiktok.com^
+||sc-static.net^
+||snap.licdn.com^
+||bat.bing.com^
+||clarity.ms^
+||segment.com^
+||cdn.segment.com^
+||js.hs-scripts.com^
+||js.hs-analytics.net^
