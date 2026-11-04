@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
@@ -97,6 +96,7 @@ import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.theme.ElectricBlue
+import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -143,7 +143,7 @@ fun HomeScreen(
 
     val shieldColor by animateColorAsState(
         targetValue = when (vpnState.status) {
-            VpnStatus.CONNECTED -> ElectricBlue
+            VpnStatus.CONNECTED -> EmeraldPrimary
             VpnStatus.PAUSED -> WarningAmber
             VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
             VpnStatus.ERROR -> AlertRed
@@ -218,58 +218,6 @@ fun HomeScreen(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // --- OMNISHIELD X AETHER Control Center (Part 12) — real measured metrics only ---
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = ElectricBlue)
-                    Spacer(Modifier.width(8.dp))
-                    Text("AETHER Control Center", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    Text(
-                        if (aetherReport.safeModeActive) "SAFE MODE" else "ONLINE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (aetherReport.safeModeActive) WarningAmber else CyberCyan
-                    )
-                }
-                Text(
-                    "${aetherReport.agentsOnline}/${aetherReport.totalAgents} agents active • ${aetherReport.dnsObserved} DNS queries analyzed",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    "Blocked: ${aetherReport.blockedConfirmed} • Anomalies observed: ${aetherReport.anomaliesObserved} • Rebinding stopped: ${aetherReport.rebindingBlocked}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    "Verification overrides: ${aetherReport.verificationOverrides} • Auto-recoveries: ${aetherReport.autoRecoveries}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (aetherReport.possibleFalsePositives.isNotEmpty()) {
-                    Text("AETHER self-audit — possible over-blocking (review, one tap to allow on Live tab):", style = MaterialTheme.typography.labelMedium)
-                    aetherReport.possibleFalsePositives.forEach { entry ->
-                        Text("• $entry", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                if (aetherReport.bestResolverLabel != null) {
-                    Text(
-                        "Best resolver: ${aetherReport.bestResolverLabel} (${aetherReport.bestResolverLatencyMs}ms avg)",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                if (aetherReport.topObservedDomains.isNotEmpty()) {
-                    Text(
-                        "Top blocked: " + aetherReport.topObservedDomains.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Text(
-                    "Heuristic evidence engine — decisions are auditable, never simulated.",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-        }
-
         // Top Header Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -336,6 +284,15 @@ fun HomeScreen(
                 }
             }
         }
+
+        AetherCommandDeck(
+            vpnState = vpnState,
+            settings = settings,
+            allTimeTotal = allTimeTotal,
+            allTimeBlocked = allTimeBlocked,
+            allTimeAllowed = allTimeAllowed,
+            aetherReport = aetherReport
+        )
 
         // Main Hero Shield & One-Tap Switch Card
         Card(
