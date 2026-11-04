@@ -11,9 +11,6 @@ Daemon will be stopped at the end of the build
 > Task :app:kspDebugKotlin
 
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/optimizer/BatteryTelemetry.kt:187:43 Unresolved reference 'Intent'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/optimizer/BatteryTelemetry.kt:189:21 Unresolved reference 'hasExtra' on receiver of type 'Any'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/optimizer/BatteryTelemetry.kt:190:29 Unresolved reference 'getIntExtra' on receiver of type 'Any'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/service/BatteryTelemetryService.kt:92:31 Unresolved reference 'ACTION_STOP'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/service/BatteryTelemetryService.kt:141:80 Unresolved reference 'ACTION_STOP'.
 
@@ -28,8 +25,8 @@ Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.a
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
    > Kotlin compiler: UNRESOLVED_REFERENCE
        Kotlin compiler error
-         Unresolved reference 'Intent'.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/optimizer/BatteryTelemetry.kt line 187
+         Unresolved reference 'ACTION_STOP'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/service/BatteryTelemetryService.kt line 92
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -190,7 +187,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'Intent'.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'ACTION_STOP'.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -227,5 +224,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolv
 	... 2 more
 
 
-BUILD FAILED in 43s
+BUILD FAILED in 48s
 8 actionable tasks: 7 executed, 1 from cache
