@@ -41,6 +41,7 @@ produces is inside Chrome's static-rule limit.
 | [`docs/EXTENSION.md`](docs/EXTENSION.md) | How the extension is built, loaded and verified |
 | [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this project deliberately does **not** do, and why |
 | [`docs/PRIVACY_POLICY.md`](docs/PRIVACY_POLICY.md) | Data handling |
+| [`docs/BATTERY_TELEMETRY.md`](docs/BATTERY_TELEMETRY.md) | Where every battery reading comes from: mA, watts, cell vs chip temperature, alerts |
 | [`docs/TESTING.md`](docs/TESTING.md) | Android test suite |
 | [`docs/BUILD_AND_SIGNING_GUIDE.md`](docs/BUILD_AND_SIGNING_GUIDE.md) | Signing and release builds |
 

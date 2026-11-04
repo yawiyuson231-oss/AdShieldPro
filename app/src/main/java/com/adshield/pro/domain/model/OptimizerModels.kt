@@ -208,6 +208,26 @@ enum class BatteryMode(
     )
 }
 
+/**
+ * A raw numeric reading together with where it came from.
+ *
+ * Battery telemetry lies in interesting ways: `EXTRA_TEMPERATURE` is the *battery*
+ * cell, not the SoC; the current may come from a charger-side, system-side or
+ * averaged ADC depending on the OEM; and a missing extra comes back as the
+ * platform default instead of null. Carrying the source next to the value is the
+ * only way the UI can be accurate about what it is showing.
+ */
+enum class MeasurementSource {
+    /** A real sensor or battery extra reported by the platform. */
+    MEASURED,
+
+    /** Derived from measured values (e.g. watts = volts x amps). */
+    DERIVED,
+
+    /** The platform did not report it; the value is a neutral placeholder. */
+    UNAVAILABLE
+}
+
 data class BatteryThermalSnapshot(
     val batteryPercent: Int,
     val temperatureCelsius: Float,
@@ -220,8 +240,37 @@ data class BatteryThermalSnapshot(
     val isLowBattery: Boolean,
     val adShieldBatteryImpactSummary: String,
     val recommendations: List<String>,
-    val timestampEpochMs: Long = System.currentTimeMillis()
-)
+    val timestampEpochMs: Long = System.currentTimeMillis(),
+    /** Signed current in mA: negative = discharging, positive = charging. */
+    val currentMilliAmps: Int = 0,
+    val currentSource: MeasurementSource = MeasurementSource.UNAVAILABLE,
+    /** Battery cell temperature in °C, straight from EXTRA_TEMPERATURE. */
+    val batteryTemperatureSource: MeasurementSource = MeasurementSource.UNAVAILABLE,
+    /** Device thermal-zone temperature in °C, null when the platform will not expose one. */
+    val socTemperatureCelsius: Float? = null,
+    /** Display-worthy name of the sensor behind [socTemperatureCelsius]. */
+    val socTemperatureSourceLabel: String = "Unavailable on this device",
+    /** Instantaneous power in mW. Negative = discharging, positive = charging. */
+    val powerMilliWatts: Int? = null,
+    /** Remaining charge capacity in mAh, when the platform exposes charge counters. */
+    val chargeCounterMilliAmpHours: Long? = null,
+    /** Estimated remaining energy in mWh. */
+    val energyMilliWattHours: Long? = null,
+    /** Short honest line describing how AdShield itself is affecting the battery. */
+    val measuredDrawLabel: String = "Current not reported by this device"
+) {
+    /** Temperature used for decisions: the cell, or the SoC when the cell is unavailable. */
+    val effectiveTemperatureCelsius: Float
+        get() = if (batteryTemperatureSource == MeasurementSource.MEASURED) {
+            temperatureCelsius
+        } else {
+            socTemperatureCelsius ?: temperatureCelsius
+        }
+
+    /** Charging state from the current sign when available, else from the status extra. */
+    val isEffectivelyCharging: Boolean
+        get() = if (currentSource == MeasurementSource.MEASURED) currentMilliAmps > 0 else isCharging
+}
 
 data class PerformanceBottleneck(
     val title: String,

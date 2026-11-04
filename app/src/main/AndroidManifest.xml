@@ -72,6 +72,16 @@
                 android:value="local_dns_ad_and_tracker_filtering_vpn" />
         </service>
 
+        <!-- Battery monitor notification (runs only while the Optimizer screen is open) -->
+        <service
+            android:name=".service.BatteryTelemetryService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="battery_telemetry_readout" />
+        </service>
+
         <!-- Boot Receiver for restoring VPN protection after device restart -->
         <receiver
             android:name=".service.BootCompletedReceiver"

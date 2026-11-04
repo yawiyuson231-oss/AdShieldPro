@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.domain.model.BatteryThermalSnapshot
+import com.adshield.pro.domain.model.MeasurementSource
 import com.adshield.pro.domain.model.DeviceHealthAssessment
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RamSnapshot
@@ -605,7 +606,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "RAM: ${String.format(Locale.US, "%.0f%%", ramSnapshot.usagePercent)} • Free Storage: ${RuleBasedOptimizationPredictor.formatBytes(storageMetrics.availableBytes)} • ${String.format(Locale.US, "%.1f°C", batterySnapshot.temperatureCelsius)}",
+                                text = "RAM: ${String.format(Locale.US, "%.0f%%", ramSnapshot.usagePercent)} • Free Storage: ${RuleBasedOptimizationPredictor.formatBytes(storageMetrics.availableBytes)} • ${if (batterySnapshot.currentSource == MeasurementSource.MEASURED) String.format(Locale.US, "%+d mA", batterySnapshot.currentMilliAmps) else "current n/a"} • ${String.format(Locale.US, "%.1f°C", batterySnapshot.effectiveTemperatureCelsius)}",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

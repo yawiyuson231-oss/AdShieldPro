@@ -49,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.service.BatteryTelemetryService
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.HomeScreen
@@ -266,6 +267,18 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // The live battery monitor is a readout, not a background poller: it runs
+            // only while the Optimizer screen is visible, and stops when the user
+            // navigates away so it cannot cost battery for a notification nobody reads.
+            val context = LocalContext.current
+            LaunchedEffect(currentTab) {
+                if (currentTab == MainNavDestination.OPTIMIZER) {
+                    BatteryTelemetryService.start(context)
+                } else {
+                    BatteryTelemetryService.stop(context)
+                }
+            }
+
             when (currentTab) {
                 MainNavDestination.HOME -> HomeScreen(
                     vpnState = vpnState,
@@ -350,7 +363,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleFavoriteGame = viewModel::toggleFavoriteGame,
                     onUpdateGamingSettings = viewModel::updateGamingBoosterSettings,
                     onTriggerGameBoost = viewModel::triggerGameBoost,
-                    onSelectBatteryMode = viewModel::selectAndApplyBatteryMode
+                    onSelectBatteryMode = viewModel::selectAndApplyBatteryMode,
+                    onUpdateBatteryNotifications = viewModel::updateBatteryNotificationSettings,
+                    onSendBatteryTestNotification = viewModel::sendBatteryTestNotification
                 )
 
                 MainNavDestination.STATISTICS -> ActivityScreen(
