@@ -174,6 +174,34 @@ test('navigation state is exposed to assistive technology, not just CSS', () => 
   assert.equal($('#toasts').getAttribute('aria-live'), 'polite');
 });
 
+test('power governor is honest about support and only changes repaint cadence', () => {
+  assert.ok(app.state.power, 'a governor must exist after boot');
+  const info = app.state.powerInfo;
+  assert.equal(info.supported, false, 'jsdom exposes no Battery Status API');
+  assert.match(info.summary, /unavailable/i, 'missing support must be stated, not glossed over');
+  assert.equal(info.factor, 1);
+
+  const before = app.state.aether.analyze('ads.doubleclick.net');
+  const slow = app.state.power.observe({ level: 0.05, charging: false });
+  assert.equal(slow.factor, 4);
+  assert.equal(app.startMonitorLoop(), app.state.settings.monitorRefreshMs * 4,
+    'a low battery must slow the repaint timer');
+
+  const after = app.state.aether.analyze('ads.doubleclick.net');
+  assert.equal(after.verdict, before.verdict, 'power state must never change a verdict');
+  assert.equal(after.score, before.score, 'power state must never change a score');
+
+  const normal = app.state.power.observe({ level: 1, charging: true });
+  assert.equal(normal.factor, 1);
+  assert.equal(app.startMonitorLoop(), app.state.settings.monitorRefreshMs);
+
+  app.navigate('dashboard');
+  const resources = text('#dash-resources');
+  assert.match(resources, /CPU, memory & battery/);
+  assert.match(resources, /while a live view is open/);
+  assert.match(resources, /estimate/i, 'memory figures must be labelled as estimates');
+});
+
 test('AETHER blocks a feed-listed ad domain and explains why', () => {
   app.navigate('aether');
   $('#aether-input').value = 'ads.doubleclick.net';

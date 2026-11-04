@@ -56,6 +56,9 @@ under **Capabilities**.
 - `localStorage` quota (typically 5 MB) bounds how many snapshots and how much model state
   can be kept; the app prunes and reports failures instead of pretending a save succeeded.
 - No background feed refresh while the tab is closed.
+- Battery-aware throttling depends on the Battery Status API, which Safari does not expose.
+  Where it is missing the app keeps the default repaint cadence and says so on the dashboard;
+  it never reports an optimisation it cannot perform.
 - Nothing here is a substitute for a maintained antivirus, EDR, or enterprise DNS gateway.
 
 ## 6. Claims policy

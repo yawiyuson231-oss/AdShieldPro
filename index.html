@@ -191,6 +191,9 @@
   }
   .toast.ok { border-left-color: var(--ok); } .toast.warn { border-left-color: var(--amber); } .toast.bad { border-left-color: var(--red); }
   @keyframes slide-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
 
   .progress { height: 6px; border-radius: 999px; background: #16294a; overflow: hidden; }
   .progress > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width .25s; }
@@ -238,6 +241,7 @@
       <div class="card" id="dash-protection"></div>
       <div class="card" id="dash-activity"></div>
     </div>
+    <div class="card" id="dash-resources"></div>
     <div class="card" id="dash-integrity"></div>
   </section>
 

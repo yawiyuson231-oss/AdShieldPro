@@ -19,6 +19,7 @@ import { FirewallAI, DEFAULT_CONFIG as FW_CONFIG } from './security/firewall-ai.
 import { FeedManager, FEED_REGISTRY } from './security/feedmanager.js';
 import { BackupManager, SCHEMA_VERSION } from './security/backup.js';
 import { PrivateAnalytics } from './security/privacy.js';
+import { PowerGovernor } from './security/power.js';
 import { createStorage } from './security/storage.js';
 import * as ui from './ui/dom.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
@@ -40,6 +41,8 @@ const state = {
   backups: null,
   analytics: null,
   settings: { aggressiveTier: false, autoUpdateFeeds: true, monitorRefreshMs: 1000 },
+  power: null,
+  powerInfo: null,
   customRules: [],
   importedBackup: null,
   booted: false,
@@ -101,7 +104,9 @@ async function boot() {
     // Train the lexical model after first paint so the UI never blocks.
     setTimeout(() => { ensureModel().catch((err) => { state.trainingError = err.message; }); }, 300);
     registerServiceWorker();
+    startPowerGovernor();
     startMonitorLoop();
+    startPowerGovernor();
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
@@ -390,6 +395,19 @@ function renderDashboard() {
       ['False positives reported', number(state.aether.stats.falsePositivesReported)],
       ['Model training', clf.isTrained ? `${clf.metrics.trainMs} ms on ${number(clf.metrics.trainSize)} samples · holdout ${number(clf.metrics.holdoutSize)}` : (state.training ? 'running…' : 'not yet trained')]
     ])
+  );
+
+  const power = state.powerInfo || state.power?.describe() || null;
+  mount('#dash-resources',
+    h('h2', { text: 'CPU, memory & battery' }),
+    kv([
+      ['Repaint cadence', `${state.monitorIntervalMs || state.settings.monitorRefreshMs} ms while a live view is open · 0 ms when the tab is hidden`],
+      ['Power state', power ? power.summary : 'starting…'],
+      ['Throttle', power && power.factor > 1 ? `${power.factor}x (band: ${power.band})` : 'none — default cadence'],
+      ['Rule set memory', `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round((estimateRuleMemory(breakdown.total) / breakdown.total))} bytes per rule)`],
+      ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background']
+    ]),
+    h('p', { class: 'small muted', style: { marginTop: '8px' }, text: 'The monitor loop is the only recurring timer in this app. It is skipped entirely in a hidden tab and slowed on low battery when the browser exposes battery state. Nothing here affects what is filtered.' })
   );
 
   const categories = breakdown.categories || {};
@@ -931,12 +949,48 @@ function renderMonitor() {
   );
 }
 
+/**
+ * Rough in-memory cost of the loaded rules. Measured from the engine's own
+ * counts, with a conservative per-rule allowance for the stored pattern string
+ * plus the Set/Map slot — labelled as an estimate everywhere it is shown.
+ */
+function estimateRuleMemory(totalRules) {
+  return Math.round((Number(totalRules) || 0) * 120);
+}
+
 function startMonitorLoop() {
+  clearInterval(state.monitorTimer);
+  const interval = state.power
+    ? state.power.intervalFor(state.settings.monitorRefreshMs)
+    : state.settings.monitorRefreshMs;
+  state.monitorIntervalMs = interval;
   state.monitorTimer = setInterval(() => {
+    // Background tabs do no work at all: a hidden tab cannot show a live view.
     if (document.hidden) return;
     if (state.currentPage === 'monitor') renderMonitor();
     if (state.currentPage === 'dashboard') renderDashboard();
-  }, state.settings.monitorRefreshMs);
+  }, interval);
+  return interval;
+}
+
+/**
+ * Battery-aware scheduling. The Battery Status API is not available in every
+ * browser (and is deliberately absent in Safari); when it is missing the app
+ * keeps the default cadence and says so instead of pretending to optimise.
+ */
+async function startPowerGovernor() {
+  state.power = new PowerGovernor({
+    onChange: (info) => {
+      state.powerInfo = info;
+      startMonitorLoop();
+      if (state.currentPage === 'dashboard') renderDashboard();
+      if (state.currentPage === 'status') renderStatus();
+      toast(`Repaint cadence changed: ${info.summary}`, 'info');
+    }
+  });
+  state.powerInfo = await state.power.start();
+  startMonitorLoop();
+  if (state.currentPage === 'dashboard') renderDashboard();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1224,6 +1278,8 @@ const CAPABILITIES = [
   ['Config backup, migration, auto-recovery', 'works', 'infrastructure.test.mjs — backup manager'],
   ['Offline operation (bundled rules + service worker)', 'works', 'sw.js caches the shell and bundled lists'],
   ['Privacy analytics with k-anonymity', 'works', 'infrastructure.test.mjs — privacy'],
+  ['Battery/CPU-aware repaint scheduling', 'works', 'power.test.mjs — bands, clamping, honest unsupported path'],
+  ['Battery Status API in every browser', 'partial', 'Chrome/Edge expose it; Safari does not. Falls back to the default cadence and says so'],
   ['Passive capture of other apps\' traffic', 'not-implemented', 'Requires OS-level VPN (Android core); browsers cannot do this'],
   ['Antivirus / file scanning', 'not-implemented', 'This is DNS filtering, not an antivirus. Never claimed.'],
   ['Universal ad blocking (all apps, all browsers)', 'not-implemented', 'No technology can guarantee that; see capabilities notes'],
@@ -1244,7 +1300,7 @@ function renderStatus() {
     h('h2', { text: 'Explicit limitations of this deployment' }),
     h('ul', { style: { paddingLeft: '20px', display: 'grid', gap: '6px' } },
       h('li', { text: 'This is a browser application: it cannot install a VPN, capture other apps\' DNS, or block traffic outside this page. The Android core does that.' }),
-      h('li', { text: 'AETHER\'s lexical score is a weak signal by measurement (AUC ≈ 0.88), weighted 7/100. It can raise a flag; it cannot block.' }),
+      h('li', { text: 'AETHER\'s lexical score is a weak signal by measurement (AUC ≈ 0.86), weighted 7/100, and its precision at a 1% base rate is ≈ 0.06. It can raise a flag; it cannot block.' }),
       h('li', { text: 'The classifier is trained on the bundled feeds plus a curated legitimate-domain list. Unfamiliar legitimate domains can be flagged as "ad-like" — the popularity guardrail and low weight limit the impact.' }),
       h('li', { text: 'DNSSEC trust is delegated to the upstream resolver\'s AD bit. OmniShield X does not verify signatures locally.' }),
       h('li', { text: 'Public suffix handling covers common multi-label ccTLD suffixes, not the full Public Suffix List.' }),
@@ -1410,5 +1466,9 @@ globalThis.__omnishield = {
   checkFeedUpdates,
   saveSnapshot,
   buildState,
-  stop() { clearInterval(state.monitorTimer); }
+  startMonitorLoop,
+  stop() {
+    clearInterval(state.monitorTimer);
+    try { state.power?.stop(); } catch { /* ignore */ }
+  }
 };

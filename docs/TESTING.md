@@ -58,10 +58,15 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 137 unit tests, 15 integration tests — all passing.
+- 143 unit tests, 16 integration tests — all passing.
 - Static verification: 62 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
-- Classifier holdout (measured in `tests/unit/classifier.test.mjs`): AUC ≈ 0.90,
-  precision ≈ 0.99, specificity ≈ 0.92 at the calibrated operating point.
+- Power governor (`tests/unit/power.test.mjs`): band thresholds, interval clamping, subscriber
+  cleanup and the *unsupported* Battery Status API path (must degrade, not pretend).
+- Classifier holdout (measured in `tests/unit/classifier.test.mjs`, three-way split): AUC ≈ 0.86,
+  precision ≈ 0.986, specificity 0.898, recall ≈ 0.663 at threshold 0.96. The 0.9 specificity
+  target is not reached out-of-sample and the UI reports that instead of the target.
+- Base-rate precision (converted from recall/specificity): ≈ 0.06 at a 1% malicious base rate,
+  ≈ 0.42 at 10%. This is why the model is weighted 7/100 and can never block.
 - Engine throughput: > 2,000 evaluations/ms budget; the test asserts < 0.5 ms/op.
 
 ## 5. What the suite does not cover

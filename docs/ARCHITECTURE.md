@@ -127,6 +127,13 @@ never a guess.
   measured latency percentiles. Metrics are derived from recorded events only.
 - `privacy.js` — salted SHA-256 bucket hashes, k-anonymity suppression (k = 10),
   date-bucket retention. No hostname is ever persisted or reported in clear.
+- `power.js` — `PowerGovernor` derives the repaint cadence from the Battery Status API
+  (1x charging/normal, 2x below 25 %, 4x below 10 %, clamped to 250 ms–60 s). It touches
+  only the monitor timer — never a verdict, score or rule. When the API is missing (Safari,
+  jsdom, some WebViews) it reports `supported: false` with the reason and keeps the default
+  cadence. The monitor loop is the app's only `setInterval`; every other timer is a one-shot
+  (model training, snapshot debounce, a single deferred feed check) and the loop does nothing
+  in a hidden tab.
 
 ## 9. Integrity, recovery and updates
 

@@ -42,6 +42,7 @@ const SHELL_ASSETS = [
   './security/feedmanager.js',
   './security/backup.js',
   './security/privacy.js',
+  './security/power.js',
   './security/sha256.js',
   './security/storage.js'
 ];
