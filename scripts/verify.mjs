@@ -151,6 +151,16 @@ export function verify() {
   }
   add('web manifest is valid', manifestOk, manifestDetail);
 
+  /* 9b. Accessibility basics that must not regress. */
+  const htmlA11y = read('index.html');
+  const tabs = [...html.matchAll(/<button[^>]*data-page="([a-z]+)"[^>]*>/g)];
+  add('every tab is a real button element', tabs.length >= 10 && tabs.every((m) => /type="button"/.test(m[0])),
+    `${tabs.length} tabs`);
+  add('the active tab exposes aria-current', tabs.filter((m) => /aria-current="page"/.test(m[0])).length === 1);
+  add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
+  add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
+  add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
+
   /* 10. Package scripts point at real test globs. */
   const pkg = JSON.parse(read('package.json'));
   add('package has test script', !!pkg.scripts?.test, pkg.scripts?.test);

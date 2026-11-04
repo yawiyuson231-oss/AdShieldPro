@@ -333,7 +333,17 @@ function navigate(page) {
   state.currentPage = page;
   for (const section of document.querySelectorAll('.page')) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll('nav.tabs button')) {
-    button.classList.toggle('active', button.dataset.page === page);
+    const active = button.dataset.page === page;
+    button.classList.toggle('active', active);
+    // Screen readers need to know which section is showing; the CSS class alone
+    // conveys nothing to assistive technology.
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  const section = document.getElementById(`page-${page}`);
+  if (section) section.setAttribute('aria-current', 'true');
+  for (const other of document.querySelectorAll('.page')) {
+    if (other !== section) other.removeAttribute('aria-current');
   }
   try { PAGE_RENDERERS[page]?.(); } catch (err) { console.error(err); toast(`Render error on ${page}: ${err.message}`, 'bad'); }
   if (location.hash !== `#${page}`) history.replaceState(null, '', `#${page}`);

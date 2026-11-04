@@ -58,8 +58,8 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 135 unit tests, 14 integration tests — all passing.
-- Static verification: 57 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest).
+- 137 unit tests, 15 integration tests — all passing.
+- Static verification: 62 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks).
 - Classifier holdout (measured in `tests/unit/classifier.test.mjs`): AUC ≈ 0.90,
   precision ≈ 0.99, specificity ≈ 0.92 at the calibrated operating point.
 - Engine throughput: > 2,000 evaluations/ms budget; the test asserts < 0.5 ms/op.

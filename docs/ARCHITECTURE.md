@@ -20,7 +20,7 @@ security/           firewall AI, monitor, feeds, backup, privacy, sha256, storag
 assets/             bundled rule feeds (GPLv3, HaGeZi) + curated supplements + icon
 sw.js               offline caching (never caches DoH)
 scripts/verify.mjs  static architecture + honesty-claim verification
-tests/              unit (135) + integration (14) + static gates
+tests/              unit (137) + integration (15) + static gates
 ```
 
 ## 2. Data flow of a single lookup

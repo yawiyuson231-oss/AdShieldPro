@@ -13,7 +13,7 @@ files (GitHub Pages compatible); works offline once visited.
 
 ```bash
 npm install        # jsdom, used only by the integration tests
-npm test           # 135 unit + 14 integration tests
+npm test           # 137 unit + 15 integration tests
 npm run verify     # static architecture & claim-policy gates
 npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
 ```
@@ -63,7 +63,7 @@ dns/       codec · cache · resolvers · dnssec · client
 aether/    reputation · classifier · typosquat · lexical · domain · data
 security/  firewall-ai · monitor · feedmanager · backup · privacy · sha256 · storage
 ui/dom.js  safe DOM construction (no innerHTML)
-tests/     135 unit + 14 integration   scripts/verify.mjs  static gates
+tests/     137 unit + 15 integration   scripts/verify.mjs  static gates
 ```
 
 Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·

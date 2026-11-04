@@ -154,6 +154,26 @@ test('every navigation target renders without error', () => {
   app.navigate('dashboard');
 });
 
+test('navigation state is exposed to assistive technology, not just CSS', () => {
+  const tabs = [...win.document.querySelectorAll('nav.tabs button')];
+  assert.ok(tabs.every((b) => b.getAttribute('type') === 'button'),
+    'tabs must not behave as submit buttons inside a form context');
+  for (const page of ['monitor', 'aether', 'dashboard']) {
+    app.navigate(page);
+    const current = tabs.filter((b) => b.getAttribute('aria-current') === 'page');
+    assert.equal(current.length, 1, `exactly one tab may be aria-current after navigating to ${page}`);
+    assert.equal(current[0].dataset.page, page);
+    assert.equal($(`#page-${page}`).getAttribute('aria-current'), 'true',
+      'the visible section must announce itself');
+    const others = [...win.document.querySelectorAll('.page')].filter((s) => s.id !== `page-${page}`);
+    assert.ok(others.every((s) => !s.hasAttribute('aria-current')),
+      'hidden sections must not claim to be current');
+  }
+  assert.equal($('#boot-status').getAttribute('role'), 'status',
+    'boot status must be a live region so readiness is announced');
+  assert.equal($('#toasts').getAttribute('aria-live'), 'polite');
+});
+
 test('AETHER blocks a feed-listed ad domain and explains why', () => {
   app.navigate('aether');
   $('#aether-input').value = 'ads.doubleclick.net';
