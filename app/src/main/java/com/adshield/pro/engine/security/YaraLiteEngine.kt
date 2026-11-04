@@ -70,41 +70,175 @@ class YaraLiteEngine(
     companion object {
         private const val MAX_RULE_TEXT = 1_048_576
         private const val MAX_RULES = 128
-        private val RULE_HEADER_REGEX = Regex("\\brule\\s+([A-Za-z_][A-Za-z0-9_]*)")
-        private val QUOTED_REGEX = Regex("\\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*\"((?:\\\\.|[^\"\\\\])*)\"\\s*([^\\r\\n]*)")
-        private val HEX_REGEX = Regex("\\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*\\{([^}]*)\\}\\s*([^\\r\\n]*)")
+        private const val MAX_STRINGS_PER_RULE = 256
+        private const val MAX_STRING_BYTES = 4096
 
+        /**
+         * Parses the supported YARA subset with a hand-written, single-pass scanner.
+         *
+         * Regular expressions were deliberately removed: Java's regex engine recurses once per
+         * matched character, so a long quoted string raised a StackOverflowError that no size
+         * check could intercept. The scanner is linear in the size of the input and every limit
+         * is enforced before the input is accepted.
+         */
         fun parse(ruleText: String): List<Rule> {
             require(ruleText.length <= MAX_RULE_TEXT) { "YARA rule bundle exceeds 1 MiB" }
-            val sanitized = ruleText.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
+            val text = stripComments(ruleText)
             val blocks = mutableListOf<Pair<String, String>>()
             var cursor = 0
-            while (true) {
-                val header = RULE_HEADER_REGEX.find(sanitized, cursor) ?: break
-                val open = sanitized.indexOf('{', header.range.last + 1)
+            while (blocks.size <= MAX_RULES) {
+                val header = findRuleHeader(text, cursor) ?: break
+                val open = text.indexOf('{', header.second)
                 if (open < 0) break
-                val close = matchingBrace(sanitized, open)
+                val close = matchingBrace(text, open)
                 if (close < 0) break
-                blocks += header.groupValues[1] to sanitized.substring(open + 1, close)
+                blocks += header.first to text.substring(open + 1, close)
                 cursor = close + 1
-                if (blocks.size > MAX_RULES) break
             }
             require(blocks.isNotEmpty()) { "No supported YARA rules found" }
             require(blocks.size <= MAX_RULES) { "Too many YARA rules" }
-            return blocks.map { (name, body) ->
-                val section = Regex("\\bstrings\\s*:(.*?)\\bcondition\\s*:(.*)", RegexOption.DOT_MATCHES_ALL)
-                    .find(body) ?: throw IllegalArgumentException("Rule $name requires strings and condition sections")
-                val stringSection = section.groupValues[1]
-                val conditionText = section.groupValues[2].trim()
-                val quoted = QUOTED_REGEX.findAll(stringSection).map { parseQuoted(it) }.toList()
-                val hex = HEX_REGEX.findAll(stringSection).map { parseHex(it) }.toList()
-                val patterns = quoted + hex
-                require(patterns.isNotEmpty() && patterns.size <= 256) { "Rule $name has no supported strings or too many strings" }
-                require(patterns.map { it.id }.distinct().size == patterns.size) { "Rule $name has duplicate string IDs" }
-                val (condition, count) = parseCondition(conditionText)
-                require(condition != Condition.AT_LEAST || count <= patterns.size) { "Rule $name condition exceeds string count" }
-                Rule(name, patterns, condition, count)
+            return blocks.map { (name, body) -> parseRule(name, body) }
+        }
+
+        private fun parseRule(name: String, body: String): Rule {
+            val stringsAt = indexOfSection(body, "strings")
+            val conditionAt = if (stringsAt >= 0) indexOfSection(body, "condition", stringsAt + 1) else -1
+            require(stringsAt >= 0 && conditionAt > stringsAt) {
+                "Rule $name requires strings and condition sections"
             }
+            val stringsSection = body.substring(stringsAt, conditionAt)
+            val conditionText = body.substring(conditionAt).substringAfter(':').trim()
+            val patterns = parseStrings(name, stringsSection)
+            require(patterns.isNotEmpty()) { "Rule $name has no supported strings" }
+            require(patterns.size <= MAX_STRINGS_PER_RULE) { "Rule $name has too many strings" }
+            require(patterns.map { it.id }.distinct().size == patterns.size) { "Rule $name has duplicate string IDs" }
+            val (condition, count) = parseCondition(conditionText)
+            require(condition != Condition.AT_LEAST || count <= patterns.size) {
+                "Rule $name condition exceeds string count"
+            }
+            return Rule(name, patterns, condition, count)
+        }
+
+        /** Reads `$id = "text"` and `$id = { 4D 5A ?? }` declarations, one character at a time. */
+        private fun parseStrings(ruleName: String, section: String): List<StringPattern> {
+            val patterns = mutableListOf<StringPattern>()
+            var index = 0
+            while (index < section.length) {
+                val char = section[index]
+                if (char != '$' || (index > 0 && section[index - 1].isIdentifierPart())) {
+                    index++
+                    continue
+                }
+                val idStart = index + 1
+                var idEnd = idStart
+                while (idEnd < section.length && section[idEnd].isIdentifierPart()) idEnd++
+                if (idEnd == idStart) {
+                    index = idEnd
+                    continue
+                }
+                val id = section.substring(idStart, idEnd)
+                var cursor = skipSpaces(section, idEnd)
+                if (cursor >= section.length || section[cursor] != '=') {
+                    index = cursor
+                    continue
+                }
+                cursor = skipSpaces(section, cursor + 1)
+                if (cursor >= section.length) break
+                val lineEnd = endOfLine(section, cursor)
+                when (section[cursor]) {
+                    '"' -> {
+                        val close = findClosingQuote(section, cursor)
+                        require(close > cursor) { "Rule $ruleName has an unterminated string" }
+                        val raw = section.substring(cursor + 1, close)
+                        val bytes = decodeEscapes(raw)
+                        require(bytes.size in 1..MAX_STRING_BYTES) { "String must contain 1..$MAX_STRING_BYTES bytes" }
+                        val modifiers = section.substring(close + 1, lineEnd)
+                            .split(' ', '\t', ',').filter { it.isNotBlank() }
+                        require(modifiers.all { it == "ascii" || it == "wide" || it == "nocase" }) {
+                            "Unsupported string modifier in rule $ruleName"
+                        }
+                        patterns += StringPattern(id, bytes, "nocase" in modifiers, "wide" in modifiers)
+                        index = lineEnd
+                    }
+                    '{' -> {
+                        val close = section.indexOf('}', cursor)
+                        require(close > cursor) { "Rule $ruleName has an unterminated hex string" }
+                        val trailing = section.substring(close + 1, lineEnd).trim()
+                        require(trailing.isEmpty()) { "Modifiers are not supported on hex strings" }
+                        patterns += parseHex(id, section.substring(cursor + 1, close), ruleName)
+                        index = lineEnd
+                    }
+                    else -> index = lineEnd
+                }
+            }
+            return patterns
+        }
+
+        private fun parseHex(id: String, inner: String, ruleName: String): StringPattern {
+            val tokens = inner.split(' ', '\t', '\r', '\n').filter { it.isNotBlank() }
+            require(tokens.size in 1..MAX_STRING_BYTES) { "Hex string must contain 1..$MAX_STRING_BYTES bytes" }
+            val wildcards = mutableSetOf<Int>()
+            val bytes = ByteArray(tokens.size)
+            tokens.forEachIndexed { index, token ->
+                when {
+                    token == "??" -> wildcards += index
+                    token.length == 2 && token.all { it.isHexDigit() } -> bytes[index] = token.toInt(16).toByte()
+                    else -> throw IllegalArgumentException(
+                        "Only complete hex bytes and ?? wildcards are supported in rule $ruleName"
+                    )
+                }
+            }
+            return StringPattern(id, bytes, wildcardPositions = wildcards)
+        }
+
+        private fun parseCondition(text: String): Pair<Condition, Int> {
+            val compact = text.trim()
+            return when {
+                compact.equals("any of them", ignoreCase = true) -> Condition.ANY to 1
+                compact.equals("all of them", ignoreCase = true) -> Condition.ALL to 1
+                else -> {
+                    val separator = compact.indexOf(" of them", ignoreCase = true)
+                    require(separator > 0) { "Unsupported condition; use any/all/N of them" }
+                    val count = compact.substring(0, separator).trim().toIntOrNull()
+                        ?: throw IllegalArgumentException("Unsupported condition; use any/all/N of them")
+                    require(count >= 1) { "Unsupported condition; use any/all/N of them" }
+                    Condition.AT_LEAST to count
+                }
+            }
+        }
+
+        private fun findRuleHeader(text: String, fromIndex: Int): Pair<String, Int>? {
+            var index = fromIndex
+            while (index < text.length) {
+                val at = text.indexOf("rule", index)
+                if (at < 0) return null
+                val beforeOk = at == 0 || !text[at - 1].isIdentifierPart()
+                if (beforeOk) {
+                    var cursor = at + 4
+                    if (cursor < text.length && text[cursor].isWhitespace()) {
+                        cursor = skipSpaces(text, cursor)
+                        val nameStart = cursor
+                        while (cursor < text.length && text[cursor].isIdentifierPart()) cursor++
+                        if (cursor > nameStart) return text.substring(nameStart, cursor) to cursor
+                    }
+                }
+                index = at + 4
+            }
+            return null
+        }
+
+        private fun indexOfSection(text: String, label: String, fromIndex: Int = 0): Int {
+            var index = fromIndex
+            while (index < text.length) {
+                val at = text.indexOf(label, index)
+                if (at < 0) return -1
+                val beforeOk = at == 0 || !text[at - 1].isIdentifierPart()
+                var cursor = at + label.length
+                cursor = skipSpaces(text, cursor)
+                if (beforeOk && cursor < text.length && text[cursor] == ':') return at
+                index = at + label.length
+            }
+            return -1
         }
 
         private fun matchingBrace(text: String, openIndex: Int): Int {
@@ -112,7 +246,7 @@ class YaraLiteEngine(
             var inString = false
             var index = openIndex
             while (index < text.length) {
-                when (val char = text[index]) {
+                when (text[index]) {
                     '\\' -> index++
                     '"' -> inString = !inString
                     '{' -> if (!inString) depth++
@@ -126,29 +260,64 @@ class YaraLiteEngine(
             return -1
         }
 
-        private fun parseQuoted(match: MatchResult): StringPattern {
-            val raw = match.groupValues[2]
-            val modifiers = match.groupValues[3].split(Regex("\\s+")).filter { it.isNotBlank() }
-            require(modifiers.all { it in setOf("ascii", "wide", "nocase") }) { "Unsupported string modifier" }
-            val bytes = decodeEscapes(raw)
-            require(bytes.size in 1..4096) { "String must contain 1..4096 bytes" }
-            return StringPattern(match.groupValues[1], bytes, "nocase" in modifiers, "wide" in modifiers)
+        private fun findClosingQuote(text: String, openIndex: Int): Int {
+            var index = openIndex + 1
+            while (index < text.length) {
+                when (text[index]) {
+                    '\\' -> index++
+                    '"' -> return index
+                }
+                index++
+            }
+            return -1
         }
 
-        private fun parseHex(match: MatchResult): StringPattern {
-            require(match.groupValues[3].isBlank()) { "Modifiers are not supported on hex strings" }
-            val tokens = match.groupValues[2].trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-            require(tokens.size in 1..4096) { "Hex string must contain 1..4096 bytes" }
-            val wildcards = mutableSetOf<Int>()
-            val bytes = tokens.mapIndexed { index, token ->
+        private fun stripComments(text: String): String {
+            val out = StringBuilder(text.length)
+            var index = 0
+            var inString = false
+            while (index < text.length) {
+                val char = text[index]
+                if (inString) {
+                    out.append(char)
+                    when {
+                        char == '\\' && index + 1 < text.length -> out.append(text[++index])
+                        char == '"' -> inString = false
+                    }
+                    index++
+                    continue
+                }
                 when {
-                    token == "??" -> { wildcards += index; 0 }
-                    token.matches(Regex("[0-9A-Fa-f]{2}")) -> token.toInt(16)
-                    else -> throw IllegalArgumentException("Only complete hex bytes and ?? wildcards are supported")
+                    char == '"' -> { inString = true; out.append(char); index++ }
+                    char == '/' && index + 1 < text.length && text[index + 1] == '/' -> {
+                        while (index < text.length && text[index] != '\n') index++
+                    }
+                    char == '/' && index + 1 < text.length && text[index + 1] == '*' -> {
+                        index += 2
+                        while (index + 1 < text.length && !(text[index] == '*' && text[index + 1] == '/')) index++
+                        index = (index + 2).coerceAtMost(text.length)
+                    }
+                    else -> { out.append(char); index++ }
                 }
             }
-            return StringPattern(match.groupValues[1], bytes.map { it.toByte() }.toByteArray(), wildcardPositions = wildcards)
+            return out.toString()
         }
+
+        private fun skipSpaces(text: String, fromIndex: Int): Int {
+            var index = fromIndex
+            while (index < text.length && text[index].isWhitespace()) index++
+            return index
+        }
+
+        private fun endOfLine(text: String, fromIndex: Int): Int {
+            val newline = text.indexOf('\n', fromIndex)
+            return if (newline < 0) text.length else newline
+        }
+
+        private fun Char.isIdentifierPart(): Boolean = this == '_' || isLetterOrDigit()
+
+        private fun Char.isHexDigit(): Boolean =
+            this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
         private fun decodeEscapes(raw: String): ByteArray {
             val out = java.io.ByteArrayOutputStream()
@@ -177,19 +346,6 @@ class YaraLiteEngine(
                 index += 2
             }
             return out.toByteArray()
-        }
-
-        private fun parseCondition(text: String): Pair<Condition, Int> {
-            val compact = text.replace(Regex("//.*"), "").trim()
-            return when {
-                compact.equals("any of them", true) -> Condition.ANY to 1
-                compact.equals("all of them", true) -> Condition.ALL to 1
-                else -> {
-                    val count = Regex("^(\\d+)\\s+of\\s+them$", RegexOption.IGNORE_CASE).find(compact)
-                        ?: throw IllegalArgumentException("Unsupported condition; use any/all/N of them")
-                    Condition.AT_LEAST to count.groupValues[1].toInt()
-                }
-            }
         }
 
         private val DEFAULT_RULES = parse(

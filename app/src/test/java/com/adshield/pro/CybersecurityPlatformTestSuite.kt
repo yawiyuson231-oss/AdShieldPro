@@ -188,7 +188,7 @@ class CybersecurityPlatformTestSuite {
             """.trimIndent()
         )
         val engine = YaraLiteEngine(rules)
-        assertEquals(listOf("Hex_Test"), engine.scan("xxMZ\u007f").map { it.ruleName })
+        assertEquals(listOf("Hex_Test"), engine.scan("xxMZ?\u007f").map { it.ruleName })
         assertEquals(listOf("Wide_Test"), engine.scan("E\u0000V\u0000I\u0000L\u0000").map { it.ruleName })
         assertThrows(IllegalArgumentException::class.java) {
             YaraLiteEngine.parse("rule Bad { condition: true }")
