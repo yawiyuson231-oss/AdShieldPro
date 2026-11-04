@@ -42,7 +42,7 @@ to `main`. It installs JDK 17 and runs, in order:
 
 1. Static Kotlin source/diff checks
 2. `:app:compileDebugKotlin` and `:app:assembleDebug`
-3. `:app:testDebugUnitTest`, then asserts exactly 125 tests executed with no failure/error/skip
+3. `:app:testDebugUnitTest`, then asserts exactly 129 tests executed with no failure/error/skip
 4. `:app:lintDebug` — hard gate
 5. APK DEX/manifest/resource/bundled-list inspection
 

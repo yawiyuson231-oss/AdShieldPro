@@ -108,7 +108,7 @@ fun FiltersScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Sync Now")
+                    Text("Evolve Now")
                 }
             }
         }
@@ -157,11 +157,11 @@ fun FiltersScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Scheduled Background Updates",
+                                    text = "AETHER Protection Evolution",
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = "Atomic swap with automatic rollback if a source fails validation.",
+                                    text = "Validated rules, source-health learning and signed update discovery. Reversible by design.",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -203,6 +203,49 @@ fun FiltersScreen(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    val evolutionColor = when (settings.lastEvolutionStatus) {
+                        "SUCCESS" -> Color(0xFF22D3A6)
+                        "COMPLETED_WITH_WARNINGS" -> WarningAmber
+                        "FAILED" -> AlertRed
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Text(
+                        text = settings.lastEvolutionStatus.replace('_', ' '),
+                        color = evolutionColor,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = settings.lastEvolutionMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (settings.lastEvolutionRunEpochMs > 0L) {
+                        Text(
+                            text = "Last run ${dateFormat.format(Date(settings.lastEvolutionRunEpochMs))} • " +
+                                "${settings.evolutionRunCount} recorded run(s) • ${settings.lastEvolutionRuleCount} rules",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = if (settings.availableAppVersion != null) {
+                            "Signed app update available: ${settings.availableAppVersion}. Review it from Settings → Check for updates."
+                        } else if (settings.lastAppUpdateCheckEpochMs > 0L) {
+                            "App update channel checked ${dateFormat.format(Date(settings.lastAppUpdateCheckEpochMs))}; no newer verified release recorded."
+                        } else {
+                            "Signed app releases are checked daily. Android always asks before installation."
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (settings.availableAppVersion != null) CyberCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Protection data evolves automatically; executable code never rewrites or installs itself.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

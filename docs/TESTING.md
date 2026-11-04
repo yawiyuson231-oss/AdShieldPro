@@ -8,7 +8,7 @@ if it is green, the release is published; if it is red, nothing ships.
 
 | Layer | Command | Runs locally? | Runs in CI? |
 | --- | --- | --- | --- |
-| Kotlin / JVM unit tests (125 cases) | `./gradlew :app:testDebugUnitTest` | needs JDK 17 + Android SDK | yes |
+| Kotlin / JVM unit tests (129 cases) | `./gradlew :app:testDebugUnitTest` | needs JDK 17 + Android SDK | yes |
 | Web engine ladder vs. the real 79k-rule assets | `node website/engine.test.mjs` | yes | yes |
 | PC agent DNS ladder / packet builders | `python3 pc-agent/omnishield_proxy.py --selftest` | yes | yes |
 | Kotlin source balance check | `python3 tools/check_kotlin_syntax.py app/src` | yes | yes |
@@ -17,7 +17,7 @@ if it is green, the release is published; if it is red, nothing ships.
 
 ## The Kotlin suite
 
-`app/src/test/java/com/adshield/pro/` contains **125 test cases**, asserted by exact count in CI (not just "zero failures"),
+`app/src/test/java/com/adshield/pro/` contains **129 test cases**, asserted by exact count in CI (not just "zero failures"),
 so a suite that silently stops running fails the build.
 
 | Suite | Covers |

@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EXPECTED_TESTS: '125'
+  EXPECTED_TESTS: '129'
   GH_TOKEN: ${{ github.token }}
 
 jobs:

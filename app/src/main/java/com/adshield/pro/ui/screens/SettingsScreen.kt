@@ -538,12 +538,20 @@ fun SettingsScreen(
                     HorizontalDivider()
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("DNSSEC — what happens", style = MaterialTheme.typography.titleSmall)
+                            Text("DNSSEC upstream validation", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Learn more: your chosen resolver (Cloudflare, Google, Quad9, AdGuard) validates DNSSEC signatures before answering, and OmniShield passes the validated answer through untouched. Tampered answers from non-validating paths are rejected upstream. OmniShield does not re-validate signatures itself — it relies on the encrypted, validating resolver you select.",
+                                "Requests Authenticated Data (AD) and clears Checking Disabled so the selected recursive resolver validates signatures. “DNSSEC AD” appears in Live only when the response proves upstream validation. Unsigned domains remain available and are not mislabeled as attacks. This is not local cryptographic chain validation; custom resolver support varies.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                        Switch(
+                            checked = settings.resolverConfig.requestDnsSecValidation,
+                            onCheckedChange = {
+                                onUpdateResolverConfig(
+                                    settings.resolverConfig.copy(requestDnsSecValidation = it)
+                                )
+                            }
+                        )
                     }
                     HorizontalDivider()
                     Row(verticalAlignment = Alignment.CenterVertically) {

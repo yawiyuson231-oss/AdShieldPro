@@ -15,6 +15,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.adshield.pro.BuildConfig
 import com.adshield.pro.R
+import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.ui.UpdatePromptActivity
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -71,11 +72,15 @@ object GitHubReleaseClient {
 
 @HiltWorker
 class GitHubUpdateWorker @AssistedInject constructor(
-    @Assisted context: Context, @Assisted params: WorkerParameters
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val preferences: UserPreferencesRepository
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
             val release = GitHubReleaseClient.latest() ?: return@withContext Result.retry()
+            val available = release.name.takeIf { release.code > BuildConfig.VERSION_CODE }
+            preferences.recordAppUpdateCheck(System.currentTimeMillis(), available)
             if (release.code <= BuildConfig.VERSION_CODE) return@withContext Result.success()
             if (Build.VERSION.SDK_INT >= 33 &&
                 ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

@@ -152,7 +152,9 @@ data class DnsResolverConfig(
     val customDotHost: String = "one.one.one.one",
     val customPrimaryIpv4: String = "1.1.1.1",
     val customSecondaryIpv4: String = "1.0.0.1",
-    val enableIpv6: Boolean = true
+    val enableIpv6: Boolean = true,
+    /** Ask the configured recursive resolver to validate DNSSEC and return AD when proven. */
+    val requestDnsSecValidation: Boolean = true
 ) {
     val activeDohUrl: String
         get() = if (preset == DnsProviderPreset.CUSTOM) customDohUrl.ifBlank { preset.dohUrl } else preset.dohUrl

@@ -41,13 +41,16 @@ class UpstreamDnsResolver @Inject constructor() {
         val protocolUsed: String,
         val fromCache: Boolean,
         val latencyMs: Int,
-        val fallbackUsed: Boolean = false
+        val fallbackUsed: Boolean = false,
+        val dnsSecRequested: Boolean = false,
+        val dnsSecAuthenticated: Boolean = false
     )
 
     private data class CachedDnsEntry(
         val wireResponse: ByteArray,
         val expiresAtEpochMs: Long,
-        val protocolOrigin: String
+        val protocolOrigin: String,
+        val dnsSecAuthenticated: Boolean
     )
 
     private val dnsCache = object : LruCache<String, CachedDnsEntry>(1024) {}
@@ -159,7 +162,7 @@ class UpstreamDnsResolver @Inject constructor() {
             DnsProtocol.UDP_TCP -> "${config.activePrimaryIpv4}|${config.activeSecondaryIpv4}"
         }
         // Answers from one resolver must never be served after the user switches provider.
-        val cacheKey = "${config.protocol.name}|$resolverScope|${query.cacheKey}"
+        val cacheKey = "${config.protocol.name}|$resolverScope|dnssec=${config.requestDnsSecValidation}|${query.cacheKey}"
 
         // 1. Check LRU TTL Cache
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
@@ -168,9 +171,12 @@ class UpstreamDnsResolver @Inject constructor() {
                 val rewritten = DnsPacketCodec.rewriteTransactionId(cached.wireResponse, query.transactionId)
                 return@withContext UpstreamResult(
                     responseBytes = rewritten,
-                    protocolUsed = "${cached.protocolOrigin} (Cached)",
+                    protocolUsed = "${cached.protocolOrigin} (Cached)" +
+                        if (cached.dnsSecAuthenticated) " · DNSSEC AD" else "",
                     fromCache = true,
-                    latencyMs = 0
+                    latencyMs = 0,
+                    dnsSecRequested = config.requestDnsSecValidation,
+                    dnsSecAuthenticated = cached.dnsSecAuthenticated
                 )
             } else {
                 synchronized(dnsCache) { dnsCache.remove(cacheKey) }
@@ -178,6 +184,15 @@ class UpstreamDnsResolver @Inject constructor() {
         }
 
         val startMs = System.currentTimeMillis()
+
+        val upstreamQuery = if (config.requestDnsSecValidation) {
+            query.copy(
+                flags = (query.flags or 0x0020) and 0xFFEF,
+                rawPayload = DnsPacketCodec.requestUpstreamDnsSec(query.rawPayload)
+            )
+        } else {
+            query
+        }
 
         // 2. Use only the protocol selected by the user. Encrypted DNS must never
         // downgrade to plaintext UDP/TCP when its upstream is unavailable. A failed
@@ -188,7 +203,7 @@ class UpstreamDnsResolver @Inject constructor() {
                 val candidates = dohFailoverCandidates(config, allowEncryptedFailover)
                 var answer: Pair<ByteArray, String>? = null
                 for ((index, candidate) in candidates.withIndex()) {
-                    val response = runCatching { queryDoh(query.rawPayload, candidate.first) }.getOrNull()
+                    val response = runCatching { queryDoh(upstreamQuery.rawPayload, candidate.first) }.getOrNull()
                         ?.takeIf { DnsPacketCodec.isValidUpstreamResponse(query, it) }
                     if (response != null) {
                         answer = response to ("DoH (${candidate.second})" +
@@ -203,7 +218,7 @@ class UpstreamDnsResolver @Inject constructor() {
                 val candidates = dotFailoverCandidates(config, allowEncryptedFailover)
                 var answer: Pair<ByteArray, String>? = null
                 for ((index, candidate) in candidates.withIndex()) {
-                    val response = runCatching { queryDot(query.rawPayload, candidate) }.getOrNull()
+                    val response = runCatching { queryDot(upstreamQuery.rawPayload, candidate) }.getOrNull()
                         ?.takeIf { DnsPacketCodec.isValidUpstreamResponse(query, it) }
                     if (response != null) {
                         answer = response to ("DoT (${candidate.activeDotHost})" +
@@ -215,7 +230,7 @@ class UpstreamDnsResolver @Inject constructor() {
                     "SERVFAIL (DoT unavailable; plaintext fallback refused)")
             }
             DnsProtocol.UDP_TCP -> {
-                val udpRes = runCatching { queryUdpOrTcp(query, config) }.getOrNull()
+                val udpRes = runCatching { queryUdpOrTcp(upstreamQuery, config) }.getOrNull()
                     ?.takeIf { DnsPacketCodec.isValidUpstreamResponse(query, it) }
                 if (udpRes != null) {
                     udpRes to "UDP/53 (${config.activePrimaryIpv4})"
@@ -237,7 +252,8 @@ class UpstreamDnsResolver @Inject constructor() {
                     CachedDnsEntry(
                         wireResponse = responseBytes,
                         expiresAtEpochMs = System.currentTimeMillis() + (ttlSeconds * 1000L),
-                        protocolOrigin = config.protocol.name
+                        protocolOrigin = config.protocol.name,
+                        dnsSecAuthenticated = DnsPacketCodec.responseHasAuthenticatedData(responseBytes)
                     )
                 )
             }
@@ -245,10 +261,13 @@ class UpstreamDnsResolver @Inject constructor() {
 
         UpstreamResult(
             responseBytes = responseBytes,
-            protocolUsed = protocolUsed,
+            protocolUsed = protocolUsed +
+                if (DnsPacketCodec.responseHasAuthenticatedData(responseBytes)) " · DNSSEC AD" else "",
             fromCache = false,
             latencyMs = latency,
-            fallbackUsed = false
+            fallbackUsed = false,
+            dnsSecRequested = config.requestDnsSecValidation,
+            dnsSecAuthenticated = DnsPacketCodec.responseHasAuthenticatedData(responseBytes)
         )
     }
 

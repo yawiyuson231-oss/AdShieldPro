@@ -91,7 +91,8 @@ class AdShieldViewModel @Inject constructor(
     val aetherCore: com.adshield.pro.engine.aether.AetherGodCore,
     private val batteryRepository: BatteryIntelligenceRepository,
     private val securityLocalStore: com.adshield.pro.engine.security.SecurityLocalStore,
-    private val networkIntelligenceRepository: NetworkIntelligenceRepository
+    private val networkIntelligenceRepository: NetworkIntelligenceRepository,
+    private val evolutionEngine: com.adshield.pro.engine.evolution.ProtectionEvolutionEngine
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -366,6 +367,12 @@ class AdShieldViewModel @Inject constructor(
             _isCheckingForUpdates.value = true
             try {
                 val release = withContext(Dispatchers.IO) { GitHubReleaseClient.latest() }
+                if (release != null) {
+                    preferencesRepository.recordAppUpdateCheck(
+                        System.currentTimeMillis(),
+                        release.name.takeIf { release.code > BuildConfig.VERSION_CODE }
+                    )
+                }
                 when {
                     release == null -> showFeedback("Couldn't check for updates. Check your internet connection and try again.")
                     release.code <= BuildConfig.VERSION_CODE -> showFeedback("OmniShield X Infinity is up to date.")
@@ -801,17 +808,14 @@ class AdShieldViewModel @Inject constructor(
         if (_isUpdatingFilters.value) return
         viewModelScope.launch {
             _isUpdatingFilters.value = true
-            val res = repository.updateAllEnabledFilterLists()
+            val report = evolutionEngine.evolveNow()
             _isUpdatingFilters.value = false
-            res.fold(
-                onSuccess = { totalRules ->
-                    upstreamDnsResolver.clearCache()
-                    showFeedback("Filter lists synchronized: $totalRules active rules loaded.")
-                },
-                onFailure = { err ->
-                    showFeedback("Filter update rolled back safely: ${err.message}")
-                }
-            )
+            if (report.status == com.adshield.pro.engine.evolution.EvolutionRunStatus.FAILED) {
+                showFeedback(report.message)
+            } else {
+                upstreamDnsResolver.clearCache()
+                showFeedback(report.message)
+            }
         }
     }
 

@@ -18,6 +18,7 @@ import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.GameSessionRecord
 import com.adshield.pro.domain.model.GamingProfile
 import com.adshield.pro.domain.model.ProtectionMode
+import com.adshield.pro.engine.evolution.EvolutionRunReport
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -42,6 +43,13 @@ data class AppSettingsState(
     val autoUpdateFiltersEnabled: Boolean = true,
     val updateIntervalHours: Int = 24,
     val lastFilterUpdateEpochMs: Long = 0L,
+    val lastEvolutionRunEpochMs: Long = 0L,
+    val lastEvolutionRuleCount: Int = 0,
+    val lastEvolutionStatus: String = "NOT_RUN",
+    val lastEvolutionMessage: String = "No protection evolution run has completed yet.",
+    val evolutionRunCount: Int = 0,
+    val lastAppUpdateCheckEpochMs: Long = 0L,
+    val availableAppVersion: String? = null,
     val excludedAppPackages: Set<String> = emptySet(),
     val browserSiteExceptions: Set<String> = emptySet(),
     val browserCosmeticFilteringEnabled: Boolean = true,
@@ -110,6 +118,7 @@ class UserPreferencesRepository @Inject constructor(
         val CUSTOM_IPV4_PRIMARY = stringPreferencesKey("custom_ipv4_primary")
         val CUSTOM_IPV4_SECONDARY = stringPreferencesKey("custom_ipv4_secondary")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
+        val DNSSEC_UPSTREAM_VALIDATION = booleanPreferencesKey("dnssec_upstream_validation")
         val DETAILED_LOGGING = booleanPreferencesKey("detailed_dns_logging_enabled")
         val SHADOW_MODE_ENABLED = booleanPreferencesKey("shadow_mode_enabled")
         val FALSE_POSITIVE_REPORTS = intPreferencesKey("false_positive_report_count")
@@ -131,6 +140,13 @@ class UserPreferencesRepository @Inject constructor(
         val AUTO_UPDATE_FILTERS = booleanPreferencesKey("auto_update_filters")
         val UPDATE_INTERVAL_HOURS = intPreferencesKey("update_interval_hours")
         val LAST_FILTER_UPDATE_MS = longPreferencesKey("last_filter_update_ms")
+        val LAST_EVOLUTION_RUN_MS = longPreferencesKey("last_evolution_run_ms")
+        val LAST_EVOLUTION_RULE_COUNT = intPreferencesKey("last_evolution_rule_count")
+        val LAST_EVOLUTION_STATUS = stringPreferencesKey("last_evolution_status")
+        val LAST_EVOLUTION_MESSAGE = stringPreferencesKey("last_evolution_message")
+        val EVOLUTION_RUN_COUNT = intPreferencesKey("evolution_run_count")
+        val LAST_APP_UPDATE_CHECK_MS = longPreferencesKey("last_app_update_check_ms")
+        val AVAILABLE_APP_VERSION = stringPreferencesKey("available_app_version")
         val EXCLUDED_PACKAGES = stringSetPreferencesKey("excluded_app_packages")
         val BROWSER_EXCEPTIONS = stringSetPreferencesKey("browser_site_exceptions")
         val BROWSER_COSMETIC = booleanPreferencesKey("browser_cosmetic_filtering")
@@ -203,7 +219,8 @@ class UserPreferencesRepository @Inject constructor(
                 customDotHost = prefs[Keys.CUSTOM_DOT_HOST] ?: "one.one.one.one",
                 customPrimaryIpv4 = prefs[Keys.CUSTOM_IPV4_PRIMARY] ?: "1.1.1.1",
                 customSecondaryIpv4 = prefs[Keys.CUSTOM_IPV4_SECONDARY] ?: "1.0.0.1",
-                enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true
+                enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true,
+                requestDnsSecValidation = prefs[Keys.DNSSEC_UPSTREAM_VALIDATION] ?: true
             ),
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
             shadowModeEnabled = prefs[Keys.SHADOW_MODE_ENABLED] ?: false,
@@ -226,6 +243,14 @@ class UserPreferencesRepository @Inject constructor(
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
             updateIntervalHours = prefs[Keys.UPDATE_INTERVAL_HOURS] ?: 24,
             lastFilterUpdateEpochMs = prefs[Keys.LAST_FILTER_UPDATE_MS] ?: 0L,
+            lastEvolutionRunEpochMs = prefs[Keys.LAST_EVOLUTION_RUN_MS] ?: 0L,
+            lastEvolutionRuleCount = prefs[Keys.LAST_EVOLUTION_RULE_COUNT] ?: 0,
+            lastEvolutionStatus = prefs[Keys.LAST_EVOLUTION_STATUS] ?: "NOT_RUN",
+            lastEvolutionMessage = prefs[Keys.LAST_EVOLUTION_MESSAGE]
+                ?: "No protection evolution run has completed yet.",
+            evolutionRunCount = prefs[Keys.EVOLUTION_RUN_COUNT] ?: 0,
+            lastAppUpdateCheckEpochMs = prefs[Keys.LAST_APP_UPDATE_CHECK_MS] ?: 0L,
+            availableAppVersion = prefs[Keys.AVAILABLE_APP_VERSION],
             excludedAppPackages = prefs[Keys.EXCLUDED_PACKAGES] ?: emptySet(),
             browserSiteExceptions = prefs[Keys.BROWSER_EXCEPTIONS] ?: emptySet(),
             browserCosmeticFilteringEnabled = prefs[Keys.BROWSER_COSMETIC] ?: true,
@@ -275,6 +300,7 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.CUSTOM_IPV4_PRIMARY] = config.customPrimaryIpv4.trim()
             prefs[Keys.CUSTOM_IPV4_SECONDARY] = config.customSecondaryIpv4.trim()
             prefs[Keys.ENABLE_IPV6] = config.enableIpv6
+            prefs[Keys.DNSSEC_UPSTREAM_VALIDATION] = config.requestDnsSecValidation
         }
     }
 
@@ -355,6 +381,25 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun recordFilterUpdateTimestamp(epochMs: Long) {
         context.adShieldDataStore.edit { it[Keys.LAST_FILTER_UPDATE_MS] = epochMs }
+    }
+
+    suspend fun recordEvolutionRun(report: EvolutionRunReport) {
+        context.adShieldDataStore.edit {
+            it[Keys.LAST_EVOLUTION_RUN_MS] = report.finishedAtEpochMs
+            it[Keys.LAST_EVOLUTION_RULE_COUNT] = report.activeRuleCount
+            it[Keys.LAST_EVOLUTION_STATUS] = report.status.name
+            it[Keys.LAST_EVOLUTION_MESSAGE] = report.message.take(320)
+            it[Keys.EVOLUTION_RUN_COUNT] = ((it[Keys.EVOLUTION_RUN_COUNT] ?: 0) + 1)
+                .coerceAtMost(1_000_000)
+        }
+    }
+
+    suspend fun recordAppUpdateCheck(epochMs: Long, availableVersion: String?) {
+        context.adShieldDataStore.edit {
+            it[Keys.LAST_APP_UPDATE_CHECK_MS] = epochMs
+            if (availableVersion.isNullOrBlank()) it.remove(Keys.AVAILABLE_APP_VERSION)
+            else it[Keys.AVAILABLE_APP_VERSION] = availableVersion.take(40)
+        }
     }
 
     suspend fun toggleExcludedAppPackage(packageName: String, excluded: Boolean) {

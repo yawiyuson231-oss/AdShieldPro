@@ -267,6 +267,26 @@ object DnsPacketCodec {
         return out.toByteArray()
     }
 
+    /**
+     * Requests DNSSEC authenticated data from a recursive resolver (AD=1) and requires validation
+     * by clearing Checking Disabled (CD=0). This does not claim local signature-chain validation.
+     */
+    fun requestUpstreamDnsSec(queryPayload: ByteArray): ByteArray {
+        if (queryPayload.size < 4) return queryPayload
+        return queryPayload.copyOf().apply {
+            val flags = ((this[2].toInt() and 0xFF) shl 8) or (this[3].toInt() and 0xFF)
+            val updated = (flags or 0x0020) and 0xFFEF
+            this[2] = (updated ushr 8).toByte()
+            this[3] = updated.toByte()
+        }
+    }
+
+    /** True only when the upstream response carries DNSSEC Authenticated Data (AD=1). */
+    fun responseHasAuthenticatedData(response: ByteArray): Boolean {
+        if (response.size < 4) return false
+        return (response[3].toInt() and 0x20) != 0
+    }
+
     /** Rejects truncated, mismatched, or non-response upstream packets before use or caching. */
     fun isValidUpstreamResponse(query: ParsedDnsQuery, response: ByteArray): Boolean {
         if (response.size < 12) return false

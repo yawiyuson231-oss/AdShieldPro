@@ -445,4 +445,20 @@ class AdShieldEngineTestSuite {
         assertEquals(3, DnsPacketCodec.responseRcode(DnsPacketCodec.buildBlockedResponse(query, false)))
         assertEquals(2, DnsPacketCodec.responseRcode(DnsPacketCodec.buildServFailResponse(query)))
     }
+
+    @Test
+    fun testDnsSec_requestsAuthenticatedDataWithoutMutatingOriginal() {
+        val raw = buildRawDnsQueryPacket().also { it[3] = 0x10 } // CD=1 in client query
+        val secured = DnsPacketCodec.requestUpstreamDnsSec(raw)
+        assertTrue((secured[3].toInt() and 0x20) != 0) // AD requested
+        assertFalse((secured[3].toInt() and 0x10) != 0) // upstream checking required
+        assertTrue((raw[3].toInt() and 0x10) != 0) // caller packet unchanged
+
+        val query = DnsPacketCodec.parseQuery(raw)!!
+        val response = DnsPacketCodec.buildBlockedResponse(query, false)
+        assertFalse(DnsPacketCodec.responseHasAuthenticatedData(response))
+        response[3] = (response[3].toInt() or 0x20).toByte()
+        assertTrue(DnsPacketCodec.responseHasAuthenticatedData(response))
+        assertFalse(DnsPacketCodec.responseHasAuthenticatedData(ByteArray(3)))
+    }
 }

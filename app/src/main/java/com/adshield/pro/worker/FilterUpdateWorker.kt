@@ -10,6 +10,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.adshield.pro.data.repository.AdShieldRepository
+import com.adshield.pro.engine.evolution.ProtectionEvolutionEngine
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -22,16 +23,19 @@ import java.util.concurrent.TimeUnit
 class FilterUpdateWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val repository: AdShieldRepository
+    private val repository: AdShieldRepository,
+    private val evolutionEngine: ProtectionEvolutionEngine
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         repository.enforceLogRetentionPolicy()
-        val updateResult = repository.updateAllEnabledFilterLists()
-        return if (updateResult.isSuccess) {
-            Result.success()
-        } else {
+        val report = evolutionEngine.evolveNow()
+        return if (report.status == com.adshield.pro.engine.evolution.EvolutionRunStatus.FAILED) {
             Result.retry()
+        } else {
+            // Warnings mean one or more sources failed but a verified cached/bundled snapshot is
+            // active. Do not repeatedly hammer an unavailable provider; its status stays visible.
+            Result.success()
         }
     }
 
