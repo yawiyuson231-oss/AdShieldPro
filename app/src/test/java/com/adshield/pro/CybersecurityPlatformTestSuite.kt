@@ -179,6 +179,7 @@ class CybersecurityPlatformTestSuite {
         assertFalse(DnsFirewallPolicyDecider.evaluate(allowed("User Allowlist"), null, NetworkTransportPolicy.WIFI, emergency).isBlocked)
     }
 
+    @Test
     fun yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax() {
         val rules = YaraLiteEngine.parse(
             """
@@ -212,6 +213,54 @@ class CybersecurityPlatformTestSuite {
             assertTrue(verdict.findings.any { it.contains("PowerShell_Encoded_Dropper") })
         } finally {
             file.delete()
+        }
+    }
+
+    @Test
+    fun resolverServesTtlCacheWithoutRequeryingUpstream() = runBlocking {
+        val resolver = UpstreamDnsResolver(DnsProviderHealthMonitor())
+        var calls = 0
+        resolver.providerTransport = UpstreamDnsResolver.ProviderTransport { parsed, _, _ ->
+            calls++
+            DnsPacketCodec.buildBlockedResponse(parsed, false)
+        }
+        val config = DnsResolverConfig(preset = DnsProviderPreset.CLOUDFLARE, protocol = DnsProtocol.DOH)
+        val parsed = query("cache-hit.example")
+        val first = resolver.resolve(parsed, config)
+        assertFalse(first.fromCache)
+        val second = resolver.resolve(parsed, config)
+        assertTrue(second.fromCache)
+        assertEquals(1, calls)
+        assertEquals(parsed.transactionId, ((second.responseBytes[0].toInt() and 0xFF) shl 8) or (second.responseBytes[1].toInt() and 0xFF))
+    }
+
+    @Test
+    fun strictDnssecFailsClosedWithServfailInsteadOfAnUnsignedAnswer() = runBlocking {
+        val resolver = UpstreamDnsResolver(DnsProviderHealthMonitor())
+        resolver.providerTransport = UpstreamDnsResolver.ProviderTransport { parsed, _, _ ->
+            // A positive, unsigned answer: NOERROR with one A record and no AD bit.
+            DnsPacketCodec.buildBlockedResponse(parsed, true)
+        }
+        val config = DnsResolverConfig(
+            preset = DnsProviderPreset.QUAD9,
+            protocol = DnsProtocol.DOT,
+            dnssecMode = DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS
+        )
+        val result = resolver.resolve(query("unsigned.example"), config)
+        assertTrue(result.protocolUsed.startsWith("SERVFAIL"))
+        val rcode = result.responseBytes[3].toInt() and 0x0F
+        assertEquals(2, rcode)
+    }
+
+    @Test
+    fun yaraParsingRejectsOversizedOrUnboundedRuleInput() {
+        val huge = "rule Big { strings: $s = \"" + "a".repeat(5_000) + "\" condition: any of them }"
+        assertThrows(IllegalArgumentException::class.java) { YaraLiteEngine.parse(huge) }
+        assertThrows(IllegalArgumentException::class.java) {
+            YaraLiteEngine.parse("rule NoStrings { strings: condition: any of them }")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            YaraLiteEngine.parse("rule BadCondition { strings: $s = \"x\" condition: 2 of them }")
         }
     }
 }
