@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EXPECTED_TESTS: '118'
+  EXPECTED_TESTS: '125'
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -103,7 +103,22 @@ jobs:
           PY
 
       - name: Android lint (hard gate)
-        run: ./gradlew --no-daemon --console=plain --stacktrace :app:lintDebug
+        run: |
+          set +e
+          ./gradlew --no-daemon --console=plain :app:lintDebug > lint.log 2>&1
+          STATUS=$?
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E '^e:|FAILED|Error:|Warning:|What went wrong' lint.log | tail -60 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            {
+              printf 'Android lint failed. Log excerpt:\n\n```text\n'
+              tail -c 55000 lint.log
+              printf '\n```\n'
+            } > lint-failure-context.md
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@lint-failure-context.md || true
+          fi
+          exit "$STATUS"
 
       - name: Inspect development APK
         run: |

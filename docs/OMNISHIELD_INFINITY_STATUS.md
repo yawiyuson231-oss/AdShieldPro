@@ -32,7 +32,7 @@ must still be exercised on a physical Android device before a release is publish
 
 ## Verification contract
 
-- JVM test contract: **118 tests**, zero failures/errors/skips (development CI asserts the count).
+- JVM test contract: **125 tests**, zero failures/errors/skips (development CI asserts the count).
 - Hard gates: Kotlin compile, debug APK packaging, JVM suite, Android lint, APK DEX/manifest/resource
   and bundled-rule inspection.
 - Physical device: **not yet tested in this environment**. VPN consent/coexistence, IPv4/IPv6,
