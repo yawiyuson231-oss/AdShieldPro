@@ -10,7 +10,7 @@ Every row states what SHIPS, verified by which test. No claims beyond it.
 | Random-looking (DGA) detection | SHIPPED — entropy analyzer; OBSERVE in Balanced, block in Strict (toggle) | dgaAndLookalikeSignals test |
 | Lookalike brands incl. homoglyphs | SHIPPED — Damerau-Levenshtein + homoglyph fold (Cyrillic/Greek/fullwidth) | lookalikeImpostors test |
 | DNS rebinding block | SHIPPED (v4.0 AETHER rebinding guard) | AetherInfinityTest |
-| Encrypted DNS only, no silent downgrade | SHIPPED — DoH/DoT; failure → fallback plain DNS WITH warning (never silent cut, never port-443 blocking) | resolver fallback + LIVE fallback banner |
+| Encrypted DNS only, no silent downgrade | SHIPPED — DoH/DoT; failure → encrypted candidate failover when explicitly enabled; otherwise SERVFAIL, never plaintext downgrade | resolver fallback + LIVE fallback banner |
 | DNSSEC plain-language | SHIPPED — resolver-side validation, explained in Settings ("Learn more") | SettingsScreen row |
 | Provider adapter | SHIPPED — DnsResolverConfig presets + custom DoH/DoT (switch without rewrite) | UpstreamDnsResolver |
 

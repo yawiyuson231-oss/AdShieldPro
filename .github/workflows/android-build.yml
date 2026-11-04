@@ -11,7 +11,8 @@ on:
       - main
 
 permissions:
-  contents: read
+  # Used only to attach failure-only compiler excerpts to the commit; never to publish releases.
+  contents: write
 
 concurrency:
   group: android-dev-${{ github.ref }}
@@ -19,6 +20,7 @@ concurrency:
 
 env:
   EXPECTED_TESTS: '118'
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   verify:
@@ -51,6 +53,12 @@ jobs:
               echo "::error::${line//'%'/'%25'}"
             done
             tail -80 build.log
+            {
+              printf 'Android development compilation failed. Log excerpt:\n\n```text\n'
+              tail -c 55000 build.log
+              printf '\n```\n'
+            } > failure-context.md
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" -F body=@failure-context.md || true
           fi
           exit "$STATUS"
 
