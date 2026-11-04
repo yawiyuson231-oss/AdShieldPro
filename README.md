@@ -88,6 +88,7 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 | [`docs/INFINITY_ARCHITECTURE.md`](docs/INFINITY_ARCHITECTURE.md) | Component boundaries, server deployment, WebDAV URL, capacity semantics, security and backup requirements |
 | [`docs/INFINITY_VERIFICATION.md`](docs/INFINITY_VERIFICATION.md) | Feature-by-feature implementation/test status, evidence, external requirements and remaining issues |
 | [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
+| [`docs/DNS_SECURITY_ARCHITECTURE.md`](docs/DNS_SECURITY_ARCHITECTURE.md) | Upstream failover, response validation, DNSSEC reporting, DNS-only app/network policy and the local YARA subset |
 
 ## App screenshots
 

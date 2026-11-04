@@ -134,6 +134,50 @@ object CapabilityRegistry {
             "Manual device smoke test"
         ),
         cap(
+            "dns-provider-failover", "Opt-in provider failover with measured health", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_VPN),
+            listOf("Real per-query success/failure counts, EWMA latency and circuit-breaker cooldowns from DnsProviderHealthMonitor"),
+            listOf(
+                "Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53",
+                "Health is per-process: it is reset when the VPN service is restarted"
+            ),
+            "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt"
+        ),
+        cap(
+            "dns-response-validation", "Strict upstream response validation before caching or answering", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResponseValidator.kt", emptyList(),
+            listOf("Full resource-record walk of the upstream wire response (DnsPacketCodec.inspectResponseRecordTypes)"),
+            listOf("Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes"),
+            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData"
+        ),
+        cap(
+            "dnssec-evidence", "Upstream DNSSEC evidence reporting and strict AD mode", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.PARTIAL, "engine/dns/DnsResponseValidator.kt", emptyList(),
+            listOf("Upstream Authenticated Data (AD) flag and RRSIG presence in the returned records"),
+            listOf(
+                "Reports and optionally enforces upstream evidence only; it is not local DNSSEC chain validation",
+                "Strict mode rejects unsigned positive answers, so unsigned domains stop resolving by design"
+            ),
+            "CybersecurityPlatformTestSuite.dnssecModeReportsUpstreamAdAndStrictModeRejectsUnsignedPositiveAnswers"
+        ),
+        cap(
+            "dns-policy-per-app", "Per-app, per-network and emergency DNS policy", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFirewallPolicyDecider.kt", listOf(PERM_VPN),
+            listOf("Query owner package from VpnService, active transport from ConnectivityManager, user policy from DataStore"),
+            listOf(
+                "DNS decisions only: non-DNS sockets are not inspected because the tunnel routes DNS addresses exclusively",
+                "Emergency allowlist-only mode blocks every DNS answer that is not an explicit user or built-in safety allow"
+            ),
+            "CybersecurityPlatformTestSuite.appNetworkAndEmergencyPoliciesAreDeterministic"
+        ),
+        cap(
+            "dns-diagnostics", "Real resolver diagnostics against the configured upstream", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsDiagnostics.kt", listOf(PERM_INTERNET, PERM_VPN),
+            listOf("A genuine A query with EDNS0 DO bit, measured latency, RCODE, answer count and provider health"),
+            listOf("Validates the configured resolver path; it is not an external DNS leak test and no third-party echo service is contacted"),
+            "CybersecurityPlatformTestSuite.diagnosticQueryUsesEdns0AndNormalisesCase"
+        ),
+        cap(
             "dns-leak-detect", "DNS leak detection", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.PLANNED, "",
             listOf(PERM_INTERNET), listOf("Would compare resolver seen by the tunnel against configured upstream"),
@@ -271,6 +315,16 @@ object CapabilityRegistry {
             listOf("File bytes read from SAF URIs or app-accessible paths"),
             listOf("Signature + structure only; no byte-level AV engine and no cloud hash lookup"),
             "SecurityCenterTestSuite.testFileScanner_detectsEicarTestSignature and related cases"
+        ),
+        cap(
+            "scan-yara-lite", "Local YARA-compatible rule subset (offline file triage)", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.PARTIAL, "engine/security/YaraLiteEngine.kt", emptyList(),
+            listOf("Quoted ASCII/wide/nocase strings and hex byte strings with ?? wildcards, any/all/N-of-them conditions"),
+            listOf(
+                "Not the native YARA engine: no regex, no file/process modules, no external rule packs",
+                "Unsupported syntax is rejected at parse time and the built-in rule set is a small starter set"
+            ),
+            "CybersecurityPlatformTestSuite.yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax and fileScannerUsesRealYaraRuleOutcomes"
         ),
         cap(
             "scan-apk", "APK binary manifest analysis (package, permissions, risk)", CapabilityArea.THREAT_SCANNING,

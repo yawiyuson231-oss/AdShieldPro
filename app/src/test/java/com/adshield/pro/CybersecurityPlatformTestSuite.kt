@@ -38,6 +38,18 @@ class CybersecurityPlatformTestSuite {
     )
 
     @Test
+    fun diagnosticQueryUsesEdns0AndNormalisesCase() {
+        val wire = DnsDiagnosticQueryFactory.build("Example.COM.", transactionId = 0x2A2A)
+        val parsed = DnsPacketCodec.parseQuery(wire)!!
+        assertEquals("example.com", parsed.questionDomain)
+        assertEquals(DnsPacketCodec.TYPE_A, parsed.qType)
+        assertEquals(1, ((wire[10].toInt() and 0xFF) shl 8) or (wire[11].toInt() and 0xFF))
+        // OPT TTL is 0x00008000: the DNSSEC OK bit is set so upstream AD/RRSIG evidence can be reported.
+        assertEquals(0x80, wire[wire.size - 4].toInt() and 0xFF)
+        assertThrows(IllegalArgumentException::class.java) { DnsDiagnosticQueryFactory.build("bad..name") }
+    }
+
+    @Test
     fun providerPlanIsExplicitAndNeverCrossFailsPlaintextDns() {
         val config = DnsResolverConfig(
             preset = DnsProviderPreset.NEXTDNS,
