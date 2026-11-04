@@ -260,10 +260,10 @@ jobs:
           - In-app update checks against this repository's own releases.
 
           ## Universal build
-          One ABI-independent APK: no native libraries, so it installs on arm64-v8a,
-          armeabi-v7a, x86 and x86_64 devices running Android 10+ (API 29-37), on phones,
-          tablets and foldables. Verified by `tools/check_universal_release.py` before this
-          release was published.
+          One APK for every device: any native helper library (AndroidX graphics-path,
+          DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
+          installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
+          Verified by `tools/check_universal_release.py` before this release was published.
 
           ## Notes
           - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.

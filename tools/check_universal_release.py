@@ -8,8 +8,10 @@ is a verified property of each build rather than a promise.
 
 Checks
   1. build config: minSdk == 29, targetSdk >= 29, no abiFilters / splits / native build.
-  2. APK: no lib/<abi>/ entries (=> installs on arm64, armv7, x86, x86_64),
-          contains classes*.dex, resources.arsc, AndroidManifest.xml.
+  2. APK: every native library ships for ALL supported ABIs (arm64-v8a, armeabi-v7a,
+          x86, x86_64) — a pure-JVM APK passes trivially; AndroidX libraries such as
+          libandroidx.graphics.path.so are fine as long as no ABI is left behind.
+          Contains classes*.dex, resources.arsc, AndroidManifest.xml.
   3. APK: bundled offline rule sets are present and non-trivial.
   4. versionCode/versionName match the build file (so upgrades are ordered).
 
@@ -26,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BUILD_FILE = ROOT / "app/build.gradle.kts"
 
 MIN_SDK_REQUIRED = 29
+SUPPORTED_ABIS = {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"}
 
 
 def read_int(pattern: str, text: str, label: str) -> int:
@@ -65,9 +68,30 @@ def check_apk(apk: Path, problems: list[str]) -> dict:
         return {}
     with zipfile.ZipFile(apk) as archive:
         names = archive.namelist()
-        native = sorted({name.split("/")[1] for name in names if name.startswith("lib/") and name.count("/") >= 2})
-        if native:
-            problems.append(f"APK contains native libraries for {native} — it is not ABI-universal")
+        # Universality means "runs on every supported ABI", not "contains zero native code".
+        # AndroidX (Compose graphics-path, DataStore shared counter) ships small .so helpers
+        # for ALL ABIs inside one APK — that is still universal. What breaks devices is a
+        # library that exists for some ABIs but not others, or an unexpected ABI subset.
+        abi_libs: dict[str, set[str]] = {}
+        for name in names:
+            if name.startswith("lib/") and name.count("/") >= 2 and name.endswith(".so"):
+                parts = name.split("/")
+                abi_libs.setdefault(parts[1], set()).add("/".join(parts[2:]))
+        native = sorted(abi_libs)
+        if abi_libs:
+            unknown = set(abi_libs) - SUPPORTED_ABIS
+            if unknown:
+                problems.append(f"APK bundles native libraries for unexpected ABIs {sorted(unknown)}")
+            missing = SUPPORTED_ABIS - set(abi_libs)
+            if missing:
+                problems.append(
+                    f"native libraries are missing for {sorted(missing)} — the APK would fail on those devices"
+                )
+            all_libs = set().union(*abi_libs.values())
+            for abi in sorted(set(abi_libs) & SUPPORTED_ABIS):
+                gap = all_libs - abi_libs[abi]
+                if gap:
+                    problems.append(f"{abi} is missing {sorted(gap)} that other ABIs bundle")
         if not any(re.fullmatch(r"classes\d*\.dex", name) for name in names):
             problems.append("APK has no classes*.dex")
         if "resources.arsc" not in names:
@@ -88,9 +112,11 @@ def check_apk(apk: Path, problems: list[str]) -> dict:
             if archive.getinfo(entry).file_size < minimum_lines * 8:
                 problems.append(f"{asset} looks truncated in the APK")
 
+        lib_names = sorted(set().union(*abi_libs.values())) if abi_libs else []
         return {
             "size_mb": round(apk.stat().st_size / (1024 * 1024), 2),
-            "native_abis": native or ["none (pure JVM — runs on every ABI)"],
+            "native_abis": [f"{', '.join(native)} (all ABIs: {', '.join(lib_names)})"] if native
+            else ["none (pure JVM — runs on every ABI)"],
             "dex": sum(1 for name in names if re.fullmatch(r"classes\d*\.dex", name)),
         }
 
