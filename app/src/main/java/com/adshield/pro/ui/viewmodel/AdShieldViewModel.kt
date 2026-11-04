@@ -12,6 +12,9 @@ import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.BuildConfig
 import com.adshield.pro.domain.model.AppExclusionInfo
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.DnsFirewallPolicy
+import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.domain.model.AppDnsActivity
 import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.BatteryThermalSnapshot
@@ -52,6 +55,8 @@ import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.browser.SearchSuggestionClient
 import com.adshield.pro.engine.platform.DeviceProfiler
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
+import com.adshield.pro.engine.dns.DnsDiagnosticReport
+import com.adshield.pro.engine.dns.runDiagnostics
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
@@ -152,6 +157,11 @@ class AdShieldViewModel @Inject constructor(
 
     private val _installedApps = MutableStateFlow<List<AppExclusionInfo>>(emptyList())
     val installedApps: StateFlow<List<AppExclusionInfo>> = _installedApps.asStateFlow()
+
+    private val _dnsDiagnosticReport = MutableStateFlow<DnsDiagnosticReport?>(null)
+    val dnsDiagnosticReport: StateFlow<DnsDiagnosticReport?> = _dnsDiagnosticReport.asStateFlow()
+    private val _isRunningDnsDiagnostics = MutableStateFlow(false)
+    val isRunningDnsDiagnostics: StateFlow<Boolean> = _isRunningDnsDiagnostics.asStateFlow()
 
     private val _isUpdatingFilters = MutableStateFlow(false)
     val isUpdatingFilters: StateFlow<Boolean> = _isUpdatingFilters.asStateFlow()
@@ -489,6 +499,21 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun runDnsDiagnostics(domain: String) {
+        if (_isRunningDnsDiagnostics.value) return
+        viewModelScope.launch {
+            _isRunningDnsDiagnostics.value = true
+            try {
+                _dnsDiagnosticReport.value = upstreamDnsResolver.runDiagnostics(domain, settingsState.value.resolverConfig)
+            } catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                showFeedback("DNS diagnostic failed: ${error.message ?: error.javaClass.simpleName}")
+            } finally {
+                _isRunningDnsDiagnostics.value = false
+            }
+        }
+    }
+
     // --- Filter List Updates & Sources ---
 
     fun triggerManualFilterUpdate() {
@@ -672,8 +697,10 @@ class AdShieldViewModel @Inject constructor(
 
     fun loadInstalledApps() {
         viewModelScope.launch {
-            val excluded = settingsState.value.excludedAppPackages
-            _installedApps.value = repository.getInstalledApps(excluded)
+            val settings = settingsState.value
+            _installedApps.value = repository.getInstalledApps(
+                settings.excludedAppPackages, settings.dnsFirewallPolicy.appPolicies
+            )
         }
     }
 
@@ -685,6 +712,42 @@ class AdShieldViewModel @Inject constructor(
             showFeedback(
                 if (excluded) "Excluded $packageName from VPN tunnel."
                 else "Included $packageName in VPN protection."
+            )
+        }
+    }
+
+    fun setAppDnsPolicy(packageName: String, policy: AppDnsPolicy) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            val updated = current.appPolicies.toMutableMap().apply {
+                if (policy == AppDnsPolicy.DEFAULT) remove(packageName) else put(packageName, policy)
+            }
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(appPolicies = updated))
+            upstreamDnsResolver.clearCache()
+            loadInstalledApps()
+            showFeedback("${packageName}: ${policy.label}")
+        }
+    }
+
+    fun setTransportProtected(transport: NetworkTransportPolicy, protected: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            val transports = current.protectedTransports.toMutableSet().apply {
+                if (protected) add(transport) else remove(transport)
+            }
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(protectedTransports = transports))
+            showFeedback("${transport.label} DNS filtering ${if (protected) "enabled" else "set to passthrough"}")
+        }
+    }
+
+    fun setEmergencyAllowlistOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(emergencyAllowlistOnly = enabled))
+            upstreamDnsResolver.clearCache()
+            showFeedback(
+                if (enabled) "Emergency DNS mode enabled: only explicit user/system allowlisted domains resolve."
+                else "Emergency DNS mode disabled. Global and per-app policies restored."
             )
         }
     }

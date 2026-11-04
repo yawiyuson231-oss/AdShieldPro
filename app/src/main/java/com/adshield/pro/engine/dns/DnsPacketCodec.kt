@@ -336,6 +336,36 @@ object DnsPacketCodec {
         return 120
     }
 
+    /**
+     * Walks every resource record with bounds and compression-pointer checks.
+     * Returns null for malformed wire data; otherwise returns all RR types present.
+     */
+    fun inspectResponseRecordTypes(message: ByteArray): Set<Int>? {
+        if (message.size < 12) return null
+        val qd = u16At(message, 4)
+        val records = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
+        if (qd != 1 || records > 4096) return null
+        var offset = 12
+        val question = readDomainName(message, 0, offset, message.size) ?: return null
+        offset = question.nextOffset + 4
+        if (offset > message.size) return null
+        val types = mutableSetOf<Int>()
+        repeat(records) {
+            val name = readDomainName(message, 0, offset, message.size) ?: return null
+            offset = name.nextOffset
+            if (offset + 10 > message.size) return null
+            types.add(u16At(message, offset))
+            val rdLength = u16At(message, offset + 8)
+            offset += 10 + rdLength
+            if (offset > message.size) return null
+        }
+        // Trailing bytes are not a valid DNS message and can conceal parser differentials.
+        return if (offset == message.size) types else null
+    }
+
+    private fun u16At(bytes: ByteArray, offset: Int): Int =
+        ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
+
     private fun writeDomainLabels(out: ByteArrayOutputStream, domain: String) {
         val labels = domain.trim('.').split('.')
         for (label in labels) {

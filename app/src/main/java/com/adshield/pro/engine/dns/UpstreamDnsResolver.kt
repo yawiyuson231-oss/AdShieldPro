@@ -1,6 +1,5 @@
 package com.adshield.pro.engine.dns
 
-import android.util.LruCache
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
@@ -35,13 +34,28 @@ import javax.net.ssl.SSLSocketFactory
  * - Thread-safe TTL-aware LRU DNS cache
  */
 @Singleton
-class UpstreamDnsResolver @Inject constructor() {
+class UpstreamDnsResolver @Inject constructor(
+    private val healthMonitor: DnsProviderHealthMonitor
+) {
+    internal fun interface ProviderTransport {
+        fun query(
+            query: DnsPacketCodec.ParsedDnsQuery,
+            config: DnsResolverConfig,
+            endpoint: DnsProviderEndpoint
+        ): ByteArray
+    }
+
+    @Volatile
+    internal var providerTransport: ProviderTransport? = null
+
 
     data class UpstreamResult(
         val responseBytes: ByteArray,
         val protocolUsed: String,
         val fromCache: Boolean,
-        val latencyMs: Int
+        val latencyMs: Int,
+        val providerId: String? = null,
+        val dnssecStatus: DnssecStatus? = null
     )
 
     private data class CachedDnsEntry(
@@ -50,7 +64,9 @@ class UpstreamDnsResolver @Inject constructor() {
         val protocolOrigin: String
     )
 
-    private val dnsCache = object : LruCache<String, CachedDnsEntry>(1024) {}
+    private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > 1024
+    }
 
     @Volatile
     private var currentProtector: ((Socket) -> Boolean)? = null
@@ -68,28 +84,34 @@ class UpstreamDnsResolver @Inject constructor() {
 
     fun clearCache() {
         synchronized(dnsCache) {
-            dnsCache.evictAll()
+            dnsCache.clear()
         }
     }
 
     fun getCacheSize(): Int {
         synchronized(dnsCache) {
-            return dnsCache.size()
+            return dnsCache.size
         }
     }
 
     fun trimExpiredAndExcessCache(targetSize: Int = 128): Int {
         synchronized(dnsCache) {
-            val before = dnsCache.size()
+            val before = dnsCache.size
             val now = System.currentTimeMillis()
-            val snapshot = dnsCache.snapshot()
-            for ((key, entry) in snapshot) {
+            val snapshot = dnsCache.entries.toList()
+            for (mapEntry in snapshot) {
+                val key = mapEntry.key
+                val entry = mapEntry.value
                 if (now >= entry.expiresAtEpochMs) {
                     dnsCache.remove(key)
                 }
             }
-            dnsCache.trimToSize(targetSize.coerceAtLeast(0))
-            return (before - dnsCache.size()).coerceAtLeast(0)
+            val target = targetSize.coerceAtLeast(0)
+            while (dnsCache.size > target) {
+                val eldest = dnsCache.entries.firstOrNull()?.key ?: break
+                dnsCache.remove(eldest)
+            }
+            return (before - dnsCache.size).coerceAtLeast(0)
         }
     }
 
@@ -126,6 +148,10 @@ class UpstreamDnsResolver @Inject constructor() {
                     listOf("94.140.14.140", "94.140.14.141", "2a10:50c0::1:ff", "2a10:50c0::2:ff")
                 "dns.google" ->
                     listOf("8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844")
+                "dns.nextdns.io" ->
+                    listOf("45.90.28.0", "45.90.30.0", "2a07:a8c0::", "2a07:a8c1::")
+                "freedns.controld.com", "p0.freedns.controld.com" ->
+                    listOf("76.76.2.0", "76.76.10.0", "2606:1a40::", "2606:1a40:1::")
                 else -> emptyList()
             }
             if (presetIps.isNotEmpty()) {
@@ -157,82 +183,88 @@ class UpstreamDnsResolver @Inject constructor() {
     ): UpstreamResult = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val cacheKey = buildCacheKey(query, config)
-
-        // 1. Check LRU TTL Cache
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
         if (cached != null) {
             if (cached.expiresAtEpochMs > now) {
-                val rewritten = DnsPacketCodec.rewriteTransactionId(cached.wireResponse, query.transactionId)
                 return@withContext UpstreamResult(
-                    responseBytes = rewritten,
+                    responseBytes = DnsPacketCodec.rewriteTransactionId(cached.wireResponse, query.transactionId),
                     protocolUsed = "${cached.protocolOrigin} (Cached)",
                     fromCache = true,
                     latencyMs = 0
                 )
-            } else {
-                synchronized(dnsCache) { dnsCache.remove(cacheKey) }
             }
+            synchronized(dnsCache) { dnsCache.remove(cacheKey) }
         }
 
-        val startMs = System.currentTimeMillis()
-
-        // 2. Use only the protocol selected by the user. Encrypted DNS must never silently
-        // downgrade to plaintext UDP/TCP when its upstream is unavailable.
-        val (responseBytes, protocolUsed) = when (config.protocol) {
-            DnsProtocol.DOH -> {
-                val dohRes = runCatching { queryDoh(query.rawPayload, config.activeDohUrl) }.getOrNull()
-                    ?.takeIf { isValidDnsResponseForQuery(query.transactionId, it) }
-                if (dohRes != null) {
-                    dohRes to "DoH (${config.preset.displayName})"
-                } else {
-                    DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoH unavailable)"
+        val configuredPlan = DnsProviderRegistry.queryPlan(config)
+        val plan = DnsProviderRegistry.orderedByHealth(
+            configuredPlan, healthMonitor, config.protocol, config.fastestHealthyProvider
+        )
+        val failures = mutableListOf<String>()
+        for (endpoint in plan) {
+            val providerStart = System.currentTimeMillis()
+            try {
+                healthMonitor.checkAvailable(endpoint.providerId, config.protocol, providerStart)
+                val response = providerTransport?.query(query, config, endpoint)
+                    ?: executeProviderQuery(query, config, endpoint)
+                val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
+                val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
+                healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
+                val protocol = "${config.protocol.name} (${endpoint.displayName}) · ${inspection.dnssecStatus.name}"
+                if (shouldCacheDnsResponse(response)) {
+                    val ttlSeconds = DnsPacketCodec.extractResponseTtlSeconds(response)
+                    synchronized(dnsCache) {
+                        dnsCache.put(
+                            cacheKey,
+                            CachedDnsEntry(
+                                wireResponse = response.copyOf(),
+                                expiresAtEpochMs = System.currentTimeMillis() + ttlSeconds * 1000L,
+                                protocolOrigin = protocol
+                            )
+                        )
+                    }
                 }
-            }
-            DnsProtocol.DOT -> {
-                val dotRes = runCatching { queryDot(query.rawPayload, config) }.getOrNull()
-                    ?.takeIf { isValidDnsResponseForQuery(query.transactionId, it) }
-                if (dotRes != null) {
-                    dotRes to "DoT (${config.activeDotHost})"
-                } else {
-                    DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL (DoT unavailable)"
-                }
-            }
-            DnsProtocol.UDP_TCP -> {
-                val udpRes = runCatching { queryUdpOrTcp(query, config) }.getOrNull()
-                if (udpRes != null) {
-                    udpRes to "UDP/53 (${config.activePrimaryIpv4})"
-                } else {
-                    DnsPacketCodec.buildServFailResponse(query) to "SERVFAIL"
-                }
-            }
-        }
-
-        val latency = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-
-        // 3. Store in cache only when the upstream answer is cacheable. Transient failures
-        //    (SERVFAIL/REFUSED/NOTIMP/FORMERR) and truncated messages must never be cached,
-        //    otherwise one upstream hiccup would keep a domain broken for the whole TTL.
-        if (!protocolUsed.startsWith("SERVFAIL") && shouldCacheDnsResponse(responseBytes)) {
-            val ttlSeconds = DnsPacketCodec.extractResponseTtlSeconds(responseBytes)
-            synchronized(dnsCache) {
-                dnsCache.put(
-                    cacheKey,
-                    CachedDnsEntry(
-                        wireResponse = responseBytes,
-                        expiresAtEpochMs = System.currentTimeMillis() + (ttlSeconds * 1000L),
-                        protocolOrigin = config.protocol.name
-                    )
+                return@withContext UpstreamResult(
+                    responseBytes = response,
+                    protocolUsed = protocol,
+                    fromCache = false,
+                    latencyMs = latency.toInt().coerceAtMost(Int.MAX_VALUE),
+                    providerId = endpoint.providerId,
+                    dnssecStatus = inspection.dnssecStatus
                 )
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (error: Throwable) {
+                if (error !is ProviderCircuitOpenException) {
+                    healthMonitor.recordFailure(
+                        endpoint.providerId, config.protocol, error, System.currentTimeMillis()
+                    )
+                }
+                failures += "${endpoint.providerId}: ${error.message ?: error.javaClass.simpleName}"
             }
         }
 
+        // Fail closed at the DNS protocol layer: return SERVFAIL, never an unvalidated response
+        // and never an implicit plaintext downgrade.
         UpstreamResult(
-            responseBytes = responseBytes,
-            protocolUsed = protocolUsed,
+            responseBytes = DnsPacketCodec.buildServFailResponse(query),
+            protocolUsed = "SERVFAIL (${failures.joinToString("; ").take(180)})",
             fromCache = false,
-            latencyMs = latency
+            latencyMs = 0
         )
     }
+
+    private fun executeProviderQuery(
+        query: DnsPacketCodec.ParsedDnsQuery,
+        config: DnsResolverConfig,
+        endpoint: DnsProviderEndpoint
+    ): ByteArray = when (config.protocol) {
+        DnsProtocol.DOH -> queryDoh(query.rawPayload, endpoint.dohUrl)
+        DnsProtocol.DOT -> queryDot(query.rawPayload, endpoint, config.enableIpv6)
+        DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6)
+    }
+
+    fun providerHealthSnapshots(): List<DnsProviderHealth> = healthMonitor.snapshots()
 
     /**
      * Executes an RFC 8484 DNS-over-HTTPS wireformat POST query.
@@ -261,15 +293,15 @@ class UpstreamDnsResolver @Inject constructor() {
     /**
      * Executes an RFC 7858 DNS-over-TLS query over port 853 with SNI and certificate verification.
      */
-    fun queryDot(rawDnsQuery: ByteArray, config: DnsResolverConfig): ByteArray {
+    fun queryDot(rawDnsQuery: ByteArray, endpoint: DnsProviderEndpoint, enableIpv6: Boolean = true): ByteArray {
         val candidates = buildList {
-            add(config.activePrimaryIpv4)
-            if (config.enableIpv6) add(config.activePrimaryIpv6)
+            addAll(endpoint.ipv4Addresses)
+            if (enableIpv6) addAll(endpoint.ipv6Addresses)
         }.filter { it.isNotBlank() }.distinct()
         var lastFailure: Throwable? = null
         for (candidate in candidates) {
             try {
-                return queryDotOverAddress(rawDnsQuery, config, candidate)
+                return queryDotOverAddress(rawDnsQuery, endpoint, candidate)
             } catch (t: Throwable) {
                 lastFailure = t
             }
@@ -279,18 +311,18 @@ class UpstreamDnsResolver @Inject constructor() {
 
     private fun queryDotOverAddress(
         rawDnsQuery: ByteArray,
-        config: DnsResolverConfig,
+        endpoint: DnsProviderEndpoint,
         serverIp: String
     ): ByteArray {
         val rawSocket = Socket()
         currentProtector?.invoke(rawSocket)
         val targetIp = InetAddress.getByName(serverIp)
-        rawSocket.connect(InetSocketAddress(targetIp, config.preset.dotPort), 3500)
+        rawSocket.connect(InetSocketAddress(targetIp, endpoint.dotPort), 3500)
         rawSocket.soTimeout = 3500
 
         val sslFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
-        val dotHost = config.activeDotHost
-        val sslSocket = sslFactory.createSocket(rawSocket, dotHost, config.preset.dotPort, true) as SSLSocket
+        val dotHost = endpoint.dotHostname
+        val sslSocket = sslFactory.createSocket(rawSocket, dotHost, endpoint.dotPort, true) as SSLSocket
         sslSocket.use { tls ->
             tls.startHandshake()
             val session = tls.session
@@ -323,9 +355,13 @@ class UpstreamDnsResolver @Inject constructor() {
      */
     fun queryUdpOrTcp(
         query: DnsPacketCodec.ParsedDnsQuery,
-        config: DnsResolverConfig
+        endpoint: DnsProviderEndpoint,
+        enableIpv6: Boolean = true
     ): ByteArray {
-        val servers = upstreamUdpTcpServers(config)
+        val servers = buildList {
+            addAll(endpoint.ipv4Addresses)
+            if (enableIpv6) addAll(endpoint.ipv6Addresses)
+        }.filter { it.isNotBlank() }.distinct()
         var lastError: Throwable? = null
 
         for (serverIp in servers) {
@@ -454,7 +490,10 @@ class UpstreamDnsResolver @Inject constructor() {
                 DnsProtocol.DOT -> "${config.activeDotHost.lowercase()}:${config.preset.dotPort}"
                 DnsProtocol.UDP_TCP -> upstreamUdpTcpServers(config).joinToString(",")
             }
-            return "${config.protocol.name}@$endpoint|${query.cacheKey}"
+            val failoverScope = if (config.failoverEnabled && config.protocol != DnsProtocol.UDP_TCP) {
+                "|plan=" + DnsProviderRegistry.queryPlan(config).joinToString(",") { it.providerId }
+            } else ""
+            return "${config.protocol.name}@$endpoint$failoverScope|${query.cacheKey}"
         }
     }
 }

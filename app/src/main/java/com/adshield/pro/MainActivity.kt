@@ -654,6 +654,8 @@ private fun SettingsDestination(
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val dnsDiagnosticReport by viewModel.dnsDiagnosticReport.collectAsStateWithLifecycle()
+    val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
@@ -663,6 +665,12 @@ private fun SettingsDestination(
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,
         onLoadInstalledApps = viewModel::loadInstalledApps,
         onToggleAppExclusion = viewModel::toggleAppExclusion,
+        onSetAppDnsPolicy = viewModel::setAppDnsPolicy,
+        onSetTransportProtected = viewModel::setTransportProtected,
+        onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
+        dnsDiagnosticReport = dnsDiagnosticReport,
+        isRunningDnsDiagnostics = isRunningDnsDiagnostics,
+        onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,

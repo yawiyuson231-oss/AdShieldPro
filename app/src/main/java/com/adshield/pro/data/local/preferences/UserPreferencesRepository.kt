@@ -13,6 +13,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.CleanHistoryRecord
 import com.adshield.pro.domain.model.DnsProtocol
+import com.adshield.pro.domain.model.DnsFirewallPolicy
+import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.GameSessionRecord
@@ -39,6 +41,7 @@ data class AppSettingsState(
     val darkThemeMode: DarkThemePreference = DarkThemePreference.DARK,
     val protectionMode: ProtectionMode = ProtectionMode.STANDARD,
     val resolverConfig: DnsResolverConfig = DnsResolverConfig(),
+    val dnsFirewallPolicy: DnsFirewallPolicy = DnsFirewallPolicy(),
     val detailedDnsLoggingEnabled: Boolean = true,
     val logRetentionDays: Int = 7,
     val autoUpdateFiltersEnabled: Boolean = true,
@@ -98,6 +101,13 @@ class UserPreferencesRepository @Inject constructor(
         val CUSTOM_DOT_HOST = stringPreferencesKey("custom_dot_host")
         val CUSTOM_IPV4_PRIMARY = stringPreferencesKey("custom_ipv4_primary")
         val CUSTOM_IPV4_SECONDARY = stringPreferencesKey("custom_ipv4_secondary")
+        val CUSTOM_IPV6_PRIMARY = stringPreferencesKey("custom_ipv6_primary")
+        val CUSTOM_IPV6_SECONDARY = stringPreferencesKey("custom_ipv6_secondary")
+        val DNS_FAILOVER_ENABLED = booleanPreferencesKey("dns_failover_enabled")
+        val DNS_FAILOVER_PROVIDERS = stringSetPreferencesKey("dns_failover_providers")
+        val DNS_FASTEST_HEALTHY = booleanPreferencesKey("dns_fastest_healthy")
+        val DNSSEC_MODE = stringPreferencesKey("dnssec_mode")
+        val DNS_FIREWALL_POLICY = stringPreferencesKey("dns_firewall_policy_json")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
         val DETAILED_LOGGING = booleanPreferencesKey("detailed_dns_logging_enabled")
         val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
@@ -169,6 +179,13 @@ class UserPreferencesRepository @Inject constructor(
         val searchProvider = runCatching {
             SearchProvider.valueOf(prefs[Keys.SEARCH_PROVIDER] ?: SearchProvider.DUCKDUCKGO.name)
         }.getOrDefault(SearchProvider.DUCKDUCKGO)
+        val dnsFirewallPolicy = prefs[Keys.DNS_FIREWALL_POLICY]?.let { raw ->
+            runCatching { json.decodeFromString<DnsFirewallPolicy>(raw) }.getOrDefault(DnsFirewallPolicy())
+        } ?: DnsFirewallPolicy()
+        val dnssecMode = runCatching {
+            DnssecMode.valueOf(prefs[Keys.DNSSEC_MODE] ?: DnssecMode.REPORT_ONLY.name)
+        }.getOrDefault(DnssecMode.REPORT_ONLY)
+
         val searchHistory = prefs[Keys.SEARCH_HISTORY_JSON]?.let { raw ->
             runCatching { json.decodeFromString<List<SearchHistoryEntry>>(raw) }.getOrDefault(emptyList())
         } ?: emptyList()
@@ -185,8 +202,15 @@ class UserPreferencesRepository @Inject constructor(
                 customDotHost = prefs[Keys.CUSTOM_DOT_HOST] ?: "one.one.one.one",
                 customPrimaryIpv4 = prefs[Keys.CUSTOM_IPV4_PRIMARY] ?: "1.1.1.1",
                 customSecondaryIpv4 = prefs[Keys.CUSTOM_IPV4_SECONDARY] ?: "1.0.0.1",
-                enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true
+                customPrimaryIpv6 = prefs[Keys.CUSTOM_IPV6_PRIMARY] ?: "2606:4700:4700::1111",
+                customSecondaryIpv6 = prefs[Keys.CUSTOM_IPV6_SECONDARY] ?: "2606:4700:4700::1001",
+                enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true,
+                failoverEnabled = prefs[Keys.DNS_FAILOVER_ENABLED] ?: false,
+                failoverProviderIds = prefs[Keys.DNS_FAILOVER_PROVIDERS] ?: emptySet(),
+                fastestHealthyProvider = prefs[Keys.DNS_FASTEST_HEALTHY] ?: false,
+                dnssecMode = dnssecMode
             ),
+            dnsFirewallPolicy = dnsFirewallPolicy,
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
             logRetentionDays = prefs[Keys.LOG_RETENTION_DAYS] ?: 7,
             autoUpdateFiltersEnabled = prefs[Keys.AUTO_UPDATE_FILTERS] ?: true,
@@ -246,8 +270,18 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.CUSTOM_DOT_HOST] = config.customDotHost.trim()
             prefs[Keys.CUSTOM_IPV4_PRIMARY] = config.customPrimaryIpv4.trim()
             prefs[Keys.CUSTOM_IPV4_SECONDARY] = config.customSecondaryIpv4.trim()
+            prefs[Keys.CUSTOM_IPV6_PRIMARY] = config.customPrimaryIpv6.trim()
+            prefs[Keys.CUSTOM_IPV6_SECONDARY] = config.customSecondaryIpv6.trim()
+            prefs[Keys.DNS_FAILOVER_ENABLED] = config.failoverEnabled
+            prefs[Keys.DNS_FAILOVER_PROVIDERS] = config.failoverProviderIds
+            prefs[Keys.DNS_FASTEST_HEALTHY] = config.fastestHealthyProvider
+            prefs[Keys.DNSSEC_MODE] = config.dnssecMode.name
             prefs[Keys.ENABLE_IPV6] = config.enableIpv6
         }
+    }
+
+    suspend fun updateDnsFirewallPolicy(policy: DnsFirewallPolicy) {
+        context.adShieldDataStore.edit { it[Keys.DNS_FIREWALL_POLICY] = json.encodeToString(policy) }
     }
 
     suspend fun setDetailedDnsLogging(enabled: Boolean) {

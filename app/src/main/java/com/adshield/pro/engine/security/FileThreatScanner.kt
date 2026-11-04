@@ -201,9 +201,20 @@ class FileThreatScanner {
         }
         val text = sb.toString()
 
+        val yaraMatches = YaraLiteEngine().scan(text)
+        yaraMatches.forEach { match ->
+            findings.add(
+                "YARA-compatible local rule '${match.ruleName}' matched: ${match.matchedStringIds.joinToString(", ")}"
+            )
+        }
+
         if (text.contains(EICAR_STRING)) {
             findings.add("Exact match: EICAR antivirus test signature (industry-standard detection test file)")
             return ContentFindings(findings, 100, "EICAR.Test.File")
+        }
+        if (yaraMatches.isNotEmpty()) {
+            score += 70
+            threatName = "YARA: ${yaraMatches.first().ruleName}"
         }
 
         val dropperPatterns = listOf(
