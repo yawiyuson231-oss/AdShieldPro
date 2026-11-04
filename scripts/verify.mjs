@@ -162,9 +162,12 @@ export function verify() {
   add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
+  // Derived, not hardcoded: adding a screen must not be able to slip past this gate.
+  const sectionCount = (htmlA11y.match(/<section class="page"/g) || []).length;
+  const labelledCount = (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length;
   add('every page section has an accessible name',
-    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === 10,
-    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of 10`);
+    sectionCount > 0 && labelledCount === sectionCount,
+    `${labelledCount} of ${sectionCount}`);
   add('a skip link targets the main landmark',
     /class="skip-link" href="#main"/.test(htmlA11y) && /<main id="main"/.test(htmlA11y));
 

@@ -179,6 +179,42 @@
 
   .empty { color: var(--dim); font-size: 13px; padding: 10px 0; }
 
+  /* Additive helpers for the storage / scan / search / downloader screens.
+     Same palette and radius as every other component; nothing existing is redefined. */
+  .split { display: grid; gap: 14px; grid-template-columns: minmax(220px, 1fr) minmax(320px, 2.2fr); align-items: start; }
+  @media (max-width: 820px) { .split { grid-template-columns: 1fr; } }
+  .file-row { display: flex; align-items: center; gap: 10px; }
+  .file-ico {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none;
+    background: var(--surface3); font-size: 14px; color: var(--glow);
+  }
+  .sortbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sortbar button[aria-pressed="true"] { border-color: var(--blue); background: #2e7dff22; color: #fff; }
+  .track { height: 8px; border-radius: 999px; background: #16294a; overflow: hidden; margin: 6px 0; }
+  .track > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); transition: width .3s; }
+  .trace { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--dim); max-height: 190px; overflow: auto; }
+  .trace div { padding: 2px 0; border-bottom: 1px solid #14294a66; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--dim);
+    background: var(--surface2); cursor: pointer; font-family: inherit;
+  }
+  .chip:hover { border-color: var(--blue); color: var(--text); }
+  .chip[aria-pressed="true"] { border-color: var(--blue); background: #2e7dff22; color: #fff; }
+  .media-thumb { width: 100%; max-width: 340px; border-radius: 12px; border: 1px solid var(--line-soft); display: block; }
+  .searchbox { display: flex; gap: 10px; flex-wrap: wrap; }
+  .searchbox input { flex: 1 1 320px; }
+  .engine-card { border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px 14px; background: #0b1730aa; cursor: pointer; }
+  .engine-card[aria-pressed="true"] { border-color: var(--blue); box-shadow: 0 0 0 1px #2e7dff33 inset; }
+  .engine-card h4 { margin: 0 0 4px; font-size: 13.5px; color: var(--text); }
+  .engine-card p { font-size: 12px; margin: 0; }
+  .dropzone {
+    border: 1.5px dashed var(--line); border-radius: 12px; padding: 18px; text-align: center;
+    color: var(--dim); font-size: 13px; background: #0b173055;
+  }
+  .dropzone.over { border-color: var(--blue); background: #2e7dff14; color: var(--text); }
+  .mono-ellipsis { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   footer.site {
     padding: 26px; text-align: center; color: var(--dim); font-size: 12.5px;
     border-top: 1px solid var(--line-soft); margin-top: 30px;
@@ -237,6 +273,10 @@
   <button type="button" data-page="feeds">Feeds</button>
   <button type="button" data-page="privacy">Privacy</button>
   <button type="button" data-page="sync">Backup &amp; Sync</button>
+  <button type="button" data-page="scan">System Scan</button>
+  <button type="button" data-page="search">Private Search</button>
+  <button type="button" data-page="vault">Cloud Box</button>
+  <button type="button" data-page="media">Downloader</button>
   <button type="button" data-page="extension">Extension</button>
   <button type="button" data-page="status">Capabilities</button>
 </nav>
@@ -392,6 +432,122 @@
         </table>
       </div>
     </div>
+  </section>
+
+  <section class="page" id="page-scan" aria-label="System Scan" tabindex="-1" hidden>
+    <div class="card accent">
+      <h2>System scan <span class="pill info" id="scan-status">idle</span></h2>
+      <p>Real byte-level inspection of files you grant, phishing analysis of links, integrity
+      verification of the vault and an audit of this build's security configuration. A web page
+      cannot read other applications or the whole device file system — the rows below say exactly
+      what each module can and cannot reach instead of pretending.</p>
+      <div class="chips" id="scan-modules" style="margin-top:12px"></div>
+      <div class="dropzone" id="scan-drop" style="margin-top:12px">
+        Drop files or a folder here, or use the buttons below. Nothing is uploaded; bytes are read in this tab only.
+        <div class="row" style="justify-content:center;margin-top:10px">
+          <button id="scan-pick" type="button">Choose files…</button>
+          <button id="scan-pick-folder" type="button">Choose a folder…</button>
+          <button class="primary" id="scan-run" type="button">Run scan</button>
+          <button id="scan-stop" type="button" disabled>Stop</button>
+        </div>
+        <input type="file" id="scan-files" multiple hidden>
+        <input type="file" id="scan-folder" webkitdirectory directory multiple hidden>
+      </div>
+      <div id="scan-progress" style="margin-top:14px">
+        <div class="small muted" id="scan-phase">No scan has run yet.</div>
+        <div class="track"><i id="scan-bar"></i></div>
+        <div class="trace" id="scan-trace" aria-live="polite"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="scan-report" type="button" disabled>Download report (JSON)</button>
+        <span class="small muted" id="scan-summary"></span>
+      </div>
+    </div>
+    <div class="grid k2">
+      <div class="card" id="scan-findings"></div>
+      <div class="card" id="scan-modules-info"></div>
+    </div>
+    <div class="card" id="scan-files-card"></div>
+    <div class="card" id="scan-history"></div>
+  </section>
+
+  <section class="page" id="page-search" aria-label="Private Search" tabindex="-1" hidden>
+    <div class="card accent">
+      <h2>Private search <span class="pill" id="search-engine-pill">DuckDuckGo</span></h2>
+      <p>Pick the engine that matches the privacy you want. Queries open in a new tab with
+      <code>noopener,noreferrer</code>, so the engine never learns which page sent you, and
+      tracking parameters are stripped from every result link. History stays on this device and can
+      be switched off entirely.</p>
+      <div class="searchbox" style="margin-top:12px">
+        <input type="text" id="search-input" placeholder="Search the web — or paste a result URL to clean it" autocomplete="off" spellcheck="false" aria-label="Search query">
+        <button class="primary" id="search-go" type="button">Search</button>
+        <button id="search-instant" type="button">Instant answer here</button>
+        <button id="search-clean" type="button">Strip trackers</button>
+      </div>
+      <div class="grid k3" id="search-engines" style="margin-top:14px"></div>
+      <div class="chips" id="search-kinds" style="margin-top:12px"></div>
+      <div id="search-out" style="margin-top:12px"></div>
+    </div>
+    <div class="grid k2">
+      <div class="card" id="search-answer"></div>
+      <div class="card" id="search-privacy"></div>
+    </div>
+    <div class="card" id="search-history"></div>
+  </section>
+
+  <section class="page" id="page-vault" aria-label="Cloud Box" tabindex="-1" hidden>
+    <div class="card accent">
+      <h2>Private cloud box <span class="pill info" id="vault-lock-pill">unlocked</span></h2>
+      <p>Your files live in this browser's IndexedDB on this device — no server, no account, no
+      upload. Add photos, videos, documents or audio, organise them in folders, preview them,
+      download them again and verify they are unchanged with SHA-256. A passphrase lock encrypts
+      new files with AES-GCM.</p>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="vault-upload" type="button">Add files…</button>
+        <button id="vault-new-folder" type="button">New folder</button>
+        <button id="vault-lock" type="button">Set passphrase</button>
+        <button id="vault-manifest" type="button">Export manifest</button>
+        <button class="danger" id="vault-wipe" type="button">Delete everything</button>
+        <input type="file" id="vault-files" multiple hidden>
+      </div>
+      <div class="track"><i id="vault-bar"></i></div>
+      <div class="small muted" id="vault-usage">Reading storage…</div>
+    </div>
+    <div class="split">
+      <div class="card" id="vault-folders"></div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Files</h2>
+          <input type="text" id="vault-filter" placeholder="Search name or tag" style="max-width:240px" aria-label="Search vault">
+        </div>
+        <div class="chips" id="vault-kinds" style="margin:10px 0"></div>
+        <div class="scroll-x" id="vault-list"></div>
+      </div>
+    </div>
+    <div class="card" id="vault-preview"></div>
+  </section>
+
+  <section class="page" id="page-media" aria-label="Downloader" tabindex="-1" hidden>
+    <div class="card accent">
+      <h2>Video &amp; music downloader</h2>
+      <p>Paste a media URL. This checks the platform's real metadata endpoint and tells you
+      upfront whether its terms allow a download. Direct media files (MP4, WebM, MP3, M4A …) and
+      links whose server permits it are downloaded with pause, resume and cancel; completed files
+      land in your cloud box. DRM-protected and paywalled sources are refused with the reason —
+      never faked.</p>
+      <div class="searchbox" style="margin-top:12px">
+        <input type="text" id="media-url" placeholder="https://…/video.mp4 · vimeo.com/… · soundcloud.com/…" autocomplete="off" spellcheck="false" aria-label="Media URL">
+        <button class="primary" id="media-check" type="button">Check</button>
+        <button id="media-add" type="button" disabled>Download</button>
+      </div>
+      <div id="media-out" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <h2>Transfers <span class="pill info" id="media-progress-pill">idle</span></h2>
+      <div class="track"><i id="media-bar"></i></div>
+      <div class="scroll-x" id="media-list"></div>
+    </div>
+    <div class="card" id="media-history"></div>
   </section>
 
   <section class="page" id="page-extension" aria-label="Browser extension" tabindex="-1" hidden>

@@ -21,7 +21,11 @@ import { FeedManager, FEED_REGISTRY } from './security/feedmanager.js';
 import { BackupManager, SCHEMA_VERSION } from './security/backup.js';
 import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
-import { createStorage } from './security/storage.js';
+import { createStorage, IndexedDbAdapter } from './security/storage.js';
+import { FileVault, setDefaultSinkVault } from './security/vault.js';
+import { SystemScanner, scanUrl } from './security/scan.js';
+import { DownloadQueue, parseMediaUrl, probeMedia, inspectRemote } from './security/media.js';
+import { PROVIDERS as SEARCH_PROVIDERS, buildSearchUrl, stripTracking, openExternal as openSearch, instantAnswer, sanitizeQuery, resolveBang, providerById as searchProvider, SearchHistory } from './security/search.js';
 import * as ui from './ui/dom.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
@@ -54,7 +58,20 @@ const state = {
   bundled: {},
   snapshotTimer: null,
   lastSnapshotId: null,
-  currentPage: 'dashboard'
+  currentPage: 'dashboard',
+  // v5.1 additions: on-device vault, system scanner, private search, downloader.
+  vault: null,
+  scanner: null,
+  downloads: null,
+  searchHistory: null,
+  scanFiles: [],
+  scanRun: null,
+  scanTrace: [],
+  vaultView: { folder: '/', kind: null, query: '' },
+  search: { provider: 'duckduckgo', kind: 'web', lastQuery: '', lastUrl: null },
+  mediaDraft: null,
+  mediaTimer: null,
+  vaultUrl: null
 };
 
 /* ------------------------------------------------------------------ */
@@ -84,6 +101,20 @@ async function boot() {
     await state.analytics.load();
     state.feeds = new FeedManager({ storage: state.storage, onEvent: (e) => { if (e.ok === false) console.debug('[feeds]', e.reason, e.detail); } });
     state.backups = new BackupManager({ storage: state.storage, maxSnapshots: 4 });
+
+    state.vault = new FileVault({ storage: state.storage });
+    await state.vault.load();
+    setDefaultSinkVault(state.vault);
+    state.scanner = new SystemScanner({ vault: state.vault });
+    state.downloads = new DownloadQueue({
+      onUpdate: () => { if (state.currentPage === 'media') renderMediaTransfers(); }
+    });
+    state.searchHistory = await new SearchHistory({ storage: state.storage }).load();
+    await restoreDownloadHistory();
+    try {
+      const savedProvider = await state.storage.getItem('search:provider');
+      if (savedProvider && SEARCH_PROVIDERS.some((provider) => provider.id === savedProvider)) state.search.provider = savedProvider;
+    } catch { /* the default provider is fine if the preference cannot be read */ }
 
     setBootStatus('loading rule sets…', 'info');
     state.engine = new OmniShieldFilterEngine();
@@ -334,6 +365,10 @@ const PAGE_RENDERERS = {
   feeds: renderFeeds,
   privacy: renderPrivacy,
   sync: renderSync,
+  scan: renderScan,
+  search: renderSearch,
+  vault: renderVault,
+  media: renderMedia,
   extension: renderExtension,
   status: renderStatus
 };
@@ -362,15 +397,18 @@ function navigate(page) {
   for (const other of document.querySelectorAll('.page')) {
     if (other !== section) other.removeAttribute('aria-current');
   }
+  let rendered = Promise.resolve();
   try {
     // Renderers may be async (they read shipped artifacts); a rejection must be
-    // reported, never left as an unhandled promise.
-    Promise.resolve(PAGE_RENDERERS[page]?.()).catch((err) => {
+    // reported, never left as an unhandled promise. The promise is returned so a
+    // caller can await a fully painted page instead of racing it.
+    rendered = Promise.resolve(PAGE_RENDERERS[page]?.()).catch((err) => {
       console.error(err);
       toast(`Render error on ${page}: ${err.message}`, 'bad');
     });
   } catch (err) { console.error(err); toast(`Render error on ${page}: ${err.message}`, 'bad'); }
   if (location.hash !== `#${page}`) history.replaceState(null, '', `#${page}`);
+  return rendered;
 }
 
 function renderAll() {
@@ -1495,6 +1533,918 @@ function renderStatus() {
 }
 
 /* ------------------------------------------------------------------ */
+/* System scan                                                         */
+/* ------------------------------------------------------------------ */
+
+const SCAN_MODULE_LABELS = {
+  files: 'Files & downloads',
+  urls: 'Links & QR targets',
+  vault: 'Cloud box integrity',
+  configuration: 'Security configuration',
+  storage: 'Browser storage',
+  applications: 'Installed apps',
+  systemFiles: 'Whole-device files',
+  network: 'Other apps\' traffic'
+};
+
+function scanEnabledModules() {
+  if (!state.scanEnabled) {
+    state.scanEnabled = { files: true, urls: true, vault: true, configuration: true, storage: true };
+  }
+  return state.scanEnabled;
+}
+
+function scanSeverityPill(severity) {
+  const cls = severity === 'critical' || severity === 'high' ? 'bad'
+    : severity === 'medium' ? 'warn'
+      : severity === 'low' ? 'info'
+        : severity === 'clean' ? 'ok' : '';
+  return pill(severity, cls);
+}
+
+/** Reads the live configuration so the audit inspects what is actually running. */
+async function collectScanConfiguration() {
+  const config = { engineLoaded: !!state.engine };
+  try {
+    const active = state.client.pool.order()[0];
+    if (active) config.resolver = { name: active.name, dohJson: active.dohJson, dot: active.dot };
+  } catch { /* leave undefined: the audit reports the gap */ }
+  try {
+    const statuses = await state.feeds.list();
+    const checked = [];
+    for (const status of statuses) {
+      if (!status.installed) continue;
+      const verification = await state.feeds.verify(status.id);
+      checked.push({ id: status.id, verified: verification.ok, error: verification.reason === 'ok' ? null : verification.reason });
+    }
+    if (checked.length) config.feeds = checked;
+  } catch { /* reported as unknown */ }
+  if (state.engine) config.rules = state.engine.breakdown();
+  config.vaultLocked = !!state.vault?.locked;
+  config.serviceWorker = !!(globalThis.navigator?.serviceWorker?.controller);
+  if (state.lastDnsAssessment) config.dnssec = state.lastDnsAssessment;
+  return config;
+}
+
+function renderScan() {
+  if (!state.scanner) return;
+  const enabled = scanEnabledModules();
+  const modules = state.scanner.capabilities();
+
+  mount('#scan-modules', modules.map((capability) => h('button', {
+    type: 'button',
+    class: 'chip',
+    'aria-pressed': String(!!enabled[capability.id] && capability.available),
+    disabled: !capability.available,
+    title: capability.available ? capability.detail : `${capability.detail} Not selectable.`,
+    text: `${capability.label}${capability.available ? '' : ' · unavailable'}`,
+    onclick: () => {
+      if (!capability.available) return;
+      enabled[capability.id] = !enabled[capability.id];
+      renderScan();
+    }
+  })));
+
+  const selected = state.scanFiles.length;
+  mount('#scan-status', h('span', { text: state.scanner.running ? 'running' : (state.scanRun ? state.scanRun.status : 'idle') }));
+
+  const run = state.scanRun;
+  mount('#scan-phase', run
+    ? h('span', { text: `${run.phase} · ${run.progress === 1 ? 'finished in' : 'running for'} ${(run.durationMs ?? (Date.now() - run.startedAt))} ms · ${plural(selected, 'file')} queued` })
+    : h('span', { text: selected ? `${plural(selected, 'file')} ready — press Run scan.` : 'No scan has run yet. Choose files or run the configuration, link and storage checks.' }));
+  const bar = document.getElementById('scan-bar');
+  if (bar) bar.style.width = `${Math.round((run?.progress ?? 0) * 100)}%`;
+
+  mount('#scan-trace', state.scanTrace.slice(-12).map((line) => h('div', { text: line })));
+
+  const stopButton = document.getElementById('scan-stop');
+  if (stopButton) stopButton.disabled = !state.scanner.running;
+  const runButton = document.getElementById('scan-run');
+  if (runButton) runButton.disabled = state.scanner.running;
+  const reportButton = document.getElementById('scan-report');
+  if (reportButton) reportButton.disabled = !run || run.status === 'running';
+
+  const findings = run?.findings || [];
+  mount('#scan-findings',
+    h('h2', { text: 'Findings' }),
+    run ? table(['Severity', 'Target', 'Finding', 'Evidence'], findings.map((finding) => [
+      scanSeverityPill(finding.severity), finding.target || '—', finding.label || '—', finding.evidence || '—'
+    ]), { emptyText: 'No findings in this run — every check that ran came back clean.' }) : empty('Run a scan to see findings.'),
+    run?.errors.length ? note(`${plural(run.errors.length, 'item')} could not be checked: ${run.errors.map((e) => `${e.target || e.scope}: ${e.message}`).join('; ')}`, 'warn') : null,
+    run?.skipped.length ? h('p', { class: 'small muted', style: { marginTop: '8px' }, text: `Skipped: ${run.skipped.map((s) => s.scope).join(', ')} (see the module list for why).` }) : null
+  );
+
+  mount('#scan-modules-info',
+    h('h2', { text: 'What each module can reach' }),
+    table(['Module', 'Available', 'Scope'], modules.map((capability) => [
+      capability.label,
+      capability.available ? pill('yes', 'ok') : pill('no', 'bad'),
+      capability.detail
+    ])),
+    h('h3', { text: 'Where the data lives' }),
+    kv([
+      ['Storage backend in use', state.vault?.storage?.name || 'unknown'],
+      ['IndexedDB available', IndexedDbAdapter.detect() ? 'yes — large files and binary payloads are supported' : 'no — the cloud box falls back to localStorage (small files only)'],
+      ['Files queued for this run', String(state.scanFiles.length)],
+      ['Bytes read per file', 'head window 4 KB, deep window 6 MB — files larger than that are scanned from their first 6 MB and their size is reported']
+    ])
+  );
+
+  mount('#scan-files-card',
+    h('h2', { text: 'Files inspected' }),
+    table(['File', 'Size', 'Detected', 'Severity', 'SHA-256'], (run?.files || []).map((file) => [
+      h('div', { class: 'file-row' }, h('span', { class: 'file-ico', text: '📄' }), h('span', { text: file.name })),
+      bytes(file.size),
+      file.container || file.type,
+      scanSeverityPill(file.severity),
+      h('span', { class: 'tiny mono', text: file.sha256 ? `${file.sha256.slice(0, 24)}…` : '—' })
+    ]), { emptyText: 'No files inspected yet.' })
+  );
+
+  const summary = run?.summary;
+  mount('#scan-summary', summary
+    ? h('span', { text: `${summary.status} · ${plural(summary.findings, 'finding')} · ${plural(summary.files, 'file')} · ${bytes(summary.bytes)} read · ${plural(summary.checks, 'check')}` })
+    : h('span', { text: '' }));
+
+  mount('#scan-history',
+    h('h2', { text: 'Scan history' }),
+    table(['Started', 'Modules', 'Files', 'Findings', 'Result', ''], state.scanner.history.slice().reverse().map((entry) => [
+      relativeTime(entry.startedAt),
+      entry.modules.length,
+      entry.scanned.files,
+      entry.summary.findings,
+      scanSeverityPill(entry.summary.status),
+      h('button', {
+        class: 'sm', type: 'button', text: 'Report',
+        onclick: () => downloadScanReport(entry.id)
+      })
+    ]), { emptyText: 'No runs recorded in this session.' })
+  );
+}
+
+function downloadScanReport(runId = null) {
+  const report = state.scanner.report(runId);
+  if (!report) { toast('No scan report to export yet.', 'warn'); return; }
+  download(`omnishield-scan-${report.run.id}.json`, JSON.stringify(report, null, 2));
+  toast('Scan report downloaded (findings only — no file contents).', 'ok');
+}
+
+async function runScan() {
+  if (!state.scanner || state.scanner.running) return;
+  const enabled = scanEnabledModules();
+  const modules = Object.entries(enabled).filter(([, on]) => on).map(([id]) => id);
+  if (!modules.length) { toast('Select at least one module to scan.', 'warn'); return; }
+  state.scanTrace = [];
+  state.scanner.onProgress((event) => {
+    if (event.type === 'progress') {
+      state.scanTrace.push(`${new Date().toLocaleTimeString()} · ${event.run.phase} · ${Math.round(event.run.progress * 100)}%`);
+      state.scanRun = event.run;
+      if (state.currentPage === 'scan') renderScan();
+    } else if (event.type === 'done') {
+      state.scanTrace.push(`${new Date().toLocaleTimeString()} · ${event.run.status} · ${event.run.summary.findings} finding(s)`);
+      state.scanRun = event.run;
+      if (state.currentPage === 'scan') renderScan();
+    }
+  });
+
+  const urls = new Set();
+  for (const task of state.downloads?.list() || []) if (task.url) urls.add(task.url);
+  const mediaInput = document.getElementById('media-url')?.value?.trim();
+  if (mediaInput) urls.add(mediaInput);
+  const searchInput = document.getElementById('search-input')?.value?.trim();
+  if (searchInput && /^https?:\/\//i.test(searchInput)) urls.add(searchInput);
+
+  try {
+    const configuration = await collectScanConfiguration();
+    const run = await state.scanner.run({
+      modules,
+      files: state.scanFiles,
+      urls: [...urls],
+      configuration: modules.includes('configuration') ? configuration : null
+    });
+    state.scanRun = run;
+    const worst = run.summary.counts.critical + run.summary.counts.high;
+    toast(`Scan ${run.status}: ${plural(run.summary.findings, 'finding')}${worst ? `, ${worst} high or critical` : ''}.`, worst ? 'warn' : 'ok');
+    renderScan();
+    return run;
+  } catch (error) {
+    toast(`Scan failed: ${error.message}`, 'bad');
+    renderScan();
+    return null;
+  }
+}
+
+/** Walks a dropped item list, including folders, without leaving the page. */
+async function collectDroppedFiles(transfer) {
+  const items = transfer?.items ? [...transfer.items] : [];
+  const entries = items
+    .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+    .filter(Boolean);
+  if (!entries.length) return [...(transfer?.files || [])];
+
+  const files = [];
+  const walk = async (entry, prefix = '') => {
+    if (!entry) return;
+    if (entry.isFile) {
+      const file = await new Promise((resolve) => entry.file(resolve, () => resolve(null)));
+      if (file) {
+        try { Object.defineProperty(file, '__path', { value: `${prefix}${file.name}`, configurable: true }); } catch { /* read-only in some engines */ }
+        files.push(file);
+      }
+      return;
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      for (;;) {
+        const batch = await new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+        if (!batch.length) break;
+        for (const child of batch) await walk(child, `${prefix}${entry.name}/`);
+      }
+    }
+  };
+  for (const entry of entries) await walk(entry);
+  return files.length ? files : [...(transfer?.files || [])];
+}
+
+function addScanFiles(files) {
+  const list = [...files].filter(Boolean);
+  if (!list.length) return;
+  state.scanFiles = [...state.scanFiles, ...list].slice(0, 2000);
+  toast(`${plural(list.length, 'file')} added to the scan queue (${plural(state.scanFiles.length, 'file')} queued).`, 'ok');
+  renderScan();
+}
+
+/* ------------------------------------------------------------------ */
+/* Private search                                                      */
+/* ------------------------------------------------------------------ */
+
+function renderSearch() {
+  const provider = searchProvider(state.search.provider);
+
+  mount('#search-engine-pill', h('span', { text: provider.name }));
+  mount('#search-engines', SEARCH_PROVIDERS.map((entry) => h('div', {
+    class: 'engine-card',
+    role: 'button',
+    tabindex: '0',
+    'aria-pressed': String(entry.id === provider.id),
+    onclick: () => selectSearchProvider(entry.id),
+    onkeydown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectSearchProvider(entry.id); } }
+  },
+    h('h4', { text: entry.name }),
+    h('p', { text: entry.privacy })
+  )));
+
+  const kinds = ['web', 'images', 'videos', 'news', 'maps'];
+  mount('#search-kinds', kinds.map((kind) => h('button', {
+    type: 'button',
+    class: 'chip',
+    'aria-pressed': String(state.search.kind === kind),
+    disabled: kind !== 'web' && provider.kinds?.[kind] === null,
+    text: provider.kinds?.[kind] === null ? `${kind} · not offered by ${provider.name}` : kind,
+    onclick: () => { state.search.kind = kind; renderSearch(); }
+  })));
+
+  mount('#search-privacy',
+    h('h2', { text: `${provider.name} — privacy position` }),
+    kv([
+      ['Query endpoint', h('span', { class: 'tiny mono', text: provider.search })],
+      ['What the engine receives', provider.name === 'Google' ? 'your query, IP address and Google account cookies in the browser profile' : 'your query and the IP address of this connection'],
+      ['Privacy stance', provider.privacy],
+      ['Bangs', h('code', { text: `${provider.bang} query` }) ],
+      ['Referrer', 'The query opens with noopener,noreferrer, so no referrer header is sent from this page.'],
+      ['What is stored here', state.searchHistory?.enabled ? `${plural(state.searchHistory.entries.length, 'query', 'queries')} in this browser` : 'nothing — history is switched off']
+    ]),
+    note('Opening a third-party search page hands that engine your query and connection. This app cannot proxy it without a backend, and it does not pretend to: the link opens the engine you chose, stripped of tracking parameters.', 'warn')
+  );
+
+  const history = state.searchHistory || new SearchHistory({});
+  mount('#search-history',
+    h('h2', { text: 'Search history (this device only)' }),
+    h('div', { class: 'row' },
+      h('button', {
+        type: 'button', class: 'sm', text: history.enabled ? 'Turn history off' : 'Turn history on',
+        onclick: async () => {
+          await history.setEnabled(!history.enabled);
+          toast(history.enabled ? 'Search history enabled (stored locally).' : 'Search history disabled and cleared.', 'ok');
+          renderSearch();
+        }
+      }),
+      h('button', {
+        type: 'button', class: 'danger sm', text: 'Clear history',
+        onclick: async () => { await history.clear(); renderSearch(); toast('Search history cleared.', 'ok'); }
+      }),
+      pill(history.enabled ? 'enabled' : 'disabled', history.enabled ? 'ok' : 'info')
+    ),
+    table(['Query', 'Engine', 'When'], history.entries.slice(0, 20).map((entry) => [
+      h('a', { href: buildSearchUrl(entry.provider, entry.query), target: '_blank', rel: 'noopener noreferrer', text: entry.query }),
+      searchProvider(entry.provider).name,
+      relativeTime(entry.at)
+    ]), { emptyText: history.enabled ? 'No searches yet.' : 'History is switched off — nothing is recorded.' })
+  );
+}
+
+async function selectSearchProvider(id) {
+  state.search.provider = id;
+  try { await state.storage.setItem('search:provider', id); } catch { /* preference is best-effort */ }
+  renderSearch();
+}
+
+async function runSearch({ instant = false, clean = false } = {}) {
+  const input = document.getElementById('search-input');
+  const raw = input?.value || '';
+  const parsedBang = resolveBang(raw);
+  if (parsedBang.provider && parsedBang.provider !== state.search.provider) await selectSearchProvider(parsedBang.provider);
+  const query = sanitizeQuery(parsedBang.query);
+  const out = document.getElementById('search-out');
+
+  if (clean) {
+    const result = stripTracking(query);
+    if (!result.ok) {
+      mount(out, note(`“${query}” is not a valid URL, so there was nothing to clean. Paste a full link with http(s)://.`, 'warn'));
+      return;
+    }
+    mount(out, note(result.removed.length
+      ? `Removed ${result.removed.length} tracking parameter(s): ${result.removed.join(', ')}.`
+      : 'No tracking parameters found in that URL.', result.removed.length ? 'ok' : 'info'),
+    h('p', { class: 'small' }, h('a', { href: result.url, target: '_blank', rel: 'noopener noreferrer', text: result.url })));
+    return;
+  }
+
+  if (!query) { mount(out, note('Type something to search for.', 'warn')); return; }
+
+  if (instant) {
+    await runInstantAnswer(query);
+    return;
+  }
+
+  let url;
+  try {
+    url = buildSearchUrl(state.search.provider, query, { kind: state.search.kind });
+  } catch (error) {
+    mount(out, note(error.message, 'warn'));
+    return;
+  }
+  state.search.lastQuery = query;
+  state.search.lastUrl = url;
+  await state.searchHistory?.record(query, state.search.provider);
+  const opened = openSearch(url, window);
+  mount(out,
+    opened.opened
+      ? note(`Opened ${searchProvider(state.search.provider).name} in a new tab.`, 'ok')
+      : note(`${opened.reason}. Open it manually:`, 'warn'),
+    h('p', { class: 'small' }, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: url })),
+    h('div', { class: 'row', style: { marginTop: '8px' } },
+      h('button', { type: 'button', class: 'sm', text: 'Inspect this query in AETHER', onclick: () => {
+        const aetherInput = document.getElementById('aether-input');
+        if (aetherInput) { aetherInput.value = query; }
+        navigate('aether');
+        analyseDomain(query);
+      } }),
+      h('button', { type: 'button', class: 'sm', text: 'Scan the URL', onclick: () => {
+        const result = scanUrl(url);
+        mount(out, note(`URL check: ${result.level} (${result.score}/100) — ${result.findings.map((f) => f.label).join('; ')}`, result.level === 'clean' ? 'ok' : 'warn'));
+      } })
+    )
+  );
+  renderSearch();
+}
+
+async function runInstantAnswer(query) {
+  const out = document.getElementById('search-out');
+  const box = document.getElementById('search-answer');
+  mount(box, h('h2', { text: 'Instant answer' }), h('p', { class: 'small muted', text: 'Asking DuckDuckGo…' }));
+  const result = await instantAnswer(query);
+  if (!result.ok) {
+    mount(box, h('h2', { text: 'Instant answer' }),
+      note(`No in-app answer: ${result.error}`, 'warn'),
+      h('p', { class: 'small muted', text: 'The full search still works in a new tab — use Search above.' }));
+    mount(out, note('In-app answers come from the DuckDuckGo Instant Answer API, which allows cross-origin reads. When it cannot be reached, nothing is shown rather than a guess.', 'warn'));
+    return;
+  }
+  if (!result.hasContent) {
+    mount(box, h('h2', { text: 'Instant answer' }),
+      note('DuckDuckGo has no instant answer for that query. That is an empty result, not an error.', 'info'));
+    return;
+  }
+  mount(box,
+    h('h2', { text: result.heading || 'Instant answer' }),
+    result.answer ? h('p', { text: result.answer }) : null,
+    result.definition ? h('p', { text: result.definition }) : null,
+    result.sourceUrl ? h('p', { class: 'small' }, h('a', { href: result.sourceUrl, target: '_blank', rel: 'noopener noreferrer', text: result.source || result.sourceUrl })) : null,
+    result.topics.length ? h('ul', { style: { paddingLeft: '18px', marginTop: '8px' } }, result.topics.map((topic) =>
+      h('li', { class: 'small' }, h('a', { href: topic.url, target: '_blank', rel: 'noopener noreferrer', text: topic.title })))) : null,
+    h('p', { class: 'tiny muted', style: { marginTop: '8px' }, text: `${result.endpoint} · fetched ${relativeTime(result.fetchedAt)} · passed through no proxy` })
+  );
+  mount(out, note('Answer rendered from the DuckDuckGo Instant Answer API response above.', 'ok'));
+}
+
+/* ------------------------------------------------------------------ */
+/* Private cloud box                                                   */
+/* ------------------------------------------------------------------ */
+
+const KIND_ICON = { image: '🖼', video: '🎬', audio: '🎵', document: '📄', archive: '🗜', other: '📦' };
+
+async function renderVault() {
+  if (!state.vault) return;
+  await state.vault.load();
+  const view = state.vaultView;
+
+  const lockPill = document.getElementById('vault-lock-pill');
+  if (lockPill) {
+    lockPill.className = `pill ${state.vault.locked ? (state.vault.unlocked ? 'ok' : 'warn') : 'info'}`;
+    lockPill.textContent = state.vault.locked ? (state.vault.unlocked ? 'locked · unlocked this session' : 'locked') : 'unlocked';
+  }
+  const lockButton = document.getElementById('vault-lock');
+  if (lockButton) lockButton.textContent = state.vault.locked ? 'Manage passphrase' : 'Set passphrase';
+
+  const usage = await state.vault.usage();
+  const quota = usage.estimate?.supported ? usage.estimate.quota : null;
+  const bar = document.getElementById('vault-bar');
+  if (bar) bar.style.width = `${quota ? Math.min(100, Math.round((usage.estimate.usage / quota) * 100)) : Math.min(100, Math.round((usage.bytes / (25 * 1024 * 1024)) * 100))}%`;
+  mount('#vault-usage',
+    h('span', { text: `${plural(usage.files, 'file')} · ${bytes(usage.bytes)} stored · ${quota ? `${bytes(usage.estimate.usage)} of ${bytes(quota)} browser quota in use` : 'browser did not report a quota (StorageManager.estimate unavailable)'} · backend: ${state.vault.storage.name}` }),
+    state.vault.indexError ? note(state.vault.indexError, 'bad') : null
+  );
+
+  mount('#vault-folders',
+    h('h2', { text: 'Folders' }),
+    h('div', { style: { display: 'grid', gap: '4px' } }, state.vault.foldersList().map((folder) => h('button', {
+      type: 'button',
+      class: 'sm',
+      style: { textAlign: 'left', borderColor: folder.path === view.folder ? 'var(--blue)' : '' },
+      text: `${folder.path === '/' ? 'All files' : folder.path} (${folder.count})`,
+      onclick: () => { view.folder = folder.path; renderVault(); }
+    }))),
+    state.vaultNewFolder
+      ? h('div', { class: 'row', style: { marginTop: '10px' } },
+        h('input', { type: 'text', id: 'vault-folder-name', placeholder: '/Photos/2026' }),
+        h('button', { type: 'button', class: 'primary sm', text: 'Create', onclick: createVaultFolder }),
+        h('button', { type: 'button', class: 'sm', text: 'Cancel', onclick: () => { state.vaultNewFolder = false; renderVault(); } }))
+      : null
+  );
+
+  const kinds = ['image', 'video', 'audio', 'document', 'archive', 'other'];
+  mount('#vault-kinds', [
+    h('button', { type: 'button', class: 'chip', 'aria-pressed': String(!view.kind), text: 'all types', onclick: () => { view.kind = null; renderVault(); } }),
+    ...kinds.map((kind) => h('button', {
+      type: 'button', class: 'chip', 'aria-pressed': String(view.kind === kind),
+      text: `${KIND_ICON[kind]} ${kind}`,
+      onclick: () => { view.kind = view.kind === kind ? null : kind; renderVault(); }
+    }))
+  ]);
+
+  const entries = state.vault.list({ folder: view.folder === '/' ? null : view.folder, kind: view.kind, query: view.query });
+  mount('#vault-list',
+    table(['Name', 'Type', 'Size', 'Folder', 'Added', 'Actions'], entries.map((entry) => [
+      h('div', { class: 'file-row' },
+        h('span', { class: 'file-ico', text: KIND_ICON[entry.kind] || '📦' }),
+        h('button', { type: 'button', class: 'ghost', style: { padding: '0', border: 'none', color: 'var(--text)' }, text: entry.name, onclick: () => openVaultPreview(entry.id) })
+      ),
+      entry.kind + (entry.encrypted ? ' · encrypted' : ''),
+      bytes(entry.size),
+      entry.folder,
+      relativeTime(entry.createdAt),
+      h('div', { class: 'row', style: { gap: '6px' } },
+        h('button', { type: 'button', class: 'sm', text: 'Preview', onclick: () => openVaultPreview(entry.id) }),
+        h('button', { type: 'button', class: 'sm', text: 'Download', onclick: () => downloadVaultFile(entry.id) }),
+        h('button', { type: 'button', class: 'sm', text: 'Verify', onclick: () => verifyVaultFile(entry.id) }),
+        h('button', { type: 'button', class: 'sm danger', text: 'Delete', onclick: () => deleteVaultFile(entry.id) })
+      )
+    ]), { emptyText: view.query || view.kind || view.folder !== '/' ? 'Nothing matches this filter.' : 'The cloud box is empty. Add files to get started.' })
+  );
+
+  if (!state.vaultDetails) {
+    mount('#vault-preview',
+      h('h2', { text: 'Preview & file details' }),
+      empty('Select a file to preview it, rename it, move it between folders or add tags.')
+    );
+  }
+}
+
+async function createVaultFolder() {
+  const input = document.getElementById('vault-folder-name');
+  try {
+    const created = await state.vault.createFolder(input?.value || '');
+    state.vaultNewFolder = false;
+    state.vaultView.folder = created;
+    toast(`Folder ${created} created.`, 'ok');
+  } catch (error) {
+    toast(`Could not create the folder: ${error.message}`, 'bad');
+  }
+  renderVault();
+}
+
+async function uploadToVault(files) {
+  const list = [...files];
+  if (!list.length) return;
+  let stored = 0;
+  const errors = [];
+  for (const file of list) {
+    try {
+      await state.vault.put(file, { folder: state.vaultView.folder, source: 'upload' });
+      stored += 1;
+    } catch (error) {
+      errors.push(`${file.name}: ${error.message}`);
+    }
+  }
+  if (stored) toast(`${plural(stored, 'file')} added to the cloud box.`, 'ok');
+  if (errors.length) toast(`${plural(errors.length, 'file')} not stored — ${errors[0]}`, 'bad');
+  // Awaited: callers (and tests) may rely on the list already showing the new files.
+  await renderVault();
+}
+
+async function openVaultPreview(id) {
+  const entry = state.vault.get(id);
+  if (!entry) return;
+  if (state.vaultUrl) { state.vault.releaseUrl(state.vaultUrl); state.vaultUrl = null; }
+  state.vaultDetails = entry;
+  const box = document.getElementById('vault-preview');
+  mount(box,
+    h('h2', { text: `${KIND_ICON[entry.kind] || '📦'} ${entry.name}` }),
+    kv([
+      ['Type', `${entry.kind} · ${entry.mime}`],
+      ['Size', bytes(entry.size)],
+      ['Folder', entry.folder],
+      ['Added', new Date(entry.createdAt).toLocaleString()],
+      ['SHA-256', h('span', { class: 'tiny mono', text: entry.sha256 })],
+      ['Encryption', entry.encrypted ? 'AES-GCM 256' : 'none (passphrase lock off when added)'],
+      ['Tags', entry.tags.length ? entry.tags.join(', ') : '—'],
+      ['Source', entry.source]
+    ]),
+    h('div', { id: 'vault-media', style: { marginTop: '10px' } }),
+    h('h3', { text: 'Organise' }),
+    h('div', { class: 'row' },
+      h('input', { type: 'text', id: 'vault-rename-input', value: entry.name, 'aria-label': 'New name', style: { maxWidth: '260px' } }),
+      h('button', { type: 'button', class: 'primary sm', text: 'Rename', onclick: () => renameVaultFile(entry.id) }),
+      h('input', { type: 'text', id: 'vault-move-input', value: entry.folder, 'aria-label': 'Folder', style: { maxWidth: '200px' } }),
+      h('button', { type: 'button', class: 'sm', text: 'Move', onclick: () => moveVaultFile(entry.id) }),
+      h('input', { type: 'text', id: 'vault-tag-input', value: entry.tags.join(', '), 'aria-label': 'Tags', style: { maxWidth: '200px' } }),
+      h('button', { type: 'button', class: 'sm', text: 'Save tags', onclick: () => tagVaultFile(entry.id) })
+    )
+  );
+
+  const media = document.getElementById('vault-media');
+  if (entry.size > 60 * 1024 * 1024 && ['video', 'audio'].includes(entry.kind)) {
+    mount(media, note('This file is large; preview is skipped to keep the tab responsive. Use Download to save a copy.', 'info'));
+    return;
+  }
+  try {
+    const url = await state.vault.urlFor(entry.id);
+    state.vaultUrl = url;
+    if (entry.kind === 'image') mount(media, h('img', { src: url, alt: entry.name, class: 'media-thumb' }));
+    else if (entry.kind === 'video') mount(media, h('video', { src: url, controls: 'controls', class: 'media-thumb' }));
+    else if (entry.kind === 'audio') mount(media, h('audio', { src: url, controls: 'controls', style: { width: '100%' } }));
+    else if (entry.kind === 'document' && /^text\/|json|xml/.test(entry.mime)) {
+      const textBody = await (await state.vault.read(entry.id)).blob.text();
+      mount(media, h('pre', { class: 'trace', text: textBody.slice(0, 4000) + (textBody.length > 4000 ? '\n… (truncated preview)' : '') }));
+    } else if (entry.mime === 'application/pdf') {
+      mount(media, h('iframe', { src: url, title: entry.name, style: { width: '100%', height: '420px', border: '1px solid var(--line-soft)', borderRadius: '12px' } }));
+    } else {
+      mount(media, note('No inline preview for this type. Download it to open it in your usual app.', 'info'));
+    }
+  } catch (error) {
+    mount(media, note(`Preview failed: ${error.message}`, 'bad'));
+  }
+}
+
+async function downloadVaultFile(id) {
+  const entry = state.vault.get(id);
+  if (!entry) return;
+  try {
+    const { blob } = await state.vault.read(id);
+    const url = URL.createObjectURL(blob.type ? blob : new Blob([blob], { type: entry.mime }));
+    const anchor = h('a', { href: url, download: entry.name });
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast(`Saving ${entry.name}.`, 'ok');
+  } catch (error) {
+    toast(`Could not read ${entry.name}: ${error.message}`, 'bad');
+  }
+}
+
+async function verifyVaultFile(id) {
+  const result = await state.vault.verify(id);
+  toast(result.ok ? `Verified ${state.vault.get(id)?.name}: ${result.note}.` : `Integrity failure on ${state.vault.get(id)?.name}: ${result.error}`, result.ok ? 'ok' : 'bad');
+}
+
+async function deleteVaultFile(id) {
+  const entry = state.vault.get(id);
+  if (!entry) return;
+  if (!confirm(`Delete “${entry.name}” from the cloud box? This cannot be undone.`)) return;
+  await state.vault.remove(id);
+  if (state.vaultDetails?.id === id) { state.vaultDetails = null; if (state.vaultUrl) { state.vault.releaseUrl(state.vaultUrl); state.vaultUrl = null; } }
+  toast(`${entry.name} deleted.`, 'ok');
+  renderVault();
+}
+
+async function renameVaultFile(id) {
+  const value = document.getElementById('vault-rename-input')?.value;
+  try { await state.vault.rename(id, value); toast('Renamed.', 'ok'); state.vaultDetails = state.vault.get(id); renderVault(); await openVaultPreview(id); } catch (error) { toast(error.message, 'bad'); }
+}
+
+async function moveVaultFile(id) {
+  const value = document.getElementById('vault-move-input')?.value;
+  try { await state.vault.move(id, value); toast('Moved.', 'ok'); state.vaultDetails = state.vault.get(id); renderVault(); await openVaultPreview(id); } catch (error) { toast(error.message, 'bad'); }
+}
+
+async function tagVaultFile(id) {
+  const value = (document.getElementById('vault-tag-input')?.value || '').split(',');
+  try { await state.vault.tag(id, value); toast('Tags saved.', 'ok'); renderVault(); await openVaultPreview(id); } catch (error) { toast(error.message, 'bad'); }
+}
+
+function renderVaultLockForm() {
+  const box = document.getElementById('vault-preview');
+  const vault = state.vault;
+  if (vault.locked && !vault.unlocked) {
+    mount(box, h('h2', { text: 'Unlock the cloud box' }),
+      h('div', { class: 'row' }, h('input', { type: 'password', id: 'vault-pass', placeholder: 'Passphrase', 'aria-label': 'Passphrase' }),
+        h('button', { type: 'button', class: 'primary', text: 'Unlock', onclick: async () => {
+          try { await vault.unlock(document.getElementById('vault-pass')?.value || ''); toast('Cloud box unlocked for this session.', 'ok'); renderVault(); }
+          catch (error) { toast(error.message, 'bad'); }
+        } })));
+    return;
+  }
+  mount(box, h('h2', { text: 'Passphrase lock (AES-GCM 256)' }),
+    h('p', { class: 'small muted', text: 'Files added while the lock is on are encrypted with a key derived from your passphrase (PBKDF2-SHA256, 210 000 iterations). There is no recovery: if the passphrase is lost the encrypted files cannot be read.' }),
+    h('div', { class: 'row' },
+      h('input', { type: 'password', id: 'vault-pass', placeholder: vault.locked ? 'Current passphrase' : 'New passphrase (8+ characters)', 'aria-label': 'Passphrase' }),
+      h('input', { type: 'password', id: 'vault-pass2', placeholder: 'Repeat', 'aria-label': 'Repeat passphrase' }),
+      h('button', { type: 'button', class: 'primary', text: vault.locked ? 'Unlock / change' : 'Enable lock', onclick: async () => {
+        const first = document.getElementById('vault-pass')?.value || '';
+        const second = document.getElementById('vault-pass2')?.value || '';
+        try {
+          if (vault.locked) await vault.unlock(first);
+          if (first !== second) throw new Error('The two passphrases do not match.');
+          await vault.setPassphrase(first);
+          toast('Passphrase lock enabled — new files are encrypted.', 'ok');
+          renderVault();
+        } catch (error) { toast(error.message, 'bad'); }
+      } }),
+      vault.locked ? h('button', { type: 'button', class: 'danger', text: 'Remove lock (decrypts files)', onclick: async () => {
+        const pass = document.getElementById('vault-pass')?.value || '';
+        try { await vault.removePassphrase(pass); toast('Lock removed; stored files were decrypted.', 'warn'); renderVault(); }
+        catch (error) { toast(error.message, 'bad'); }
+      } }) : null,
+      vault.locked ? h('button', { type: 'button', text: 'Lock now', onclick: () => { vault.lock(); toast('Cloud box locked.', 'ok'); renderVault(); } }) : null
+    ));
+}
+
+/* ------------------------------------------------------------------ */
+/* Media downloader                                                    */
+/* ------------------------------------------------------------------ */
+
+function persistDownloadHistory() {
+  if (!state.downloads) return;
+  const tasks = state.downloads.list().slice(0, 60).map((task) => ({
+    id: task.id, url: task.url, name: task.name, status: task.status, size: task.size,
+    received: task.received, format: task.format, platform: task.platform, sha256: task.sha256,
+    error: task.error, finishedAt: task.finishedAt, updatedAt: task.updatedAt
+  }));
+  Promise.resolve(state.storage?.setItem('media:history', JSON.stringify(tasks))).catch(() => {});
+}
+
+async function restoreDownloadHistory() {
+  try {
+    const raw = await state.storage.getItem('media:history');
+    if (!raw) return;
+    const tasks = JSON.parse(raw);
+    if (!Array.isArray(tasks)) return;
+    for (const task of tasks) {
+      if (!task?.id || !task.url) continue;
+      state.downloads.tasks.set(task.id, { ...task, status: task.status === 'downloading' ? 'interrupted' : task.status });
+    }
+  } catch { /* history is a convenience, not a contract */ }
+}
+
+function renderMedia() {
+  if (!state.downloads) return;
+  const draft = state.mediaDraft;
+  const out = document.getElementById('media-out');
+  if (out && draft) {
+    const platform = draft.parsed.platform;
+    const fetchable = !!draft.parsed.direct;
+    // Three honest states: permitted and fetchable · permitted but needs an
+    // authorised link we cannot obtain in a browser · not permitted at all.
+    const status = fetchable
+      ? pill('download permitted', 'ok')
+      : platform.directDownload
+        ? pill('needs the uploader\'s authorised link', 'warn')
+        : pill('download not permitted', 'bad');
+    const explanation = fetchable ? null : platform.directDownload
+      ? note(`${platform.reason || 'This platform only serves media through an authorised link.'} ${platform.alternative ? `Alternative: ${platform.alternative}` : ''}`, 'warn')
+      : note(`${platform.reason || 'This platform does not permit third-party downloads.'} ${platform.alternative ? `Alternative: ${platform.alternative}` : ''}`, 'warn');
+
+    mount(out,
+      h('div', { class: 'row', style: { justifyContent: 'space-between' } },
+        h('h3', { style: { margin: '0' }, text: `${platform.name}${draft.parsed.id ? ` · ${draft.parsed.id}` : ''}` }),
+        status),
+      explanation,
+      draft.probe && draft.probe.ok ? kv([
+        ['Title', draft.probe.title || '—'],
+        ['Author', draft.probe.author || '—'],
+        ['Duration', draft.probe.durationSeconds ? `${Math.floor(draft.probe.durationSeconds / 60)}m ${draft.probe.durationSeconds % 60}s` : '—'],
+        ['Metadata source', draft.probe.source]
+      ]) : draft.probe && !draft.probe.ok ? h('p', { class: 'small muted', text: `Metadata: ${draft.probe.error}` }) : null,
+      draft.remote ? h('p', { class: 'small', style: { marginTop: '8px' }, text: draft.remote.ok
+        ? `Pre-flight: ${bytes(draft.remote.size ?? 0)} · ${draft.remote.type || 'type unknown'} · ${draft.remote.resumable ? 'resumable (Range supported)' : 'no range support — a pause restarts the transfer'}`
+        : `Pre-flight: ${draft.remote.error}` }) : null,
+      draft.probe?.ok && draft.probe.thumbnail ? h('img', { src: draft.probe.thumbnail, alt: 'thumbnail', class: 'media-thumb', style: { marginTop: '10px' } }) : null,
+      h('div', { style: { marginTop: '12px' } },
+        h('h4', { class: 'small', text: 'Choose a format' }),
+        h('div', { class: 'chips', id: 'media-formats' }, (draft.probe?.formats || []).map((format) => h('button', {
+          type: 'button', class: 'chip', 'aria-pressed': String(draft.format?.id === format.id),
+          text: format.resolution ? `${format.container.toUpperCase()} ${format.resolution}` : `${format.container.toUpperCase()} ${format.bitrateKbps} kbps`,
+          onclick: () => { draft.format = format; renderMedia(); }
+        }))),
+        h('p', { class: 'tiny muted', style: { marginTop: '6px' }, text: 'Formats are the container/resolution ladder the platform publishes and the choice is recorded against the transfer. The browser stores the bytes the server actually sends; it does not transcode.' }),
+        fetchable
+          ? h('p', { class: 'tiny muted', text: `Destination: your cloud box, folder /Downloads · file ${draft.parsed.canonical.split('/').pop()?.split('?')[0] || 'download'}` })
+          : h('p', { class: 'tiny muted', text: 'No transfer can be started for this URL — the Download button stays disabled on purpose.' })
+      )
+    );
+  }
+  const addButton = document.getElementById('media-add');
+  if (addButton) addButton.disabled = !draft || !draft.parsed.direct || state.downloads.get(draft.taskId || '')?.status === 'downloading';
+  renderMediaTransfers();
+}
+
+function renderMediaTransfers() {
+  if (!state.downloads) return;
+  const tasks = state.downloads.list();
+  const stats = state.downloads.stats();
+  mount('#media-progress-pill', h('span', { text: stats.active ? `${stats.active} active` : `${stats.done} complete` }));
+  const active = tasks.find((task) => task.status === 'downloading');
+  const bar = document.getElementById('media-bar');
+  if (bar) bar.style.width = `${active && active.size ? Math.min(100, Math.round((active.received / active.size) * 100)) : 0}%`;
+
+  mount('#media-list',
+    table(['File', 'Platform', 'Size', 'Progress', 'Status', 'Actions'], tasks.map((task) => [
+      h('span', { class: 'small mono-ellipsis', title: task.name, text: task.name }),
+      task.platform || 'direct',
+      task.size ? bytes(task.size) : bytes(task.received),
+      h('div', { style: { minWidth: '110px' } },
+        h('div', { class: 'track', style: { margin: '0' } }, h('i', { style: { width: `${task.size ? Math.min(100, Math.round((task.received / task.size) * 100)) : (task.status === 'done' ? 100 : 0)}%` } })),
+        h('span', { class: 'tiny muted', text: `${bytes(task.received)}${task.size ? ` / ${bytes(task.size)}` : ''}` })),
+      pill(task.status, task.status === 'done' ? 'ok' : task.status === 'failed' || task.status === 'cancelled' ? 'bad' : task.status === 'paused' || task.status === 'interrupted' ? 'warn' : 'info'),
+      h('div', { class: 'row', style: { gap: '6px' } },
+        ['paused', 'queued', 'interrupted', 'failed'].includes(task.status) ? h('button', { type: 'button', class: 'sm', text: 'Resume', onclick: () => resumeDownload(task.id) }) : null,
+        task.status === 'downloading' ? h('button', { type: 'button', class: 'sm', text: 'Pause', onclick: () => { state.downloads.pause(task.id); renderMediaTransfers(); } }) : null,
+        ['downloading', 'paused', 'queued'].includes(task.status) ? h('button', { type: 'button', class: 'sm danger', text: 'Cancel', onclick: () => { state.downloads.cancel(task.id); persistDownloadHistory(); renderMediaTransfers(); } }) : null,
+        h('button', { type: 'button', class: 'sm', text: 'Remove', onclick: () => { state.downloads.remove(task.id); persistDownloadHistory(); renderMediaTransfers(); } })
+      )
+    ]), { emptyText: 'No transfers yet. Check a URL above, then press Download.' })
+  );
+
+  mount('#media-history',
+    h('h2', { text: 'Download history (this device)' }),
+    table(['When', 'File', 'Result', 'SHA-256'], tasks.filter((task) => ['done', 'failed', 'cancelled'].includes(task.status)).map((task) => [
+      relativeTime(task.finishedAt || task.updatedAt),
+      h('span', { class: 'small mono-ellipsis', text: task.name }),
+      task.status === 'done' ? pill('saved to cloud box', 'ok') : pill(task.error ? `${task.status}: ${task.error}` : task.status, 'bad'),
+      h('span', { class: 'tiny mono', text: task.sha256 ? `${task.sha256.slice(0, 16)}…` : '—' })
+    ]), { emptyText: 'No finished transfers yet.' }),
+    h('p', { class: 'small muted', style: { marginTop: '8px' }, text: 'Only sources that permit downloading are fetched. Every entry above is a real transfer attempt and its real outcome.' })
+  );
+}
+
+async function checkMediaUrl() {
+  const input = document.getElementById('media-url');
+  const button = document.getElementById('media-check');
+  const out = document.getElementById('media-out');
+  const parsed = parseMediaUrl(input?.value || '');
+  if (!parsed.ok) {
+    state.mediaDraft = null;
+    mount(out, note(parsed.error, 'warn'));
+    renderMedia();
+    return;
+  }
+  state.mediaDraft = { parsed, probe: null, remote: null, format: null, taskId: null };
+  setBusy(button, true, 'Checking…');
+  renderMedia();
+  try {
+    const probe = await probeMedia(parsed);
+    state.mediaDraft.probe = probe;
+    const formats = probe.formats || [];
+    state.mediaDraft.format = formats[0] || null;
+    if (parsed.direct) {
+      state.mediaDraft.remote = await inspectRemote(parsed.canonical);
+    }
+  } catch (error) {
+    state.mediaDraft.probe = { ok: false, error: error.message };
+  } finally {
+    setBusy(button, false);
+  }
+  renderMedia();
+}
+
+async function startDownload(taskId) {
+  const task = state.downloads.get(taskId);
+  if (!task) return;
+  const result = await state.downloads.start(taskId);
+  persistDownloadHistory();
+  renderMediaTransfers();
+  if (result.status === 'done') toast(`${result.name} saved to the cloud box (${bytes(result.received)}).`, 'ok');
+  else if (result.status === 'failed') toast(`Download failed: ${result.error}`, 'bad');
+  else if (result.status === 'paused') toast('Download paused — Resume continues from the saved byte offset when the server supports ranges.', 'warn');
+}
+
+async function resumeDownload(taskId) {
+  const task = state.downloads.get(taskId);
+  if (!task) return;
+  task.status = 'queued';
+  renderMediaTransfers();
+  await startDownload(taskId);
+}
+
+async function addMediaDownload() {
+  const draft = state.mediaDraft;
+  if (!draft || !draft.parsed.direct) { toast('That source does not permit downloading.', 'warn'); return; }
+  const name = decodeURIComponent(draft.parsed.canonical.split('/').pop().split('?')[0] || 'download.bin');
+  const task = state.downloads.add({
+    url: draft.parsed.canonical,
+    name,
+    format: draft.format?.id || null,
+    kind: draft.parsed.kind,
+    size: draft.remote?.size ?? null,
+    resumable: draft.remote?.resumable ?? null,
+    platform: draft.parsed.platform.id,
+    destination: '/Downloads'
+  });
+  draft.taskId = task.id;
+  renderMedia();
+  await startDownload(task.id);
+}
+
+/* ------------------------------------------------------------------ */
+/* Wiring for the v5.1 screens                                         */
+/* ------------------------------------------------------------------ */
+
+function wireNewFeatures() {
+  // --- scanner
+  const scanFiles = document.getElementById('scan-files');
+  const scanFolder = document.getElementById('scan-folder');
+  const scanDrop = document.getElementById('scan-drop');
+  document.getElementById('scan-pick')?.addEventListener('click', () => scanFiles?.click());
+  document.getElementById('scan-pick-folder')?.addEventListener('click', () => scanFolder?.click());
+  scanFiles?.addEventListener('change', (event) => { addScanFiles(event.target.files || []); event.target.value = ''; });
+  scanFolder?.addEventListener('change', (event) => { addScanFiles(event.target.files || []); event.target.value = ''; });
+  document.getElementById('scan-run')?.addEventListener('click', runScan);
+  document.getElementById('scan-stop')?.addEventListener('click', () => { state.scanner?.stop(); toast('Stopping after the current file.', 'warn'); });
+  document.getElementById('scan-report')?.addEventListener('click', () => downloadScanReport());
+
+  if (scanDrop) {
+    const over = (event) => { event.preventDefault(); scanDrop.classList.add('over'); };
+    const leave = () => scanDrop.classList.remove('over');
+    scanDrop.addEventListener('dragover', over);
+    scanDrop.addEventListener('dragenter', over);
+    scanDrop.addEventListener('dragleave', leave);
+    scanDrop.addEventListener('drop', async (event) => {
+      event.preventDefault();
+      leave();
+      const dropped = await collectDroppedFiles(event.dataTransfer);
+      addScanFiles(dropped);
+    });
+  }
+
+  // --- search
+  document.getElementById('search-go')?.addEventListener('click', () => runSearch());
+  document.getElementById('search-instant')?.addEventListener('click', () => runSearch({ instant: true }));
+  document.getElementById('search-clean')?.addEventListener('click', () => runSearch({ clean: true }));
+  const searchInput = document.getElementById('search-input');
+  searchInput?.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); runSearch(); } });
+
+  // --- vault
+  const vaultFiles = document.getElementById('vault-files');
+  document.getElementById('vault-upload')?.addEventListener('click', () => vaultFiles?.click());
+  vaultFiles?.addEventListener('change', async (event) => { await uploadToVault(event.target.files || []); event.target.value = ''; });
+  document.getElementById('vault-new-folder')?.addEventListener('click', () => { state.vaultNewFolder = true; renderVault(); });
+  document.getElementById('vault-lock')?.addEventListener('click', () => { renderVaultLockForm(); });
+  document.getElementById('vault-manifest')?.addEventListener('click', () => {
+    const manifest = state.vault.manifest();
+    download('omnishield-vault-manifest.json', JSON.stringify(manifest, null, 2));
+    toast('Manifest exported (file names and hashes — no contents).', 'ok');
+  });
+  document.getElementById('vault-wipe')?.addEventListener('click', async () => {
+    if (!confirm('Delete every file in the cloud box? This cannot be undone.')) return;
+    const result = await state.vault.destroy();
+    toast(`${plural(result.removed, 'file')} deleted.`, 'ok');
+    state.vaultDetails = null;
+    renderVault();
+  });
+  document.getElementById('vault-filter')?.addEventListener('input', (event) => {
+    state.vaultView.query = event.target.value;
+    renderVault();
+  });
+
+  // --- media
+  document.getElementById('media-check')?.addEventListener('click', checkMediaUrl);
+  document.getElementById('media-add')?.addEventListener('click', addMediaDownload);
+  document.getElementById('media-url')?.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); checkMediaUrl(); } });
+}
+
+/* ------------------------------------------------------------------ */
 /* Status helpers                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -1621,6 +2571,8 @@ function wireEvents() {
     importAndroidBackup(file);
   });
   document.getElementById('export-btn').addEventListener('click', exportMergedConfig);
+
+  wireNewFeatures();
 }
 
 /* ------------------------------------------------------------------ */
@@ -1651,6 +2603,17 @@ globalThis.__omnishield = {
   saveSnapshot,
   buildState,
   startMonitorLoop,
+  // v5.1 feature handles: the integration suite drives these exactly as the UI does.
+  scanner: () => state.scanner,
+  vault: () => state.vault,
+  downloads: () => state.downloads,
+  runScan,
+  runSearch,
+  checkMediaUrl,
+  addMediaDownload,
+  uploadToVault,
+  openVaultPreview,
+  selectSearchProvider,
   stop() {
     clearInterval(state.monitorTimer);
     try { state.power?.stop(); } catch { /* ignore */ }
