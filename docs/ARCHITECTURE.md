@@ -20,7 +20,7 @@ security/           firewall AI, monitor, feeds, backup, privacy, sha256, storag
 assets/             bundled rule feeds (GPLv3, HaGeZi) + curated supplements + icon
 sw.js               offline caching (never caches DoH)
 scripts/verify.mjs  static architecture + honesty-claim verification
-tests/              unit (153) + integration (17) + static gates
+tests/              unit (161) + integration (18) + static gates
 ```
 
 ## 2. Data flow of a single lookup
@@ -107,6 +107,16 @@ Measured: 79,801 rules evaluate at well under the 0.5 ms/op budget asserted in
 - `dnssec.js` — reports `VALIDATED_UPSTREAM | SIGNED_UNVERIFIED | UNSIGNED | BOGUS_SUSPECTED |
   UNKNOWN`; never upgrades one to another; refuses to call SERVFAIL "bogus".
 - `client.js` — orchestrates the pipeline and the counters used by the dashboard.
+
+### Redirect-chain audit (`dns/chain.js`)
+
+`auditChain()` walks the resolver's CNAME links (bounded to 12), resolves each link's
+registrable domain, and asks the filter engine and the reputation engine about every hop.
+A link that leaves the queried site's registrable domain *and* is blocked or scores ≥ 45/100
+is reported as CNAME cloaking, with the rule or score attached. The function returns
+advisory data only — it has no `blocked` or `action` field, so it cannot enforce. The DNS lab
+renders the chain as a table plus the evidence list, and always prints the scope line
+("HTTP redirects are invisible to a DNS filter").
 
 ## 6. AETHER (`aether/`)
 

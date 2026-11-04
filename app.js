@@ -11,6 +11,7 @@
 import { OmniShieldFilterEngine } from './engine.js';
 import { DnsClient } from './dns/client.js';
 import { RESOLVERS, RESOLVER_BY_ID, DotTransport } from './dns/resolvers.js';
+import { auditChain } from './dns/chain.js';
 import { Aether } from './aether/index.js';
 import { DomainClassifier } from './aether/classifier.js';
 import { SIGNAL_WEIGHTS, EVIDENCE_FLOORS } from './aether/reputation.js';
@@ -715,6 +716,42 @@ async function resolveDomain() {
   }
 }
 
+/**
+ * Audits the CNAME chain of a resolution result: which links leave the queried
+ * site, and whether any of them is already blocked or flagged. Purely advisory.
+ */
+function chainAuditFor(result) {
+  if (!result || !Array.isArray(result.cname) || !result.cname.length) {
+    return auditChain({ name: result?.name || '', cname: [], engine: state.engine });
+  }
+  return auditChain({
+    name: result.name,
+    cname: result.cname,
+    engine: state.engine,
+    reputation: (domain) => state.aether.reputation.analyze(domain)
+  });
+}
+
+function chainAuditNodes(audit) {
+  return [
+    h('h3', { text: 'Redirect chain audit (DNS CNAME)' }),
+    h('div', { class: 'row' },
+      pill(audit.cloaking ? 'cloaking detected' : `${audit.depth} link(s)`, audit.cloaking ? 'warn' : 'info'),
+      h('span', { class: 'small muted', text: audit.summary })
+    ),
+    audit.links.length
+      ? table(['Chain link', 'Registrable domain', 'Filter', 'AETHER score'], audit.links.map((link) => [
+        link.target,
+        link.registrable || '—',
+        link.blocked ? pill(`blocked · ${link.blockedBy.source}`, 'bad') : pill('no rule', 'ok'),
+        link.score === null ? '—' : `${link.score} (${link.verdict})`
+      ]))
+      : empty('No CNAME links in this answer.'),
+    h('ul', { style: { paddingLeft: '20px', marginTop: '8px' } }, (audit.evidence || []).map((line) => h('li', { class: 'small', text: line }))),
+    note(audit.scope, 'info')
+  ];
+}
+
 function renderDnsResult(out, result, type) {
   if (type === 'dual') {
     const a = result.results.a;
@@ -734,7 +771,8 @@ function renderDnsResult(out, result, type) {
       table(['Query', 'Status', 'Resolver', 'Transport', 'DNSSEC', 'Latency'], [
         ['A', a.status, a.resolver?.name ?? '—', a.transport ?? '—', a.dnssec?.status ?? '—', `${a.latencyMs} ms`],
         ['AAAA', aaaa.status, aaaa.resolver?.name ?? '—', aaaa.transport ?? '—', aaaa.dnssec?.status ?? '—', `${aaaa.latencyMs} ms`]
-      ])
+      ]),
+      ...(a.cname?.length ? chainAuditNodes(chainAuditFor(a)) : [])
     );
     return;
   }
@@ -757,7 +795,8 @@ function renderDnsResult(out, result, type) {
       ['Latency', `${result.latencyMs} ms`],
       ['Pipeline', (result.pipeline || []).join(' → ')],
       ['Fallback attempts', (result.attempts || []).length ? (result.attempts || []).map((a) => `${a.resolverId}:${a.ok ? 'ok' : a.reason || a.code}`).join(', ') : 'single attempt']
-    ])
+    ]),
+    ...(result.cname?.length ? chainAuditNodes(chainAuditFor(result)) : [])
   );
 }
 
@@ -1388,6 +1427,8 @@ const CAPABILITIES = [
   ['Feed updates with integrity + rollback protection', 'works', 'infrastructure.test.mjs — feed manager'],
   ['Config backup, migration, auto-recovery', 'works', 'infrastructure.test.mjs — backup manager'],
   ['Offline operation (bundled rules + service worker)', 'works', 'sw.js caches the shell and bundled lists'],
+  ['CNAME cloaking / DNS redirect-chain audit', 'works', 'chain.test.mjs — named targets, blocked-by attribution, advisory only'],
+  ['HTTP redirect analysis (301/302/JS)', 'not-implemented', 'Invisible to a DNS filter; only the CNAME chain can be audited'],
   ['Privacy analytics with k-anonymity', 'works', 'infrastructure.test.mjs — privacy'],
   ['Battery/CPU-aware repaint scheduling', 'works', 'power.test.mjs — bands, clamping, honest unsupported path'],
   ['Battery Status API in every browser', 'partial', 'Chrome/Edge expose it; Safari does not. Falls back to the default cadence and says so'],

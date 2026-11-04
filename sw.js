@@ -29,6 +29,7 @@ const SHELL_ASSETS = [
   './dns/cache.js',
   './dns/client.js',
   './dns/dnssec.js',
+  './dns/chain.js',
   './dns/resolvers.js',
   './aether/index.js',
   './aether/data.js',

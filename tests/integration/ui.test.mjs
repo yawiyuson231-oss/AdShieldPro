@@ -46,6 +46,22 @@ function installFetch() {
       const name = url.searchParams.get('name') || '';
       const type = Number(url.searchParams.get('type') || 1);
       const answerable = name === 'example.com';
+      // A CNAME-cloaked hostname: first-party-looking name pointing at a blocked tracker.
+      if (name === 'metrics.shop.example') {
+        return {
+          ok: true, status: 200, headers: { get: () => null },
+          async json() {
+            return {
+              Status: 0, AD: true, Question: [{ name: `${name}.`, type }],
+              Answer: [
+                { name: `${name}.`, type: 5, TTL: 60, data: 'ads.doubleclick.net.' },
+                { name: 'ads.doubleclick.net.', type: 1, TTL: 60, data: '93.184.216.34' }
+              ]
+            };
+          },
+          async text() { return ''; }
+        };
+      }
       if (!answerable) {
         return {
           ok: true, status: 200, headers: { get: () => null },
@@ -282,6 +298,23 @@ test('DNS lab resolves over DoH, caches, and records real monitor events', async
 
   app.navigate('monitor');
   assert.match(text('#mon-kpis'), /\d/, 'monitor KPIs must show measured numbers');
+});
+
+test('DNS lab audits CNAME chains and names the cloaked target', async () => {
+  app.navigate('dns');
+  $('#dns-input').value = 'metrics.shop.example';
+  $('#dns-type').value = 'A';
+  click('#dns-go');
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  const out = text('#dns-result');
+  assert.match(out, /Redirect chain audit \(DNS CNAME\)/, 'the audit section must render');
+  assert.match(out, /cloaking detected/i);
+  assert.match(out, /ads\.doubleclick\.net/, 'the cloaked target must be named');
+  assert.match(out, /blocked · core_/i, 'the block must be attributed to a real feed');
+  assert.match(out, /HTTP redirects .*invisible/i, 'the DNS-only scope must be stated');
+  // It is advisory: the queried name itself was not blocked by this audit.
+  assert.match(out, /metrics\.shop\.example/);
 });
 
 test('DNS lab refuses to invent an answer for an unresolvable name', async () => {

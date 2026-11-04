@@ -38,6 +38,15 @@ under **Capabilities**.
 - `SERVFAIL` with DNSSEC requested is reported as *"could be bogus or simply unreachable"*.
   OmniShield X never asserts that a signature was proven invalid.
 
+## 3b. Redirects and CNAME chains
+
+- **HTTP redirects are not visible.** A DNS filter sees names, not HTTP responses, so a
+  301/302/JavaScript redirect to a malicious site is outside what this app can observe.
+- **What is analysed:** the CNAME chain returned by the resolver. If a first-party-looking
+  hostname resolves through an off-site link that the filter blocks or that AETHER scores
+  ≥ 45/100, the DNS lab reports **CNAME cloaking** and names the target and the rule. This is
+  advisory evidence, not enforcement, and it never blocks the queried name.
+
 ## 4. Intelligence limits
 
 - The lexical classifier sees **only the hostname string**. It is a 7/100-weight signal with
