@@ -174,8 +174,8 @@ class GpsEngineTest {
             fix(latitude = 14.5996, longitude = 120.9842, speedMps = 13f, timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
         )
         assertTrue(
-            report.verdict == IntegrityVerdict.TRUSTED || report.verdict == IntegrityVerdict.DEGRADED,
-            "normal motion must not be flagged critical, got ${report.verdict}"
+            "normal motion must not be flagged critical, got ${report.verdict}",
+            report.verdict == IntegrityVerdict.TRUSTED || report.verdict == IntegrityVerdict.DEGRADED
         )
         assertFalse(report.shouldRejectObservation)
     }

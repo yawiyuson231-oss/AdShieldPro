@@ -7,13 +7,13 @@ import com.adshield.pro.gps.geo.Geodesy
 import com.adshield.pro.gps.offline.OfflinePlanner
 import com.adshield.pro.gps.security.EmergencyShareBuilder
 import com.adshield.pro.gps.security.HistoryGuard
-import com.adshield.pro.gps.security.IncidentValidator
 import com.adshield.pro.gps.security.LocationPrivacyPolicy
 import com.adshield.pro.gps.security.PermissionAudit
 import com.adshield.pro.gps.security.TelemetryGate
 import com.adshield.pro.gps.traffic.CongestionLevel
 import com.adshield.pro.gps.traffic.IncidentDeduplicator
 import com.adshield.pro.gps.traffic.IncidentKind
+import com.adshield.pro.gps.traffic.IncidentValidator
 import com.adshield.pro.gps.traffic.RoadSegment
 import com.adshield.pro.gps.traffic.SpeedObservation
 import com.adshield.pro.gps.traffic.TokenBucketRateLimiter
