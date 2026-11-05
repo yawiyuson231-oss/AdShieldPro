@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Monitor
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -66,6 +67,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.globalvpn.ui.GlobalVpnScreen
+import com.adshield.pro.globalvpn.ui.GlobalVpnViewModel
 import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
@@ -85,6 +88,7 @@ import dagger.hilt.android.AndroidEntryPoint
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
+    GLOBAL_VPN("Global VPN", Icons.Default.Public),
     LIVE("Live", Icons.Default.Monitor),
     SECURITY("Security", Icons.Default.Security),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
@@ -232,6 +236,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onOpenStatus = { currentTab = MainNavDestination.STATUS }
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
+                MainNavDestination.GLOBAL_VPN -> GlobalVpnDestination()
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.OPTIMIZER -> OptimizerDestination(viewModel)
@@ -372,6 +377,14 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onChangeSearchProvider = viewModel::setSearchProvider,
         onShowFeedback = viewModel::showFeedback
     )
+}
+
+@Composable
+private fun GlobalVpnDestination() {
+    // Isolated state holder: the Global VPN feature collects only its own flows here, so it never
+    // recomposes the DNS-driven tabs and never reads the DNS system's state.
+    val globalVpnViewModel: GlobalVpnViewModel = hiltViewModel()
+    GlobalVpnScreen(viewModel = globalVpnViewModel)
 }
 
 @Composable

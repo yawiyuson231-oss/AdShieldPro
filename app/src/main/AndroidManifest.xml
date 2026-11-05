@@ -72,6 +72,17 @@
                 android:value="local_dns_ad_and_tracker_filtering_vpn" />
         </service>
 
+        <!-- Global VPN foreground keeper (notification + background monitoring only). The real
+             WireGuard tunnel is owned by the library's GoBackend$VpnService, declared by the AAR. -->
+        <service
+            android:name=".globalvpn.engine.GlobalVpnService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="global_vpn_connection_status_and_monitoring" />
+        </service>
+
         <!-- Boot Receiver for restoring VPN protection after device restart -->
         <receiver
             android:name=".service.BootCompletedReceiver"

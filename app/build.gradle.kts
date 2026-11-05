@@ -61,8 +61,8 @@ android {
         applicationId = "com.adshield.pro"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20700
-        versionName = "2.7.0"
+        versionCode = 20900
+        versionName = "2.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -199,6 +199,9 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.androidx.webkit)
+
+    // Global VPN: real WireGuard userspace tunnel (Apache-2.0, open source, no paid SDK).
+    implementation(libs.wireguard.tunnel)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
