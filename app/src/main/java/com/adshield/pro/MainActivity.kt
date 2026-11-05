@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Monitor
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -87,6 +88,7 @@ import com.adshield.pro.ui.screens.OptimizerScreen
 import com.adshield.pro.ui.screens.SecurityScreen
 import com.adshield.pro.ui.screens.SettingsScreen
 import com.adshield.pro.ui.theme.AdShieldProTheme
+import com.adshield.pro.gps.ui.GpsHubScreen
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
@@ -107,7 +109,8 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     BATTERY("Battery", Icons.Default.BatteryChargingFull),
     STATISTICS("Statistics", Icons.Default.Analytics),
     SETTINGS("Settings", Icons.Default.Settings),
-    STATUS("Status", Icons.Default.VerifiedUser)
+    STATUS("Status", Icons.Default.VerifiedUser),
+    GPS("GPS", Icons.Default.Navigation)
 }
 
 @AndroidEntryPoint
@@ -263,6 +266,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onCloseAbout = { showAboutScreen = false }
                 )
                 MainNavDestination.STATUS -> StatusDestination(viewModel)
+                MainNavDestination.GPS -> GpsDestination()
             }
         }
     }
@@ -396,6 +400,15 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onFetchSearchSuggestions = viewModel::fetchSearchSuggestions,
         onShowFeedback = viewModel::showFeedback
     )
+}
+
+/**
+ * GPS console. Intentionally isolated: it owns its own state holder (GpsViewModel) and shares nothing
+ * with the DNS/VPN view model, so a satellite tick never recomposes the protection dashboard.
+ */
+@Composable
+private fun GpsDestination() {
+    GpsHubScreen()
 }
 
 @Composable

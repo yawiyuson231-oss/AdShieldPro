@@ -1,0 +1,19 @@
+{
+  "name": "adshield-gps-traffic-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional zero-cost community traffic aggregator for the AdShield Pro GPS module (Node 20 + Postgres/PostGIS, or in-memory for local testing)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node api/server.mjs",
+    "dev": "node api/server.mjs --memory",
+    "migrate": "psql \"$DATABASE_URL\" -f postgres/migrations/0001_init.sql",
+    "test": "node --test tests/"
+  },
+  "optionalDependencies": {
+    "pg": "^8.13.1"
+  }
+}

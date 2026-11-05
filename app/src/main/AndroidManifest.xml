@@ -15,6 +15,23 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- GPS / navigation module. Location is only requested while the user opens the map,
+         starts navigation, or explicitly opts in to anonymous traffic observation.
+         The DNS/VPN module never reads location. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- The app still installs and runs on a device without a GPS receiver (map + offline
+         routing keep working); the GPS screens report "no GNSS hardware" instead of failing. -->
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.compass"
+        android:required="false" />
+
     <application
         android:name=".AdShieldApplication"
         android:allowBackup="false"
@@ -70,6 +87,19 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="local_dns_ad_and_tracker_filtering_vpn" />
+        </service>
+
+        <!-- GPS console foreground service: keeps GNSS fixes, turn-by-turn alerts and the
+             optional traffic-observation uplink alive while the screen is off. It is a
+             separate service from the DNS VPN and shares no state with it. -->
+        <service
+            android:name=".service.GpsConsoleService"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="on_device_gps_telemetry_and_navigation" />
         </service>
 
         <!-- Boot Receiver for restoring VPN protection after device restart -->

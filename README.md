@@ -89,6 +89,7 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 | [`docs/INFINITY_VERIFICATION.md`](docs/INFINITY_VERIFICATION.md) | Feature-by-feature implementation/test status, evidence, external requirements and remaining issues |
 | [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
 | [`docs/DNS_SECURITY_ARCHITECTURE.md`](docs/DNS_SECURITY_ARCHITECTURE.md) | Upstream failover, response validation, DNSSEC reporting and DNS-only app/network policy |
+| [`docs/GPS_MODULE.md`](docs/GPS_MODULE.md) | Zero-cost GPS, maps, navigation and community traffic: free stack, honesty rules, privacy defaults, offline graph format, optional self-hosted traffic server |
 
 ## App screenshots
 

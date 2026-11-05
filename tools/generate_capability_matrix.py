@@ -40,6 +40,7 @@ AREA_LABEL = {
     "FILE_MANAGEMENT": "SAF file management",
     "DOWNLOADS": "Direct media downloads",
     "UPDATES": "Updates & supply chain",
+    "GPS_NAVIGATION": "GPS, maps & navigation",
     "PLATFORM": "Platform & operations",
 }
 

@@ -31,6 +31,7 @@ enum class CapabilityArea(val label: String) {
     FILE_MANAGEMENT("SAF file management"),
     DOWNLOADS("Direct media downloads"),
     UPDATES("Updates & supply chain"),
+    GPS_NAVIGATION("GPS, maps & navigation"),
     PLATFORM("Platform & operations")
 }
 
@@ -62,6 +63,9 @@ object CapabilityRegistry {
     private const val PERM_VPN = "android.permission.BIND_VPN_SERVICE"
     private const val PERM_NOTIF = "android.permission.POST_NOTIFICATIONS"
     private const val PERM_BATTERY_STATS = "android.permission.BATTERY_STATS"
+    private const val PERM_FINE_LOCATION = "android.permission.ACCESS_FINE_LOCATION"
+    private const val PERM_COARSE_LOCATION = "android.permission.ACCESS_COARSE_LOCATION"
+    private const val PERM_FG_LOCATION = "android.permission.FOREGROUND_SERVICE_LOCATION"
 
     /**
      * The 100 capabilities from the product directive, as they actually stand.
@@ -825,6 +829,130 @@ object CapabilityRegistry {
                 "WorkManager timing is approximate and deferrable by the OS to save battery"
             ),
             "Manual device check; ScanJournalTest covers record/report shape"
+        ),
+        // ------------------------------------------------- GPS, maps & navigation
+        // Every row here is measured against the same rule as the DNS rows: the code path exists,
+        // a JVM test or a documented device step checks it, and the limitation says what it cannot
+        // do. Nothing in this module invents a position or a traffic colour.
+        cap(
+            "gps-gnss-engine", "GNSS positioning with per-satellite diagnostics", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/engine/GpsEngine.kt",
+            listOf(PERM_FINE_LOCATION, PERM_COARSE_LOCATION),
+            listOf(
+                "Android LocationManager GNSS provider at 1 Hz with GnssStatus callbacks",
+                "Rotation-vector/magnetometer compass for heading at walking speed"
+            ),
+            listOf(
+                "Only A-GNSS as provided by the device; no RTK and no correction service",
+                "Satellite sky plot is empty when the chipset does not report azimuth/elevation",
+                "A reading the receiver does not report stays empty instead of showing zero"
+            ),
+            "GpsEngineTest.testAccuracyBandThresholds"
+        ),
+        cap(
+            "gps-integrity-monitor", "Location integrity monitoring (jumps, mock, clock)", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/engine/PositionModels.kt", listOf(PERM_FINE_LOCATION),
+            listOf("Every delivered fix, cross-checked against the previous one and the monotonic clock"),
+            listOf(
+                "Heuristic only: a rooted device with a system-level spoofer can defeat every app-side check, and the UI says so",
+                "Cannot disable mock-location developer options (an app has no such permission)",
+                "Mock-flagged positions are excluded from history, traffic samples and reports"
+            ),
+            "GpsEngineTest.testIntegrityMonitorFlagsImpossibleJump"
+        ),
+        cap(
+            "gps-sky-radar", "Satellite radar (real sky plot)", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/engine/RadarGeometry.kt", listOf(PERM_FINE_LOCATION),
+            listOf("GnssStatus azimuth/elevation/C-N0 per satellite, projected onto a polar plot"),
+            listOf(
+                "Geometry only; it does not decode raw ephemeris or compute a position solution itself",
+                "Devices that report SVIDs without geometry show the explicit empty state"
+            ),
+            "GpsEngineTest.testRadarPlacesNorthernSatelliteAboveCentre"
+        ),
+        cap(
+            "gps-maplibre-map", "MapLibre vector map with 3D buildings and camera tracking", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/map/MapLibreEngine.kt", listOf(PERM_INTERNET),
+            listOf(
+                "MapLibre Native 13.7.1 OpenGL backend with OpenFreeMap styles over OpenStreetMap data",
+                "OpenMapTiles building/transportation source layers for extrusion and road geometry"
+            ),
+            listOf(
+                "3D buildings exist only where the tile schema carries render_height",
+                "The style must be reachable once to cache; a cold start with no network shows the last cached style or an explicit error",
+                "Terrain is rendered only if the style's source provides it — no DEM is bundled"
+            ),
+            "GpsEngineTest.testMapProjectionTileCountForSmallRegion"
+        ),
+        cap(
+            "gps-navigation", "Turn-by-turn navigation over OSRM / Valhalla / offline graph", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/nav/NavigationSession.kt",
+            listOf(PERM_FINE_LOCATION, PERM_INTERNET, PERM_NOTIF),
+            listOf(
+                "OSRM (routing.openstreetmap.de) and Valhalla (valhalla1.openstreetmap.de) public demo servers",
+                "Android TextToSpeech for voice guidance, installed voices only",
+                "On-device A* over an imported OSM graph when offline"
+            ),
+            listOf(
+                "Public demo routers are fair-use and may rate-limit; the app reports that instead of silently failing",
+                "No lane-level guidance and no live re-routing around traffic jams (aggregates only colour the map)",
+                "Rerouting requires a fresh fix; it is not triggered from dead reckoning"
+            ),
+            "GpsEngineTest.testEtaUsesMeasuredSpeedWhenMoving"
+        ),
+        cap(
+            "gps-community-traffic", "Community traffic with honest UNKNOWN", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/traffic/TrafficRepository.kt", listOf(PERM_INTERNET),
+            listOf(
+                "Opt-in anonymous speed samples from this device",
+                "Optional self-hosted aggregator (gps-backend/) — no commercial feed exists in this codebase"
+            ),
+            listOf(
+                "With no server and no driven segments every road reads UNKNOWN; the map never fills the gap",
+                "A colour needs at least a 0.35 confidence score and samples younger than 30 minutes",
+                "Position-level incident reports depend on a user actually reporting them"
+            ),
+            "GpsTrafficSecurityTest.testSegmentWithNoObservationsIsUnknownNotGreen"
+        ),
+        cap(
+            "gps-offline-maps", "Offline map regions, offline search and offline routing", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/offline/OfflinePlanner.kt", listOf(PERM_INTERNET),
+            listOf(
+                "MapLibre OfflineManager vector-tile regions with an on-disk cache",
+                "Room-backed local place database for previously resolved destinations",
+                "Imported AdShield routing graph, built offline by the OSM graph builder in tools"
+            ),
+            listOf(
+                "Free tile host policy caps a pack at 3 000 tiles / 50 MB; a bigger area is refused with the exact reason",
+                "MapLibre does not expose the total download size in bytes, so the estimate is computed from tile count and stays an estimate",
+                "Offline routing needs a graph the user downloaded and imported; without it routing is online-only"
+            ),
+            "GpsTrafficSecurityTest.testOfflinePlanRejectsRegionAboveTheFreeTileBudget"
+        ),
+        cap(
+            "gps-location-privacy", "Encrypted local history and privacy kill switch", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps/security/LocationSecurity.kt", emptyList(),
+            listOf(
+                "SharedPreferences/DataStore policy flags, AES-256-GCM blobs via Android Keystore",
+                "Tracker runs in the foreground location service only"
+            ),
+            listOf(
+                "Encryption is at rest; a rooted device with the app's keystore can still decrypt",
+                "Emergency sharing generates text the user copies themselves — the app never uploads it",
+                "Background location is deliberately not requested, so navigation stops at the foreground-service limit"
+            ),
+            "GpsTrafficSecurityTest.testKillSwitchOverridesEmergencyAllowance"
+        ),
+        cap(
+            "gps-traffic-backend", "Self-hosted traffic aggregator (Node + PostGIS)", CapabilityArea.GPS_NAVIGATION,
+            CapabilityStatus.IMPLEMENTED, "gps-backend/api/server.mjs", emptyList(),
+            listOf("gps-backend/api/server.mjs with Postgres/PostGIS, or an in-memory store for local testing"),
+            listOf(
+                "Postgres mode needs a running database; the in-memory mode loses data on restart and reports storage=memory",
+                "Not deployed by anyone by default — no public instance is operated by this project",
+                "No long-term per-user storage exists, so there is nothing to export or delete server-side"
+            ),
+            "Manual device check: run the aggregator locally with the memory store, then set the backend URL in Live traffic"
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,

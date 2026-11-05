@@ -200,6 +200,9 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.androidx.webkit)
 
+    // GPS / map module: MapLibre Native (BSD-2-Clause) + OSM data. No API key, no billing.
+    implementation(libs.maplibre.android.sdk)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.room.testing)
