@@ -63,6 +63,11 @@ jobs:
           chmod +x tools/generate_capability_matrix.py
           python3 tools/generate_capability_matrix.py --check
 
+      - name: Verify every capability's claimed test actually runs
+        run: |
+          chmod +x tools/audit_capability_tests.py
+          python3 tools/audit_capability_tests.py --strict
+
       - name: UI performance and lazy-list gates
         run: |
           chmod +x tools/check_ui_performance.py
