@@ -47,6 +47,9 @@ requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 
 1. Capability matrix freshness check (`tools/generate_capability_matrix.py --check`)
 2. UI performance gates (`tools/check_ui_performance.py`)
+2b. Battery Command Center gates (`tools/check_battery_command_center.py`) — import/member
+    resolution inside the battery slice, honesty rules (no randomness, no sleep-polling, no
+    fast-charge claim without a platform signal), lifecycle wiring, docs sync
 3. `:app:compileDebugKotlin` — fails fast on toolchain problems
 4. `:app:assembleDebug` — APK packaging
 5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
@@ -65,6 +68,10 @@ The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 ```
 
 HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
+
+`BatteryCommandCenterTestSuite` covers the monitoring engine's honesty contracts; see
+[`BATTERY_COMMAND_CENTER.md`](BATTERY_COMMAND_CENTER.md) for the behaviour it protects and
+`tools/check_battery_command_center.py` for the static gates that run before compilation.
 
 `AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
 device-independent engine code directly, which is where all DNS, filtering and scoring

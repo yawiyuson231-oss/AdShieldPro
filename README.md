@@ -132,6 +132,16 @@ that read *not implemented* — nothing there is aspirational.
 
 ## What was new in 2.4.0
 
+- **Battery Command Center** — the Battery tab is now a real-time monitoring console built on an
+  event-driven engine: `ACTION_BATTERY_CHANGED` for every state change plus a 1 Hz
+  `BATTERY_PROPERTY_CURRENT_NOW` re-read while the screen is visible (and only on devices that
+  actually expose a current sensor). Additions: monotonic freshness (`Live`/`Delayed`/`Stale`),
+  per-sensor diagnostics (`Operational`/`Unsupported`/`Invalid`/`Waiting`), a per-component
+  monitoring status panel, a safety-first status engine, power trends, screen-on vs screen-off
+  drain measured from observed samples, a charging-efficiency estimate that states its own limits,
+  charging stability from voltage spread and recorded dropouts, and measurement reliability derived
+  from freshness and sensor coverage. Fast charging is only ever claimed with a platform signal plus
+  a measured rate. See [`docs/BATTERY_COMMAND_CENTER.md`](docs/BATTERY_COMMAND_CENTER.md).
 - **Battery Intelligence tab** — live hardware telemetry (level, temperature, voltage, current,
   charge counters, cycle count where Android exposes them), battery-side power, measured charging
   speed, charging diagnostics with evidence and confidence, real capacity-health measurement when
@@ -170,12 +180,13 @@ Everything needed is pinned in the repository (Gradle 9.7.1 wrapper, AGP 9.4.1, 
 ```
 
 The JVM suite (`AdShieldEngineTestSuite`, `SecurityCenterTestSuite`, `BatteryIntelligenceTestSuite`,
-`AetherCoreTest`, `DashboardPresentationTest`, `PrivateSearchTest`, `ScanJournalTest`
-and `CapabilityRegistryTest`) covers DNS
+`BatteryCommandCenterTestSuite`, `AetherCoreTest`, `DashboardPresentationTest`, `PrivateSearchTest`,
+`ScanJournalTest` and `CapabilityRegistryTest`) covers DNS
 wire-format parsing, UDP/TCP packet framing and checksums, upstream response validation and cache
 policy, UDP truncation and TCP segmentation limits, the filter rule engine, the browser blocker, and
 in-app update asset selection (release APK over debug/split APKs), the battery power/rate maths and
-its no-fabrication rules, the Aether decision table (no verdict without evidence), the live
+its no-fabrication rules (including sensor-state mapping, fast-charge gating, freshness bucketing
+and the 1 Hz-only-when-it-pays-off refresh policy), the Aether decision table (no verdict without evidence), the live
 dashboard model, dashboard counter/motion honesty rules, cross-device feature gates for API 29–37,
 and the capability registry's honesty constraints.
 See [docs/TESTING.md](docs/TESTING.md) for the full matrix, signing requirements and the on-device
