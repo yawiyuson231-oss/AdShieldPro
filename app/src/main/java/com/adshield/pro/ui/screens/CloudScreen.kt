@@ -109,7 +109,7 @@ fun CloudScreen(viewModel: CloudViewModel) {
     ) {
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(CloudSection.entries) { s ->
+                items(CloudSection.entries, key = { it.name }) { s ->
                     OutlinedButton(
                         onClick = { section = s },
                         shape = RoundedCornerShape(10.dp),
