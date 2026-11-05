@@ -1,0 +1,6 @@
+# The published origin of the GitHub Pages site.
+#
+# scripts/stage-site.mjs reads this file to generate robots.txt and sitemap.xml, so the
+# deployed URLs cannot drift from the og:url / og:image / canonical tags in docs/index.html.
+# Change this (and those tags) when the site moves to a custom domain. One URL, no trailing slash.
+https://yawiyuson231-oss.github.io/AdShieldPro

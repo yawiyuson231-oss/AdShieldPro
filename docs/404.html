@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02060b">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex">
+  <title>Page not found — AdShield Pro</title>
+  <style>
+    /* Self-contained on purpose: this page is served for any unknown path, so it must not
+       depend on the stylesheet, fonts or scripts of the marketing site loading. */
+    :root { color-scheme: dark; --bg: #02060b; --emerald: #14e8a2; --cyan: #22e4ff; --text: #eefcf8; --muted: #9fb6b8; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      background: radial-gradient(900px 500px at 20% -10%, #0d3b3055, transparent), var(--bg);
+      color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { max-width: 34rem; }
+    .mark { width: 64px; height: 72px; display: block; margin-bottom: 22px; }
+    .code { font: 700 13px/1 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .18em; color: var(--emerald); }
+    h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.15; margin: 12px 0 14px; letter-spacing: -.02em; }
+    p { color: var(--muted); margin: 0 0 26px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    a.btn {
+      text-decoration: none; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 15px;
+      border: 1px solid #14e8a24d; color: var(--text); transition: border-color .15s, transform .15s;
+    }
+    a.btn:hover, a.btn:focus-visible { border-color: var(--emerald); transform: translateY(-1px); }
+    a.btn--primary { background: linear-gradient(120deg, var(--emerald), var(--cyan)); color: #03130f; border-color: transparent; }
+    footer { margin-top: 34px; font-size: 13px; color: #6f8790; }
+    footer a { color: #6f8790; }
+  </style>
+</head>
+<body>
+  <main>
+    <svg class="mark" viewBox="0 0 48 54" aria-hidden="true">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#b6ffe9"/><stop offset=".45" stop-color="#14e8a2"/><stop offset="1" stop-color="#0a8fb0"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z" fill="url(#g)"/>
+      <circle cx="24" cy="26.5" r="8.4" fill="none" stroke="#02060b" stroke-width="3.8"/>
+      <path d="m18.2 20.7 11.6 11.6" stroke="#02060b" stroke-width="3.8" stroke-linecap="round"/>
+    </svg>
+    <p class="code">ERROR 404</p>
+    <h1>This page slipped past the filter.</h1>
+    <p>The address does not exist on this site. It may have moved, or the link that brought you
+      here may have a typo in it. Nothing was blocked — this is just a missing page.</p>
+    <div class="actions">
+      <a class="btn btn--primary" href="/">Back to the homepage</a>
+      <a class="btn" href="/app/">Open the web platform</a>
+      <a class="btn" href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">Download the APK</a>
+    </div>
+    <footer>
+      <a href="https://github.com/yawiyuson231-oss/AdShieldPro">Source code</a> ·
+      <a href="https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md">Privacy policy</a>
+    </footer>
+  </main>
+</body>
+</html>

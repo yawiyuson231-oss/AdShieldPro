@@ -42,6 +42,14 @@ jobs:
       - name: Integration tests (the real UI in jsdom)
         run: npm run test:integration
 
+      - name: Assemble and audit the deployable site
+        # The Pages workflow runs the same two commands. Doing it here means a change that
+        # breaks the deployment (a dangling link, an unpublished og:image, a sitemap pointing at
+        # the wrong origin) fails on the pull request instead of on the live site.
+        run: |
+          npm run stage
+          node scripts/verify-site.mjs _site
+
       - name: Check the extension archive is inside Chrome's static-rule limit
         run: node scripts/build-extension.mjs --check
 

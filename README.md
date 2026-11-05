@@ -7,8 +7,11 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
 
 - **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
   [docs/](docs), deployed by [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
-  One-time setup: repository **Settings → Pages → Source: GitHub Actions** (a repository admin has
-  to click it once; the deploy workflow reports it if it is still off).
+  The web platform is published alongside it at
+  <https://yawiyuson231-oss.github.io/AdShieldPro/app/>.
+  Publishing is documented end to end in
+  [`skills/web-deploy-github-pages/`](skills/web-deploy-github-pages) — staging, the deploy
+  gates, the one-time Pages setup and rollback.
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 
@@ -41,12 +44,14 @@ over HTTP and it works offline after the first visit.
 
 ```bash
 npm install               # jsdom, used only by the integration tests
-npm test                  # 166 unit + 19 integration tests
+npm test                  # 175 unit + 19 integration tests
 npm run lint              # house lint rules for the shipped runtime code
 npm run verify            # 86 static architecture, claim, artifact and packaging gates
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 npm run stage             # assemble _site/ exactly as the Pages workflow does
+npm run verify:site       # audit the staged _site/ (links, preview tags, sitemap, size)
+npm run deploy:status     # is Pages live, and what did the last deploy do
 ```
 
 | Document | Contents |
