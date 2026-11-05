@@ -1,0 +1,9 @@
+  <testcase name="cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.22">
+    <failure message="java.lang.AssertionError" type="java.lang.AssertionError">java.lang.AssertionError
+--
+  <testcase name="uploadEngineResumesOnlyThePartsTheServerIsStillMissing" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.879">
+    <failure message="java.lang.AssertionError: expected:&lt;3&gt; but was:&lt;1&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;3&gt; but was:&lt;1&gt;
+  <testcase name="uploadEngineCancelsCleanlyAndTellsTheServerToCancelTheSession" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.086">
+    <failure message="java.lang.AssertionError" type="java.lang.AssertionError">java.lang.AssertionError
+  <testcase name="uploadEngineRetriesATransientPartFailureAndThenSucceeds" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.87">
+    <failure message="java.lang.AssertionError: expected:&lt;COMPLETED&gt; but was:&lt;FAILED&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;COMPLETED&gt; but was:&lt;FAILED&gt;

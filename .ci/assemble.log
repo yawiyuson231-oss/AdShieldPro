@@ -26,24 +26,24 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeExtDexDebug
 > Task :app:mergeLibDexDebug
 > Task :app:hiltJavaCompileDebug
-> Task :app:mapDebugSourceSetPaths
 > Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
 > Task :app:compileDebugNavigationResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:mergeDebugJniLibFolders
-> Task :app:mergeDebugResources
 > Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugNativeLibs
+> Task :app:processDebugResources
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
 
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so. Run with --info option to learn more.
 
-> Task :app:processDebugResources
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
 > Task :app:writeDebugSigningConfigVersions
 > Task :app:transformDebugClassesWithAsm
 > Task :app:dexBuilderDebug
@@ -52,6 +52,6 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 2m 17s
+BUILD SUCCESSFUL in 2m 20s
 42 actionable tasks: 34 executed, 8 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

@@ -14,7 +14,7 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:483:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:527:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:561:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudApi.kt:117:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudApi.kt:118:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:272:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudUploadEngine.kt:490:42 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/SupabaseAuth.kt:72:41 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
@@ -44,6 +44,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 3m
+BUILD SUCCESSFUL in 2m 31s
 8 actionable tasks: 8 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
