@@ -71,6 +71,31 @@ jobs:
           test -s app.js
           ls -l docs/index.html docs/404.html docs/og-image.png docs/PRIVACY_POLICY.md
 
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Assemble the site
+        # Single source of truth: scripts/stage-site.mjs builds _site/ (marketing site at /,
+        # web platform at /app/), generates robots.txt + sitemap.xml, and fails if any
+        # service-worker precache target is missing from the staged tree.
+        run: node scripts/stage-site.mjs --out _site
+
+      - name: Verify the staged site
+        # Gates that only make sense on the assembled tree: every internal link resolves inside
+        # _site/, the 404 page does not depend on missing assets, and the sitemap matches the
+        # published origin. Runs in CI and locally (`npm run verify:site`).
+        run: node scripts/verify-site.mjs _site
+
+      - name: Summarise what is being published
+        run: |
+          {
+            echo "Staged for **${GITHUB_REF_NAME}** at ${GITHUB_SHA:0:7} — generated from docs/ + the web platform."
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/verify-site.mjs _site --summary >> "$GITHUB_STEP_SUMMARY"
+
       # The default GITHUB_TOKEN can configure a Pages site but can never create one, so this
       # step is allowed to fail: the next step checks whether Pages exists and prints the exact
       # one-time fix instead of an obscure "Create Pages site failed".
@@ -95,26 +120,6 @@ jobs:
           fi
           echo "::error::GitHub Pages is not enabled for ${GITHUB_REPOSITORY}, and the token used here cannot create it. Fix it once, either way: (a) open https://github.com/${GITHUB_REPOSITORY}/settings/pages and set Source to \"GitHub Actions\"; or (b) add a repository secret PAGES_TOKEN holding a fine-grained PAT with \"Pages: read and write\", which lets this workflow enable Pages itself. Then re-run this job."
           exit 1
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-
-      - name: Assemble the site
-        # Single source of truth: scripts/stage-site.mjs builds _site/ (marketing site at /,
-        # web platform at /app/), generates robots.txt + sitemap.xml, and fails if any
-        # service-worker precache target is missing from the staged tree.
-        run: node scripts/stage-site.mjs --out _site
-
-      - name: Verify the staged site
-        # Gates that only make sense on the assembled tree: every internal link resolves inside
-        # _site/, the 404 page does not depend on missing assets, and the sitemap matches the
-        # published origin. Runs in CI and locally (`npm run verify:site -- _site`).
-        run: node scripts/verify-site.mjs _site
-
-      - name: Summarise what is being published
-        run: node scripts/verify-site.mjs _site --summary >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v5
