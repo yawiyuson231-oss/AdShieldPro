@@ -172,18 +172,10 @@ jobs:
         if: failure()
         run: |
           # Test assertions never reach the annotation surface above, and the Actions log
-          # endpoint is unreachable from some environments, so mirror them into .ci/ too.
-          {
-            cat <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          for path in glob.glob('app/build/test-results/testDebugUnitTest/*.xml'):
-              for case in ET.parse(path).getroot().iter('testcase'):
-                  for failure in case.findall('failure'):
-                      print(f"{case.get('classname')}.{case.get('name')}")
-                      print((failure.text or failure.get('message') or '').strip()[:2500])
-                      print('-' * 70)
-          PY
-          } | sed 's/^ *//' | python3 - > .ci/test-failures.txt || true
+          # endpoint and artifact downloads are unreachable from some environments, so the
+          # raw JUnit XML is mirrored into .ci/ (committed by the log-mirror step below).
+          mkdir -p .ci/junit
+          cp app/build/test-results/testDebugUnitTest/*.xml .ci/junit/ 2>/dev/null || true
           cat .ci/*.log 2>/dev/null \
             | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
             | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true
