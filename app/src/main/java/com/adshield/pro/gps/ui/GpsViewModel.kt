@@ -188,8 +188,10 @@ class GpsViewModel @Inject constructor(
     private suspend fun grabObservers() {
         // Feed every fix into the trip recorder and the traffic recorder.
         engine.addFixListener(fixListener)
-        OfflineProgressBus.progress.collect { (packId, progress) ->
-            val pack = dao.offlinePack(packId) ?: return@collect
+        OfflineProgressBus.progress.collect { event ->
+            val packId = event.first
+            val progress = event.second
+            dao.offlinePack(packId) ?: return@collect
             dao.updatePackProgress(
                 id = packId,
                 state = if (progress.complete) OfflinePackState.READY.name else OfflinePackState.DOWNLOADING.name,

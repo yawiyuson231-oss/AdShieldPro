@@ -174,7 +174,7 @@ object OsrmMapper {
                     val maneuverLocation = if (lat != null && lon != null && lat in -90.0..90.0) {
                         GeoPoint(lat, lon)
                     } else {
-                        geometry.getOrNull(stepIndex).orEmptyFallback(geometry.first())
+                        geometry.getOrNull(stepIndex) ?: geometry.first()
                     }
                     val type = maneuver?.get("type").stringOrNull() ?: "continue"
                     val modifier = maneuver?.get("modifier").stringOrNull()

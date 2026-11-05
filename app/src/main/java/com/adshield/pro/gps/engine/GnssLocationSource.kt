@@ -194,9 +194,16 @@ class GnssLocationSource(
             }
         }
 
-        val registered = runCatching {
+        // Register and remember whether it actually worked: a receiver that refuses the callback
+        // must surface as an empty radar, not as a silent never-emitting flow.
+        val registered: Boolean = try {
             manager.registerGnssStatusCallback(callback, Looper.getMainLooper())
-        }.isSuccess
+            true
+        } catch (error: SecurityException) {
+            false
+        } catch (error: IllegalArgumentException) {
+            false
+        }
 
         if (!registered) {
             close()
@@ -204,7 +211,11 @@ class GnssLocationSource(
         }
 
         awaitClose {
-            runCatching { manager.unregisterGnssStatusCallback(callback) }
+            try {
+                manager.unregisterGnssStatusCallback(callback)
+            } catch (error: IllegalArgumentException) {
+                // Already unregistered (e.g. the provider was torn down); nothing to do.
+            }
         }
     }
 
@@ -239,18 +250,29 @@ class GnssLocationSource(
         }
         // requestLocationUpdates with a huge interval is the only portable way to observe provider
         // toggles without a deprecated broadcast on newer targets.
-        val registered = if (hasFinePermission() || hasCoarsePermission()) {
-            runCatching {
+        val registered: Boolean = if (hasFinePermission() || hasCoarsePermission()) {
+            try {
                 manager.requestLocationUpdates(
                     if (hasFinePermission()) LocationManager.PASSIVE_PROVIDER else LocationManager.NETWORK_PROVIDER,
                     3_600_000L, 0f, listener, Looper.getMainLooper()
                 )
-            }.isSuccess
+                true
+            } catch (error: SecurityException) {
+                false
+            } catch (error: IllegalArgumentException) {
+                false
+            }
         } else {
             false
         }
         if (!registered) { close(); return@callbackFlow }
-        awaitClose { runCatching { manager.removeUpdates(listener) } }
+        awaitClose {
+            try {
+                manager.removeUpdates(listener)
+            } catch (error: IllegalArgumentException) {
+                // Listener already gone; the flow is closing anyway.
+            }
+        }
     }
 
     companion object {

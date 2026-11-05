@@ -189,7 +189,7 @@ object SecureFileStreams {
 
     fun openEncryptedInput(file: File, key: SecretKey): CipherInputStream {
         val input = FileInputStream(file)
-        val header = ByteArray(LocationCipher.MAGIC.size)
+        val header = ByteArray(LocationCipher.MAGIC.length)
         input.read(header)
         require(header.contentEquals(LocationCipher.MAGIC.toByteArray(Charsets.US_ASCII))) {
             "not an AdShield encrypted file"

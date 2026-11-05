@@ -18,6 +18,7 @@ import org.maplibre.android.offline.OfflineManager
 import org.maplibre.android.offline.OfflineRegion
 import org.maplibre.android.offline.OfflineRegionError
 import org.maplibre.android.offline.OfflineRegionStatus
+import kotlinx.coroutines.flow.asSharedFlow
 import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
@@ -539,10 +540,11 @@ object OfflineProgressBus {
         extraBufferCapacity = 32,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
     )
-    val progress = _progress.asSharedFlow()
+    val progress: kotlinx.coroutines.flow.SharedFlow<Pair<String, OfflineRegionProgress>> =
+        _progress.asSharedFlow()
 
     private val _errors = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 16)
-    val errors = _errors.asSharedFlow()
+    val errors: kotlinx.coroutines.flow.SharedFlow<Pair<String, String>> = _errors.asSharedFlow()
 
     fun publish(packId: String, progress: OfflineRegionProgress) {
         _progress.tryEmit(packId to progress)

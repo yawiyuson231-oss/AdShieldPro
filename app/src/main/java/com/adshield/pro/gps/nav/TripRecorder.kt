@@ -305,7 +305,7 @@ class TripRecorder @Inject constructor(
     }
 
     private fun secureStoreDirectory(): File =
-        File(appContext.filesDir, "gps_tracks")
+        File(context.filesDir, "gps_tracks")
 
     private fun GeoPoint.toPointEntity(tripId: Long, fix: GnssFix): TripPointEntity = TripPointEntity(
         tripId = tripId,
