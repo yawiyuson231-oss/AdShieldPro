@@ -9,101 +9,8 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources
 > Task :app:generateDebugRFile
 > Task :app:kspDebugKotlin
-
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:57:9 Conflicting declarations:
-searchProvider: SearchProvider = ...
-searchProvider: SearchProvider = ...
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:57:9 Conflicting declarations:
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:77:9 Conflicting declarations:
-searchProvider: SearchProvider = ...
-searchProvider: SearchProvider = ...
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:77:9 Conflicting declarations:
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:128:13 Conflicting declarations:
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:150:13 Conflicting declarations:
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:189:47 Overload resolution ambiguity between candidates:
-val SEARCH_PROVIDER: Preferences.Key<String>
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:253:13 Argument already passed for this parameter.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:253:65 Overload resolution ambiguity between candidates:
-val SEARCH_PROVIDER: Preferences.Key<String>
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:260:50 Overload resolution ambiguity between candidates:
-val SEARCH_PROVIDER: Preferences.Key<String>
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:389:24 Overload resolution ambiguity between candidates:
-val SEARCH_PROVIDER: Preferences.Key<String>
-val SEARCH_PROVIDER: Preferences.Key<String>
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:100:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:100:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:100:32 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:100:56 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:100:71 Unresolved reference 'homeUrl'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:101:27 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:101:27 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:101:38 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:101:62 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:101:77 Unresolved reference 'homeUrl'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:128:76 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:136:39 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:189:54 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:192:29 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:200:29 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:201:59 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:201:74 Unresolved reference 'label'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:202:55 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:207:29 @Composable invocations can only happen from the context of a @Composable function
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:243:49 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:535:42 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:575:82 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:575:97 Unresolved reference 'label'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:579:42 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:590:42 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:601:42 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:614:55 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:614:70 Unresolved reference 'label'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:660:53 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:662:37 Unresolved reference 'onChangeSearchProvider'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:670:41 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:670:56 Unresolved reference 'privacyNote'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/AdShieldViewModel.kt:871:52 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/AdShieldViewModel.kt:890:62 Overload resolution ambiguity between candidates:
-val searchProvider: SearchProvider
-val searchProvider: SearchProvider
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -114,12 +21,10 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: REDECLARATION
+   > Kotlin compiler: UNRESOLVED_REFERENCE
        Kotlin compiler error
-         Conflicting declarations:
-         searchProvider: SearchProvider = ...
-         searchProvider: SearchProvider = ...
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt line 57
+         Unresolved reference 'onChangeSearchProvider'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt line 662
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -280,9 +185,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Conflicting declarations:
-searchProvider: SearchProvider = ...
-searchProvider: SearchProvider = ...
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'onChangeSearchProvider'.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -319,5 +222,5 @@ searchProvider: SearchProvider = ...
 	... 2 more
 
 
-BUILD FAILED in 1m 34s
+BUILD FAILED in 2m 18s
 8 actionable tasks: 8 executed
