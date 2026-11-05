@@ -22,7 +22,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Serializable
-private data class SupabaseUserDto(
+data class SupabaseUserDto(
     val id: String = "",
     val email: String? = null
 )

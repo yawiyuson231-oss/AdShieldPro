@@ -103,7 +103,7 @@ data class BackupFirewall(
 @Serializable
 data class BackupAppPolicy(
     val packageName: String = "",
-    val policy: String = AppDnsPolicy.ALLOW.name
+    val policy: String = AppDnsPolicy.ALLOW_ALL.name
 )
 
 const val BACKUP_SCHEMA_VERSION = 1
@@ -346,7 +346,7 @@ class CloudBackupManager @Inject constructor(
             runCatching { NetworkTransportPolicy.valueOf(it) }.getOrNull()
         }.toSet().ifEmpty { setOf(NetworkTransportPolicy.WIFI, NetworkTransportPolicy.CELLULAR) }
         val policies = payload.firewall.appPolicies.associate {
-            it.packageName to runCatching { AppDnsPolicy.valueOf(it.policy) }.getOrDefault(AppDnsPolicy.ALLOW)
+            it.packageName to runCatching { AppDnsPolicy.valueOf(it.policy) }.getOrDefault(AppDnsPolicy.ALLOW_ALL)
         }
         preferences.updateDnsFirewallPolicy(
             DnsFirewallPolicy(
