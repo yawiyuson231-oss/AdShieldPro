@@ -5,8 +5,9 @@
  *   engine.js                  deterministic filter ladder (the only thing that blocks)
  *   dns/                       DoH/DoT transports, DNSSEC assessment, cache, pipeline
  *   aether/                    reputation scoring, lexical model, typosquat detection
- *   security/                  firewall AI, monitor, feeds, backup, privacy analytics
+ *   security/                  firewall AI, monitor, feeds, backup, privacy, sha256, storage, llm-advisor (optional)
  *   ui/dom.js                  safe DOM helpers (textContent only — no innerHTML)
+ *   security/llm-advisor.js    optional FreeLLMAPI advisory — explains threats, never blocks (see docs/FREELLMAPI_SKILL.md)
  */
 import { OmniShieldFilterEngine } from './engine.js';
 import { DnsClient } from './dns/client.js';
@@ -190,6 +191,22 @@ function handleObservation(event) {
   if (event.ok) {
     state.aether.observe(domain, { blocked: false, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
+  }
+}
+
+// Optional FreeLLMAPI advisory — advisory only, never blocks.
+// Kept as a dynamic import so security/llm-advisor.js is reachable for lint
+// but never loaded unless the user has configured a gateway (see docs/FREELLMAPI_SKILL.md).
+// eslint-disable-next-line no-unused-vars
+async function maybeExplainThreat(domain, verdict) {
+  try {
+    const apiKey = state.storage ? await state.storage.get('freellmapi_key') : null;
+    if (!apiKey) return null;
+    const baseURL = (await state.storage.get('freellmapi_url')) || 'http://localhost:3001/v1';
+    const { explainThreat } = await import('./security/llm-advisor.js');
+    return await explainThreat(domain, verdict, { baseURL, apiKey });
+  } catch {
+    return null;
   }
 }
 

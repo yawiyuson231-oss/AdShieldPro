@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "freellmapi": {
+      "source": "./skills/freellmapi",
+      "sourceType": "local",
+      "computedHash": "32ee85d3efc053980c853ef6063619150c7eab81381a3243bf7e37d7309ad681"
+    }
+  }
+}
