@@ -99,8 +99,11 @@ that read *not implemented* — nothing there is aspirational.
 - **Duplicate-id crash fix** — scan ids used `System.currentTimeMillis()` while the history list
   keyed on them; two scans in the same millisecond could crash the list. Ids are now strictly
   increasing.
-- **Honest gaps** — private cloud storage, the universal downloader and a full SAF file manager are
+- **Honest gaps** — the universal downloader and a full SAF file manager are
   registered as **not implemented** in the capability report rather than shown as working features.
+  Private cloud storage **is** implemented (see [docs/CLOUD.md](docs/CLOUD.md)): the app ships the
+  full client and the free-tier Cloudflare Worker/R2/D1 backend source in `cloud-worker/`, which you
+  deploy on your own free account — the app operates no backend itself and simulates nothing.
 
 ## What's new in 2.6.0
 

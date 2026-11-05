@@ -89,6 +89,8 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     SECURITY("Security", Icons.Default.Security),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     BATTERY("Battery", Icons.Default.BatteryChargingFull),
+    CLOUD("Cloud", Icons.Default.Cloud),
+    VPN("VPN", Icons.Default.VpnKey),
     STATISTICS("Statistics", Icons.Default.Analytics),
     SETTINGS("Settings", Icons.Default.Settings),
     STATUS("Status", Icons.Default.VerifiedUser)
@@ -497,6 +499,18 @@ private fun BatteryDestination(viewModel: AdShieldViewModel) {
         onRefresh = viewModel::refreshBatteryReadings,
         onClearSessions = viewModel::clearBatterySessions
     )
+}
+
+@Composable
+private fun CloudDestination() {
+    val cloudViewModel: com.adshield.pro.ui.viewmodel.CloudViewModel = hiltViewModel()
+    com.adshield.pro.ui.screens.CloudScreen(viewModel = cloudViewModel)
+}
+
+@Composable
+private fun VpnDestination() {
+    val vpnViewModel: com.adshield.pro.ui.viewmodel.VpnViewModel = hiltViewModel()
+    com.adshield.pro.ui.screens.VpnScreen(viewModel = vpnViewModel)
 }
 
 @Composable

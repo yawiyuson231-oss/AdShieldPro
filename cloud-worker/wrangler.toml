@@ -1,0 +1,28 @@
+# AdShield Pro — free-tier cloud backend configuration.
+#
+# Everything below runs on Cloudflare's free tier (no credit card required for Workers,
+# R2 or D1 free allowances as of 2026-11):
+#   - Workers: 100,000 requests/day
+#   - R2: 10 GB storage, 1M Class A (write/list) ops/month, 10M Class B (read) ops/month
+#   - D1: 5M rows read/day, 100k rows written/day, 5 GB storage
+#
+# Deploy with:  npx wrangler deploy     (requires a free Cloudflare account)
+# Bindings (R2 bucket + D1 database) are created with the commands in README.md.
+name = "adshield-cloud"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# Free-tier limits are enforced in code (see src/index.js) — never silently upgraded.
+[vars]
+MAX_USER_QUOTA_BYTES = "10737418240"   # 10 GB (R2 free tier)
+SIGNED_URL_TTL_SECONDS = "900"          # 15 minutes
+MAX_FILE_BYTES = "1073741824"           # 1 GiB per file
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "adshield-cloud-files"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "adshield-cloud-db"
+database_id = "REPLACE_WITH_OUTPUT_OF_wrangler_d1_create"

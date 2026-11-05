@@ -615,6 +615,10 @@ class AdShieldVpnService : VpnService() {
         const val ACTION_PAUSE_VPN = "com.adshield.pro.action.PAUSE_VPN"
         const val ACTION_RESUME_VPN = "com.adshield.pro.action.RESUME_VPN"
         const val ACTION_RELOAD_TUNNEL_CONFIG = "com.adshield.pro.action.RELOAD_TUNNEL_CONFIG"
+        const val ACTION_START_GLOBAL_VPN = "com.adshield.pro.action.START_GLOBAL_VPN"
+        const val EXTRA_SERVER_ID = "extra_server_id"
+        const val EXTRA_SERVER_HOST = "extra_server_host"
+        const val EXTRA_SERVER_PORT = "extra_server_port"
 
         private const val NOTIFICATION_CHANNEL_ID = "adshield_vpn_channel"
         private const val NOTIFICATION_ID = 2001

@@ -35,4 +35,10 @@ object AppModule {
     fun provideAdShieldDao(database: AdShieldDatabase): AdShieldDao {
         return database.adShieldDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideCloudDao(database: AdShieldDatabase): CloudDao {
+        return database.cloudDao()
+    }
 }

@@ -508,7 +508,7 @@ object CapabilityRegistry {
             "adaptive-navigation", "Bottom navigation adapts to phone, tablet and landscape widths", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "MainActivity.kt", emptyList(),
             listOf("LocalConfiguration screen width, lazy scrollable NavigationBar row"),
-            listOf("Nine destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
+            listOf("Ten destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
         ),
         cap(
@@ -526,7 +526,7 @@ object CapabilityRegistry {
             "tools/check_ui_performance.py and DashboardPresentationTest"
         ),
         cap(
-            "private-search", "Private search with a choice of Google or DuckDuckGo", CapabilityArea.PRIVACY_BROWSER,
+            "private-search", "Private search with a choice of DuckDuckGo, its Tor onion, Brave or Google", CapabilityArea.PRIVACY_BROWSER,
             CapabilityStatus.IMPLEMENTED, "engine/browser/PrivateSearch.kt", emptyList(),
             listOf("User provider preference, address-bar input, existing tracking-parameter stripper"),
             listOf(
@@ -567,14 +567,40 @@ object CapabilityRegistry {
         ),
         cap(
             "private-cloud", "Private cloud storage box (upload/download/sync)", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(),
-            listOf("Would need a WebDAV endpoint, Google Drive OAuth client, or an S3-compatible service"),
+            CapabilityStatus.IMPLEMENTED, "cloud/CloudRepository.kt", listOf(PERM_INTERNET),
             listOf(
-                "Not implemented: no backend is bundled and no account service is operated by this app",
-                "Requires user-supplied credentials or an OAuth client id before it can be enabled"
+                "User-deployed Cloudflare Worker (free tier) + R2 + D1, source in cloud-worker/",
+                "Short-lived signed URLs issued after server-side ownership checks; no cloud secret in the APK"
             ),
-            "n/a — not implemented"
+            listOf(
+                "The app operates no backend of its own: the user deploys the free-tier Worker from cloud-worker/ and enters its URL in Cloud → Settings",
+                "Free-tier quotas apply (R2 10 GB, Worker 100k req/day, D1 5M reads/day); the UI shows server-reported numbers only"
+            ),
+            "CloudEngineTestSuite (quota rules, signed-URL expiry, dedupe, backup integrity, file-type gate)"
+        ),
+        cap(
+            "dns-cloud-backup", "DNS configuration cloud backup and verified restore", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "cloud/DnsBackupSerializer.kt", listOf(PERM_INTERNET),
+            listOf("Local configuration backup JSON uploaded as an integrity-hashed cloud object"),
+            listOf(
+                "Restore merges rules and never deletes newer local rules; SHA-256 is verified before applying",
+                "The DNS blocker itself never needs the cloud — protection is fully offline"
+            ),
+            "CloudEngineTestSuite.testDnsBackup_roundTripAndTamperDetection"
+        ),
+        cap(
+            "global-vpn", "Global VPN module on the shared single VPNService", CapabilityArea.PLATFORM,
+            CapabilityStatus.PARTIAL, "vpn/VpnEngine.kt", listOf(PERM_VPN, PERM_INTERNET),
+            listOf(
+                "One shared AdShieldVpnService in full-tunnel mode (0.0.0.0/0, ::/0) with blocking kill switch",
+                "Real TCP latency probes, user-configured server endpoints, real public-IP/DNS-leak checks"
+            ),
+            listOf(
+                "WireGuard/OpenVPN handshake needs a tunnel backend: the app ships no VPN servers and no wireguard-go library, so CONNECT to a server reports SERVER REQUIRED until the user configures one",
+                "Android permits only one VPNService per profile — DNS and VPN share it by design",
+                "Multi-hop, QUIC/MASQUE, obfuscation not implemented"
+            ),
+            "VpnEngineTestSuite (fastest-server selection from real probes, WireGuard parser, honest empty states)"
         ),
         cap(
             "universal-downloader", "URL-based video/audio downloader", CapabilityArea.PLATFORM,

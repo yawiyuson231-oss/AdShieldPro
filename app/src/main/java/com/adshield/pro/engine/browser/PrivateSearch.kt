@@ -23,6 +23,17 @@ enum class SearchProvider(
         homeUrl = "https://duckduckgo.com/",
         privacyNote = "Default. Does not build a search history profile tied to you."
     ),
+    DUCKDUCKGO_ONION(
+        label = "DuckDuckGo (Onion)",
+        homeUrl = "https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/",
+        privacyNote = "DuckDuckGo's Tor onion service — reachable only with an onion-routing setup " +
+            "(e.g. Orbot) active; the app does not bundle a Tor client."
+    ),
+    BRAVE(
+        label = "Brave Search",
+        homeUrl = "https://search.brave.com/",
+        privacyNote = "Independent index; does not profile you like Google. Brave still receives the query."
+    ),
     GOOGLE(
         label = "Google",
         homeUrl = "https://www.google.com/",
@@ -35,6 +46,8 @@ enum class SearchProvider(
         val encoded = percentEncodeQueryComponent(query.trim())
         return when (this) {
             DUCKDUCKGO -> "https://duckduckgo.com/?q=$encoded"
+            DUCKDUCKGO_ONION -> "https://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/?q=$encoded"
+            BRAVE -> "https://search.brave.com/search?q=$encoded"
             GOOGLE -> "https://www.google.com/search?q=$encoded"
         }
     }
