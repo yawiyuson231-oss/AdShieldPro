@@ -84,6 +84,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
+| `CloudBackupFormat` | Strict versioned configuration-backup filename generation and recognition; only AdShield's own matching backup files are eligible for restore/retention |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
@@ -112,3 +113,10 @@ Those cannot be exercised by JVM unit tests.
    the scroll-to-top button appears after scrolling, and the shield stops animating when the
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
+12. In **Settings → Configuration backup folder**, select a writable folder from an installed
+   document provider (for example Google Drive, OneDrive, Dropbox or WebDAV). Tap **Back Up Now**,
+   force-stop and reopen the app, then tap **Restore Latest**. Confirm the success message and
+   that the selected folder contains a versioned `adshield-pro-backup-<timestamp>.json` file.
+   Tap **Disconnect** and confirm that the app clears the selected folder while leaving the backup
+   file in the provider untouched. The document provider, not AdShield, is responsible for
+   uploading/synchronising that folder.

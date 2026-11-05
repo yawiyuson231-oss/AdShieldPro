@@ -10,6 +10,7 @@ import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 import com.adshield.pro.data.local.preferences.ScanJournalStore
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
+import com.adshield.pro.data.cloud.CloudBackupManager
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.BuildConfig
 import com.adshield.pro.domain.model.AppExclusionInfo
@@ -103,6 +104,7 @@ class AdShieldViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val repository: AdShieldRepository,
     private val preferencesRepository: UserPreferencesRepository,
+    private val cloudBackupManager: CloudBackupManager,
     private val filterRuleEngine: FilterRuleEngine,
     private val upstreamDnsResolver: UpstreamDnsResolver,
     val browserContentBlocker: BrowserContentBlocker,
@@ -772,18 +774,55 @@ class AdShieldViewModel @Inject constructor(
 
     fun restoreFullBackupJson(rawJson: String) {
         viewModelScope.launch {
-            val res = repository.restoreConfigurationFromJson(rawJson)
-            res.fold(
-                onSuccess = { ruleCount ->
-                    upstreamDnsResolver.clearCache()
-                    refreshRuleConflicts()
-                    showFeedback("Restored configuration backup ($ruleCount custom rules).")
-                },
-                onFailure = { err ->
-                    showFeedback("Restore failed: ${err.message}")
-                }
+            applyConfigurationRestore(repository.restoreConfigurationFromJson(rawJson))
+        }
+    }
+
+    /** Stores the configuration in a folder granted through Android's system document picker. */
+    fun connectCloudBackupFolder(treeUri: Uri) {
+        viewModelScope.launch {
+            cloudBackupManager.connect(treeUri).fold(
+                onSuccess = { showFeedback("Cloud backup folder selected. Backups stay under your selected document provider.") },
+                onFailure = { error -> showFeedback(error.message ?: "Couldn't connect the cloud backup folder.") }
             )
         }
+    }
+
+    fun disconnectCloudBackupFolder() {
+        viewModelScope.launch {
+            cloudBackupManager.disconnect()
+            showFeedback("Cloud backup folder disconnected. Existing backup files were not deleted.")
+        }
+    }
+
+    fun backUpConfigurationToCloud() {
+        viewModelScope.launch {
+            val configuration = repository.createConfigurationBackupJson()
+            cloudBackupManager.saveConfiguration(configuration).fold(
+                onSuccess = { backup -> showFeedback("Configuration backup saved as ${backup.displayName}.") },
+                onFailure = { error -> showFeedback(error.message ?: "Configuration backup failed.") }
+            )
+        }
+    }
+
+    fun restoreLatestConfigurationFromCloud() {
+        viewModelScope.launch {
+            cloudBackupManager.readLatestConfiguration().fold(
+                onSuccess = { rawJson -> applyConfigurationRestore(repository.restoreConfigurationFromJson(rawJson)) },
+                onFailure = { error -> showFeedback(error.message ?: "Cloud restore failed.") }
+            )
+        }
+    }
+
+    private fun applyConfigurationRestore(result: Result<Int>) {
+        result.fold(
+            onSuccess = { ruleCount ->
+                upstreamDnsResolver.clearCache()
+                refreshRuleConflicts()
+                showFeedback("Restored configuration backup ($ruleCount custom rules).")
+            },
+            onFailure = { err -> showFeedback("Restore failed: ${err.message}") }
+        )
     }
 
     private fun reloadTunnelIfConnected() {

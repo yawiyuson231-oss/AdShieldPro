@@ -128,6 +128,14 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
         contract = ActivityResultContracts.RequestPermission()
     ) { _ -> viewModel.startVpnService() }
 
+    val cloudBackupFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        // The ViewModel persists the SAF read/write grant before recording the folder. A cancelled
+        // picker leaves the current folder untouched.
+        if (treeUri != null) viewModel.connectCloudBackupFolder(treeUri)
+    }
+
     val startAfterConsent: () -> Unit = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -241,7 +249,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     viewModel = viewModel,
                     showAboutScreen = showAboutScreen,
                     onOpenAbout = { showAboutScreen = true },
-                    onCloseAbout = { showAboutScreen = false }
+                    onCloseAbout = { showAboutScreen = false },
+                    onChooseCloudBackupFolder = { cloudBackupFolderLauncher.launch(null) }
                 )
                 MainNavDestination.STATUS -> StatusDestination(viewModel)
             }
@@ -542,7 +551,8 @@ private fun SettingsDestination(
     viewModel: AdShieldViewModel,
     showAboutScreen: Boolean,
     onOpenAbout: () -> Unit,
-    onCloseAbout: () -> Unit
+    onCloseAbout: () -> Unit,
+    onChooseCloudBackupFolder: () -> Unit
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
@@ -558,7 +568,11 @@ private fun SettingsDestination(
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,
-        onRestoreBackupJson = viewModel::restoreFullBackupJson
+        onRestoreBackupJson = viewModel::restoreFullBackupJson,
+        onChooseCloudBackupFolder = onChooseCloudBackupFolder,
+        onBackupConfigurationToCloud = viewModel::backUpConfigurationToCloud,
+        onRestoreLatestConfigurationFromCloud = viewModel::restoreLatestConfigurationFromCloud,
+        onDisconnectCloudBackupFolder = viewModel::disconnectCloudBackupFolder
     )
 }
 

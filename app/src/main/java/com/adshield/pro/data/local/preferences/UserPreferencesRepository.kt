@@ -66,7 +66,12 @@ data class AppSettingsState(
     // --- Private search & scheduled scanning ---
     val searchProvider: SearchProvider = SearchProvider.DUCKDUCKGO,
     val scheduledScanEnabled: Boolean = false,
-    val scheduledScanIntervalHours: Int = 24
+    val scheduledScanIntervalHours: Int = 24,
+    // A persistable Storage Access Framework tree URI, chosen explicitly by the user. It can
+    // point to an installed cloud document provider or ordinary device storage; no account
+    // credentials are stored by this app.
+    val cloudBackupTreeUri: String? = null,
+    val cloudBackupLastSuccessEpochMs: Long = 0L
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -127,6 +132,8 @@ class UserPreferencesRepository @Inject constructor(
         val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
         val SCHEDULED_SCAN_ENABLED = booleanPreferencesKey("scheduled_scan_enabled")
         val SCHEDULED_SCAN_HOURS = intPreferencesKey("scheduled_scan_interval_hours")
+        val CLOUD_BACKUP_TREE_URI = stringPreferencesKey("cloud_backup_tree_uri")
+        val CLOUD_BACKUP_LAST_SUCCESS_MS = longPreferencesKey("cloud_backup_last_success_ms")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -202,7 +209,9 @@ class UserPreferencesRepository @Inject constructor(
             lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L,
             searchProvider = SearchProvider.fromName(prefs[Keys.SEARCH_PROVIDER]),
             scheduledScanEnabled = prefs[Keys.SCHEDULED_SCAN_ENABLED] ?: false,
-            scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168)
+            scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168),
+            cloudBackupTreeUri = prefs[Keys.CLOUD_BACKUP_TREE_URI]?.takeIf { it.isNotBlank() },
+            cloudBackupLastSuccessEpochMs = prefs[Keys.CLOUD_BACKUP_LAST_SUCCESS_MS] ?: 0L
         )
     }
 
@@ -214,6 +223,30 @@ class UserPreferencesRepository @Inject constructor(
         context.adShieldDataStore.edit {
             it[Keys.SCHEDULED_SCAN_ENABLED] = enabled
             it[Keys.SCHEDULED_SCAN_HOURS] = intervalHours.coerceIn(12, 168)
+        }
+    }
+
+    /** The URI is a SAF permission handle, not a cloud account token or password. */
+    suspend fun setCloudBackupDestination(treeUri: String) {
+        require(treeUri.isNotBlank()) { "Cloud backup folder URI cannot be blank." }
+        context.adShieldDataStore.edit {
+            it[Keys.CLOUD_BACKUP_TREE_URI] = treeUri
+            // A successful backup timestamp belongs to a specific folder. Do not show a backup
+            // from the previous provider/folder after the user changes destination.
+            it.remove(Keys.CLOUD_BACKUP_LAST_SUCCESS_MS)
+        }
+    }
+
+    suspend fun recordCloudBackupSuccess(epochMs: Long) {
+        context.adShieldDataStore.edit {
+            it[Keys.CLOUD_BACKUP_LAST_SUCCESS_MS] = epochMs.coerceAtLeast(0L)
+        }
+    }
+
+    suspend fun clearCloudBackupDestination() {
+        context.adShieldDataStore.edit {
+            it.remove(Keys.CLOUD_BACKUP_TREE_URI)
+            it.remove(Keys.CLOUD_BACKUP_LAST_SUCCESS_MS)
         }
     }
 

@@ -61,6 +61,8 @@ import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun SettingsScreen(
@@ -75,7 +77,11 @@ fun SettingsScreen(
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
-    onRestoreBackupJson: (String) -> Unit
+    onRestoreBackupJson: (String) -> Unit,
+    onChooseCloudBackupFolder: () -> Unit,
+    onBackupConfigurationToCloud: () -> Unit,
+    onRestoreLatestConfigurationFromCloud: () -> Unit,
+    onDisconnectCloudBackupFolder: () -> Unit
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -450,6 +456,89 @@ fun SettingsScreen(
                             Icon(Icons.Default.Policy, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Privacy Policy")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            val cloudFolderConnected = !settings.cloudBackupTreeUri.isNullOrBlank()
+            val lastBackup = if (settings.cloudBackupLastSuccessEpochMs > 0L) {
+                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                    .format(Date(settings.cloudBackupLastSuccessEpochMs))
+            } else {
+                "No cloud backup saved yet"
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Configuration backup folder", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (cloudFolderConnected) {
+                            "Folder selected • $lastBackup"
+                        } else {
+                            "No folder connected"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (cloudFolderConnected) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Choose a folder through Android's system picker. It can be in a cloud provider you already " +
+                            "use, or in device storage. AdShield saves only configuration backups: custom rules, protection " +
+                            "mode, browser exceptions, and VPN exclusions. Your provider, not AdShield, performs remote sync.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (!cloudFolderConnected) {
+                        Button(
+                            onClick = onChooseCloudBackupFolder,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Choose Cloud Backup Folder")
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = onBackupConfigurationToCloud,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Back Up Now")
+                            }
+                            OutlinedButton(
+                                onClick = onRestoreLatestConfigurationFromCloud,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Restore Latest")
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onChooseCloudBackupFolder,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Change Folder")
+                            }
+                            TextButton(
+                                onClick = onDisconnectCloudBackupFolder,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Disconnect")
+                            }
                         }
                     }
                 }

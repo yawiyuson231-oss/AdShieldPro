@@ -566,15 +566,15 @@ object CapabilityRegistry {
             "Manual device check; ScanJournalTest covers record/report shape"
         ),
         cap(
-            "private-cloud", "Private cloud storage box (upload/download/sync)", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
+            "private-cloud", "Cloud configuration backup through a user-selected folder", CapabilityArea.PLATFORM,
+            CapabilityStatus.PARTIAL, "data/cloud/CloudBackupManager.kt",
             emptyList(),
-            listOf("Would need a WebDAV endpoint, Google Drive OAuth client, or an S3-compatible service"),
+            listOf("User-selected Storage Access Framework document tree and configuration backup JSON"),
             listOf(
-                "Not implemented: no backend is bundled and no account service is operated by this app",
-                "Requires user-supplied credentials or an OAuth client id before it can be enabled"
+                "Backs up and restores configuration only: custom rules, protection mode, browser exceptions and VPN exclusions",
+                "The selected document provider performs its own remote sync; no AdShield account, backend, provider OAuth or continuous background sync is operated"
             ),
-            "n/a — not implemented"
+            "CloudBackupFormatTest plus manual: select a Drive/OneDrive/WebDAV document-provider folder, back up, restart, then restore latest"
         ),
         cap(
             "universal-downloader", "URL-based video/audio downloader", CapabilityArea.PLATFORM,
