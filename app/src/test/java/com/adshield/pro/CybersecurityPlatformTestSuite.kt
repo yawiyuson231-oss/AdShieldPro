@@ -184,8 +184,11 @@ class CybersecurityPlatformTestSuite {
         file.writeText("powershell.exe -WindowStyle hidden -enc SQBFAFgA")
         try {
             val verdict = FileThreatScanner().scanFile(file)
-            assertEquals(FileThreatScanner.ThreatLevel.DANGEROUS, verdict.threatLevel)
+            // The dropper heuristic is worth 60/100 on its own: high-risk, not auto-quarantine.
+            assertEquals(FileThreatScanner.ThreatLevel.SUSPICIOUS, verdict.threatLevel)
+            assertTrue(verdict.riskScore >= 60)
             assertTrue(verdict.findings.any { it.contains("Obfuscated PowerShell dropper command") })
+            assertTrue(verdict.findings.none { it.contains("YARA") })
         } finally {
             file.delete()
         }
