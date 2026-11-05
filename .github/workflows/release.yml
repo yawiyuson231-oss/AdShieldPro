@@ -153,6 +153,9 @@ jobs:
           chmod +x tools/check_ui_performance.py
           python3 tools/check_ui_performance.py
 
+      - name: Universal-package gate regression tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py' -v
+
       - name: JVM unit tests
         run: |
           chmod +x gradlew
@@ -270,10 +273,13 @@ jobs:
             that stops when idle, and a scroll-to-top control on long dashboards.
 
           ## Universal build
-          One APK for every device: any native helper library (AndroidX graphics-path,
-          DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
-          installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
-          Verified by `tools/check_universal_release.py` before this release was published.
+          One APK for the supported device matrix: any native helper library (AndroidX
+          graphics-path, DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64.
+          The package targets Android 10+ (API 29+) phones, tablets and foldables, declares
+          touchscreen hardware optional, and has no intentional required-hardware or screen-size
+          exclusions. `tools/check_universal_release.py` inspects the final merged manifest and
+          package before publication. Physical-device installation and runtime behavior are not
+          certified merely by this package check.
 
           ## Notes
           - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.

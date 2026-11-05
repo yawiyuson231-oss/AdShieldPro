@@ -463,11 +463,11 @@ object CapabilityRegistry {
             "Manual security review"
         ),
         cap(
-            "universal-package", "One APK for every CPU architecture and Android 10+", CapabilityArea.PLATFORM,
+            "universal-package", "One universal APK for supported CPUs and device types (Android 10+)", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "tools/check_universal_release.py", emptyList(),
-            listOf("Build config and the packaged APK (every native helper bundled for all four ABIs, no ABI splits)"),
-            listOf("App code is pure Kotlin/Java; AndroidX native helpers ship for arm64-v8a, armeabi-v7a, x86 and x86_64 alike. The release job refuses to publish an APK that leaves any supported ABI behind or uses per-ABI splits"),
-            "Release APK workflow: universal-build gate"
+            listOf("Build config, source/merged APK manifests, native libraries and offline assets; aapt verifies final package metadata and device filters"),
+            listOf("Android 10+ on arm64-v8a, armeabi-v7a, x86 and x86_64; no ABI splits or required hardware/screen filters; touchscreen is optional. Package checks do not replace installation and runtime testing on physical devices"),
+            "Universal gate regression tests; Android CI checks both debug and release APKs; Release APK workflow checks the signed release"
         ),
         cap(
             "aether-decision-core", "Aether AI evidence-based verdicts (VERIFIED / SUSPECTED / UNKNOWN)", CapabilityArea.AI_INTELLIGENCE,

@@ -47,13 +47,16 @@ requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 
 1. Capability matrix freshness check (`tools/generate_capability_matrix.py --check`)
 2. UI performance gates (`tools/check_ui_performance.py`)
-3. `:app:compileDebugKotlin` — fails fast on toolchain problems
-4. `:app:assembleDebug` — APK packaging
-5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
-   universal ABI gate (`tools/check_universal_release.py`)
-6. `:app:testDebugUnitTest` — then discovers every `@Test` case in `app/src/test` and asserts the
+3. Universal-package gate regression tests (`python3 -m unittest discover -s tools -p 'test_*.py' -v`)
+4. `:app:compileDebugKotlin` — fails fast on toolchain problems
+5. `:app:assembleDebug` — APK packaging
+6. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
+   universal gate (`tools/check_universal_release.py`) against **both** debug and release APKs. The
+   gate checks all four ABIs, source and merged manifest device filters, packaged SDK/version values,
+   offline assets, and the absence of per-ABI splits.
+7. `:app:testDebugUnitTest` — then discovers every `@Test` case in `app/src/test` and asserts the
    JUnit XML reports the same number, with zero failures/errors/skips
-7. `:app:lintDebug` — hard gate, the build fails on any lint error
+8. `:app:lintDebug` — hard gate, the build fails on any lint error
 
 The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 

@@ -2,6 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Do not let stores filter out keyboard/mouse devices (including compatible
+         Chromebooks) solely because they have no touchscreen. Input behavior still
+         needs real-device testing; this declaration only removes the install filter. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
     <!-- Core Network & VPN Permissions (No Root or invasive permissions) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
