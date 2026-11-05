@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.adshield.pro.gps.geo.GeoPoint
 import com.adshield.pro.gps.security.LocationPrivacyPolicy
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -31,7 +32,7 @@ internal val Context.gpsDataStore by preferencesDataStore(name = "adshield_gps_s
 
 @Singleton
 class GpsPreferences @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
 
     private object Keys {

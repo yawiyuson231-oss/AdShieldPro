@@ -32,6 +32,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -51,7 +52,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class GeocodingClient @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val preferences: GpsPreferences,
     @GpsHttpClient private val httpClient: OkHttpClient
 ) {
@@ -177,7 +178,7 @@ object NetworkMonitor {
  */
 @Singleton
 class RoutingClient @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val preferences: GpsPreferences,
     @GpsHttpClient private val httpClient: OkHttpClient
 ) {
@@ -324,7 +325,7 @@ internal suspend fun <T> kotlinx.coroutines.flow.Flow<T>.collectOnce(): T {
  */
 @Singleton
 class TrafficApiClient @Inject constructor(
-    private val context: Context,
+    @ApplicationContext private val context: Context,
     private val preferences: GpsPreferences,
     @GpsHttpClient private val httpClient: OkHttpClient
 ) {
