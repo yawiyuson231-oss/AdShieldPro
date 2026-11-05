@@ -31,7 +31,7 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:211:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:276:17 'fun create(contentType: MediaType?, content: String): RequestBody' is deprecated. Moved to extension function. Put the 'content' argument first to fix Java.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/data/GpsDatabase.kt:43:14 'fun fallbackToDestructiveMigrationOnDowngrade(): RoomDatabase.Builder<GpsDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/di/GpsModule.kt:51:11 'fun fallbackToDestructiveMigrationOnDowngrade(): RoomDatabase.Builder<GpsDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/di/GpsModule.kt:54:11 'fun fallbackToDestructiveMigrationOnDowngrade(): RoomDatabase.Builder<GpsDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/PositionModels.kt:512:37 Unnecessary safe call on a non-null receiver of type 'HeadingSample'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:47:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/MapLibreEngine.kt:85:39 Unnecessary safe call on a non-null receiver of type 'CameraPosition'.
@@ -55,6 +55,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 2m 46s
+BUILD SUCCESSFUL in 2m 13s
 8 actionable tasks: 8 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

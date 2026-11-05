@@ -27,31 +27,6 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeLibDexDebug
 
 > Task :app:hiltJavaCompileDebug
-/home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/DuplicateBindings] okhttp3.OkHttpClient is bound multiple times:
-  public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
-                         ^
-          @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.di.CloudModule.provideCloudHttpClient()
-          @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.gps.di.GpsModule.provideGpsHttpClient(com.adshield.pro.gps.data.GpsHttpClientFactory)
-      okhttp3.OkHttpClient is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.di.CloudModule.provideCloudUploadEngine(…, client, …)
-      com.adshield.pro.data.cloud.CloudUploadEngine is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker(…, engine)
-      com.adshield.pro.worker.CloudUploadWorker_AssistedFactory is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker_HiltModule.bind(factory)
-      java.util.Map<java.lang.String,javax.inject.Provider<androidx.hilt.work.WorkerAssistedFactory<? extends androidx.work.ListenableWorker>>> is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] androidx.hilt.work.WorkerFactoryModule.provideFactory(workerFactories)
-      androidx.hilt.work.HiltWorkerFactory is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication.workerFactory
-      com.adshield.pro.AdShieldApplication is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication_GeneratedInjector.injectAdShieldApplication(com.adshield.pro.AdShieldApplication)
-  It is also requested at:
-      com.adshield.pro.data.cloud.CloudBackupManager(…, http, …)
-      com.adshield.pro.di.CloudModule.provideCloudApi(client, …)
-      com.adshield.pro.gps.data.GeocodingClient(…, httpClient)
-      com.adshield.pro.gps.data.RoutingClient(…, httpClient)
-      com.adshield.pro.gps.data.TrafficApiClient(…, httpClient)
-  The following other entry points also depend on it:
-      dagger.hilt.android.internal.lifecycle.HiltViewModelFactory.ViewModelFactoriesEntryPoint.getHiltViewModelMap() [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC → com.adshield.pro.AdShieldApplication_HiltComponents.ActivityRetainedC → com.adshield.pro.AdShieldApplication_HiltComponents.ViewModelC]
 /home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/MissingBinding] android.content.Context cannot be provided without an @Provides-annotated method.
   public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
                          ^
@@ -80,7 +55,7 @@ Daemon will be stopped at the end of the build
       @dagger.hilt.android.qualifiers.ActivityContext android.content.Context is provided at:
           [com.adshield.pro.AdShieldApplication_HiltComponents.ActivityC] dagger.hilt.android.internal.modules.ActivityModule.provideContext(…)
   (For Kotlin sources, you may need to use '@JvmSuppressWildcards' or '@JvmWildcard' if you need to explicitly control the wildcards at a particular usage site.)
-2 errors
+1 error
 
 > Task :app:hiltJavaCompileDebug FAILED
 
@@ -91,31 +66,6 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:hiltJavaCompileDebug' (registered by plugin 'com.android.internal.application').
 > Compilation failed; see the compiler output below.
-  /home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/DuplicateBindings] okhttp3.OkHttpClient is bound multiple times:
-    public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
-                           ^
-            @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.di.CloudModule.provideCloudHttpClient()
-            @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.gps.di.GpsModule.provideGpsHttpClient(com.adshield.pro.gps.data.GpsHttpClientFactory)
-        okhttp3.OkHttpClient is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.di.CloudModule.provideCloudUploadEngine(…, client, …)
-        com.adshield.pro.data.cloud.CloudUploadEngine is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker(…, engine)
-        com.adshield.pro.worker.CloudUploadWorker_AssistedFactory is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker_HiltModule.bind(factory)
-        java.util.Map<java.lang.String,javax.inject.Provider<androidx.hilt.work.WorkerAssistedFactory<? extends androidx.work.ListenableWorker>>> is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] androidx.hilt.work.WorkerFactoryModule.provideFactory(workerFactories)
-        androidx.hilt.work.HiltWorkerFactory is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication.workerFactory
-        com.adshield.pro.AdShieldApplication is injected at
-            [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication_GeneratedInjector.injectAdShieldApplication(com.adshield.pro.AdShieldApplication)
-    It is also requested at:
-        com.adshield.pro.data.cloud.CloudBackupManager(…, http, …)
-        com.adshield.pro.di.CloudModule.provideCloudApi(client, …)
-        com.adshield.pro.gps.data.GeocodingClient(…, httpClient)
-        com.adshield.pro.gps.data.RoutingClient(…, httpClient)
-        com.adshield.pro.gps.data.TrafficApiClient(…, httpClient)
-    The following other entry points also depend on it:
-        dagger.hilt.android.internal.lifecycle.HiltViewModelFactory.ViewModelFactoriesEntryPoint.getHiltViewModelMap() [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC → com.adshield.pro.AdShieldApplication_HiltComponents.ActivityRetainedC → com.adshield.pro.AdShieldApplication_HiltComponents.ViewModelC]
   /home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/MissingBinding] android.content.Context cannot be provided without an @Provides-annotated method.
     public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
                            ^
@@ -144,7 +94,7 @@ Execution failed for task ':app:hiltJavaCompileDebug' (registered by plugin 'com
         @dagger.hilt.android.qualifiers.ActivityContext android.content.Context is provided at:
             [com.adshield.pro.AdShieldApplication_HiltComponents.ActivityC] dagger.hilt.android.internal.modules.ActivityModule.provideContext(…)
     (For Kotlin sources, you may need to use '@JvmSuppressWildcards' or '@JvmWildcard' if you need to explicitly control the wildcards at a particular usage site.)
-  2 errors
+  1 error
 
 * Try:
 > Check your code and dependencies to fix the compilation error(s)
@@ -183,65 +133,9 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:hil
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$0(DefaultBuildLifecycleController.java:323)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:324)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$0(StateTransitionController.java:235)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:235)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
-	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Compilation failed; see the compiler output below.
-/home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/DuplicateBindings] okhttp3.OkHttpClient is bound multiple times:
-  public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
-                         ^
-          @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.di.CloudModule.provideCloudHttpClient()
-          @Provides @Singleton okhttp3.OkHttpClient com.adshield.pro.gps.di.GpsModule.provideGpsHttpClient(com.adshield.pro.gps.data.GpsHttpClientFactory)
-      okhttp3.OkHttpClient is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.di.CloudModule.provideCloudUploadEngine(…, client, …)
-      com.adshield.pro.data.cloud.CloudUploadEngine is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker(…, engine)
-      com.adshield.pro.worker.CloudUploadWorker_AssistedFactory is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.worker.CloudUploadWorker_HiltModule.bind(factory)
-      java.util.Map<java.lang.String,javax.inject.Provider<androidx.hilt.work.WorkerAssistedFactory<? extends androidx.work.ListenableWorker>>> is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] androidx.hilt.work.WorkerFactoryModule.provideFactory(workerFactories)
-      androidx.hilt.work.HiltWorkerFactory is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication.workerFactory
-      com.adshield.pro.AdShieldApplication is injected at
-          [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC] com.adshield.pro.AdShieldApplication_GeneratedInjector.injectAdShieldApplication(com.adshield.pro.AdShieldApplication)
-  It is also requested at:
-      com.adshield.pro.data.cloud.CloudBackupManager(…, http, …)
-      com.adshield.pro.di.CloudModule.provideCloudApi(client, …)
-      com.adshield.pro.gps.data.GeocodingClient(…, httpClient)
-      com.adshield.pro.gps.data.RoutingClient(…, httpClient)
-      com.adshield.pro.gps.data.TrafficApiClient(…, httpClient)
-  The following other entry points also depend on it:
-      dagger.hilt.android.internal.lifecycle.HiltViewModelFactory.ViewModelFactoriesEntryPoint.getHiltViewModelMap() [com.adshield.pro.AdShieldApplication_HiltComponents.SingletonC → com.adshield.pro.AdShieldApplication_HiltComponents.ActivityRetainedC → com.adshield.pro.AdShieldApplication_HiltComponents.ViewModelC]
 /home/runner/work/AdShieldPro/AdShieldPro/app/build/generated/hilt/component_sources/debug/com/adshield/pro/AdShieldApplication_HiltComponents.java:170: error: [Dagger/MissingBinding] android.content.Context cannot be provided without an @Provides-annotated method.
   public abstract static class SingletonC implements AdShieldApplication_GeneratedInjector,
                          ^
@@ -270,7 +164,7 @@ Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Com
       @dagger.hilt.android.qualifiers.ActivityContext android.content.Context is provided at:
           [com.adshield.pro.AdShieldApplication_HiltComponents.ActivityC] dagger.hilt.android.internal.modules.ActivityModule.provideContext(…)
   (For Kotlin sources, you may need to use '@JvmSuppressWildcards' or '@JvmWildcard' if you need to explicitly control the wildcards at a particular usage site.)
-2 errors
+1 error
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:88)
 	at org.gradle.api.internal.tasks.compile.JdkJavaCompiler.execute(JdkJavaCompiler.java:49)
 	at org.gradle.api.internal.tasks.compile.NormalizingJavaCompiler.delegateAndHandleErrors(NormalizingJavaCompiler.java:98)
@@ -407,8 +301,8 @@ Caused by: org.gradle.api.internal.tasks.compile.CompilationFailedException: Com
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 61 more
+	... 30 more
 
 
-BUILD FAILED in 1m 34s
+BUILD FAILED in 1m 24s
 21 actionable tasks: 13 executed, 8 up-to-date
