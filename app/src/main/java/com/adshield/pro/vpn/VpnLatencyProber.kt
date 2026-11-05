@@ -23,7 +23,7 @@ object VpnLatencyProber {
             val start = System.nanoTime()
             val socket = Socket()
             try {
-                socket.connect(InetSocketAddress(server.host, server.port), TIMEOUT_MS)
+                socket.connect(InetSocketAddress(server.host, server.port), TIMEOUT_MS.toInt())
                 (System.nanoTime() - start) / 1_000_000L
             } catch (e: Exception) {
                 null

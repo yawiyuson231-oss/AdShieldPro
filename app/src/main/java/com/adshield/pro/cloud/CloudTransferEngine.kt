@@ -100,7 +100,7 @@ class CloudTransferEngine @Inject constructor(
     private suspend fun updateState(id: String, state: String) {
         val pending: List<CloudTransferEntity> = cloudDao.pendingTransfers()
         val row = pending.find { it.id == id }
-            ?: first(cloudDao.observeTransfers()).find { it.id == id }
+            ?: cloudDao.observeTransfers().first().find { it.id == id }
         if (row != null) {
             cloudDao.updateTransfer(row.copy(state = state, updatedAtEpochMs = System.currentTimeMillis()))
         }
