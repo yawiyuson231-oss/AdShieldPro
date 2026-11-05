@@ -257,7 +257,15 @@ jobs:
           - Battery Intelligence (measured telemetry and charging diagnostics) and Security Center
             (URL/file/APK scanning, installed-app risk audit) — all on-device.
           - 367k offline rules bundled in the APK, so a fresh install protects before any sync.
-          - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking.
+          - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking,
+            a search-only history with opt-in suggestions, and optional onion routing through Orbot
+            (requires Orbot installed and connected).
+          - AdShield Cloud (optional, self-hosted): account, resumable multipart uploads, folders,
+            version history, expiring share links, duplicate detection, quota reconciliation,
+            encrypted DNS-configuration backup/restore and a pre-upload malware scan. No storage
+            credentials ship in the APK, and nothing is uploaded unless you sign in.
+          - Storage Access Framework file tools: folder browsing, verified scans, duplicate grouping
+            by SHA-256, and direct HTTPS media downloads with optional publisher-checksum checks.
           - Activity, statistics and per-app DNS analytics; AI Smart Boost, storage cleaning,
             Game Booster and battery/thermal tools — all local, no cloud AI.
           - In-app update checks against this repository's own releases.
