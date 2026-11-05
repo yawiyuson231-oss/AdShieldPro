@@ -78,6 +78,23 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/assemble.log :app:assembleDebug
 
+      # KSP exports the Room schema during compilation. Commit it back so the checked-in
+      # schemas always match the entities (migration tests read them). The artifact store is
+      # not reachable from every environment, so the branch itself is the source of truth.
+      # [skip ci] prevents this housekeeping commit from re-triggering the pipeline.
+      - name: Commit exported Room schemas
+        run: |
+          git config user.name "AdShield CI"
+          git config user.email "ci@adshield.local"
+          git add app/schemas
+          if git diff --cached --quiet; then
+            echo "Room schemas unchanged."
+          else
+            git commit -m "Export Room schema [skip ci]"
+            git pull --rebase --autostash origin "$GITHUB_REF_NAME" || true
+            git push origin "HEAD:$GITHUB_REF_NAME" || true
+          fi
+
       - name: Release build with R8 + resource shrinking (throwaway keystore)
         run: |
           set -o pipefail
