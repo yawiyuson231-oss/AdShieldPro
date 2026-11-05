@@ -438,7 +438,13 @@ class GpsTrafficSecurityTest {
         val point = GeoBounds(south = 14.6, west = 120.9, north = 14.6, east = 120.9)
         val plan = OfflinePlanner.plan(point, 12, 15)
         assertFalse(plan.withinLimits)
-        assertTrue(plan.limitReason!!.contains("single point"))
+        // A zero-span box has no area: the planner says so instead of counting one tile and
+        // pretending there is something to download.
+        assertTrue(
+            "expected an area/zoom reason, got: ${plan.limitReason}",
+            plan.limitReason!!.contains("area", ignoreCase = true) ||
+                plan.limitReason!!.contains("point", ignoreCase = true)
+        )
     }
 
     @Test

@@ -64,9 +64,9 @@ class GpsEngineTest {
     fun testGeodesyDistanceBetweenManilaAndQuezonCity() {
         val manila = GeoPoint(14.5995, 120.9842)
         val quezonCity = GeoPoint(14.6760, 121.0437)
-        // Real-world distance is 9.9 km; allow 2 % for the spherical model.
+        // Spherical (haversine) distance is ~10.65 km between these two centroids.
         val distance = Geodesy.distanceMeters(manila, quezonCity)
-        assertTrue("expected ~9.9 km, got $distance", distance in 9_700.0..10_150.0)
+        assertTrue("expected ~10.6 km, got $distance", distance in 10_400.0..10_900.0)
     }
 
     @Test
@@ -99,8 +99,12 @@ class GpsEngineTest {
 
     @Test
     fun testMapProjectionRejectsPolarLatitude() {
-        val clamped = MapProjection.toMercator(GeoPoint(89.9, 0.0))
-        assertTrue(clamped.y in 0.0..1.0)
+        // 89.9° is outside Web Mercator's ±85.0511° limit and must be clamped into the square.
+        val northPole = MapProjection.toMercator(GeoPoint(89.9, 0.0))
+        val southPole = MapProjection.toMercator(GeoPoint(-89.9, 0.0))
+        assertTrue("north edge must map to y=0, got ${northPole.y}", northPole.y in -0.001..0.001)
+        assertTrue("south edge must map to y=1, got ${southPole.y}", southPole.y in 0.999..1.001)
+        assertEquals(0.5, MapProjection.toMercator(GeoPoint(0.0, 0.0)).x, 0.0001)
     }
 
     // ----------------------------------------------------------------- accuracy
@@ -168,10 +172,14 @@ class GpsEngineTest {
     @Test
     fun testIntegrityMonitorAcceptsNormalDriving() {
         val monitor = GpsIntegrityMonitor()
-        monitor.inspect(fix(speedMps = 13f, timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L))
-        // 13 m/s for one second ≈ 13 m: well inside the accuracy tolerance at 5 m.
+        // Two consecutive fixes at a constant 13 m/s, ~13 m apart. A realistic driveway.
+        monitor.inspect(
+            fix(latitude = 14.5995, longitude = 120.9842, accuracy = 8f, speedMps = 13f, bearing = 0f,
+                timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L)
+        )
         val report = monitor.inspect(
-            fix(latitude = 14.5996, longitude = 120.9842, speedMps = 13f, timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
+            fix(latitude = 14.59962, longitude = 120.9842, accuracy = 8f, speedMps = 13f, bearing = 0f,
+                timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
         )
         assertTrue(
             "normal motion must not be flagged critical, got ${report.verdict}",
@@ -281,8 +289,9 @@ class GpsEngineTest {
     fun testRadarRingsAreHorizonZenithAndMid() {
         val rings = RadarGeometry.rings()
         assertEquals(3, rings.size)
-        assertEquals(1f, rings[0], 0.0001f)   // 0° elevation = horizon = rim
-        assertEquals(0f, rings[2], 0.0001f)   // 90° would be the centre; 60° ring is last drawn
+        assertEquals(1f, rings[0], 0.0001f)        // 0° elevation  = horizon = rim
+        assertEquals(2f / 3f, rings[1], 0.0001f)   // 30° elevation
+        assertEquals(1f / 3f, rings[2], 0.0001f)   // 60° elevation, closest to the zenith
     }
 
     @Test
@@ -308,6 +317,8 @@ class GpsEngineTest {
     fun testRadarEmptyReasonIsSpecificAboutTheCause() {
         assertTrue(RadarGeometry.emptyReason(false, true, true).contains("permission", ignoreCase = true))
         assertTrue(RadarGeometry.emptyReason(true, false, true).contains("switched off", ignoreCase = true))
+        // gnssReported == true with an empty satellite list is "still waiting", not a hardware gap.
+        assertTrue(RadarGeometry.emptyReason(true, true, true).contains("Waiting", ignoreCase = true))
         assertTrue(RadarGeometry.emptyReason(true, true, false).contains("GnssStatus"))
     }
 
