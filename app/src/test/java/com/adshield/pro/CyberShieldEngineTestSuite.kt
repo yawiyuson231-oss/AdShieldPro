@@ -265,13 +265,14 @@ class CyberShieldEngineTestSuite {
             listOf(
                 dns(1, "x.same.example", blocked = true, category = "TRACKERS", app = "AppA"),
                 dns(2, "y.same.example", blocked = true, category = "MALWARE", app = "AppB"),
-                dns(3, "solo.other.example", blocked = true, category = "ADS"),
+                dns(3, "solo.other.example", blocked = true, category = "STRICT_TELEMETRY"),
                 dns(4, "allowed.example"),
-                dns(5, "ancient.example", ts = now - 3 * 86_400_000L, blocked = true, category = "MALWARE")
+                dns(5, "ancient.example", ts = now - 3 * 86_400_000L, blocked = true, category = "MALWARE"),
+                dns(6, "ads.noise.example", blocked = true, category = "ADS")
             )
         )
         val incidents = CorrelationEngine.correlate(events, now)
-        assertEquals(2, incidents.size) // allowed + ancient excluded
+        assertEquals(2, incidents.size) // allowed + ancient + ads-only excluded
         assertEquals("same.example", incidents[0].domain)
         assertEquals(CsSeverity.HIGH, incidents[0].severity)
         assertEquals(2, incidents[0].eventCount)

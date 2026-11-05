@@ -161,7 +161,10 @@ object CorrelationEngine {
         val relevant = events.filter {
             nowEpochMs - it.timestampEpochMs <= windowMs &&
                 (it.action == CsEventAction.BLOCKED || it.action == CsEventAction.FLAGGED) &&
-                it.severity >= CsSeverity.LOW
+                it.severity >= CsSeverity.LOW &&
+                // Pure advertising blocks are noise, not security threats; they
+                // remain visible in the activity feed and attack-vector stats.
+                it.category != "ADS"
         }
         return relevant.groupBy { ThreatEventMapper.registrableDomain(it.domain) }
             .map { (key, group) ->

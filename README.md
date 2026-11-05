@@ -2,6 +2,39 @@
 
 AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
 
+## CYBERSHIELD AI — security-operations dashboard (new)
+
+The landing tab is now **CyberShield AI**, a dark-navy / neon-cyan SOC-style
+dashboard built entirely on real data — the classic Home remains one tap away
+(home icon in the dashboard header) and every previous feature is preserved.
+
+- **Central shield** reflects the *actual* VPN runtime state (off / starting /
+  active / paused / error) with lightweight Canvas glow + sweep animations — it
+  never shows a permanent "protected" claim.
+- **Threat overview & analytics** — severity donut, 24-hour activity bars, 7-day
+  trend and attack-vector shares computed from the real Room DNS history.
+- **Global threat map** — interactive Canvas world map (pan/zoom/tap/filters)
+  showing verified, attributed botnet-C2 intelligence from Feodo Tracker
+  (abuse.ch, CC0) at country level, with offline caching and honest load states.
+  Markers are threat-infrastructure locations, never attacks on your device.
+- **AI threat detection** — the on-device AETHER engine plus statistical
+  behavioral analysis (bursts, beaconing, subdomain floods, DGA-like patterns).
+  Explainable, local, flag-not-block heuristics; no cloud AI.
+- **Active threats & activity feed** — searchable, severity-filtered incidents
+  with event history and real actions (block rule, audited expiring allow,
+  false-positive report); live feed with per-app attribution (Room v3).
+- **Endpoint / network / compliance** — real public Android API signals
+  (screen lock, encryption, ADB, patch age, app sources, network validation),
+  DNS-level network monitoring, and an exportable JSON compliance report.
+  Signals Android hides are marked *unavailable*, never guessed.
+- **Cloud security** — real provider platform status (Statuspage v2: GitHub,
+  Cloudflare, DigitalOcean) plus custom endpoints with Keystore-encrypted
+  tokens; tenant posture is honestly shown as not connected.
+- **Verification** — 30 new JVM unit tests (`tools/cybershield_jvm/run.sh`, also
+  run by CI `testDebugUnitTest`), no new dependencies, no new permissions.
+  See [`docs/CYBERSHIELD_VERIFICATION_REPORT.md`](docs/CYBERSHIELD_VERIFICATION_REPORT.md)
+  for the full implemented/tested/limited breakdown.
+
 ## AETHER AI — OMNISHIELD X INFINITY (new)
 
 This branch upgrades the existing DNS architecture into a working, privacy-first
