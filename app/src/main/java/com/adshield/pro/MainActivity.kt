@@ -16,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,6 +33,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Security
@@ -45,6 +50,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -71,6 +78,9 @@ import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.BatteryScreen
 import com.adshield.pro.ui.screens.CapabilitiesScreen
+import com.adshield.pro.ui.screens.CloudStorageScreen
+import com.adshield.pro.ui.screens.DownloaderScreen
+import com.adshield.pro.ui.screens.FileManagerScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
@@ -80,6 +90,9 @@ import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
+import com.adshield.pro.ui.viewmodel.CloudStorageViewModel
+import com.adshield.pro.ui.viewmodel.DownloaderViewModel
+import com.adshield.pro.ui.viewmodel.FileManagerViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
@@ -87,6 +100,9 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     SECURITY("Security", Icons.Default.Security),
+    FILES("Files", Icons.Default.Folder),
+    CLOUD("Cloud", Icons.Default.Cloud),
+    DOWNLOADS("Downloads", Icons.Default.Download),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     BATTERY("Battery", Icons.Default.BatteryChargingFull),
     STATISTICS("Statistics", Icons.Default.Analytics),
@@ -234,6 +250,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
+                MainNavDestination.FILES -> FilesDestination()
+                MainNavDestination.CLOUD -> CloudDestination()
+                MainNavDestination.DOWNLOADS -> DownloadsDestination()
                 MainNavDestination.OPTIMIZER -> OptimizerDestination(viewModel)
                 MainNavDestination.BATTERY -> BatteryDestination(viewModel)
                 MainNavDestination.STATISTICS -> StatisticsDestination(viewModel)
@@ -298,6 +317,7 @@ private fun HomeDestination(
     onOpenStatus: () -> Unit
 ) {
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val allTimeTotal by viewModel.allTimeTotalQueries.collectAsStateWithLifecycle()
     val allTimeBlocked by viewModel.allTimeBlockedQueries.collectAsStateWithLifecycle()
@@ -313,6 +333,7 @@ private fun HomeDestination(
     HomeScreen(
         vpnState = vpnState,
         settings = settings,
+        protectionStatus = protectionStatus,
         allTimeTotal = allTimeTotal,
         allTimeBlocked = allTimeBlocked,
         allTimeAllowed = allTimeAllowed,
@@ -369,7 +390,10 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onToggleSiteException = viewModel::toggleBrowserSiteException,
         onUpdateBrowserPrivacy = viewModel::updateBrowserPrivacySettings,
         onAddCustomCosmeticSelector = viewModel::addCustomCosmeticSelector,
-        onChangeSearchProvider = viewModel::setSearchProvider,
+        onUpdatePrivateSearch = viewModel::updatePrivateSearchOptions,
+        onRecordSearch = viewModel::recordSearch,
+        onClearSearchHistory = viewModel::clearSearchHistory,
+        onFetchSearchSuggestions = viewModel::fetchSearchSuggestions,
         onShowFeedback = viewModel::showFeedback
     )
 }
@@ -414,6 +438,7 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         onScanUri = viewModel::scanUri,
         onAuditApps = viewModel::auditInstalledApps,
         onQuarantineLastScanned = viewModel::quarantineLastScannedFile,
+        onDeleteScannedDocument = viewModel::deleteScannedDocument,
         onRestoreQuarantined = viewModel::restoreQuarantined,
         onDeleteQuarantined = viewModel::deleteQuarantined,
         onVerifyQuarantined = viewModel::verifyQuarantined,
@@ -421,6 +446,141 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         onBuildScanReport = viewModel::buildScanReport,
         onSetScheduledScan = viewModel::setScheduledScan,
         onShowFeedback = viewModel::showFeedback
+    )
+}
+
+@Composable
+private fun CloudDestination() {
+    var showLegacyProviders by remember { mutableStateOf(false) }
+    if (showLegacyProviders) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { showLegacyProviders = false }) {
+                    Text("\u2190 AdShield Cloud", fontSize = 12.sp)
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Legacy WebDAV providers",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+            Box(Modifier.weight(1f)) { LegacyCloudDestination() }
+        }
+    } else {
+        com.adshield.pro.ui.screens.cloud.CloudDashboardScreen(
+            onOpenLegacyProviders = { showLegacyProviders = true }
+        )
+    }
+}
+
+@Composable
+private fun LegacyCloudDestination(viewModel: CloudStorageViewModel = hiltViewModel()) {
+    val providers by viewModel.providers.collectAsStateWithLifecycle()
+    val capacity by viewModel.capacity.collectAsStateWithLifecycle()
+    val selectedProviderId by viewModel.selectedProviderId.collectAsStateWithLifecycle()
+    val currentPath by viewModel.currentPath.collectAsStateWithLifecycle()
+    val objects by viewModel.objects.collectAsStateWithLifecycle()
+    val query by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val operation by viewModel.operation.collectAsStateWithLifecycle()
+    val shareLink by viewModel.shareLink.collectAsStateWithLifecycle()
+    val preview by viewModel.preview.collectAsStateWithLifecycle()
+    CloudStorageScreen(
+        providers = providers,
+        capacity = capacity,
+        selectedProviderId = selectedProviderId,
+        currentPath = currentPath,
+        objects = objects,
+        searchQuery = query,
+        operation = operation,
+        shareLink = shareLink,
+        preview = preview,
+        onSelectProvider = viewModel::selectProvider,
+        onCloseProvider = viewModel::closeProvider,
+        onRegisterProvider = viewModel::registerProvider,
+        onRemoveProvider = viewModel::removeProvider,
+        onCheckProvider = viewModel::checkProvider,
+        onRefresh = viewModel::refresh,
+        onOpenFolder = viewModel::openFolder,
+        onGoToParent = viewModel::goToParent,
+        onGoToPath = viewModel::goToPath,
+        onSearchQuery = viewModel::setSearchQuery,
+        onCreateFolder = viewModel::createFolder,
+        onRename = viewModel::rename,
+        onDelete = viewModel::delete,
+        onUpload = viewModel::upload,
+        onDownload = viewModel::download,
+        onPreview = viewModel::preview,
+        onClearPreview = viewModel::clearPreview,
+        onCreateShare = viewModel::createPublicShare,
+        onClearShare = viewModel::clearShareLink,
+        onClearOperation = viewModel::clearOperationMessage
+    )
+}
+
+@Composable
+private fun FilesDestination(viewModel: FileManagerViewModel = hiltViewModel()) {
+    val listing by viewModel.listing.collectAsStateWithLifecycle()
+    val canGoBack by viewModel.canGoBack.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val scanProgress by viewModel.scanProgress.collectAsStateWithLifecycle()
+    val duplicates by viewModel.duplicates.collectAsStateWithLifecycle()
+    FileManagerScreen(
+        listing = listing,
+        canGoBack = canGoBack,
+        busy = busy,
+        message = message,
+        error = error,
+        query = query,
+        scanProgress = scanProgress,
+        duplicates = duplicates,
+        onOpenTree = viewModel::openTree,
+        onRefresh = viewModel::refresh,
+        onOpenFolder = viewModel::openFolder,
+        onBack = viewModel::goBack,
+        onQuery = viewModel::setQuery,
+        onCreateFolder = viewModel::createFolder,
+        onRename = viewModel::rename,
+        onDelete = viewModel::delete,
+        onImport = viewModel::importDocument,
+        onScan = viewModel::scanTree,
+        onFindDuplicates = viewModel::findDuplicates,
+        onClearMessages = viewModel::clearMessages
+    )
+}
+
+@Composable
+private fun DownloadsDestination(viewModel: DownloaderViewModel = hiltViewModel()) {
+    val inspection by viewModel.inspection.collectAsStateWithLifecycle()
+    val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val allowMetered by viewModel.allowMetered.collectAsStateWithLifecycle()
+    DownloaderScreen(
+        inspection = inspection,
+        downloads = downloads,
+        busy = busy,
+        message = message,
+        error = error,
+        allowMetered = allowMetered,
+        onInspect = viewModel::inspect,
+        onEnqueue = viewModel::enqueue,
+        onAllowMetered = viewModel::setAllowMetered,
+        onCancel = viewModel::cancel,
+        onDeleteHistory = viewModel::deleteHistory,
+        onVerify = viewModel::verify,
+        onStartUpdates = viewModel::startProgressUpdates,
+        onStopUpdates = viewModel::stopProgressUpdates,
+        onClearMessages = viewModel::clearMessages
     )
 }
 
@@ -546,6 +706,9 @@ private fun SettingsDestination(
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+    val dnsDiagnosticReport by viewModel.dnsDiagnosticReport.collectAsStateWithLifecycle()
+    val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
@@ -555,6 +718,13 @@ private fun SettingsDestination(
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,
         onLoadInstalledApps = viewModel::loadInstalledApps,
         onToggleAppExclusion = viewModel::toggleAppExclusion,
+        onSetAppDnsPolicy = viewModel::setAppDnsPolicy,
+        onSetTransportProtected = viewModel::setTransportProtected,
+        protectionStatus = protectionStatus,
+        onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
+        dnsDiagnosticReport = dnsDiagnosticReport,
+        isRunningDnsDiagnostics = isRunningDnsDiagnostics,
+        onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,
@@ -569,5 +739,6 @@ private fun StatusDestination(viewModel: AdShieldViewModel) {
     val deviceProfile = remember(configuration.screenWidthDp, configuration.smallestScreenWidthDp, batteryTelemetry) {
         viewModel.deviceProfile(configuration.screenWidthDp, configuration.smallestScreenWidthDp)
     }
-    CapabilitiesScreen(deviceProfile = deviceProfile)
+    val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
+    CapabilitiesScreen(deviceProfile = deviceProfile, protectionStatus = protectionStatus)
 }

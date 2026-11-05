@@ -31,6 +31,8 @@ import com.adshield.pro.engine.platform.CapabilityArea
 import com.adshield.pro.engine.platform.CapabilityRegistry
 import com.adshield.pro.engine.platform.CapabilityStatus
 import com.adshield.pro.engine.platform.DeviceProfile
+import com.adshield.pro.ui.components.CompactStatusChip
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
 
@@ -46,12 +48,31 @@ private val StatusBlue = Color(0xFF2E7DFF)
  * from the same list a unit test validates.
  */
 @Composable
-fun CapabilitiesScreen(deviceProfile: DeviceProfile? = null) {
+fun CapabilitiesScreen(
+    deviceProfile: DeviceProfile? = null,
+    protectionStatus: ProtectionPipelineStatus? = null
+) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (protectionStatus != null) {
+            item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Live protection status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(protectionStatus.summary, fontSize = 11.sp, color = MutedText, maxLines = 2)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    CompactStatusChip(protectionStatus)
+                }
+            }
+        }
         if (deviceProfile != null) {
             item { DeviceProfileCard(deviceProfile) }
         }

@@ -1,0 +1,53 @@
+name: Cloud API
+
+# Runs the AdShield Cloud Worker suite against a local D1 (node:sqlite) and a Backblaze B2 stub.
+# No accounts, no secrets and no cost: the Worker, SQL and routes under test are the shipping code.
+
+on:
+  push:
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud-api.yml'
+  pull_request:
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Check the runtime supports node:sqlite
+        run: node -e "const { DatabaseSync } = require('node:sqlite'); new DatabaseSync(':memory:').exec('create table t(a)'); console.log('node:sqlite OK', process.version)"
+
+      - name: Install dependencies
+        working-directory: cloud
+        run: npm install --no-audit --no-fund
+
+      - name: Run the cloud API suite
+        working-directory: cloud
+        run: npm test
+
+      - name: Refuse an active test-mode override
+        working-directory: cloud
+        run: |
+          set -euo pipefail
+          if grep -qE '^[[:space:]]*AUTH_MODE[[:space:]]*=' wrangler.toml; then
+            echo "::error::wrangler.toml ships with an active AUTH_MODE override."
+            exit 1
+          fi
+          echo "wrangler.toml has no active AUTH_MODE override (placeholder bindings are expected until provisioning)."

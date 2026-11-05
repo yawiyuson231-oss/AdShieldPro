@@ -109,6 +109,14 @@ class ScanJournalStore @Inject constructor(
         context.scanJournalDataStore.edit { it.remove(Keys.HISTORY_JSON) }
     }
 
+    /** Drops a single journal entry (used by the security screen's per-record delete action). */
+    suspend fun removeHistory(id: Long) {
+        context.scanJournalDataStore.edit { prefs ->
+            val remaining = decodeHistory(prefs).filterNot { it.id == id }
+            prefs[Keys.HISTORY_JSON] = json.encodeToString(remaining)
+        }
+    }
+
     suspend fun addQuarantined(item: QuarantinedItem) {
         context.scanJournalDataStore.edit { prefs ->
             val existing = decodeQuarantine(prefs)

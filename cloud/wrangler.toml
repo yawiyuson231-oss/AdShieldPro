@@ -1,0 +1,35 @@
+# AdShield Cloud API — Cloudflare Worker (free tier) + D1 + Backblaze B2
+#
+# Cost model: Workers free (100 000 requests/day), D1 free (5 GB, 5M reads/day,
+# 100k writes/day), Backblaze B2 free (10 GB stored, no payment method required to activate).
+# Nothing in this file enables a paid plan. Do not add `usage_model` or paid bindings.
+
+name = "adshield-cloud"
+main = "src/index.js"
+compatibility_date = "2026-01-15"
+
+# `wrangler dev` runs against local D1/R2 emulation; production requires the real bindings below.
+[[d1_databases]]
+binding = "DB"
+database_name = "adshield_cloud"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+# Supabase project URL is public; the JWT signature is verified against its JWKS.
+SUPABASE_URL = "https://REPLACE_WITH_PROJECT.supabase.co"
+# Leave AUTH_MODE unset in production. "test" accepts HS256 tokens signed with TEST_JWT_SECRET
+# and is refused outright when B2_API_BASE points at production.
+# AUTH_MODE = "test"
+B2_BUCKET_NAME = "REPLACE_WITH_BUCKET_NAME"
+B2_BUCKET_ID = "REPLACE_WITH_BUCKET_ID"
+B2_API_BASE = "https://api.backblazeb2.com"
+
+# Secrets (never commit — set with `wrangler secret put <NAME>`):
+#   B2_KEY_ID               Backblaze application key ID
+#   B2_APPLICATION_KEY      Backblaze application key
+#   TURNSTILE_SECRET        Cloudflare Turnstile secret key
+#   TEST_JWT_SECRET         only used when AUTH_MODE=test
+
+[observability]
+enabled = true

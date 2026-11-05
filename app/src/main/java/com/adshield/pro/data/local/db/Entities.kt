@@ -112,3 +112,58 @@ data class DailyStatEntity(
     @ColumnInfo(name = "cached_queries")
     val cachedQueries: Long
 )
+
+@Entity(
+    tableName = "security_scans",
+    indices = [Index(value = ["timestamp_epoch_ms"]), Index(value = ["threat_level"])]
+)
+data class SecurityScanEntity(
+    @PrimaryKey val id: Long,
+    @ColumnInfo(name = "kind") val kind: String,
+    @ColumnInfo(name = "target") val target: String,
+    @ColumnInfo(name = "source_uri") val sourceUri: String?,
+    @ColumnInfo(name = "threat_level") val threatLevel: String,
+    @ColumnInfo(name = "risk_score") val riskScore: Int,
+    @ColumnInfo(name = "threat_name") val threatName: String?,
+    @ColumnInfo(name = "findings_json") val findingsJson: String,
+    @ColumnInfo(name = "recommendation") val recommendation: String,
+    @ColumnInfo(name = "timestamp_epoch_ms") val timestampEpochMs: Long
+)
+
+@Entity(
+    tableName = "storage_providers",
+    indices = [Index(value = ["health"]), Index(value = ["last_checked_epoch_ms"])]
+)
+data class StorageProviderEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val kind: String,
+    @ColumnInfo(name = "base_url") val baseUrl: String,
+    val username: String,
+    val health: String,
+    @ColumnInfo(name = "last_checked_epoch_ms") val lastCheckedEpochMs: Long,
+    @ColumnInfo(name = "last_error") val lastError: String?,
+    @ColumnInfo(name = "total_bytes") val totalBytes: Long?,
+    @ColumnInfo(name = "available_bytes") val availableBytes: Long?,
+    @ColumnInfo(name = "used_bytes") val usedBytes: Long?
+)
+
+@Entity(
+    tableName = "direct_downloads",
+    indices = [Index(value = ["system_download_id"]), Index(value = ["updated_at_epoch_ms"])]
+)
+data class DirectDownloadEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "system_download_id") val systemDownloadId: Long?,
+    @ColumnInfo(name = "source_url") val sourceUrl: String,
+    @ColumnInfo(name = "file_name") val fileName: String,
+    @ColumnInfo(name = "mime_type") val mimeType: String,
+    @ColumnInfo(name = "destination_uri") val destinationUri: String?,
+    val status: String,
+    @ColumnInfo(name = "downloaded_bytes") val downloadedBytes: Long,
+    @ColumnInfo(name = "total_bytes") val totalBytes: Long?,
+    @ColumnInfo(name = "created_at_epoch_ms") val createdAtEpochMs: Long,
+    @ColumnInfo(name = "updated_at_epoch_ms") val updatedAtEpochMs: Long,
+    val error: String?,
+    @ColumnInfo(name = "integrity_status") val integrityStatus: String?
+)

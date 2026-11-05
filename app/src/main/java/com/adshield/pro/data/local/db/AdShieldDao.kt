@@ -119,4 +119,46 @@ interface AdShieldDao {
 
     @Query("DELETE FROM filter_sources WHERE id = :id AND is_built_in = 0")
     suspend fun deleteCustomFilterSource(id: String)
+
+    // --- Persistent security reports ---
+    @Query("SELECT * FROM security_scans ORDER BY timestamp_epoch_ms DESC LIMIT 200")
+    fun observeSecurityScans(): Flow<List<SecurityScanEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSecurityScan(scan: SecurityScanEntity)
+
+    @Query("DELETE FROM security_scans WHERE id = :id")
+    suspend fun deleteSecurityScan(id: Long)
+
+    @Query("DELETE FROM security_scans")
+    suspend fun clearSecurityScans()
+
+    // --- Authorized storage providers ---
+    @Query("SELECT * FROM storage_providers ORDER BY name COLLATE NOCASE ASC")
+    fun observeStorageProviders(): Flow<List<StorageProviderEntity>>
+
+    @Query("SELECT * FROM storage_providers WHERE id = :id LIMIT 1")
+    suspend fun getStorageProvider(id: String): StorageProviderEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertStorageProvider(provider: StorageProviderEntity)
+
+    @Query("DELETE FROM storage_providers WHERE id = :id")
+    suspend fun deleteStorageProvider(id: String)
+
+    // --- Direct-media download history ---
+    @Query("SELECT * FROM direct_downloads ORDER BY created_at_epoch_ms DESC LIMIT 200")
+    fun observeDirectDownloads(): Flow<List<DirectDownloadEntity>>
+
+    @Query("SELECT * FROM direct_downloads WHERE id = :id LIMIT 1")
+    suspend fun getDirectDownload(id: String): DirectDownloadEntity?
+
+    @Query("SELECT * FROM direct_downloads WHERE system_download_id IS NOT NULL AND status IN ('QUEUED', 'RUNNING', 'PAUSED_BY_SYSTEM')")
+    suspend fun getActiveDirectDownloads(): List<DirectDownloadEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDirectDownload(download: DirectDownloadEntity)
+
+    @Query("DELETE FROM direct_downloads WHERE id = :id")
+    suspend fun deleteDirectDownload(id: String)
 }

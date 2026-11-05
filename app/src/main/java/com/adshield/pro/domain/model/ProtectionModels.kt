@@ -130,6 +130,30 @@ enum class DnsProviderPreset(
         dohUrl = "https://dns.google/dns-query",
         dotHostname = "dns.google"
     ),
+    NEXTDNS(
+        id = "nextdns",
+        displayName = "NextDNS",
+        providerSummary = "Configurable encrypted DNS using the public NextDNS anycast resolver.",
+        privacyDisclosure = "Operated by NextDNS; logging and analytics depend on the public resolver policy. No account profile or API key is embedded.",
+        primaryIpv4 = "45.90.28.0",
+        secondaryIpv4 = "45.90.30.0",
+        primaryIpv6 = "2a07:a8c0::",
+        secondaryIpv6 = "2a07:a8c1::",
+        dohUrl = "https://dns.nextdns.io/dns-query",
+        dotHostname = "dns.nextdns.io"
+    ),
+    CONTROL_D(
+        id = "controld",
+        displayName = "Control D",
+        providerSummary = "Encrypted anycast DNS using Control D's unfiltered public resolver.",
+        privacyDisclosure = "Operated by Control D / Windscribe. This uses the unfiltered public endpoint, not a private account configuration.",
+        primaryIpv4 = "76.76.2.0",
+        secondaryIpv4 = "76.76.10.0",
+        primaryIpv6 = "2606:1a40::",
+        secondaryIpv6 = "2606:1a40:1::",
+        dohUrl = "https://freedns.controld.com/p0",
+        dotHostname = "p0.freedns.controld.com"
+    ),
     CUSTOM(
         id = "custom",
         displayName = "Custom DNS Resolver",
@@ -152,7 +176,13 @@ data class DnsResolverConfig(
     val customDotHost: String = "one.one.one.one",
     val customPrimaryIpv4: String = "1.1.1.1",
     val customSecondaryIpv4: String = "1.0.0.1",
-    val enableIpv6: Boolean = true
+    val customPrimaryIpv6: String = "2606:4700:4700::1111",
+    val customSecondaryIpv6: String = "2606:4700:4700::1001",
+    val enableIpv6: Boolean = true,
+    val failoverEnabled: Boolean = false,
+    val failoverProviderIds: Set<String> = emptySet(),
+    val fastestHealthyProvider: Boolean = false,
+    val dnssecMode: DnssecMode = DnssecMode.REPORT_ONLY
 ) {
     val activeDohUrl: String
         get() = if (preset == DnsProviderPreset.CUSTOM) customDohUrl.ifBlank { preset.dohUrl } else preset.dohUrl
@@ -168,9 +198,51 @@ data class DnsResolverConfig(
 
     /** Primary IPv6 resolver address, used for IPv6-only networks and as a fallback. */
     val activePrimaryIpv6: String
-        get() = preset.primaryIpv6
+        get() = if (preset == DnsProviderPreset.CUSTOM) customPrimaryIpv6.ifBlank { preset.primaryIpv6 } else preset.primaryIpv6
 
     /** Secondary IPv6 resolver address, used for IPv6-only networks and as a fallback. */
     val activeSecondaryIpv6: String
-        get() = preset.secondaryIpv6
+        get() = if (preset == DnsProviderPreset.CUSTOM) customSecondaryIpv6.ifBlank { preset.secondaryIpv6 } else preset.secondaryIpv6
 }
+
+
+enum class DnsSelectionMode { CONFIGURED_ORDER, FASTEST_HEALTHY }
+
+@Serializable
+enum class DnssecMode(val label: String, val description: String) {
+    REPORT_ONLY(
+        "Report upstream DNSSEC status",
+        "Preserves normal unsigned DNS resolution and reports AD/RRSIG evidence; does not claim local chain validation."
+    ),
+    REQUIRE_AUTHENTICATED_ANSWERS(
+        "Strict: require AD on answers",
+        "Rejects positive answers without the upstream Authenticated Data bit. This intentionally blocks unsigned domains and is not local DNSSEC validation."
+    )
+}
+
+@Serializable
+enum class AppDnsPolicy(val label: String) {
+    DEFAULT("Use global protection"),
+    ALLOW_ALL("Allow all DNS (bypass domain filters)"),
+    BLOCK_ALL("Block all DNS for this app")
+}
+
+@Serializable
+enum class NetworkTransportPolicy(val label: String) {
+    WIFI("Wi-Fi"),
+    CELLULAR("Mobile data"),
+    ETHERNET("Ethernet"),
+    OTHER("Other / VPN")
+}
+
+@Serializable
+data class DnsFirewallPolicy(
+    val appPolicies: Map<String, AppDnsPolicy> = emptyMap(),
+    val protectedTransports: Set<NetworkTransportPolicy> = setOf(
+        NetworkTransportPolicy.WIFI,
+        NetworkTransportPolicy.CELLULAR,
+        NetworkTransportPolicy.ETHERNET,
+        NetworkTransportPolicy.OTHER
+    ),
+    val emergencyAllowlistOnly: Boolean = false
+)

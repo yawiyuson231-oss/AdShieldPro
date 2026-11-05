@@ -223,7 +223,9 @@ data class SecurityScanRecord(
     val recommendation: String,
     val timestampEpochMs: Long,
     val scanSource: ScanSource = ScanSource.MANUAL,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    /** A user-granted SAF URI, when deletion/quarantine can be offered without broad storage access. */
+    val sourceUri: String? = null
 )
 
 data class SecurityPosture(

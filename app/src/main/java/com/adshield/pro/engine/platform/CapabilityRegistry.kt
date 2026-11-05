@@ -27,6 +27,9 @@ enum class CapabilityArea(val label: String) {
     AI_INTELLIGENCE("On-device intelligence"),
     BATTERY("Battery & power"),
     DEVICE_MAINTENANCE("Device maintenance"),
+    CLOUD_STORAGE("Private cloud & Infinity storage"),
+    FILE_MANAGEMENT("SAF file management"),
+    DOWNLOADS("Direct media downloads"),
     UPDATES("Updates & supply chain"),
     PLATFORM("Platform & operations")
 }
@@ -129,6 +132,50 @@ object CapabilityRegistry {
             listOf("BOOT_COMPLETED broadcast, ConnectivityManager callbacks"),
             listOf("Android may delay boot receivers; VpnService needs user consent once"),
             "Manual device smoke test"
+        ),
+        cap(
+            "dns-provider-failover", "Opt-in provider failover with measured health", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_VPN),
+            listOf("Real per-query success/failure counts, EWMA latency and circuit-breaker cooldowns from DnsProviderHealthMonitor"),
+            listOf(
+                "Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53",
+                "Health is per-process: it is reset when the VPN service is restarted"
+            ),
+            "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt"
+        ),
+        cap(
+            "dns-response-validation", "Strict upstream response validation before caching or answering", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResponseValidator.kt", emptyList(),
+            listOf("Full resource-record walk of the upstream wire response (DnsPacketCodec.inspectResponseRecordTypes)"),
+            listOf("Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes"),
+            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData"
+        ),
+        cap(
+            "dnssec-evidence", "Upstream DNSSEC evidence reporting and strict AD mode", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.PARTIAL, "engine/dns/DnsResponseValidator.kt", emptyList(),
+            listOf("Upstream Authenticated Data (AD) flag and RRSIG presence in the returned records"),
+            listOf(
+                "Reports and optionally enforces upstream evidence only; it is not local DNSSEC chain validation",
+                "Strict mode rejects unsigned positive answers, so unsigned domains stop resolving by design"
+            ),
+            "CybersecurityPlatformTestSuite.dnssecModeReportsUpstreamAdAndStrictModeRejectsUnsignedPositiveAnswers"
+        ),
+        cap(
+            "dns-policy-per-app", "Per-app, per-network and emergency DNS policy", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFirewallPolicyDecider.kt", listOf(PERM_VPN),
+            listOf("Query owner package from VpnService, active transport from ConnectivityManager, user policy from DataStore"),
+            listOf(
+                "DNS decisions only: non-DNS sockets are not inspected because the tunnel routes DNS addresses exclusively",
+                "Emergency allowlist-only mode blocks every DNS answer that is not an explicit user or built-in safety allow"
+            ),
+            "CybersecurityPlatformTestSuite.appNetworkAndEmergencyPoliciesAreDeterministic"
+        ),
+        cap(
+            "dns-diagnostics", "Real resolver diagnostics against the configured upstream", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsDiagnostics.kt", listOf(PERM_INTERNET, PERM_VPN),
+            listOf("A genuine A query with EDNS0 DO bit, measured latency, RCODE, answer count and provider health"),
+            listOf("Validates the configured resolver path; it is not an external DNS leak test and no third-party echo service is contacted"),
+            "CybersecurityPlatformTestSuite.diagnosticQueryUsesEdns0AndNormalisesCase"
         ),
         cap(
             "dns-leak-detect", "DNS leak detection", CapabilityArea.DNS_PROTECTION,
@@ -508,7 +555,7 @@ object CapabilityRegistry {
             "adaptive-navigation", "Bottom navigation adapts to phone, tablet and landscape widths", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "MainActivity.kt", emptyList(),
             listOf("LocalConfiguration screen width, lazy scrollable NavigationBar row"),
-            listOf("Nine destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
+            listOf("Twelve destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
         ),
         cap(
@@ -526,14 +573,228 @@ object CapabilityRegistry {
             "tools/check_ui_performance.py and DashboardPresentationTest"
         ),
         cap(
-            "private-search", "Private search with a choice of Google or DuckDuckGo", CapabilityArea.PRIVACY_BROWSER,
-            CapabilityStatus.IMPLEMENTED, "engine/browser/PrivateSearch.kt", emptyList(),
-            listOf("User provider preference, address-bar input, existing tracking-parameter stripper"),
-            listOf(
-                "Choosing Google still sends the query to Google; the provider label says so",
-                "Search runs in this app's WebView only, not in external browsers"
-            ),
-            "PrivateSearchTest (encoding, injection, provider fallback, address resolution)"
+            "private-search-providers", "Google and DuckDuckGo private-search workspace", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "engine/browser/PrivateSearch.kt", listOf(PERM_INTERNET),
+            listOf("User-entered queries sent to the selected external HTTPS provider"),
+            listOf("The selected provider receives searches and network metadata; no anonymity claim is made; WebView behavior needs a device smoke test"),
+            "InfinityCoreTestSuite.testPrivateSearch_selectsProviderAndUpgradesCleartextNavigation plus manual browser test"
+        ),
+        cap(
+            "private-search-history", "Search-only history, opt-in suggestions and private WebView cleanup", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "data/local/preferences/UserPreferencesRepository.kt", listOf(PERM_INTERNET),
+            listOf("DataStore search settings/history; provider suggestion JSON only when explicitly enabled"),
+            listOf("Private mode is not a separate OS profile; cleanup clears WebView session data, while providers still receive requests"),
+            "Manual: enable private mode, search, leave Browser, and inspect history/cookies"
+        ),
+        cap(
+            "scan-persistence", "Persistent scan reports and confirmation-based SAF deletion", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.PARTIAL, "data/repository/SecurityScanHistoryStore.kt", emptyList(),
+            listOf("Room security_scans table and user-granted SAF document URIs"),
+            listOf("Deletion depends on provider support; scan coverage remains limited to accessible files and local signatures/structural checks"),
+            "Manual: scan a document, restart the app, verify its report, then confirm deletion"
+        ),
+        cap(
+            "aether-report-explainer", "AETHER deterministic security-report explanations", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/SecurityReportExplainer.kt", emptyList(),
+            listOf("Persisted SecurityScanRecord evidence only"),
+            listOf("Deterministic summarizer, not a generative model; cannot independently delete files or change settings"),
+            "InfinityCoreTestSuite.testAetherReportExplainer_usesOnlyRecordedEvidenceAndCannotAuthorizeDeletion"
+        ),
+        cap(
+            "webdav-files", "Authenticated Nextcloud/WebDAV file operations and streaming transfers", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "engine/storage/WebDavClient.kt", listOf(PERM_INTERNET),
+            listOf("HTTPS PROPFIND, MKCOL, PUT, GET, MOVE and DELETE responses"),
+            listOf("Requires a user-supplied compatible server and credentials; live server interoperability is not verified in this sandbox"),
+            "InfinityCoreTestSuite.testWebDavXml_parsesRealMultistatusEntriesAndQuota plus manual Nextcloud test"
+        ),
+        cap(
+            "infinity-verified-capacity", "Unified capacity from online quota-verified providers only", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "domain/model/InfinityModels.kt", listOf(PERM_INTERNET),
+            listOf("DAV quota-available-bytes and quota-used-bytes from successful health checks"),
+            listOf("Offline and quota-unreported providers are excluded; this is aggregation, not distributed striping or replication"),
+            "InfinityCoreTestSuite.testCapacityAggregation_countsOnlyOnlineProvidersWithMeasuredQuota"
+        ),
+        cap(
+            "provider-credential-encryption", "Android Keystore encryption for storage-provider passwords", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "data/repository/ProviderCredentialStore.kt", emptyList(),
+            listOf("AndroidKeyStore AES-GCM keys and app-private ciphertext preferences"),
+            listOf("Keystore behavior, device lock backup behavior and key invalidation require real-device testing"),
+            "Manual: reconnect after process restart and inspect that preferences contain ciphertext only"
+        ),
+        cap(
+            "nextcloud-public-sharing", "Nextcloud OCS public-link creation and downloaded file previews", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "data/repository/CloudStorageRepository.kt", listOf(PERM_INTERNET),
+            listOf("Nextcloud OCS Share API and FileProvider cache URIs"),
+            listOf("Generic WebDAV has no standard public-share API; previews download up to 256 MiB and need an installed viewer"),
+            "InfinityCoreTestSuite.testWebDavXml_parsesOnlyHttpsNextcloudShareLinks plus manual Nextcloud share test"
+        ),
+        cap(
+            "nextcloud-server-infrastructure", "Open-source Nextcloud/PostgreSQL backend deployment manifests", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "infra/docker-compose.yml", listOf(PERM_INTERNET),
+            listOf("Operator-supplied Nextcloud Community, PostgreSQL, HTTPS reverse proxy and persistent volumes"),
+            listOf("External host, domain, backups and secrets are required; no capacity is provisioned by the repository alone"),
+            "Deployment required: follow docs/INFINITY_ARCHITECTURE.md and run health/quota verification"
+        ),
+        cap(
+            "distributed-striping", "Distributed file striping, replication and automatic recovery across providers", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PLANNED, "",
+            listOf(PERM_INTERNET), listOf("Would require a coordinated metadata/erasure-coding backend"),
+            listOf("Not implemented: independent provider aggregation must not be presented as distributed redundancy"),
+            "n/a — architecture only"
+        ),
+        cap(
+            "s3-ceph-backends", "S3-compatible, SeaweedFS and Ceph storage adapters", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PLANNED, "",
+            listOf(PERM_INTERNET), listOf("Would require operator-supplied S3-compatible infrastructure"),
+            listOf("Not enabled to avoid installing overlapping storage systems; Nextcloud/WebDAV is the selected first backend"),
+            "n/a — external infrastructure and adapter required"
+        ),
+        cap(
+            "adshield-cloud-api", "AdShield Cloud API client (accounts, files, shares, backups, usage)", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("AdShield Cloud Worker /v1 endpoints over HTTPS with a Supabase access token"),
+            listOf("Needs the user's own free Worker, D1 and Backblaze B2 project; nothing works offline and the DNS blocker does not depend on it"),
+            "CloudPlatformTestSuite.cloudApiBuildsTheDocumentedPathsAndParsesRealResponses"
+        ),
+        cap(
+            "adshield-cloud-uploads", "Resumable multipart uploads with pause, resume, retry and cancel", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudUploadEngine.kt", listOf(PERM_INTERNET),
+            listOf("Part URLs issued by POST /v1/uploads/init, bytes streamed straight to Backblaze B2"),
+            listOf("Pause takes effect at a part boundary; a part interrupted mid-flight is re-sent from its offset"),
+            "CloudPlatformTestSuite.uploadEngineResumesOnlyThePartsTheServerIsStillMissing"
+        ),
+        cap(
+            "adshield-cloud-upload-integrity", "Per-part SHA-1 verification before storage accepts a part", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudUploadEngine.kt", listOf(PERM_INTERNET),
+            listOf("SHA-1 of the exact bytes streamed, declared in X-Bz-Content-Sha1"),
+            listOf("SHA-1 is what the B2 large-file API requires; the whole-file hash is the provider's concatenation of part digests"),
+            "CloudPlatformTestSuite.uploadEngineStreamsEveryPartWithItsRealSha1AndCompletes"
+        ),
+        cap(
+            "adshield-cloud-background-uploads", "Background uploads that survive leaving the screen", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "worker/CloudUploadWorker.kt", listOf(PERM_INTERNET),
+            listOf("WorkManager one-time work with a persisted job record in app-private storage"),
+            listOf("Job metadata is persisted, not the file bytes; the source Uri must still be readable when the worker runs"),
+            "Manual: start an upload, close the app, and confirm the job completes or reports a real failure"
+        ),
+        cap(
+            "adshield-cloud-file-operations", "Folders, rename, move, copy, trash, restore and permanent delete", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/CloudRepository.kt", listOf(PERM_INTERNET),
+            listOf("POST /v1/folders and per-node action endpoints; permanent delete removes the stored object first"),
+            listOf("Trash retention is 30 days by default; a copy shares the stored object until one side is deleted"),
+            "Manual: `cd cloud && npm test` covers the folder lifecycle, purge frees quota and version pruning"
+        ),
+        cap(
+            "adshield-cloud-versioning", "Version history with pruning beyond five stored versions", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("GET /v1/nodes/:id/versions and the versions table written on re-upload"),
+            listOf("Older versions are deleted for real, so history costs storage until it is pruned"),
+            "Manual: `cd cloud && npm test` — re-uploading the same name keeps a history and prunes beyond five"
+        ),
+        cap(
+            "adshield-cloud-sharing", "Expiring share links that can be revoked", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("Random share tokens, server-side expiry, short-lived signed download URLs"),
+            listOf("Read-only links; anyone with the token can open it until it expires or is revoked"),
+            "Manual: `cd cloud && npm test` — share links work, expire and can be revoked"
+        ),
+        cap(
+            "adshield-cloud-duplicates", "Duplicate detection grouped by real content hash", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("SHA-1 recorded for every uploaded object, grouped server-side"),
+            listOf("Only files uploaded through AdShield Cloud carry a hash; identical content under different names is still grouped"),
+            "Manual: `cd cloud && npm test` — duplicate detection groups files by their real content hash"
+        ),
+        cap(
+            "adshield-cloud-quota-truth", "Quota accounting reconciled against what the provider stores", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("GET /v1/account and POST /v1/account/reconcile, which lists the objects B2 actually reports"),
+            listOf("Reconciliation pages through up to 50 000 objects per call; counters are corrected, never guessed"),
+            "Manual: `cd cloud && npm test` — reconciliation rebuilds usage from what the provider actually stores"
+        ),
+        cap(
+            "adshield-cloud-usage", "Live usage monitoring from the backend, never a local estimate", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "ui/viewmodel/CloudViewModel.kt", listOf(PERM_INTERNET),
+            listOf("Quota, used bytes, remaining bytes, trashed bytes and 24-hour request counters from the API"),
+            listOf("Percentages and bars are hidden until the account answers; the free allowance is 10 GB on Backblaze B2"),
+            "CloudPlatformTestSuite.cloudApiBuildsTheDocumentedPathsAndParsesRealResponses"
+        ),
+        cap(
+            "adshield-cloud-backup", "DNS configuration backup, integrity verification and restore", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudBackup.kt", listOf(PERM_INTERNET),
+            listOf("Resolver, protection mode, rules, filter lists, per-app firewall and preferences, hashed with SHA-256"),
+            listOf("Restore replaces rules and filter lists; the backup is re-downloaded and re-hashed before it is applied"),
+            "CloudPlatformTestSuite.backupCodecRoundTripsAndRefusesATamperedPayload"
+        ),
+        cap(
+            "adshield-cloud-vault", "Optional client-side AES-256-GCM encryption for backups", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudVault.kt", emptyList(),
+            listOf("PBKDF2-HMAC-SHA256 key derivation, Android Keystore-free passphrase vault, GCM tag verification"),
+            listOf("Backups only; a forgotten passphrase is unrecoverable; resumable multipart file uploads are not encrypted client-side"),
+            "CloudPlatformTestSuite.vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne"
+        ),
+        cap(
+            "adshield-cloud-scan", "Pre-upload malware scan with quarantine", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/CloudRepository.kt", emptyList(),
+            listOf("On-device FileThreatScanner verdict over the first 8 MiB of the file"),
+            listOf("Files rated DANGEROUS are refused and listed in the Cloud Security screen; SUSPICIOUS files upload but are reported"),
+            "Manual: pick an EICAR test file and confirm the upload is refused and appears in Quarantine"
+        ),
+        cap(
+            "adshield-cloud-audit", "Server-side audit log of every mutating action", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("audit_log rows written inside the Worker for uploads, shares, deletes and restores"),
+            listOf("The newest 100 entries are readable in the app; IP addresses come from Cloudflare's connecting-IP header"),
+            "Manual: `cd cloud && npm test` — every mutating action is written to the per-user audit log"
+        ),
+        cap(
+            "adshield-cloud-credential-safety", "No storage credentials inside the APK", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("Only public endpoints: the Worker URL, the Supabase project URL and anon key, and the Turnstile site key"),
+            listOf("Bucket keys live only in Worker secrets; the app never sees them and cannot leak them"),
+            "Manual: unzip the release APK and confirm no Backblaze key material is present"
+        ),
+        cap(
+            "onion-routing", "Onion routing through Orbot with a real Tor check", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "engine/onion/OnionRoutingManager.kt", listOf(PERM_INTERNET),
+            listOf("Orbot's SOCKS proxy at 127.0.0.1:9050 and check.torproject.org/api/ip"),
+            listOf("Requires Orbot to be installed and connected; Android only lets an app intercept GET requests, so POST forms and some media streams use the normal path; AdShield cannot bundle a Tor daemon"),
+            "OnionRoutingTestSuite.orbotStatusBroadcastMapsToHonestStates"
+        ),
+        cap(
+            "saf-universal-files", "SAF file/folder management, import, preview, share and search", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("DocumentsContract trees explicitly granted by the user and external viewer/share apps"),
+            listOf("No other-app sandbox access or all-files permission; providers may not support every mutation"),
+            "Manual device test: grant a tree, import, rename, preview, share and delete a test document"
+        ),
+        cap(
+            "saf-folder-scanning", "Bounded recursive folder scans with live per-file progress", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("User-granted SAF documents and the existing FileThreatScanner/ApkAnalyzer"),
+            listOf("At most 250 files per run; files over 512 MiB and unreadable items are skipped/reported; periodic background scans are not scheduled"),
+            "Manual device test: scan a tree containing EICAR and a clean file, then inspect persisted history"
+        ),
+        cap(
+            "saf-duplicates", "SHA-256 duplicate-content grouping without automatic deletion", CapabilityArea.FILE_MANAGEMENT,
+            CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
+            listOf("Content hashes of same-size candidates in a user-granted tree"),
+            listOf("Recursive candidate set is bounded to 250 files; unreadable candidates are omitted rather than guessed"),
+            "Manual device test: duplicate a document and verify that only identical hashes are grouped"
+        ),
+        cap(
+            "direct-media-downloads", "Direct HTTPS media inspection, system downloads and history", CapabilityArea.DOWNLOADS,
+            CapabilityStatus.PARTIAL, "data/repository/DirectDownloadRepository.kt", listOf(PERM_INTERNET),
+            listOf("HTTP HEAD/one-byte Range metadata and Android DownloadManager status"),
+            listOf("No website extractor, DRM/authentication bypass or manual pause/resume; server and SAF destination compatibility need device tests"),
+            "InfinityCoreTestSuite.testDirectMediaInput_enforcesHttpsAndSafeFileNames plus manual direct MP4 test"
+        ),
+        cap(
+            "download-integrity", "Downloaded size checks and optional publisher SHA-256 verification", CapabilityArea.DOWNLOADS,
+            CapabilityStatus.PARTIAL, "data/repository/DirectDownloadRepository.kt", emptyList(),
+            listOf("Measured destination bytes, server-declared length and optional user-supplied digest"),
+            listOf("A locally computed digest without a publisher reference does not establish authenticity"),
+            "Manual: verify a direct file with correct and deliberately incorrect SHA-256 values"
         ),
         cap(
             "scan-journal", "Persistent scan history with exportable threat reports", CapabilityArea.THREAT_SCANNING,
@@ -564,39 +825,6 @@ object CapabilityRegistry {
                 "WorkManager timing is approximate and deferrable by the OS to save battery"
             ),
             "Manual device check; ScanJournalTest covers record/report shape"
-        ),
-        cap(
-            "private-cloud", "Private cloud storage box (upload/download/sync)", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(),
-            listOf("Would need a WebDAV endpoint, Google Drive OAuth client, or an S3-compatible service"),
-            listOf(
-                "Not implemented: no backend is bundled and no account service is operated by this app",
-                "Requires user-supplied credentials or an OAuth client id before it can be enabled"
-            ),
-            "n/a — not implemented"
-        ),
-        cap(
-            "universal-downloader", "URL-based video/audio downloader", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(),
-            listOf("Would need a download queue, format probing and a user-chosen save location"),
-            listOf(
-                "Not implemented yet",
-                "Will support direct/public media URLs and official APIs only; DRM, paywalls and access restrictions are never bypassed"
-            ),
-            "n/a — not implemented"
-        ),
-        cap(
-            "file-manager", "Full SAF file manager (browse/copy/move/compress)", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(),
-            listOf("Would use Storage Access Framework tree and document URIs"),
-            listOf(
-                "Not implemented yet; single-file picking for scanning already works",
-                "Android scoped storage limits access to user-granted trees only"
-            ),
-            "n/a — not implemented"
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,

@@ -54,6 +54,12 @@ import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
 import com.adshield.pro.domain.model.AppExclusionInfo
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.DnssecMode
+import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.engine.dns.DnsDiagnosticReport
+import com.adshield.pro.ui.components.CompactStatusChip
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
@@ -72,6 +78,13 @@ fun SettingsScreen(
     onUpdateResolverConfig: (DnsResolverConfig) -> Unit,
     onLoadInstalledApps: () -> Unit,
     onToggleAppExclusion: (String, Boolean) -> Unit,
+    onSetAppDnsPolicy: (String, AppDnsPolicy) -> Unit,
+    onSetTransportProtected: (NetworkTransportPolicy, Boolean) -> Unit,
+    protectionStatus: ProtectionPipelineStatus? = null,
+    onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
+    dnsDiagnosticReport: DnsDiagnosticReport?,
+    isRunningDnsDiagnostics: Boolean,
+    onRunDnsDiagnostics: (String) -> Unit,
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
@@ -84,9 +97,11 @@ fun SettingsScreen(
 
     var showAppExclusionDialog by remember { mutableStateOf(false) }
     var showBackupDialog by remember { mutableStateOf(false) }
+    var showEmergencyConfirm by remember { mutableStateOf(false) }
     var showPrivacyPolicyDialog by remember { mutableStateOf(false) }
     var backupJsonBuffer by remember { mutableStateOf("") }
 
+    var diagnosticDomain by remember { mutableStateOf("cloudflare.com") }
     var customDohInput by remember(settings.resolverConfig) {
         mutableStateOf(settings.resolverConfig.customDohUrl)
     }
@@ -106,10 +121,17 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Text(
-                text = "Network, Apps & Privacy Settings",
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    text = "Network, Apps & Privacy Settings",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (protectionStatus != null) {
+                    Spacer(Modifier.width(8.dp))
+                    CompactStatusChip(protectionStatus)
+                }
+            }
             Text(
                 text = "Configure Encrypted DNS, Per-App VPN Exclusions, and Backup/Restore",
                 style = MaterialTheme.typography.labelMedium,
@@ -290,6 +312,138 @@ fun SettingsScreen(
             }
         }
 
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Resolver Resilience & DNSSEC", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Failover is ordered and validated; responses are never merged. Encrypted DNS never falls back to plaintext. Health scores come only from real query outcomes.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Automatic encrypted provider failover", style = MaterialTheme.typography.bodyLarge)
+                            Text("Uses only the providers selected below", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Switch(
+                            checked = settings.resolverConfig.failoverEnabled,
+                            onCheckedChange = { enabled ->
+                                onUpdateResolverConfig(settings.resolverConfig.copy(failoverEnabled = enabled))
+                            }
+                        )
+                    }
+                    if (settings.resolverConfig.failoverEnabled) {
+                        DnsProviderPreset.entries.filter {
+                            it != DnsProviderPreset.CUSTOM && it != settings.resolverConfig.preset
+                        }.forEach { preset ->
+                            FilterChip(
+                                selected = preset.id in settings.resolverConfig.failoverProviderIds,
+                                onClick = {
+                                    val ids = settings.resolverConfig.failoverProviderIds.toMutableSet().apply {
+                                        if (!add(preset.id)) remove(preset.id)
+                                    }
+                                    onUpdateResolverConfig(settings.resolverConfig.copy(failoverProviderIds = ids))
+                                },
+                                label = { Text(preset.displayName) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Prefer fastest measured healthy provider", Modifier.weight(1f))
+                            Switch(
+                                checked = settings.resolverConfig.fastestHealthyProvider,
+                                onCheckedChange = {
+                                    onUpdateResolverConfig(settings.resolverConfig.copy(fastestHealthyProvider = it))
+                                }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = diagnosticDomain,
+                        onValueChange = { diagnosticDomain = it },
+                        label = { Text("Diagnostic DNS name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        onClick = { onRunDnsDiagnostics(diagnosticDomain) },
+                        enabled = !isRunningDnsDiagnostics,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (isRunningDnsDiagnostics) "Running real DNS query…" else "Run DNS diagnostics") }
+                    dnsDiagnosticReport?.let { report ->
+                        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp)) {
+                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(if (report.successful) "Upstream query completed" else "Upstream query failed", fontWeight = FontWeight.SemiBold)
+                                Text("${report.domain} · RCODE ${report.responseCode ?: "invalid"} · ${report.answerCount ?: 0} answer(s)")
+                                Text(report.transportAndProvider, style = MaterialTheme.typography.bodySmall)
+                                Text("${report.latencyMs} ms${if (report.fromCache) " · cache" else " · network"}", style = MaterialTheme.typography.bodySmall)
+                                Text(report.dnssecStatus?.label ?: "No DNSSEC evidence available", style = MaterialTheme.typography.bodySmall)
+                                Text("This validates the configured resolver path. It is not an external DNS leak test.", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                    Text("DNSSEC handling", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                    DnssecMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = settings.resolverConfig.dnssecMode == mode,
+                            onClick = { onUpdateResolverConfig(settings.resolverConfig.copy(dnssecMode = mode)) },
+                            label = { Text(mode.label) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Text(
+                        settings.resolverConfig.dnssecMode.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (settings.resolverConfig.dnssecMode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS)
+                            WarningAmber else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Network & Emergency DNS Policies", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "These policies govern DNS queries only. Non-DNS traffic bypasses the local tunnel. Passthrough still uses the configured upstream resolver.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    NetworkTransportPolicy.entries.forEach { transport ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Filter on ${transport.label}", Modifier.weight(1f))
+                            Switch(
+                                checked = transport in settings.dnsFirewallPolicy.protectedTransports,
+                                onCheckedChange = { onSetTransportProtected(transport, it) }
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Emergency allowlist-only DNS", style = MaterialTheme.typography.bodyLarge, color = WarningAmber)
+                            Text("Blocks every domain not explicitly allowed by you or the built-in safety list", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Switch(
+                            checked = settings.dnsFirewallPolicy.emergencyAllowlistOnly,
+                            onCheckedChange = { enabled ->
+                                if (enabled) showEmergencyConfirm = true else onSetEmergencyAllowlistOnly(false)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         // Per-App VPN Controls & Streaming Compatibility Card
         item {
             Card(
@@ -329,7 +483,7 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Manage Per-App VPN Exclusions")
+                        Text("Manage Per-App VPN & DNS Policies")
                     }
                 }
             }
@@ -494,7 +648,7 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showAppExclusionDialog = false },
-            title = { Text("Per-App VPN Exclusions") },
+            title = { Text("Per-App VPN & DNS Policies") },
             text = {
                 Column(modifier = Modifier.height(420.dp)) {
                     OutlinedTextField(
@@ -537,6 +691,25 @@ fun SettingsScreen(
                                         )
                                     }
 
+                                    Text(
+                                        "DNS policy (does not control non-DNS traffic)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(
+                                            AppDnsPolicy.DEFAULT to "Global",
+                                            AppDnsPolicy.ALLOW_ALL to "Allow",
+                                            AppDnsPolicy.BLOCK_ALL to "Block"
+                                        ).forEach { (policy, label) ->
+                                            FilterChip(
+                                                selected = app.dnsPolicy == policy,
+                                                onClick = { onSetAppDnsPolicy(app.packageName, policy) },
+                                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                                            )
+                                        }
+                                    }
+
                                     if (app.compatibilityNote != null) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Row(verticalAlignment = Alignment.Top) {
@@ -565,6 +738,21 @@ fun SettingsScreen(
                     Text("Done")
                 }
             }
+        )
+    }
+
+    if (showEmergencyConfirm) {
+        AlertDialog(
+            onDismissRequest = { showEmergencyConfirm = false },
+            title = { Text("Enable emergency DNS lockdown?") },
+            text = { Text("Most apps and websites will stop resolving. Only explicit user allowlist entries and the built-in compatibility safety allowlist will resolve. Non-DNS traffic is not blocked.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSetEmergencyAllowlistOnly(true)
+                    showEmergencyConfirm = false
+                }) { Text("Enable lockdown") }
+            },
+            dismissButton = { TextButton(onClick = { showEmergencyConfirm = false }) { Text("Cancel") } }
         )
     }
 

@@ -205,7 +205,6 @@ class FileThreatScanner {
             findings.add("Exact match: EICAR antivirus test signature (industry-standard detection test file)")
             return ContentFindings(findings, 100, "EICAR.Test.File")
         }
-
         val dropperPatterns = listOf(
             Regex("""powershell(\.exe)?.{0,40}-(enc|EncodedCommand|w hidden)""", RegexOption.IGNORE_CASE) to
                 "Obfuscated PowerShell dropper command (-enc/hidden)",

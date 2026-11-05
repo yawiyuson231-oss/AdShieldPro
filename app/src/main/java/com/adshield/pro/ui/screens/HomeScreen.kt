@@ -82,7 +82,9 @@ import com.adshield.pro.ui.components.DonutChart
 import com.adshield.pro.ui.components.DonutSegment
 import com.adshield.pro.ui.components.MetricSpec
 import com.adshield.pro.ui.components.PrivacyBadge
+import com.adshield.pro.ui.components.LiveProtectionStatusPanel
 import com.adshield.pro.ui.components.ProtectionShield
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.ui.components.ResponsiveMetrics
 import com.adshield.pro.ui.components.ScrollToTopButton
 import com.adshield.pro.ui.components.Sparkline
@@ -104,6 +106,7 @@ import java.util.Locale
 fun HomeScreen(
     vpnState: VpnRuntimeState,
     settings: AppSettingsState,
+    protectionStatus: ProtectionPipelineStatus,
     allTimeTotal: Long,
     allTimeBlocked: Long,
     allTimeAllowed: Long,
@@ -243,6 +246,13 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+
+            item(key = "live_status") {
+                LiveProtectionStatusPanel(
+                    status = protectionStatus,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             item(key = "overview") {

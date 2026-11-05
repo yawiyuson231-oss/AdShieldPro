@@ -1,0 +1,20 @@
+{$DOMAIN} {
+	encode zstd gzip
+	tls {$ACME_EMAIL}
+
+	request_body {
+		max_size 10GB
+	}
+
+	redir /.well-known/carddav /remote.php/dav/ 301
+	redir /.well-known/caldav /remote.php/dav/ 301
+
+	header {
+		Strict-Transport-Security "max-age=31536000;"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy nextcloud:80
+}
