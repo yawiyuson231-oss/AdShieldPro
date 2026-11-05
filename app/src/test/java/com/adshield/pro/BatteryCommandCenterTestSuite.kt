@@ -210,13 +210,13 @@ class BatteryCommandCenterTestSuite {
         assertTrue("measured values are labelled as measurements", live.measured)
 
         val unsupported = BatteryMonitor.sensorStatus(
-            "Current", BatteryReading.unsupported("mA", "not exposed"), "CURRENT_NOW", "mA", DataFreshness.LIVE
+            "Current", BatteryReading.unsupported<Int>("mA", "not exposed"), "CURRENT_NOW", "mA", DataFreshness.LIVE
         )
         assertEquals(SensorState.UNSUPPORTED, unsupported.state)
         assertEquals("—", unsupported.statusValue)
 
         val unavailable = BatteryMonitor.sensorStatus(
-            "Current", BatteryReading.unavailable("mA", "0 mA reported"), "CURRENT_NOW", "mA", DataFreshness.LIVE
+            "Current", BatteryReading.unavailable<Int>("mA", "0 mA reported"), "CURRENT_NOW", "mA", DataFreshness.LIVE
         )
         assertEquals(SensorState.UNAVAILABLE, unavailable.state)
 
@@ -572,7 +572,7 @@ class BatteryCommandCenterTestSuite {
         assertEquals(9, report.observationMinutes)
         assertEquals(2000f, report.averageCurrentMilliAmps!!, 1f)
         assertEquals(8.4f, report.averagePowerWatts!!, 0.01f)
-        assertTrue(report.abnormalDrainDetected, "28 %/h is above the 20 %/h threshold")
+        assertTrue("28 %/h is above the 20 %/h threshold", report.abnormalDrainDetected)
         assertFalse(report.overheatingDetected)
         assertTrue(report.notes.any { it.contains("Screen-on versus screen-off") })
         assertTrue(report.notes.any { it.contains("Average current is not exposed") })
