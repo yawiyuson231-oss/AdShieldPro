@@ -10,11 +10,6 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugRFile
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/data/GpsNetworkClients.kt:389:26 Candidate 'val JsonElement.jsonObject: JsonObject' is inapplicable because of a receiver type mismatch.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/data/GpsPreferences.kt:146:80 Return type mismatch: expected 'Boolean', actual 'Comparable<String & Boolean> & Serializable'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/data/GpsPreferences.kt:162:70 Argument type mismatch: actual type is 'Boolean', but 'String' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:176:41 Unresolved reference 'hasAlmanac' on receiver of type 'GnssStatus'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:177:43 Unresolved reference 'hasEphemeris' on receiver of type 'GnssStatus'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:197:26 Cannot infer type for type parameter 'R'. Specify it explicitly.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:198:21 None of the following candidates is applicable:
 
@@ -24,14 +19,6 @@ fun registerGnssStatusCallback(p0: GnssStatus.Callback, p1: Handler?): Boolean:
 fun registerGnssStatusCallback(p0: Executor, p1: GnssStatus.Callback): Boolean:
   Argument type mismatch: actual type is '<anonymous>', but 'Executor' was expected.
   Argument type mismatch: actual type is 'Looper!', but 'GnssStatus.Callback' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/PositionModels.kt:522:56 Argument type mismatch: actual type is 'Double?', but 'Double' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/PositionModels.kt:527:23 Argument type mismatch: actual type is 'Double?', but 'Double' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:47:29 Type 'State<(CameraSnapshot) -> Unit>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:48:27 Type 'State<(GeoPoint) -> Unit>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:49:24 Type 'State<() -> Unit>' has no method 'getValue(Nothing?, KProperty0<*>)', so it cannot serve as a delegate.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:82:17 Unresolved reference 'currentOnCameraIdle'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:84:44 Unresolved reference 'currentOnMapClick'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/AdShieldMapView.kt:91:17 Unresolved reference 'currentOnReady'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/MapLibreEngine.kt:542:30 Unresolved reference 'asSharedFlow' on receiver of type 'MutableSharedFlow<Pair<String, OfflineRegionProgress>>'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/map/MapLibreEngine.kt:545:26 Unresolved reference 'asSharedFlow' on receiver of type 'MutableSharedFlow<Pair<String, String>>'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/nav/TripRecorder.kt:308:14 Unresolved reference 'appContext'.
@@ -102,10 +89,10 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: UNRESOLVED_REFERENCE_WRONG_RECEIVER
+   > Kotlin compiler: CANNOT_INFER_PARAMETER_TYPE
        Kotlin compiler error
-         Candidate 'val JsonElement.jsonObject: JsonObject' is inapplicable because of a receiver type mismatch.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/data/GpsNetworkClients.kt line 389
+         Cannot infer type for type parameter 'R'. Specify it explicitly.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt line 197
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -266,7 +253,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Candidate 'val JsonElement.jsonObject: JsonObject' is inapplicable because of a receiver type mismatch.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Cannot infer type for type parameter 'R'. Specify it explicitly.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -303,5 +290,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Candidat
 	... 2 more
 
 
-BUILD FAILED in 2m 19s
+BUILD FAILED in 2m 28s
 8 actionable tasks: 8 executed
