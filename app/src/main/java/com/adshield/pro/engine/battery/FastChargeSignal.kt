@@ -11,10 +11,18 @@ package com.adshield.pro.engine.battery
  */
 sealed class FastChargeSignal {
     data object NONE : FastChargeSignal()
-    data class Detected(val source: String) : FastChargeSignal()
+
+    /** [signal] is the platform evidence, printed verbatim in the UI. */
+    data class Detected(val signal: String) : FastChargeSignal()
 
     val isPresent: Boolean get() = this is Detected
-    val source: String? get() = (this as? Detected)?.source
+
+    /** The platform evidence behind a claim, or null when nothing was published. */
+    val source: String?
+        get() = when (this) {
+            is Detected -> signal
+            NONE -> null
+        }
 
     companion object {
         /**

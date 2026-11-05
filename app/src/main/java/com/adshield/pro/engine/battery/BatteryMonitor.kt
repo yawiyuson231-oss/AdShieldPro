@@ -565,8 +565,8 @@ object BatteryMonitor {
      * must present this as "observed while monitoring".
      */
     fun displayStateDrain(samples: List<BatteryDiagnostics.Sample>): DisplayStateDrain {
-        val on = samples.filter { it.screenOn == true }.mapNotNull { it.currentMilliAmps?.let(::abs) }
-        val off = samples.filter { it.screenOn == false }.mapNotNull { it.currentMilliAmps?.let(::abs) }
+        val on = samples.filter { it.screenOn == true }.mapNotNull { it.currentMilliAmps?.let { value -> abs(value) } }
+        val off = samples.filter { it.screenOn == false }.mapNotNull { it.currentMilliAmps?.let { value -> abs(value) } }
         fun minutesOf(list: List<BatteryDiagnostics.Sample>): Int {
             val usable = list.filter { it.timestampEpochMs > 0 }
             if (usable.size < 2) return 0
@@ -644,7 +644,7 @@ object BatteryMonitor {
         abnormalDrainThresholdPerHour: Float = 20f
     ): BatteryIntelligenceReport {
         val inWindow = samples.takeLast(600)
-        val currents = inWindow.mapNotNull { it.currentMilliAmps?.let(::abs) }
+        val currents = inWindow.mapNotNull { it.currentMilliAmps?.let { value -> abs(value) } }
         val powers = inWindow.mapNotNull { it.powerWatts }
         val temps = inWindow.mapNotNull { it.temperatureCelsius }
         val observationMinutes = if (inWindow.size >= 2) {

@@ -150,10 +150,17 @@ def body_of(code: str, header_regex: str) -> str | None:
 def declared_members(code: str, type_name: str) -> set[str]:
     body = body_of(code, rf"\b(?:enum class|class|object|data class|sealed class)\s+{re.escape(type_name)}\b")
     if body is None:
-        # The type is not declared in this file at all: return nothing so the caller can try the
-        # next candidate instead of scanning an unrelated file and reporting phantom members.
+        # Not declared in this file. It may still own extension members (`fun BatterySession.x()`),
+        # which count as members of the type, so scan the whole file but only keep extensions whose
+        # receiver is this type.
         if not re.search(rf"\b(?:class|object|interface)\s+{re.escape(type_name)}\b", code):
-            return set()
+            extensions = set(
+                re.findall(
+                    rf"\bfun\s+(?:<[^>]*>\s*)?(?:[A-Za-z_][\w.]*\.)?{re.escape(type_name)}\.([A-Za-z_]\w*)\s*[(=<]",
+                    code,
+                )
+            )
+            return extensions
         body = code
     members: set[str] = set()
     for pattern in (
@@ -233,18 +240,36 @@ for path in SLICE:
     if not raw:
         continue
     code = strip_comments_and_strings(raw)
-    for type_name in BOILERPLATE_TYPES | {"BatteryMonitor", "BatteryDiagnostics", "ChargingSource"}:
-        candidates = sorted({p for fq, p in repo_symbols.items() if fq.rsplit(".", 1)[-1] == type_name})
-        if not candidates:
-            fail(f"{path.name}: {type_name} is not declared anywhere in the app")
-            continue
-        members: set[str] = set()
-        definition = candidates[0]
-        for candidate in candidates:
-            found = declared_members(strip_comments_and_strings(sources[candidate]), type_name)
-            if found:
-                members |= found
-                definition = candidate
+    REFERENCED_TYPES = BOILERPLATE_TYPES | {"BatteryMonitor", "BatteryDiagnostics", "ChargingSource"}
+
+# Index every member of every referenced type once: declarations from the file that owns the type,
+# plus extension functions whose receiver is that type (they are members for call-site purposes).
+members_by_type: dict[str, set[str]] = {name: set() for name in REFERENCED_TYPES}
+owners: dict[str, list[Path]] = {name: [] for name in REFERENCED_TYPES}
+for source_path, source_raw in sources.items():
+    source_code = strip_comments_and_strings(source_raw)
+    for type_name in REFERENCED_TYPES:
+        declares = re.search(rf"\b(?:class|object|interface)\s+{re.escape(type_name)}\b", source_code)
+        if declares:
+            members_by_type[type_name] |= declared_members(source_code, type_name)
+            owners[type_name].append(source_path)
+        for extension in re.finditer(
+            rf"\bfun\s+(?:<[^>]*>\s*)?(?:[A-Za-z_][\w.]*\.)?{re.escape(type_name)}\.([A-Za-z_]\w*)\s*[(=<]",
+            source_code,
+        ):
+            members_by_type[type_name].add(extension.group(1))
+
+for type_name, found in members_by_type.items():
+    if not owners[type_name]:
+        fail(f"{type_name} is not declared anywhere in the app")
+
+for path in SLICE:
+    raw = read(path)
+    if not raw:
+        continue
+    code = strip_comments_and_strings(raw)
+    for type_name in REFERENCED_TYPES:
+        members = members_by_type[type_name]
         if not members:
             continue
         for match in re.finditer(rf"(?<![\w.]){re.escape(type_name)}\.([A-Za-z_]\w*)", code):
@@ -252,10 +277,8 @@ for path in SLICE:
             if member in {"Companion", "class", "java", "entries"}:
                 continue
             if member not in members:
-                fail(
-                    f"{path.name}: {type_name}.{member} is not declared in "
-                    f"{definition.relative_to(ROOT)}"
-                )
+                owner = owners[type_name][0].relative_to(ROOT) if owners[type_name] else "?"
+                fail(f"{path.name}: {type_name}.{member} is not declared in {owner}")
 
 # ---------------------------------------------------------------------------------------------
 # 3. Honesty rules

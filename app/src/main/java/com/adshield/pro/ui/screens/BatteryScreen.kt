@@ -141,10 +141,12 @@ fun BatteryScreen(
     val hud = hudRotation(animate)
     val columns = if (LocalConfiguration.current.screenWidthDp >= 600) 4 else 2
 
-    // A status change must be visible without hunting: scroll to the top when the *condition*
-    // changes (e.g. plugged in, overheating) but never on every value tick.
-    LaunchedEffect(state.status.primary) {
-        if (listState.firstVisibleItemIndex > 0) listState.animateScrollToItem(0)
+    // A status change must be visible without hunting. Scroll back to the banner only when the
+    // *condition* changes (plugged in, overheating, …) and the user has scrolled away — never on a
+    // value tick, and never fighting a user who is reading a panel.
+    val statusKey = state.status.primary.name + state.status.tone.name
+    LaunchedEffect(statusKey) {
+        if (listState.firstVisibleItemIndex > 2) listState.animateScrollToItem(0)
     }
 
     LazyColumn(
@@ -224,7 +226,7 @@ private fun CommandCenterHero(
 ) {
     val telemetry = state.telemetry
     val toneColor = toneColor(state.status.tone)
-    val level = telemetry.levelPercent.rawValue
+    val level = telemetry.level
     val gaugeFraction by animateFloatAsState(
         targetValue = (level ?: 0) / 100f,
         animationSpec = tween(600),
@@ -318,8 +320,8 @@ private fun CommandCenterHero(
                         Spacer(Modifier.height(8.dp))
                         HeroLine(
                             label = "CURRENT",
-                            value = telemetry.currentMilliAmps.rawValue?.let { "$it mA" } ?: "—",
-                            detail = telemetry.currentMilliAmps.rawValue?.let {
+                            value = telemetry.current?.let { "$it mA" } ?: "—",
+                            detail = telemetry.current?.let {
                                 BatteryMonitor.currentDirectionLabel(
                                     it, telemetry.isCharging, telemetry.currentSignKnown
                                 ) ?: ""
@@ -328,15 +330,15 @@ private fun CommandCenterHero(
                         )
                         HeroLine(
                             label = "VOLTAGE",
-                            value = telemetry.voltageVolts.rawValue?.let { "${BatteryMonitor.format1(it)} V" } ?: "—",
-                            detail = telemetry.voltageVolts.rawValue?.let { "${(it * 1000).toInt()} mV" }
+                            value = telemetry.voltage?.let { "${BatteryMonitor.format1(it)} V" } ?: "—",
+                            detail = telemetry.voltage?.let { "${(it * 1000).toInt()} mV" }
                                 ?: sourceHint(telemetry.voltageVolts),
                             color = NeonCyan
                         )
                         HeroLine(
                             label = "POWER",
-                            value = telemetry.powerWatts.rawValue?.let { "${BatteryMonitor.format1(it)} W" } ?: "—",
-                            detail = if (telemetry.powerWatts.rawValue != null) "battery-side V × I"
+                            value = telemetry.power?.let { "${BatteryMonitor.format1(it)} W" } ?: "—",
+                            detail = if (telemetry.power != null) "battery-side V × I"
                             else sourceHint(telemetry.powerWatts),
                             color = ElectricBlue
                         )
@@ -349,8 +351,8 @@ private fun CommandCenterHero(
                 ) {
                     HeroChip(
                         label = "TEMP",
-                        value = telemetry.temperatureCelsius.rawValue?.let { "${BatteryMonitor.format1(it)}°C" } ?: "—",
-                        color = if ((telemetry.temperatureCelsius.rawValue ?: 0f) >= BatteryMonitor.WARM_TEMPERATURE_CELSIUS) {
+                        value = telemetry.temperature?.let { "${BatteryMonitor.format1(it)}°C" } ?: "—",
+                        color = if ((telemetry.temperature ?: 0f) >= BatteryMonitor.WARM_TEMPERATURE_CELSIUS) {
                             ConsoleAmber
                         } else NeonGreen,
                         modifier = Modifier.weight(1f)
@@ -385,7 +387,8 @@ private fun CommandCenterHero(
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
-                        text = "last reading ${BatteryMonitor.describeAge(state.telemetry.ageMs(nowElapsed()))} ago",
+                        text = if (state.freshness == DataFreshness.NO_DATA) "no reading yet"
+                    else "last reading ${BatteryMonitor.describeAge(state.telemetry.ageMs(nowElapsed()))} ago",
                         color = ConsoleMuted,
                         fontSize = 9.sp,
                         fontFamily = MonoFont
@@ -500,12 +503,8 @@ private fun LivePowerMonitorSection(
 ) {
     val telemetry = state.telemetry
     val intelligence = state.intelligence
-    val chargingPower = BatteryMonitor.chargingPowerWatts(
-        telemetry.voltageVolts.rawValue, telemetry.currentMilliAmps.rawValue, telemetry.isCharging
-    )
-    val dischargePower = BatteryMonitor.dischargePowerWatts(
-        telemetry.voltageVolts.rawValue, telemetry.currentMilliAmps.rawValue, telemetry.isCharging
-    )
+    val chargingPower = BatteryMonitor.chargingPowerWatts(telemetry.voltage, telemetry.current, telemetry.isCharging)
+    val dischargePower = BatteryMonitor.dischargePowerWatts(telemetry.voltage, telemetry.current, telemetry.isCharging)
     CyberPanel(
         title = "Live Power Monitor",
         subtitle = if (state.livePolling) {
@@ -527,14 +526,14 @@ private fun LivePowerMonitorSection(
             metrics = listOf(
                 MetricSpec(
                     label = "Live current",
-                    value = telemetry.currentMilliAmps.rawValue?.let { "$it mA" } ?: "—",
+                    value = telemetry.current?.let { "$it mA" } ?: "—",
                     caption = sourceCaption(telemetry.currentMilliAmps, "CURRENT_NOW"),
                     color = NeonGreen
                 ),
                 MetricSpec(
                     label = "Average current",
-                    value = telemetry.currentAverageMilliAmps.rawValue?.let { "$it mA" } ?: "—",
-                    caption = telemetry.currentAverageMilliAmps.rawValue?.let { "CURRENT_AVERAGE" }
+                    value = telemetry.averageCurrent?.let { "$it mA" } ?: "—",
+                    caption = telemetry.averageCurrent?.let { "CURRENT_AVERAGE" }
                         ?: "not exposed — see computed average",
                     color = NeonCyan
                 )
@@ -545,15 +544,15 @@ private fun LivePowerMonitorSection(
             metrics = listOf(
                 MetricSpec(
                     label = "Voltage",
-                    value = telemetry.voltageVolts.rawValue?.let { "${BatteryMonitor.format1(it)} V" } ?: "—",
-                    caption = telemetry.voltageVolts.rawValue?.let { "${(it * 1000).toInt()} mV · EXTRA_VOLTAGE" }
+                    value = telemetry.voltage?.let { "${BatteryMonitor.format1(it)} V" } ?: "—",
+                    caption = telemetry.voltage?.let { "${(it * 1000).toInt()} mV · EXTRA_VOLTAGE" }
                         ?: "not reported",
                     color = NeonCyan
                 ),
                 MetricSpec(
                     label = "Actual power",
-                    value = telemetry.powerWatts.rawValue?.let { "${BatteryMonitor.format1(it)} W" } ?: "—",
-                    caption = if (telemetry.powerWatts.rawValue != null) "V × I on the battery side" else "needs V and I",
+                    value = telemetry.power?.let { "${BatteryMonitor.format1(it)} W" } ?: "—",
+                    caption = if (telemetry.power != null) "V × I on the battery side" else "needs V and I",
                     color = ElectricBlue
                 )
             )
@@ -843,7 +842,7 @@ private fun ChargingAnalyticsSection(state: BatteryIntelligenceRepository.Batter
                     caption = when {
                         telemetry.isFull -> "already full"
                         state.minutesToFull != null -> "estimate from measured rate"
-                        telemetry.chargeTimeRemainingMinutes.rawValue != null -> "Android estimate below"
+                        telemetry.chargerMinutes != null -> "Android estimate below"
                         else -> "not measurable yet"
                     },
                     color = NeonCyan
@@ -863,8 +862,8 @@ private fun ChargingAnalyticsSection(state: BatteryIntelligenceRepository.Batter
                 ),
                 MetricSpec(
                     label = "Android charge ETA",
-                    value = telemetry.chargeTimeRemainingMinutes.rawValue?.let(::formatMinutes) ?: "—",
-                    caption = if (telemetry.chargeTimeRemainingMinutes.rawValue != null)
+                    value = telemetry.chargerMinutes?.let(::formatMinutes) ?: "—",
+                    caption = if (telemetry.chargerMinutes != null)
                         "computeChargeTimeRemaining()"
                     else "not provided while not charging",
                     color = NeonCyan
@@ -1003,12 +1002,13 @@ private fun BatteryHealthSection(state: BatteryIntelligenceRepository.BatteryDas
             reading = BatteryReading.measured(telemetry.healthLabel, ""),
             fallbackDetail = "BatteryManager.EXTRA_HEALTH = ${telemetry.health.name}"
         )
+        val capacityPercent = telemetry.capacityHealthPercent
         HealthRow(
             label = "Measured capacity",
-            valueOverride = telemetry.capacityHealthPercent?.let { "${BatteryMonitor.format1(it)}% of design" },
-            reading = BatteryReading(telemetry.capacityHealthPercent, BatteryReadingSource.COMPUTED, "%"),
-            fallbackDetail = "Full ${telemetry.chargeFullMicroAmpHours.rawValue ?: "—"} µAh / " +
-                "design ${telemetry.chargeFullDesignMicroAmpHours.rawValue ?: "—"} µAh"
+            valueOverride = capacityPercent?.let { "${BatteryMonitor.format1(it)}% of design" },
+            reading = BatteryReading(capacityPercent, BatteryReadingSource.COMPUTED, "%"),
+            fallbackDetail = "Full ${telemetry.fullChargeCapacity ?: "—"} µAh / " +
+                "design ${telemetry.designCapacity ?: "—"} µAh"
         )
         HealthRow(
             label = "Cycle count",
@@ -1062,7 +1062,7 @@ private fun TemperatureMonitorSection(
     animate: Boolean
 ) {
     val telemetry = state.telemetry
-    val temperature = telemetry.temperatureCelsius.rawValue
+    val temperature = telemetry.temperature
     val series = remember(history) {
         history.takeLast(120).map { it.temperatureCelsius }
     }

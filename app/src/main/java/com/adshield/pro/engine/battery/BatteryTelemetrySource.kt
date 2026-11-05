@@ -123,9 +123,17 @@ class BatteryTelemetrySource @Inject constructor(
         } else {
             previous.powerWatts
         }
+        val now = SystemClock.elapsedRealtime()
+        // CURRENT_NOW keeps updating even when the framework's status broadcast is very old (some
+        // vendor builds go quiet while the screen is off). Publishing a fresh timestamp in that
+        // case would make the whole snapshot — level, temperature, charging state — look live when
+        // it is not, so the poll is skipped until a real broadcast refreshes the snapshot.
+        if (previous.elapsedRealtimeMs != 0L && previous.ageMs(now) > MAX_EXTRAPOLATED_AGE_MS) {
+            return null
+        }
         val updated = previous.copy(
             timestampEpochMs = System.currentTimeMillis(),
-            elapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            elapsedRealtimeMs = now,
             currentMilliAmps = currentReading,
             currentAverageMilliAmps = averageReading,
             powerWatts = power,
@@ -380,5 +388,13 @@ class BatteryTelemetrySource @Inject constructor(
         } else {
             BatteryReading.unsupported("cycles", "Android 14+ is present but the device does not report a cycle count")
         }
+    }
+
+    private companion object {
+        /**
+         * How long the fast current poll may keep re-stamping a snapshot that the framework has not
+         * refreshed. 30 s matches the "stale" boundary the UI uses.
+         */
+        const val MAX_EXTRAPOLATED_AGE_MS = 30_000L
     }
 }

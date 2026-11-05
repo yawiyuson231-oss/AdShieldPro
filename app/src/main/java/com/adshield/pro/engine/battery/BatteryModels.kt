@@ -144,6 +144,18 @@ data class BatteryTelemetry(
     val hasPowerInputs: Boolean
         get() = voltageVolts.rawValue != null && currentMilliAmps.rawValue != null
 
+    // Nullable value helpers: the UI needs "is there a number?" without unwrapping each reading.
+    val level: Int? get() = levelPercent.rawValue
+    val voltage: Float? get() = voltageVolts.rawValue
+    val current: Int? get() = currentMilliAmps.rawValue
+    val averageCurrent: Int? get() = currentAverageMilliAmps.rawValue
+    val temperature: Float? get() = temperatureCelsius.rawValue
+    val power: Float? get() = powerWatts.rawValue
+    val chargerMinutes: Int? get() = chargeTimeRemainingMinutes.rawValue
+    val designCapacity: Long? get() = chargeFullDesignMicroAmpHours.rawValue
+    val fullChargeCapacity: Long? get() = chargeFullMicroAmpHours.rawValue
+    val cycles: Int? get() = cycleCount.rawValue
+
     /** Share of the design capacity Android currently believes is stored, when both are exposed. */
     val capacityHealthPercent: Float?
         get() {
