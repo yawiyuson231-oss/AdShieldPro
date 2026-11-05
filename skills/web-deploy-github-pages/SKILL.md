@@ -15,7 +15,7 @@ document encodes.
 
 > Do not run the upstream `scripts/init_project.sh` / `scripts/deploy_github_pages.sh` here.
 > They create a second repository, a `gh-pages` branch, and a competing workflow. This repo
-> deploys with `actions/deploy-pages` and the `github-pages` environment.
+> deploys with `actions/deploy-pages@v5` and the `github-pages` environment.
 
 ## What gets published
 
@@ -45,12 +45,12 @@ npm run serve                 # http://localhost:8080 for manual checks
 ```
 checkout
   → site files present (docs/index.html, 404.html, og-image.png, canonical.txt, app entry points)
-  → configure-pages@v5 (enablement: true — turns Pages on when the token allows it)
+  → configure-pages@v6 (enablement: true — turns Pages on when the token allows it)
   → stage-site.mjs --out _site        (assembles /, /app/, 404.html, robots.txt, sitemap.xml;
                                        fails if a service-worker precache target is missing)
   → verify-site.mjs _site             (links, preview tags, 404, sitemap, size limits)
-  → upload-pages-artifact@v3
-  → deploy-pages@v4                   (needs: pages: write, id-token: write)
+  → upload-pages-artifact@v5
+  → deploy-pages@v5                   (needs: pages: write, id-token: write)
 ```
 
 `adshield-release` also re-runs this workflow after publishing an APK (`gh workflow run

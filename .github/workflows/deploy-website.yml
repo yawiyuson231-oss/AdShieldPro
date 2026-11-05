@@ -10,7 +10,7 @@ name: Deploy website
 # Runs on every change to docs/ or the web platform, and can be triggered by hand.
 # Safe to re-run: the job is idempotent.
 #
-# Pages enablement: actions/configure-pages@v5 with `enablement: true` turns Pages on
+# Pages enablement: actions/configure-pages@v6 with `enablement: true` turns Pages on
 # (Source: GitHub Actions). Creating a Pages site is one of the few operations the default
 # GITHUB_TOKEN is never allowed to perform, so an admin must either click Settings -> Pages ->
 # Source: GitHub Actions once, or add a fine-grained PAT with "Pages: read and write" as the
@@ -58,7 +58,7 @@ jobs:
       url: ${{ steps.pages.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Check the site files are present
         run: |
@@ -77,7 +77,7 @@ jobs:
       - name: Configure Pages (enables Pages when the token is allowed to)
         id: pages-config
         continue-on-error: true
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
         with:
           # PAGES_TOKEN (optional) is a PAT that can create the Pages site; falls back to the
           # workflow token, which can configure but not create it.
@@ -97,7 +97,7 @@ jobs:
           exit 1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -117,11 +117,11 @@ jobs:
         run: node scripts/verify-site.mjs _site --summary >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
       - name: Deploy to Pages
         id: pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
