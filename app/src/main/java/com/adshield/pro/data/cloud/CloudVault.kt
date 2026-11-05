@@ -14,6 +14,34 @@ import javax.crypto.spec.SecretKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Where the vault keeps its salt and verifier. Kept small so the vault is unit-testable. */
+interface VaultStorage {
+    fun salt(): ByteArray?
+    fun verifier(): ByteArray?
+    fun iterations(): Int
+    fun save(salt: ByteArray, verifier: ByteArray, iterations: Int)
+}
+
+class PreferencesVaultStorage(context: Context) : VaultStorage {
+    private val preferences = context.getSharedPreferences("adshield_cloud_vault", Context.MODE_PRIVATE)
+    override fun salt(): ByteArray? = preferences.getString(KEY_SALT, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
+    override fun verifier(): ByteArray? = preferences.getString(KEY_VERIFIER, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
+    override fun iterations(): Int = preferences.getInt(KEY_ITERATIONS, DEFAULT_ITERATIONS)
+    override fun save(salt: ByteArray, verifier: ByteArray, iterations: Int) {
+        preferences.edit()
+            .putString(KEY_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
+            .putString(KEY_VERIFIER, Base64.encodeToString(verifier, Base64.NO_WRAP))
+            .putInt(KEY_ITERATIONS, iterations)
+            .apply()
+    }
+
+    private companion object {
+        const val KEY_SALT = "salt"
+        const val KEY_VERIFIER = "verifier"
+        const val KEY_ITERATIONS = "iterations"
+    }
+}
+
 /**
  * Optional client-side encryption for cloud backups.
  *
@@ -28,16 +56,14 @@ import javax.inject.Singleton
  */
 @Singleton
 class CloudVault @Inject constructor(
-    @ApplicationContext context: Context
+    private val storage: VaultStorage
 ) {
-    private val preferences = context.getSharedPreferences("adshield_cloud_vault", Context.MODE_PRIVATE)
     private val random = SecureRandom()
 
     @Volatile
     private var masterKey: SecretKey? = null
 
-    fun isConfigured(): Boolean =
-        preferences.getString(KEY_SALT, null) != null && preferences.getString(KEY_VERIFIER, null) != null
+    fun isConfigured(): Boolean = storage.salt() != null && storage.verifier() != null
 
     fun isUnlocked(): Boolean = masterKey != null
 
@@ -50,22 +76,17 @@ class CloudVault @Inject constructor(
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, nonce))
         val verifier = cipher.doFinal(VERIFIER_PLAINTEXT)
-        preferences.edit()
-            .putString(KEY_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
-            .putString(KEY_VERIFIER, Base64.encodeToString(nonce + verifier, Base64.NO_WRAP))
-            .putInt(KEY_ITERATIONS, iterations)
-            .apply()
+        storage.save(salt, nonce + verifier, iterations)
         masterKey = key
         return true
     }
 
     /** Unlocks the vault. Returns false when the passphrase is wrong. */
     fun unlock(passphrase: CharArray): Boolean {
-        val salt = preferences.getString(KEY_SALT, null)?.let { Base64.decode(it, Base64.NO_WRAP) } ?: return false
-        val verifier = preferences.getString(KEY_VERIFIER, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
-            ?: return false
+        val salt = storage.salt() ?: return false
+        val verifier = storage.verifier() ?: return false
         if (verifier.size <= NONCE_BYTES) return false
-        val iterations = preferences.getInt(KEY_ITERATIONS, PBKDF2_ITERATIONS)
+        val iterations = storage.iterations()
         val key = derive(passphrase, salt, iterations)
         val verified = runCatching {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -87,7 +108,6 @@ class CloudVault @Inject constructor(
 
     fun changePassphrase(oldPassphrase: CharArray, newPassphrase: CharArray): Boolean {
         if (!unlock(oldPassphrase)) return false
-        preferences.edit().remove(KEY_SALT).remove(KEY_VERIFIER).apply()
         return setup(newPassphrase)
     }
 
@@ -122,9 +142,7 @@ class CloudVault @Inject constructor(
     }
 
     private companion object {
-        const val KEY_SALT = "salt"
-        const val KEY_VERIFIER = "verifier"
-        const val KEY_ITERATIONS = "iterations"
+        const val DEFAULT_ITERATIONS = PBKDF2_ITERATIONS
         const val SALT_BYTES = 16
         const val NONCE_BYTES = 12
         const val KEY_BITS = 256

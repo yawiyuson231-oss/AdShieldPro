@@ -8,7 +8,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 
 /** Supplies the Supabase access token for the signed-in user, or null when signed out. */
 fun interface CloudTokenProvider {
@@ -117,13 +116,7 @@ class CloudApiClient internal constructor(
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val code = runCatching {
-                    JSONObject(body).optString("error", "http ${response.code}")
-                }.getOrDefault("http ${response.code}")
-                val detail = runCatching {
-                    JSONObject(body).optJSONObject("detail")?.toString()
-                }.getOrNull()
-                throw CloudException(response.code, code, detail)
+                throw parseError(response.code, body)
             }
             body
         }
@@ -137,6 +130,14 @@ class CloudApiClient internal constructor(
 
     private suspend fun delete(path: String): String =
         call(authorized(url(path)).delete().build())
+
+    @kotlinx.serialization.Serializable
+    private class ErrorBodyDto(val error: String? = null, val detail: String? = null)
+
+    private fun parseError(status: Int, body: String): CloudException {
+        val parsed = runCatching { json.decodeFromString<ErrorBodyDto>(body) }.getOrNull()
+        return CloudException(status, parsed?.error ?: "http $status", parsed?.detail)
+    }
 
     private suspend fun authorized(target: okhttp3.HttpUrl): Request.Builder {
         val builder = Request.Builder().url(target)

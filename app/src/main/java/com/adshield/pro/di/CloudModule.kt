@@ -6,7 +6,9 @@ import com.adshield.pro.data.cloud.CloudApi
 import com.adshield.pro.data.cloud.CloudApiClient
 import com.adshield.pro.data.cloud.CloudUploadEngine
 import com.adshield.pro.data.cloud.JsonFileUploadJobStore
+import com.adshield.pro.data.cloud.PreferencesVaultStorage
 import com.adshield.pro.data.cloud.UploadJobStore
+import com.adshield.pro.data.cloud.VaultStorage
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,6 +35,11 @@ object CloudModule {
     @Singleton
     fun provideUploadJobStore(@ApplicationContext context: Context): UploadJobStore =
         JsonFileUploadJobStore(context)
+
+    @Provides
+    @Singleton
+    fun provideVaultStorage(@ApplicationContext context: Context): VaultStorage =
+        PreferencesVaultStorage(context)
 
     @Provides
     @Singleton

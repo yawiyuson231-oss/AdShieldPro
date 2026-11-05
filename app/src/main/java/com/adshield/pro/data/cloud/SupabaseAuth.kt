@@ -16,10 +16,16 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+
+@Serializable
+private data class SupabaseErrorDto(
+    val msg: String? = null,
+    @SerialName("error_description") val errorDescription: String? = null,
+    val error: String? = null
+)
 
 @Serializable
 data class SupabaseUserDto(
@@ -64,8 +70,8 @@ class SupabaseAuthClient internal constructor(
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val body = response.body?.string().orEmpty()
-                val message = runCatching { JSONObject(body).optString("msg") }.getOrDefault("")
-                throw CloudException(response.code, message.ifBlank { "password reset was refused" })
+                val message = decodeError(body)
+                throw CloudException(response.code, message ?: "password reset was refused")
             }
             true
         }
@@ -97,12 +103,8 @@ class SupabaseAuthClient internal constructor(
         val raw = http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val parsed = runCatching { JSONObject(body) }.getOrNull()
-                val message = parsed?.optString("msg")?.takeIf { it.isNotBlank() }
-                    ?: parsed?.optString("error_description")?.takeIf { it.isNotBlank() }
-                    ?: parsed?.optString("error")?.takeIf { it.isNotBlank() }
-                    ?: "authentication failed (http ${response.code})"
-                throw CloudException(response.code, message)
+                val message = decodeError(body)
+                throw CloudException(response.code, message ?: "authentication failed (http ${response.code})")
             }
             body
         }
@@ -122,6 +124,13 @@ class SupabaseAuthClient internal constructor(
             userId = parsed.user?.id.orEmpty(),
             email = parsed.user?.email ?: (payload as? Credentials)?.email ?: ""
         )
+    }
+
+    private fun decodeError(body: String): String? {
+        val parsed = runCatching { defaultCloudJson().decodeFromString<SupabaseErrorDto>(body) }.getOrNull()
+            ?: return null
+        return listOfNotNull(parsed.msg, parsed.errorDescription, parsed.error)
+            .firstOrNull { it.isNotBlank() }
     }
 
     private fun url(path: String) = (endpoints.supabaseUrl.trimEnd('/') + "/" + path.trimStart('/')).toHttpUrl()
