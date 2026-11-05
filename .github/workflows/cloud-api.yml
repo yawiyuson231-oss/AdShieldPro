@@ -1,0 +1,52 @@
+name: Cloud API
+
+# Runs the AdShield Cloud Worker suite against a local D1 (node:sqlite) and a Backblaze B2 stub.
+# No accounts, no secrets and no cost: the Worker, SQL and routes under test are the shipping code.
+
+on:
+  push:
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud-api.yml'
+  pull_request:
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: cloud-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: cloud
+        run: npm install --no-audit --no-fund
+
+      - name: Run the cloud API suite
+        working-directory: cloud
+        run: npm test
+
+      - name: Refuse a production bucket in test mode
+        working-directory: cloud
+        run: |
+          set -euo pipefail
+          if grep -q "AUTH_MODE = \"test\"" wrangler.toml; then
+            echo "::error::wrangler.toml ships with AUTH_MODE=test enabled."
+            exit 1
+          fi
+          if grep -qE "REPLACE_WITH_(D1_DATABASE_ID|BUCKET_NAME|BUCKET_ID)" wrangler.toml; then
+            echo "wrangler.toml still holds placeholder bindings (expected until provisioning)."
+          fi
