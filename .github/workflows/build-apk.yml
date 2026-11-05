@@ -82,7 +82,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish APK to branch for delivery
-        if: success() && github.event_name == 'workflow_dispatch' && inputs.deliver_to_branch
+        if: success() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deliver_to_branch))
         run: |
           mkdir -p apk
           APK="$(ls app/build/outputs/apk/debug/*.apk | head -1)"
