@@ -57,6 +57,14 @@ jobs:
           grep -E "FAILURE:|error:|^e: |What went wrong|Execution failed|Caused by|Unresolved reference|Could not|not found" gradle-assemble.log \
             | head -12 | while IFS= read -r line; do echo "::error::$line"; done || true
 
+      - name: Upload Gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-assemble-log
+          path: gradle-assemble.log
+          if-no-files-found: warn
+
       - name: Publish Gradle log to branch for inspection
         if: failure() && github.event_name == 'workflow_dispatch'
         run: |
@@ -66,7 +74,7 @@ jobs:
           git config user.email "agent@arena.ai"
           git add build-logs/gradle-assemble.log
           git commit -m "APK build log [skip ci]" || exit 0
-          git push origin HEAD:arena/b1d244c1-adshieldpro
+          git push origin HEAD:arena/40a64c9a-adshieldpro
 
       - name: JVM unit tests (informational)
         continue-on-error: true
@@ -95,4 +103,4 @@ jobs:
           git config user.email "agent@arena.ai"
           git add -f apk/app-debug.apk apk/app-debug.apk.sha256
           git commit -m "Deliver debug APK [skip ci]" || exit 0
-          git push origin HEAD:arena/b1d244c1-adshieldpro
+          git push origin HEAD:arena/40a64c9a-adshieldpro

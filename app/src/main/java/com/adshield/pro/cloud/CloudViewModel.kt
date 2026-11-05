@@ -31,7 +31,7 @@ import com.adshield.pro.cloud.data.CloudVersionDto
 import com.adshield.pro.cloud.engine.CloudDownloadEngine
 import com.adshield.pro.cloud.engine.CloudUploadEngine
 import com.adshield.pro.cloud.engine.PickResult
-import com.adshield.pro.cloud.engine.TransferRegistry
+import com.adshield.pro.cloud.work.TransferRegistry
 import com.adshield.pro.cloud.work.CloudAutoBackupWorker
 import com.adshield.pro.cloud.work.CloudDownloadWorker
 import com.adshield.pro.cloud.work.CloudUploadWorker
@@ -406,7 +406,7 @@ class CloudViewModel @Inject constructor(
 
     fun move(node: CloudNodeDto, targetFolderId: String?) = mutate("Moved") { api.move(node.id, targetFolderId) }
 
-    fun copy(node: CloudNodeDto) = mutate("Copied") { api.copy(node, _ui.value.currentFolderId) }
+    fun copy(node: CloudNodeDto) = mutate("Copied") { api.copy(node.id, _ui.value.currentFolderId) }
 
     fun trash(node: CloudNodeDto) {
         viewModelScope.launch {
@@ -641,11 +641,11 @@ class CloudViewModel @Inject constructor(
     }
 
     fun resumeTransfer(transfer: CloudTransferEntity) {
-        val config = configRepository.snapshot()
-        if (transfer.direction == "upload") {
-            TransferRegistry.controlFor(transfer.id).resume()
-            CloudUploadWorker.enqueue(context, transfer.id, config.wifiOnlyUploads, replace = true)
-            viewModelScope.launch {
+        viewModelScope.launch {
+            val config = configRepository.snapshot()
+            if (transfer.direction == "upload") {
+                TransferRegistry.controlFor(transfer.id).resume()
+                CloudUploadWorker.enqueue(context, transfer.id, config.wifiOnlyUploads, replace = true)
                 dao.updateTransferStatus(transfer.id, "queued", null, System.currentTimeMillis())
                 refreshTransfers()
             }
