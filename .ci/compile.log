@@ -10,10 +10,12 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugRFile FROM-CACHE
 > Task :app:kspDebugKotlin
 
+> Task :app:compileDebugKotlin
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:340:17 Unresolved reference 'Box'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:341:21 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:347:21 @Composable invocations can only happen from the context of a @Composable function
+
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:106:39 Unresolved reference 'ALLOW'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:349:105 Unresolved reference 'ALLOW'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/SupabaseAuth.kt:75:17 'public' function exposes its 'private-in-file' return type 'SupabaseUserDto'.
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
@@ -24,8 +26,8 @@ Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.a
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
    > Kotlin compiler: UNRESOLVED_REFERENCE
        Kotlin compiler error
-         Unresolved reference 'ALLOW'.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt line 106
+         Unresolved reference 'Box'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt line 340
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -217,7 +219,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 61 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'ALLOW'.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'Box'.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -254,5 +256,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolv
 	... 2 more
 
 
-BUILD FAILED in 40s
+BUILD FAILED in 47s
 8 actionable tasks: 2 executed, 6 from cache
