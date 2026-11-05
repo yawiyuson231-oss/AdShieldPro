@@ -62,13 +62,21 @@ integration checks, 0 failures** after the Room v3 / model changes.
 
 Workflow: `.github/workflows/build-apk.yml` on this branch.
 
-- `assembleDebug`: pending — run 41979706213 (commit `a85dd15`) in progress at the time of writing.
-- `testDebugUnitTest` (required gate): pending — includes the 30-test CyberShield suite plus the pre-existing AdShield/Aether suites.
-- `lintDebug` (informational): pending.
-- APK delivery target: `apk/app-debug.apk` with SHA-256 (`apk/app-debug.apk.sha256`).
+Verified outcomes (GitHub Actions, this branch):
 
-> These lines are updated with the verified outcomes before the change is
-> finalized; the authoritative record is the Actions run history for this branch.
+| Run | Commit | assembleDebug | testDebugUnitTest (required) | lintDebug | APK delivery |
+|---|---|---|---|---|---|
+| 41979706213 | `a85dd15` | ✅ success | ✅ success | ✅ success | artifact |
+| 41980574050 | `1ef71d0` (final code) | ✅ success | ✅ success | ✅ success | ✅ committed to branch |
+
+- **Delivered APK:** `apk/app-debug.apk` (64.4 MB, debug-signed, `com.adshield.pro.debug`, version 2.2.5-debug).
+- **SHA-256 (verified locally against `apk/app-debug.apk.sha256`):**
+  `a1a87e829434265ffb5bf1c0ac5b97699e6d24f16997a10c539a097ff08616e7`
+- **APK content verified:** CyberShield classes present in `classes4/5/12.dex`;
+  `assets/cybershield_world.json` (127 KB), `assets/cybershield_centroids.json`,
+  and both AETHER baselines bundled.
+- The unit-test gate includes the 30-test `CyberShieldEngineTestSuite` plus the
+  pre-existing `AdShieldEngineTestSuite` and `AetherEngineTestSuite`.
 
 ### 2.4 Not executable in this sandbox (stated plainly)
 
@@ -110,8 +118,8 @@ Workflow: `.github/workflows/build-apk.yml` on this branch.
 - **Tested:** all detectors incl. negative cases (normal traffic → zero findings), verdict rendering data, correlation ranking.
 
 ### 3.4 Active Threats — ✅ logic / 🟨 on-device interaction
-- Critical/High/Medium/Low classification, text search (domain/app), severity filter chips, incident detail dialog with **event history**, evidence, and actions: **Block domain** (real custom rule, applied immediately), **Allow 15 min** (audited AETHER policy override requiring a reason, auto-expiring), **Report false positive** (suppresses auto-block).
-- **Tested:** classification, correlation, filtering inputs; policy approval/expiry covered by the existing AETHER suite (still passing).
+- Critical/High/Medium/Low classification, text search (domain/app), severity filter chips, incident detail dialog with **event history**, evidence, and actions: **Block domain** (real custom rule, applied immediately), **Allow 15 min** (audited AETHER policy override requiring a reason, auto-expiring), **Report false positive** (suppresses auto-block). Pure advertising blocks are excluded from incidents (they remain in the feed and attack-vector stats).
+- **Tested:** classification, correlation incl. ads exclusion, filtering inputs; policy approval/expiry covered by the existing AETHER suite (still passing).
 
 ### 3.5 Security Activity Feed — ✅
 - Live Room-flow feed with accurate `HH:mm:ss` timestamps, severity dots, BLOCK/ALLOW chips, per-app attribution (new Room v3 columns), LIVE badge only while the VPN is actually connected.
