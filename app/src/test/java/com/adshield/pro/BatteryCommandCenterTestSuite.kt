@@ -13,6 +13,7 @@ import com.adshield.pro.engine.battery.DataFreshness
 import com.adshield.pro.engine.battery.DisplayStateDrain
 import com.adshield.pro.engine.battery.EngineState
 import com.adshield.pro.engine.battery.FastChargeSignal
+import com.adshield.pro.engine.battery.MeasurementReliability
 import com.adshield.pro.engine.battery.MonitoringState
 import com.adshield.pro.engine.battery.PowerTrend
 import com.adshield.pro.engine.battery.SensorState
@@ -463,10 +464,9 @@ class BatteryCommandCenterTestSuite {
 
     @Test
     fun testFastChargeSignal_requiresAnUnambiguousPlatformSignal() {
-        assertEquals(
-            FastChargeSignal.Detected("BATTERY_PROPERTY_STATUS = fast charging"),
-            FastChargeSignal.from(statusProperty = 6, chargeProtocol = null)
-        )
+        val fastByProperty = FastChargeSignal.from(statusProperty = 6, chargeProtocol = null)
+        assertTrue(fastByProperty.isPresent)
+        assertEquals("BATTERY_PROPERTY_STATUS = fast charging", fastByProperty.source)
         assertTrue(FastChargeSignal.from(statusProperty = null, chargeProtocol = "USB_PD").isPresent)
         assertTrue(FastChargeSignal.from(statusProperty = null, chargeProtocol = "SuperVOOC 65W").isPresent)
         assertTrue(FastChargeSignal.from(statusProperty = null, chargeProtocol = "USB_PD_PPS").isPresent)
@@ -604,6 +604,105 @@ class BatteryCommandCenterTestSuite {
         assertEquals(19.8f, BatteryMonitor.capacityWattHours(known)!!, 0.01f)
         assertNull(BatteryMonitor.capacityWattHours(telemetry(chargeFullUah = null)))
         assertNull(BatteryMonitor.capacityWattHours(telemetry(voltageVolts = null)))
+    }
+
+    // --- 7b. Reliability and charging stability -----------------------------------------------
+
+    @Test
+    fun testReliability_isDrivenByFreshnessThenSensorCoverage() {
+        assertEquals(
+            MeasurementReliability.NONE,
+            BatteryMonitor.reliabilityOf(DataFreshness.NO_DATA, 3, 3).first
+        )
+        assertEquals(
+            MeasurementReliability.LOW,
+            BatteryMonitor.reliabilityOf(DataFreshness.STALE, 3, 3).first
+        )
+        assertEquals(
+            MeasurementReliability.MEDIUM,
+            BatteryMonitor.reliabilityOf(DataFreshness.LIVE, 2, 3).first
+        )
+        assertEquals(
+            MeasurementReliability.MEDIUM,
+            BatteryMonitor.reliabilityOf(DataFreshness.DELAYED, 3, 3).first
+        )
+        assertEquals(
+            "every core sensor answering on a live reading is the best case",
+            MeasurementReliability.HIGH,
+            BatteryMonitor.reliabilityOf(DataFreshness.LIVE, 3, 3).first
+        )
+        assertEquals(
+            "no usable core sensor can never be high confidence",
+            MeasurementReliability.LOW,
+            BatteryMonitor.reliabilityOf(DataFreshness.LIVE, 0, 3).first
+        )
+        val detail = BatteryMonitor.reliabilityOf(DataFreshness.LIVE, 3, 3).second
+        assertTrue(detail.contains("3 of 3"))
+    }
+
+    @Test
+    fun testMonitoringStatus_carriesReliabilityAndExplainsIt() {
+        val snapshot = telemetry(charging = true, source = ChargingSource.AC, currentMilliAmps = 1200)
+        val sensors = BatteryMonitor.sensorStatuses(snapshot, DataFreshness.LIVE)
+        val status = BatteryMonitor.monitoringStatus(
+            snapshot, sensors, DataFreshness.LIVE, EngineState.ACTIVE, 1_500L
+        )
+        assertEquals(MeasurementReliability.HIGH, status.reliability)
+        assertTrue(status.reliabilityDetail.isNotBlank())
+    }
+
+    @Test
+    fun testChargingStability_usesMeasuredVoltageSpreadAndDropouts() {
+        val steady = (0 until 8).map { sample(it * 60_000L, charging = true, current = 1500, voltage = 4.2f) }
+        val report = BatteryMonitor.intelligence(
+            samples = steady,
+            telemetry = telemetry(charging = true),
+            chargeRatePercentPerHour = 30f,
+            drainRatePercentPerHour = null,
+            capacityWattHours = 15f,
+            chargingInterruptions = 0
+        )
+        assertEquals(0f, report.stabilityPercent!!, 0.001f)
+        assertEquals(0, report.chargingInterruptions)
+
+        val noisy = listOf(4.0f, 4.4f, 4.0f, 4.4f, 4.0f, 4.4f, 4.0f, 4.4f).mapIndexed { index, volts ->
+            sample(index * 60_000L, charging = true, current = 1500, voltage = volts)
+        }
+        val unstable = BatteryMonitor.intelligence(
+            samples = noisy,
+            telemetry = telemetry(charging = true),
+            chargeRatePercentPerHour = 30f,
+            drainRatePercentPerHour = null,
+            capacityWattHours = 15f,
+            chargingInterruptions = 3
+        )
+        assertTrue("noisy voltage must show real spread", unstable.stabilityPercent!! > 3f)
+        assertEquals(3, unstable.chargingInterruptions)
+
+        // Not enough samples -> no stability claim at all.
+        val thin = BatteryMonitor.intelligence(
+            samples = steady.take(2),
+            telemetry = telemetry(charging = true),
+            chargeRatePercentPerHour = null,
+            drainRatePercentPerHour = null,
+            capacityWattHours = null
+        )
+        assertNull(thin.stabilityPercent)
+    }
+
+    @Test
+    fun testIntelligence_neverAttributesDrainToAnApp() {
+        val report = BatteryMonitor.intelligence(
+            samples = (0 until 5).map { sample(it * 60_000L) },
+            telemetry = telemetry(),
+            chargeRatePercentPerHour = null,
+            drainRatePercentPerHour = 8f,
+            capacityWattHours = null
+        )
+        assertTrue(
+            "per-app attribution needs BATTERY_STATS, so the panel must say it was not attempted",
+            report.notes.any { it.contains("BATTERY_STATS") }
+        )
     }
 
     // --- 8. Refresh policy --------------------------------------------------------------------

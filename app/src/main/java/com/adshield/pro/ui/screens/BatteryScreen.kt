@@ -71,6 +71,7 @@ import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.battery.DataFreshness
 import com.adshield.pro.engine.battery.DisplayStateDrain
 import com.adshield.pro.engine.battery.EngineState
+import com.adshield.pro.engine.battery.MeasurementReliability
 import com.adshield.pro.engine.battery.MonitoringState
 import com.adshield.pro.engine.battery.MonitoringStatus
 import com.adshield.pro.engine.battery.PowerTrend
@@ -267,6 +268,8 @@ private fun CommandCenterHero(
                         fontFamily = MonoFont
                     )
                     Spacer(Modifier.weight(1f))
+                    ReliabilityBadge(state.monitoring.reliability)
+                    Spacer(Modifier.width(8.dp))
                     LiveIndicator(state = state, pulse = pulse)
                 }
                 Spacer(Modifier.height(2.dp))
@@ -397,6 +400,29 @@ private fun CommandCenterHero(
             }
         }
     }
+}
+
+/** Coarse trust level for the numbers shown, derived from freshness and sensor coverage. */
+@Composable
+private fun ReliabilityBadge(reliability: MeasurementReliability) {
+    val color = when (reliability) {
+        MeasurementReliability.HIGH -> NeonGreen
+        MeasurementReliability.MEDIUM -> NeonCyan
+        MeasurementReliability.LOW -> ConsoleAmber
+        MeasurementReliability.NONE -> ConsoleMuted
+    }
+    Text(
+        text = "REL ${reliability.label.uppercase()}",
+        color = color,
+        fontSize = 8.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        fontFamily = MonoFont,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 5.dp, vertical = 2.dp)
+    )
 }
 
 /** Live/delayed/stale indicator with a real, breathing dot (animation is draw-state only). */
@@ -1341,6 +1367,33 @@ private fun SystemMonitoringSection(state: BatteryIntelligenceRepository.Battery
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "RELIABILITY",
+                color = ConsoleMuted,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp,
+                fontFamily = MonoFont
+            )
+            Spacer(Modifier.width(8.dp))
+            ReliabilityBadge(monitoring.reliability)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "CHARGING STABILITY ${stabilityLabel(state)}",
+                color = ConsoleMuted,
+                fontSize = 9.sp,
+                letterSpacing = 0.6.sp,
+                fontFamily = MonoFont
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = monitoring.reliabilityDetail,
+            color = ConsoleMuted,
+            fontSize = 9.sp,
+            lineHeight = 12.sp
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             text = monitoringSummary(monitoring),
             color = ConsoleMuted,
@@ -1710,6 +1763,23 @@ private fun toneColor(tone: BatteryConditionTone): Color = when (tone) {
     BatteryConditionTone.CAUTION -> ConsoleAmber
     BatteryConditionTone.CRITICAL -> ConsoleCritical
     BatteryConditionTone.NEUTRAL -> ConsoleMuted
+}
+
+/**
+ * Charging stability, judged only from measurements: voltage spread across the observed window,
+ * and the number of charging dropouts the session tracker recorded. When the device exposes no
+ * voltage there is nothing to judge, and the label says so.
+ */
+@Composable
+private fun stabilityLabel(state: BatteryIntelligenceRepository.BatteryDashboardState): String {
+    val spread = state.intelligence.stabilityPercent
+    val dropouts = state.intelligence.chargingInterruptions
+    if (spread == null && dropouts == 0) {
+        return if (state.telemetry.isCharging) "NOT MEASURABLE" else "IDLE"
+    }
+    if (dropouts >= 2 || (spread != null && spread > 3f)) return "UNSTABLE"
+    if (dropouts >= 1 || (spread != null && spread > 1.5f)) return "FLUCTUATING"
+    return "STABLE"
 }
 
 private fun monitoringColor(state: MonitoringState): Color = when (state) {

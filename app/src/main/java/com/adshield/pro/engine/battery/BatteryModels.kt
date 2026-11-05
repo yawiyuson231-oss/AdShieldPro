@@ -290,6 +290,17 @@ enum class MonitoringState(val label: String) {
     UNAVAILABLE("Unavailable")
 }
 
+/**
+ * How much the displayed measurement can be trusted, derived from freshness *and* sensor coverage.
+ * Deliberately coarse: a dashboard that prints "97% reliable" would be inventing precision.
+ */
+enum class MeasurementReliability(val label: String) {
+    HIGH("High"),
+    MEDIUM("Medium"),
+    LOW("Low"),
+    NONE("None")
+}
+
 /** Heartbeat state of the monitoring engine itself. */
 enum class EngineState(val label: String) {
     ACTIVE("Active"),
@@ -323,7 +334,11 @@ data class MonitoringStatus(
     val freshness: DataFreshness,
     val overall: MonitoringState,
     val scorePercent: Int,
-    val components: List<ComponentStatus>
+    val components: List<ComponentStatus>,
+    /** Trust level for the numbers on screen, from freshness plus how many sensors answered. */
+    val reliability: MeasurementReliability = MeasurementReliability.NONE,
+    /** One sentence explaining [reliability], printed under the panel. */
+    val reliabilityDetail: String = ""
 )
 
 /**
@@ -427,5 +442,9 @@ data class BatteryIntelligenceReport(
     val efficiency: ChargingEfficiency,
     val abnormalDrainDetected: Boolean,
     val overheatingDetected: Boolean,
-    val notes: List<String>
+    /** Voltage-coefficient-of-variation across the observed window; null until 5 samples exist. */
+    val stabilityPercent: Float? = null,
+    /** Charging dropouts recorded in the current session (from real charging-state transitions). */
+    val chargingInterruptions: Int = 0,
+    val notes: List<String> = emptyList()
 )

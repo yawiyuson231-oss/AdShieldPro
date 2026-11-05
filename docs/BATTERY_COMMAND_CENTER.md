@@ -103,7 +103,9 @@ computed power, cycle count, design capacity, charge ETA. States are `Operationa
 ### System Monitoring Status
 Battery API, current sensor, voltage sensor, temperature sensor, power calculation, monitoring
 engine and data freshness, rolled up into `Operational` / `Partial` / `Error` plus a percentage of
-operational components.
+operational components, the measurement **reliability** (High/Medium/Low/None from freshness plus
+sensor coverage) and **charging stability** (voltage spread and recorded dropouts; `NOT MEASURABLE`
+when the device exposes no voltage).
 
 ### Diagnostic Engine and Charging Sessions
 The pre-existing evidence-based rule chain and locally stored session history, restyled for the
@@ -140,6 +142,8 @@ command center and unchanged in behaviour.
 | Projections need evidence | rate functions return `null` below 3 samples / 5 minutes |
 | 1 Hz never runs in the background | `LifecycleStartEffect` / `onStopOrDispose` gate + refresh-policy test |
 | No idle animation | animations stop when monitoring is not live or system animations are off |
+| Per-app drain is never invented | the intelligence panel states that per-app attribution needs `BATTERY_STATS` and is therefore not attempted |
+| Reliability is never a fake percentage | `MeasurementReliability` is a 4-step band from freshness + sensor coverage (tested) |
 
 ## 6. Verification
 

@@ -309,6 +309,11 @@ object BatteryMonitor {
             operational == scored.size -> MonitoringState.OPERATIONAL
             else -> MonitoringState.PARTIAL
         }
+        val (reliability, reliabilityDetail) = reliabilityOf(
+            freshness = freshness,
+            coreSensorsPresent = listOfNotNull(current, voltage, temperature).count { it.state == SensorState.OPERATIONAL },
+            coreSensorTotal = 3
+        )
         return MonitoringStatus(
             batteryApi = batteryApi,
             currentSensor = components[1],
@@ -319,8 +324,41 @@ object BatteryMonitor {
             freshness = freshness,
             overall = overall,
             scorePercent = if (scored.isEmpty()) 0 else round(operational * 100f / scored.size).toInt(),
-            components = components
+            components = components,
+            reliability = reliability,
+            reliabilityDetail = reliabilityDetail
         )
+    }
+
+    /**
+     * Coarse trust level for the displayed numbers.
+     *
+     * Freshness dominates (a stale voltage is worse than a missing cycle count), sensor coverage
+     * breaks ties. Both inputs are measured facts about the current reading.
+     */
+    fun reliabilityOf(
+        freshness: DataFreshness,
+        coreSensorsPresent: Int,
+        coreSensorTotal: Int
+    ): Pair<MeasurementReliability, String> {
+        val total = coreSensorTotal.coerceAtLeast(1)
+        val present = coreSensorsPresent.coerceIn(0, total)
+        val detail = when (freshness) {
+            DataFreshness.NO_DATA -> "No reading has arrived yet, so nothing is displayed as measured."
+            DataFreshness.STALE -> "Newest reading is over ${DataFreshness.STALE_WINDOW_MS / 1000} s old: values are historical."
+            DataFreshness.DELAYED -> "Newest reading is a few seconds old: live values may lag behind the hardware."
+            DataFreshness.LIVE -> "Reading is current (under ${DataFreshness.LIVE_WINDOW_MS / 1000} s) and " +
+                "$present of $total core sensors answered."
+        }
+        val reliability = when {
+            freshness == DataFreshness.NO_DATA -> MeasurementReliability.NONE
+            freshness == DataFreshness.STALE -> MeasurementReliability.LOW
+            present == 0 -> MeasurementReliability.LOW
+            freshness == DataFreshness.DELAYED -> MeasurementReliability.MEDIUM
+            present < total -> MeasurementReliability.MEDIUM
+            else -> MeasurementReliability.HIGH
+        }
+        return reliability to detail
     }
 
     private fun missingSensor(name: String) = SensorStatus(
@@ -641,7 +679,8 @@ object BatteryMonitor {
         chargeRatePercentPerHour: Float?,
         drainRatePercentPerHour: Float?,
         capacityWattHours: Float?,
-        abnormalDrainThresholdPerHour: Float = 20f
+        abnormalDrainThresholdPerHour: Float = 20f,
+        chargingInterruptions: Int = 0
     ): BatteryIntelligenceReport {
         val inWindow = samples.takeLast(600)
         val currents = inWindow.mapNotNull { it.currentMilliAmps?.let { value -> abs(value) } }
@@ -669,6 +708,8 @@ object BatteryMonitor {
         }
         notes += "Screen-on versus screen-off figures cover only the time this app was observing; Android does not " +
             "expose system-wide per-display-state battery history to apps."
+        notes += "Per-app background battery usage is readable only with the system BATTERY_STATS permission, so " +
+            "this screen never attributes drain to a specific app."
 
         val avgTemp = temps.takeIf { it.isNotEmpty() }?.average()?.toFloat()
         return BatteryIntelligenceReport(
@@ -692,6 +733,8 @@ object BatteryMonitor {
                 drainRatePercentPerHour >= abnormalDrainThresholdPerHour,
             overheatingDetected = (avgTemp != null && avgTemp >= WARM_TEMPERATURE_CELSIUS) ||
                 (telemetry.temperatureCelsius.rawValue ?: 0f) >= CRITICAL_TEMPERATURE_CELSIUS,
+            stabilityPercent = BatteryDiagnostics.voltageStabilityPercent(inWindow),
+            chargingInterruptions = chargingInterruptions,
             notes = notes
         )
     }

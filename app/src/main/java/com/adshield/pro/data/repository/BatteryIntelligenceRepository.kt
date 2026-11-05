@@ -162,7 +162,8 @@ class BatteryIntelligenceRepository @Inject constructor(
                 telemetry = snapshot,
                 chargeRatePercentPerHour = chargeRate,
                 drainRatePercentPerHour = drainRate,
-                capacityWattHours = BatteryMonitor.capacityWattHours(snapshot)
+                capacityWattHours = BatteryMonitor.capacityWattHours(snapshot),
+                chargingInterruptions = interruptionCount
             ),
             healthScore = healthScore,
             chargeRatePercentPerHour = chargeRate,
@@ -228,6 +229,10 @@ class BatteryIntelligenceRepository @Inject constructor(
         )
     }
 
+    /** Visible to the dashboard flow so "charging stability" reflects the live session. */
+    @Volatile
+    private var interruptionCount: Int = 0
+
     private fun onNewReading(snapshot: BatteryTelemetry) {
         val now = System.currentTimeMillis()
         val level = snapshot.levelPercent.rawValue
@@ -242,7 +247,10 @@ class BatteryIntelligenceRepository @Inject constructor(
             sessionPeakPower = listOfNotNull(sessionPeakPower, it).maxOrNull()
         }
 
-        if (lastChargingState && !chargingNow) sessionInterruptions++
+        if (lastChargingState && !chargingNow) {
+            sessionInterruptions++
+            interruptionCount = sessionInterruptions
+        }
         lastChargingState = chargingNow
 
         if (chargingNow != sessionWasCharging) closeSession(now, chargingNow, level)
@@ -286,6 +294,7 @@ class BatteryIntelligenceRepository @Inject constructor(
         sessionCurrentCount = 0
         sessionPeakPower = null
         sessionInterruptions = 0
+        interruptionCount = 0
         lastChargingState = nextCharging
     }
 
