@@ -30,6 +30,7 @@ from .intel import IntelManager
 from .policy import PolicyEngine
 from .privacy import PrivacyIntelligence
 from .store import Store, EVENT_COLUMNS, AUDIT_COLUMNS, SNAPSHOT_COLUMNS
+from .universal import UniversalManager
 from .util import canonical_json, epoch_now, hmac_equal, normalize_domain, sanitize_text, utcnow
 
 MAX_BODY = 64 * 1024
@@ -77,6 +78,7 @@ class AetherApp:
         self.improvement = ImprovementEngine(self.root, self.store, self.intel, self.detection)
         self.assistant = SecurityAssistant(self.detection, self.policy, self.guardian,
                                            self.intel, self.education, self.store)
+        self.universal = UniversalManager(self.root, self.store, self.intel, self.detection)
         self.sessions: dict[str, Session] = {}
         self.rate: dict[str, deque] = defaultdict(deque)
         self._lock = threading.RLock()
@@ -395,6 +397,18 @@ class AetherApp:
         if p == "/api/v1/assistant/history" and method == "GET":
             need("read")
             return 200, {"messages": self.assistant.history(query.get("session_id", [""])[0])}, None
+        if p == "/api/v1/universal/modules" and method == "GET":
+            need("read")
+            return 200, {"modules": self.universal.get_modules(), "note": "50 universal security modules — Android + Windows + macOS (iOS permanently excluded)"}, None
+        if p == "/api/v1/universal/platforms" and method == "GET":
+            need("read")
+            return 200, {"platforms": ["Android", "Windows", "macOS"], "excluded": ["iOS", "iPhone"], "capabilities": {plat: self.universal.get_capabilities(plat) for plat in ["Android", "Windows", "macOS"]}}, None
+        if p == "/api/v1/universal/status" and method == "GET":
+            need("read")
+            return 200, self.universal.get_aggregated_status(), None
+        if p == "/api/v1/universal/android" and method == "GET":
+            need("read")
+            return 200, self.universal.get_android_only_status(), None
         if p == "/api/v1/analyze" and method == "GET":
             need("analyze")
             return 200, self.analyze({"target": query.get("target", [""])[0]}, actor), None
@@ -477,6 +491,19 @@ class AetherApp:
         if p == "/api/v1/models/rollback" and method == "POST":
             need("admin")
             return 200, self.improvement.rollback(str(body.get("version", "")), actor), None
+        if p == "/api/v1/universal/diagnostics" and method == "POST":
+            need("agent")
+            platform = sanitize_text(str(body.get("platform", "unknown")), 32)
+            report = body.get("report", {})
+            if not isinstance(report, dict):
+                return 400, {"error": "report must be an object"}, None
+            return 200, self.universal.ingest_diagnostics(platform, report), None
+        if p == "/api/v1/universal/master" and method == "POST":
+            need("policy")
+            enabled = bool(body.get("enabled", True))
+            reason = sanitize_text(str(body.get("reason", "")), 200)
+            self.store.add_audit(actor, "universal.master_toggle", "policy", {"enabled": enabled, "reason": reason})
+            return 200, {"ok": True, "enabled": enabled, "reason": reason}, None
 
         return 404, {"error": "not found", "path": p}, None
 

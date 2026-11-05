@@ -342,8 +342,46 @@
       </div>`;
   }
 
+  function viewUniversal() {
+    const u = S.universal;
+    if (!u) return '<div class="loading">Loading 50-module universal status…</div>';
+    const mods = u.modules || [];
+    // Group by category
+    const cats = {};
+    mods.forEach(m => { if (!cats[m.category]) cats[m.category] = []; cats[m.category].push(m); });
+    const catNames = ["AI Protection","Device Protection","Privacy Protection","Advanced Cyber Defense","Security Intelligence"];
+    const statusBadge = (s) => {
+      const colors = {WORKING:'green', PARTIALLY_WORKING:'amber', SCANNING:'blue', PERMISSION_REQUIRED:'orange', NOT_WORKING:'red', NOT_SUPPORTED:'gray', NOT_TESTED:'white'};
+      return `<span class="badge ${colors[s]||''}">${esc(s)}</span>`;
+    };
+    const summary = `<div class="grid g4">
+      ${card('Total features', `<div class="kpi">${num(mods.length)}</div><div class="kpi-label">universal coverage</div>`)}
+      ${card('Working', `<div class="kpi" style="color:#22c55e">${num((u.summary||{}).working||mods.filter(m=>m.overall==='WORKING').length)}</div><div class="kpi-label">verified working</div>`)}
+      ${card('Platforms', `<div class="kpi plain">${esc((u.platforms||[]).join(', ')||'Android')}</div><div class="kpi-label">Android · Windows · macOS</div><div class="kpi-sub">iOS permanently excluded</div>`)}
+      ${card('Engine', `<div class="kpi plain" style="font-size:14px">${esc(u.engine_status||(u.reports?Object.keys(u.reports).length+' platforms' : 'PENDING'))}</div><div class="kpi-label">${esc(u.timestamp?new Date(u.timestamp).toLocaleString():'')}</div>`)}
+    </div>`;
+    const legends = `<div class="card" style="margin-top:14px"><h3>Status legend</h3><p class="tiny"><span style="display:inline-block;width:12px;height:12px;background:#22C55E;border-radius:50%"></span> GREEN=WORKING <span style="display:inline-block;width:12px;height:12px;background:#EAB308;border-radius:50%"></span> YELLOW=PARTIALLY <span style="display:inline-block;width:12px;height:12px;background:#3B82F6;border-radius:50%"></span> BLUE=SCANNING <span style="display:inline-block;width:12px;height:12px;background:#F97316;border-radius:50%"></span> ORANGE=PERMISSION <span style="display:inline-block;width:12px;height:12px;background:#EF4444;border-radius:50%"></span> RED=NOT WORKING <span style="display:inline-block;width:12px;height:12px;background:#6B7280;border-radius:50%"></span> GRAY=NOT SUPPORTED</p></div>`;
+    const platformInfo = `<div class="card" style="margin-top:14px"><h3>Supported platforms — honest limitations</h3>
+      <div class="grid g3">
+        <div><strong>Android (APK)</strong><p class="tiny">VpnService DNS-only TUN · Keystore · Play Integrity · WorkManager · AetherThreatEngine on every DNS query</p><p class="tiny">Limits: one VPN at a time, no process isolation, AppOps polling for camera/mic</p></div>
+        <div><strong>Windows 10/11</strong><p class="tiny">Windows Defender · Firewall · Security Center via desktop agent</p><pre class="tiny mono" style="white-space:pre-wrap">python desktop/windows/agent.py --status</pre></div>
+        <div><strong>macOS</strong><p class="tiny">Gatekeeper · XProtect · Endpoint Security (entitled) · Network Extension</p><pre class="tiny mono" style="white-space:pre-wrap">python desktop/macos/agent.py --status</pre></div>
+      </div>
+      <p class="tiny" style="margin-top:8px">iPhone and iOS are permanently excluded — not developed or displayed.</p>
+    </div>`;
+    let body = '';
+    catNames.forEach(cat => {
+      const list = cats[cat]||[];
+      if (!list.length) return;
+      body += `<div class="card" style="margin-top:14px"><h3>${esc(cat)} (${list.length})</h3><div class="list">` +
+        list.map(m => `<div class="list-item"><div class="row"><strong>${esc(m.id+'. '+m.name)}</strong>${statusBadge(m.overall||'NOT_TESTED')} ${Object.entries(m.per_platform||{}).length? Object.entries(m.per_platform).map(([p,s])=>`<span class="tiny">${esc(p)}:${statusBadge(s)}</span>`).join(' '):''}</div><p class="tiny">${esc(m.category)}</p></div>`).join('') + `</div></div>`;
+    });
+    const reports = u.reports ? `<div class="card" style="margin-top:14px"><h3>Platform reports (last ingested)</h3><pre class="tiny mono" style="max-height:260px;overflow:auto">${esc(JSON.stringify(u.reports, null, 2).slice(0, 4000))}</pre></div>` : '';
+    return head('Universal 50-Module Security Dashboard', 'Live operational status for all 50 modules across Android, Windows, and macOS. Verification requires 4 conditions: service running, protection enabled, functionality tested, detection verified.') + summary + legends + platformInfo + body + reports;
+  }
+
   function render() {
-    const views = {overview:viewOverview, investigate:viewInvestigate, assistant:viewAssistant,
+    const views = {overview:viewOverview, universal:viewUniversal, investigate:viewInvestigate, assistant:viewAssistant,
       network:viewNetwork, privacy:viewPrivacy, intel:viewIntel, learn:viewLearn,
       models:viewModels, events:viewEvents, settings:viewSettings};
     root.innerHTML = (views[S.view] || viewOverview)();
@@ -368,6 +406,7 @@
 
   async function loadViewData(view) {
     try {
+      if (view === 'universal') S.universal = await api('/api/v1/universal/status');
       if (view === 'network') S.network = await api('/api/v1/network/stats');
       if (view === 'intel') S.intel = await api('/api/v1/intel');
       if (view === 'models') S.models = await api('/api/v1/models');

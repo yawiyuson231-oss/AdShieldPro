@@ -44,4 +44,7 @@ object AppModule {
     fun provideAetherPolicy(@ApplicationContext context: Context): AetherPolicy {
         return AetherPolicy(SharedPreferencesAetherPolicyStore(context))
     }
+
+    // Universal Security — platform agents are constructor-injected singletons;
+    // no extra provision needed. Master controller is also @Singleton @Inject.
 }

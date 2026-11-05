@@ -23,8 +23,10 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -56,12 +58,14 @@ import com.adshield.pro.ui.screens.AetherScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
 import com.adshield.pro.ui.screens.SettingsScreen
+import com.adshield.pro.ui.screens.UniversalSecurityScreen
 import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
+    UNIVERSAL("Security", Icons.Default.VerifiedUser),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     STATISTICS("Statistics", Icons.Default.Analytics),
@@ -380,6 +384,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                         )
                     }
                 )
+
+                MainNavDestination.UNIVERSAL -> UniversalSecurityScreen()
 
                 MainNavDestination.AETHER -> AetherScreen()
 
