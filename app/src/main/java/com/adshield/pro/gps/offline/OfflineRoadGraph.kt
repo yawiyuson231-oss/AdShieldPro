@@ -394,9 +394,16 @@ class OfflineRoadGraph(
             edgeCount * (4L + 4 + 8 + 4 + 4 + 1) +
             names.sumOf { it.length + 2L }
 
-    /** One-sentence description shown in the Offline maps screen. */
-    fun describe(): String =
-        "${names.size} road names, ${edgeCount / 2} km of directed road, ${nodeCount} nodes"
+    /**
+     * One-sentence description shown in the Offline maps screen.
+     *
+     * Edges are stored once per direction, so the summed length is halved to report real road
+     * kilometres rather than double-counted directed edges.
+     */
+    fun describe(): String {
+        val roadKm = lengthMeters.sum() / 2_000.0
+        return "${names.size} road names, ${"%.1f".format(roadKm)} km of road, $nodeCount nodes"
+    }
 
     val approximateRoadKilometers: Double
         get() = lengthMeters.sum() / 2000.0

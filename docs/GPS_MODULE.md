@@ -183,13 +183,22 @@ minSdk 29 (Android 10) as before.
 
 **Verified in this repository (JVM, no device):**
 
-* `GpsEngineTest` — 34 tests: geodesy, accuracy bands, nullable readings, integrity (mock/jump/
-  clock), movement classification, ETA fallbacks, radar projection and ring geometry, sky score,
-  satellite quality notes, segment projection, severity ordering.
+* `GpsEngineTest` — 35 tests: geodesy, accuracy bands, nullable readings, integrity (mock/jump/
+  clock/spoofed-speed in both directions), movement classification, ETA fallbacks, radar projection
+  and ring geometry, sky score, satellite quality notes, segment projection, severity ordering.
 * `GpsTrafficSecurityTest` — 33 tests: UNKNOWN-by-default, confidence thresholds, window and
   segment filtering, free-flow derivation, rate limiting, incident dedupe, telemetry gate, privacy
   defaults, kill switch, emergency share gating, history rounding/retention, permission findings,
   incident validation, offline tile budget and auto-fit.
+* `GpsOfflineGraphTest` — 17 tests: `ADG1` write/read round-trip (raw, gzipped, on disk), foreign
+  magic, wrong version and truncated/corrupt headers all rejected with a reason, A* over a two-leg
+  network, direction-aware one-way traversal, offline turn-by-turn plan synthesis, refusal to route
+  outside the downloaded pack, nearest-node and on-segment snapping, snap radius, coverage
+  distance, and the pack description string.
+* `GpsSecureStoreTest` — 11 tests on the `ADSE1` container: exact-byte round-trip, plaintext never
+  present in the ciphertext, a fresh IV per write, documented header layout, wrong key rejected,
+  bit-flipped ciphertext and IV failing GCM authentication, plaintext and truncated files refused,
+  empty payload, and decryption with a reloaded key.
 * `gps-backend/tests/api.test.mjs` — 10 tests against the real HTTP handler.
 * `tools/osm_graph_builder.py` — graph output verified byte-for-byte against
   `OfflineRoadGraph.readFrom`'s layout (magic, header, arrays, names, no trailing bytes).
@@ -197,4 +206,6 @@ minSdk 29 (Android 10) as before.
 **Requires a physical device (not claimed as verified here):** actual GNSS acquisition, sky-plot
 population, MapLibre rendering/3D buildings, camera smoothness, TTS pronunciation, offline pack
 download against OpenFreeMap's limits, battery/memory under a long drive, and behaviour when the OS
-restricts background work. `docs/TESTING.md` describes the manual passes.
+restricts background work. The Android Keystore-backed `SecureLocationStore` (the `ADSE1` container
+itself is covered above, the Keystore key lifecycle is not) and the MapLibre tile cache also need a
+device. `docs/TESTING.md` describes the manual passes.
