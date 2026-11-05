@@ -11,52 +11,14 @@ Daemon will be stopped at the end of the build
 > Task :app:kspDebugKotlin
 
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:92:34 Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:93:30 Unresolved reference 'VpnKey' on receiver of type 'Icons.Filled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudRepository.kt:89:9 Return type mismatch: expected 'Result<Unit>', actual 'Result<CloudFile>'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:44 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:79 Unresolved reference 'first'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:104 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:148:60 Suspension functions can only be called within coroutine body.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:165:17 Suspension functions can only be called within coroutine body.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:203:24 Unresolved reference 'toRequestBody' on receiver of type 'ByteArray'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:227:43 No value passed for parameter 'byteCount'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:227:48 Argument type mismatch: actual type is 'ByteArray', but 'Buffer' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:228:29 Operator '==' cannot be applied to 'Long' and 'Int'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:229:30 None of the following candidates is applicable:
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:102:16 None of the following candidates is applicable:
 
-fun write(byteString: ByteString, offset: Int, byteCount: Int): BufferedSink:
-  Argument type mismatch: actual type is 'ByteArray', but 'ByteString' was expected.
+suspend fun <T> Flow<T>.first(): T:
+  Candidate 'suspend fun <T> Flow<T>.first(): T' is inapplicable because of a receiver type mismatch.
 
-fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:229:47 Argument type mismatch: actual type is 'Long', but 'Int' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:254:28 Unresolved reference 'skip' on receiver of type 'Source'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:258:48 Argument type mismatch: actual type is 'ByteArray', but 'Buffer' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:258:59 Too many arguments for 'fun read(sink: Buffer, byteCount: Long): Long'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:259:29 Operator '==' cannot be applied to 'Long' and 'Int'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:260:30 None of the following candidates is applicable:
-
-fun write(byteString: ByteString, offset: Int, byteCount: Int): BufferedSink:
-  Argument type mismatch: actual type is 'ByteArray', but 'ByteString' was expected.
-
-fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:260:47 Argument type mismatch: actual type is 'Long', but 'Int' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:44 Unresolved reference 'servers'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Candidate 'fun <T, R> T.let(block: (T) -> R): R' is inapplicable because of a receiver type mismatch.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:71 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:110 Unresolved reference 'servers'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:157:73 Unresolved reference 'servers'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:171:13 Unresolved reference 'servers'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:160:81 Unresolved reference 'CloudDaoHolder'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:161:10 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:161:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:42:78 Unresolved reference 'run'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:55:64 Unresolved reference 'catalog'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:56:60 Unresolved reference 'catalog'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:57:62 Unresolved reference 'catalog'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:58:50 Unresolved reference 'catalog'.
+suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
+  Candidate 'suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:102:65 Unresolved reference 'it'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/vpn/VpnLatencyProber.kt:22:9 None of the following candidates is applicable:
 
 suspend fun <T> withTimeoutOrNull(timeMillis: Long, block: suspend CoroutineScope.() -> T): T?:
@@ -64,7 +26,6 @@ suspend fun <T> withTimeoutOrNull(timeMillis: Long, block: suspend CoroutineScop
 
 suspend fun <T> withTimeoutOrNull(timeout: Duration, block: suspend CoroutineScope.() -> T): T?:
   Argument type mismatch: actual type is 'Int', but 'Duration' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/CloudTransferWorker.kt:25:13 Check for instance is always 'false'.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -75,10 +36,16 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: UNRESOLVED_REFERENCE
+   > Kotlin compiler: NONE_APPLICABLE
        Kotlin compiler error
-         Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt line 92
+         None of the following candidates is applicable:
+     
+         suspend fun <T> Flow<T>.first(): T:
+           Candidate 'suspend fun <T> Flow<T>.first(): T' is inapplicable because of a receiver type mismatch.
+     
+         suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
+           Candidate 'suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T' is inapplicable because of a receiver type mismatch.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt line 102
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -239,7 +206,13 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: None of the following candidates is applicable:
+
+suspend fun <T> Flow<T>.first(): T:
+  Candidate 'suspend fun <T> Flow<T>.first(): T' is inapplicable because of a receiver type mismatch.
+
+suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
+  Candidate 'suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T' is inapplicable because of a receiver type mismatch.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -276,5 +249,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolv
 	... 2 more
 
 
-BUILD FAILED in 40s
+BUILD FAILED in 32s
 8 actionable tasks: 6 executed, 2 from cache
