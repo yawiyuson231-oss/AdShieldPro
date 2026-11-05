@@ -3,6 +3,7 @@ package com.adshield.pro.data.cloud
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -131,12 +132,17 @@ class CloudApiClient internal constructor(
     private suspend fun delete(path: String): String =
         call(authorized(url(path)).delete().build())
 
+    /**
+     * `detail` is documented as free-form JSON and the server sends an object for quota errors
+     * (`{"requestedBytes":…,"remainingBytes":…}`). Typing it as a String made the whole body fail
+     * to decode, which threw away the server's real error code and message.
+     */
     @kotlinx.serialization.Serializable
-    private class ErrorBodyDto(val error: String? = null, val detail: String? = null)
+    private class ErrorBodyDto(val error: String? = null, val detail: JsonElement? = null)
 
     private fun parseError(status: Int, body: String): CloudException {
         val parsed = runCatching { json.decodeFromString<ErrorBodyDto>(body) }.getOrNull()
-        return CloudException(status, parsed?.error ?: "http $status", parsed?.detail)
+        return CloudException(status, parsed?.error ?: "http $status", parsed?.detail?.toString())
     }
 
     private suspend fun authorized(target: okhttp3.HttpUrl): Request.Builder {
