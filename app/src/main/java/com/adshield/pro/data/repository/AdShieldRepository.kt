@@ -12,6 +12,9 @@ import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.AppDnsActivity
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.DnsFirewallPolicy
+import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.CustomRule
 import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.DomainBlockCount
@@ -751,12 +754,14 @@ class AdShieldRepository @Inject constructor(
 
     @Serializable
     data class FullConfigurationBackup(
-        val version: Int = 2,
+        val version: Int = 3,
         val exportedAtEpochMs: Long = System.currentTimeMillis(),
         val protectionMode: ProtectionMode,
         val customRules: List<CustomRule>,
         val browserSiteExceptions: Set<String>,
-        val excludedAppPackages: Set<String>
+        val excludedAppPackages: Set<String>,
+        val resolverConfig: DnsResolverConfig? = null,
+        val dnsFirewallPolicy: DnsFirewallPolicy? = null
     )
 
     suspend fun createConfigurationBackupJson(): String = withContext(Dispatchers.IO) {
@@ -766,7 +771,9 @@ class AdShieldRepository @Inject constructor(
             protectionMode = settings.protectionMode,
             customRules = rules,
             browserSiteExceptions = settings.browserSiteExceptions,
-            excludedAppPackages = settings.excludedAppPackages
+            excludedAppPackages = settings.excludedAppPackages,
+            resolverConfig = settings.resolverConfig,
+            dnsFirewallPolicy = settings.dnsFirewallPolicy
         )
         jsonSerializer.encodeToString(backup)
     }
@@ -775,6 +782,8 @@ class AdShieldRepository @Inject constructor(
         runCatching {
             val backup = jsonSerializer.decodeFromString<FullConfigurationBackup>(rawJson)
             prefs.setProtectionMode(backup.protectionMode)
+            backup.resolverConfig?.let { prefs.updateResolverConfig(it) }
+            backup.dnsFirewallPolicy?.let { prefs.updateDnsFirewallPolicy(it) }
             filterEngine.updateProtectionMode(backup.protectionMode)
 
             val validEntities = backup.customRules.mapNotNull { rule ->
@@ -810,7 +819,7 @@ class AdShieldRepository @Inject constructor(
 
     // --- Installed Apps & Per-App VPN Exclusions ---
 
-    suspend fun getInstalledApps(excludedPackages: Set<String>): List<AppExclusionInfo> = withContext(Dispatchers.IO) {
+    suspend fun getInstalledApps(excludedPackages: Set<String>, dnsPolicies: Map<String, AppDnsPolicy> = emptyMap()): List<AppExclusionInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
         val apps = runCatching {
             pm.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -836,6 +845,7 @@ class AdShieldRepository @Inject constructor(
                     appName = label,
                     isSystemApp = isSystem,
                     isExcludedFromVpn = excludedPackages.contains(appInfo.packageName),
+                    dnsPolicy = dnsPolicies[appInfo.packageName] ?: AppDnsPolicy.DEFAULT,
                     usesFirstPartyMultiplexedAds = isFirstPartyMux,
                     compatibilityNote = note
                 )

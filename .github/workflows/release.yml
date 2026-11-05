@@ -27,6 +27,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   release:
@@ -228,15 +229,6 @@ jobs:
           APK: ${{ steps.apk.outputs.apk }}
         run: |
           set -euo pipefail
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "release $TAG already exists: updating its APK assets"
-            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
-            exit 0
-          fi
-          git config user.name "AdShield Release"
-          git config user.email "release@adshield.local"
-          git tag -f "$TAG" "$GITHUB_SHA"
-          git push -f origin "$TAG" || true
           cat > /tmp/notes.md <<EOF
           # AdShield Pro ${{ steps.meta.outputs.version_name }}
 
@@ -251,6 +243,9 @@ jobs:
           \`$(cat "$APK.sha256")\`.
 
           ## What is in this build
+          - Private search (DuckDuckGo default or Google), persistent scan journal (up to 200
+            records), exportable threat reports, SHA-256 verified file quarantine and optional
+            scheduled installed-app scanning.
           - On-device DNS filtering over Android VpnService (no root): ad, tracker and threat lists,
             custom block/allow rules, protection modes, background list sync.
           - Cyber-console dashboard: dark navy/electric-blue threat overview, animated local
@@ -262,7 +257,15 @@ jobs:
           - Battery Intelligence (measured telemetry and charging diagnostics) and Security Center
             (URL/file/APK scanning, installed-app risk audit) — all on-device.
           - 367k offline rules bundled in the APK, so a fresh install protects before any sync.
-          - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking.
+          - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking,
+            a search-only history with opt-in suggestions, and optional onion routing through Orbot
+            (requires Orbot installed and connected).
+          - AdShield Cloud (optional, self-hosted): account, resumable multipart uploads, folders,
+            version history, expiring share links, duplicate detection, quota reconciliation,
+            encrypted DNS-configuration backup/restore and a pre-upload malware scan. No storage
+            credentials ship in the APK, and nothing is uploaded unless you sign in.
+          - Storage Access Framework file tools: folder browsing, verified scans, duplicate grouping
+            by SHA-256, and direct HTTPS media downloads with optional publisher-checksum checks.
           - Activity, statistics and per-app DNS analytics; AI Smart Boost, storage cleaning,
             Game Booster and battery/thermal tools — all local, no cloud AI.
           - In-app update checks against this repository's own releases.
@@ -273,7 +276,7 @@ jobs:
           One APK for every device: any native helper library (AndroidX graphics-path,
           DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
           installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
-          Verified by `tools/check_universal_release.py` before this release was published.
+          Verified by \`tools/check_universal_release.py\` before this release was published.
 
           ## Notes
           - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.
@@ -285,6 +288,18 @@ jobs:
             \`ADSHIELD_KEYSTORE_BASE64\` / \`ADSHIELD_STORE_PASSWORD\` repository secrets and
             delete the release asset.
           EOF
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "release $TAG already exists: updating its APK assets and release notes"
+            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
+            gh release edit "$TAG" \
+              --title "AdShield Pro ${{ steps.meta.outputs.version_name }}" \
+              --notes-file /tmp/notes.md
+            exit 0
+          fi
+          git config user.name "AdShield Release"
+          git config user.email "release@adshield.local"
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "$TAG" || true
           gh release create "$TAG" "$APK" "$APK.sha256" \
             --title "AdShield Pro ${{ steps.meta.outputs.version_name }}" \
             --notes-file /tmp/notes.md \
@@ -304,15 +319,18 @@ jobs:
 
       # Best effort: trigger the real Pages pipeline (docs/ at /, web platform at /app/).
       # Pages has to be switched on once by a repository admin (Settings -> Pages ->
-      # Source: GitHub Actions); until then the deploy workflow reports that clearly.
-      # The old approach force-pushed docs/ to a gh-pages branch, which is not how this
-      # repository's Pages site is built anymore.
+      # Source: GitHub Actions); until then skip cleanly without leaving a failed step.
       - name: Trigger website deploy (GitHub Pages)
         if: success()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run deploy-website.yml --ref main
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
+            gh workflow run deploy-website.yml --ref main || true
+          else
+            echo "GitHub Pages is not enabled yet; skipping website deploy trigger."
+          fi
 
       - name: Upload workflow artifacts
         if: always()

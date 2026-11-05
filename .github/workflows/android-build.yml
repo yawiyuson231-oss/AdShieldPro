@@ -63,6 +63,11 @@ jobs:
           chmod +x tools/generate_capability_matrix.py
           python3 tools/generate_capability_matrix.py --check
 
+      - name: Verify every capability's claimed test actually runs
+        run: |
+          chmod +x tools/audit_capability_tests.py
+          python3 tools/audit_capability_tests.py --strict
+
       - name: UI performance and lazy-list gates
         run: |
           chmod +x tools/check_ui_performance.py
@@ -166,6 +171,11 @@ jobs:
       - name: Surface Gradle errors as annotations
         if: failure()
         run: |
+          # Test assertions never reach the annotation surface above, and the Actions log
+          # endpoint and artifact downloads are unreachable from some environments, so the
+          # raw JUnit XML is mirrored into .ci/ (committed by the log-mirror step below).
+          mkdir -p .ci/junit
+          cp app/build/test-results/testDebugUnitTest/*.xml .ci/junit/ 2>/dev/null || true
           cat .ci/*.log 2>/dev/null \
             | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
             | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true

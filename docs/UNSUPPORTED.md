@@ -47,6 +47,20 @@ under **Capabilities**.
   ≥ 45/100, the DNS lab reports **CNAME cloaking** and names the target and the rule. This is
   advisory evidence, not enforcement, and it never blocks the queried name.
 
+## 3c. Android DNS enforcement limits
+
+The Android core adds upstream failover, strict response validation, DNSSEC *reporting*,
+per-app/per-network/emergency DNS policy (`docs/DNS_SECURITY_ARCHITECTURE.md`). The following
+remain explicitly unsupported:
+
+| Not supported | Why |
+| --- | --- |
+| Local DNSSEC chain validation | No DNSKEY/DS fetch or signature verification on device; only upstream AD/RRSIG evidence is reported. |
+| External DNS leak testing | Would require an unaudited third-party echo service. Settings diagnostics run a real query against the configured resolver and say so. |
+| General IP/TCP/UDP firewalling | The tunnel routes DNS addresses only, so non-DNS sockets are never seen. Per-app and per-network controls are DNS decisions. |
+| YARA rules / native YARA / ClamAV | No rule parser ships in this build. The file scanner uses signature and structural checks only (EICAR, polyglot containers, script droppers, macro documents, zip-slip). |
+| DoH3 / Oblivious DoH | Only DoH (RFC 8484), DoT (RFC 7858) and explicit plaintext port 53 are implemented. |
+
 ## 4. Intelligence limits
 
 - The lexical classifier sees **only the hostname string**. It is a 7/100-weight signal with

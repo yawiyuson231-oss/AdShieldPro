@@ -1,56 +1,51 @@
 package com.adshield.pro.engine.browser
 
-import kotlinx.serialization.Serializable
-
-/**
- * AdShield Pro — private search providers.
- *
- * Both providers are reached over HTTPS inside the app's own WebView, which already sends
- * `DNT: 1` / `Sec-GPC: 1`, blocks third-party cookies (user setting) and strips cross-site
- * tracking parameters via [BrowserContentBlocker.sanitizeTrackingParameters].
- *
- * Honesty note: choosing Google still sends the query to Google, and Google may log it.
- * The provider label says so rather than implying the app makes Google anonymous.
- */
-@Serializable
-enum class SearchProvider(
-    val label: String,
-    val homeUrl: String,
-    val privacyNote: String
-) {
-    DUCKDUCKGO(
-        label = "DuckDuckGo",
-        homeUrl = "https://duckduckgo.com/",
-        privacyNote = "Default. Does not build a search history profile tied to you."
-    ),
-    GOOGLE(
-        label = "Google",
-        homeUrl = "https://www.google.com/",
-        privacyNote = "Google receives and may log your query. Tracking-parameter stripping and " +
-            "cookie blocking still apply, but the query itself is not anonymous."
-    );
-
-    /** Builds the provider's query URL with the term percent-encoded exactly once. */
-    fun searchUrl(query: String): String {
-        val encoded = percentEncodeQueryComponent(query.trim())
-        return when (this) {
-            DUCKDUCKGO -> "https://duckduckgo.com/?q=$encoded"
-            GOOGLE -> "https://www.google.com/search?q=$encoded"
-        }
-    }
-
-    companion object {
-        /** Unknown / legacy / corrupt preference values fall back to the privacy default. */
-        fun fromName(raw: String?): SearchProvider =
-            entries.firstOrNull { it.name.equals(raw?.trim(), ignoreCase = true) } ?: DUCKDUCKGO
-    }
-}
+import com.adshield.pro.domain.model.SearchProvider
+import java.net.URLEncoder
 
 /**
  * Pure address-bar resolution. Deliberately free of `android.net.Uri` so the rules that decide
  * "is this a search or an address" are unit-testable on the JVM.
+ *
+ * Two resolution styles coexist on purpose and are documented separately:
+ *  - [navigationTarget] is what the browser address bar uses: it upgrades cleartext `http://` to
+ *    HTTPS because the app rejects cleartext traffic.
+ *  - [resolveInput] is the lower-level rule set: it preserves an explicit `http://` so HTTP-only
+ *    hosts (a local router, for example) are never silently rewritten, and the address bar can
+ *    show its own insecure indicator instead.
  */
 object PrivateSearch {
+
+    /**
+     * URLs are restricted to HTTP(S); HTTP is upgraded because the app rejects cleartext traffic.
+     * Everything else is treated as a search query, never as a WebView script/custom scheme.
+     */
+    fun navigationTarget(rawInput: String, provider: SearchProvider): String {
+        val input = rawInput.trim()
+        require(input.isNotEmpty()) { "Enter a search or HTTPS address" }
+        if (input.startsWith("https://", ignoreCase = true)) return input
+        if (input.startsWith("http://", ignoreCase = true)) return "https://" + input.substring(7)
+        if (looksLikeHost(input)) return "https://$input"
+        val encoded = URLEncoder.encode(input, Charsets.UTF_8.name()).replace("+", "%20")
+        return provider.searchBaseUrl + encoded
+    }
+
+    fun isSearchQuery(rawInput: String): Boolean {
+        val input = rawInput.trim()
+        return input.isNotEmpty() && !input.startsWith("https://", true) &&
+            !input.startsWith("http://", true) && !looksLikeHost(input)
+    }
+
+    private fun looksLikeHost(input: String): Boolean {
+        if (input.length > 2048 || input.any { it.isWhitespace() || it.isISOControl() }) return false
+        if (!input.contains('.') || input.contains('/') && !input.matches(HOST_WITH_OPTIONAL_PATH)) return false
+        return input.matches(HOST_WITH_OPTIONAL_PATH)
+    }
+
+    private val HOST_WITH_OPTIONAL_PATH = Regex(
+        "^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\\.)+" +
+            "[A-Za-z]{2,63}(?::\\d{1,5})?(?:/[A-Za-z0-9._~!$&'()*+,;=:@%/?#-]*)?$"
+    )
 
     /**
      * True when the input should be treated as an address rather than a search term.
@@ -84,28 +79,4 @@ object PrivateSearch {
         if (looksLikeAddress(trimmed)) return "https://$trimmed"
         return provider.searchUrl(trimmed)
     }
-}
-
-private const val HEX_DIGITS = "0123456789ABCDEF"
-
-/**
- * RFC 3986 percent-encoding of a query component. Spaces become `%20` (valid for both providers
- * and unambiguous), UTF-8 multibyte characters are encoded per byte, and reserved characters such
- * as `&`, `=` and `+` are escaped so a search term can never inject extra query parameters.
- */
-internal fun percentEncodeQueryComponent(value: String): String {
-    val bytes = value.toByteArray(Charsets.UTF_8)
-    val out = StringBuilder(bytes.size)
-    for (byte in bytes) {
-        val code = byte.toInt() and 0xFF
-        val char = code.toChar()
-        val unreserved = char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' ||
-            char == '-' || char == '_' || char == '.' || char == '~'
-        if (unreserved) {
-            out.append(char)
-        } else {
-            out.append('%').append(HEX_DIGITS[code shr 4]).append(HEX_DIGITS[code and 0x0F])
-        }
-    }
-    return out.toString()
 }

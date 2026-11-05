@@ -13,6 +13,9 @@ import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.BuildConfig
 import com.adshield.pro.domain.model.AppExclusionInfo
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.DnsFirewallPolicy
+import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.domain.model.AppDnsActivity
 import com.adshield.pro.domain.model.BatteryMode
 import com.adshield.pro.domain.model.BatteryThermalSnapshot
@@ -34,11 +37,15 @@ import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
+import com.adshield.pro.domain.model.SearchHistoryEntry
+import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.domain.model.SmartBoostResult
 import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.ui.model.ProtectionPipelineStatus
+import com.adshield.pro.ui.model.ProtectionStatusEvaluator
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.data.repository.BatteryIntelligenceRepository
 import com.adshield.pro.engine.battery.BatteryDiagnostic
@@ -47,9 +54,11 @@ import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
-import com.adshield.pro.engine.browser.SearchProvider
+import com.adshield.pro.engine.browser.SearchSuggestionClient
 import com.adshield.pro.engine.platform.DeviceProfiler
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
+import com.adshield.pro.engine.dns.DnsDiagnosticReport
+import com.adshield.pro.engine.dns.runDiagnostics
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
@@ -111,7 +120,8 @@ class AdShieldViewModel @Inject constructor(
     private val scanJournalStore: ScanJournalStore,
     private val quarantineManager: QuarantineManager,
     private val batteryRepository: BatteryIntelligenceRepository,
-    private val deviceProfiler: DeviceProfiler
+    private val deviceProfiler: DeviceProfiler,
+    private val searchSuggestionClient: SearchSuggestionClient
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -159,6 +169,31 @@ class AdShieldViewModel @Inject constructor(
 
     private val _installedApps = MutableStateFlow<List<AppExclusionInfo>>(emptyList())
     val installedApps: StateFlow<List<AppExclusionInfo>> = _installedApps.asStateFlow()
+
+    private val _dnsDiagnosticReport = MutableStateFlow<DnsDiagnosticReport?>(null)
+    val dnsDiagnosticReport: StateFlow<DnsDiagnosticReport?> = _dnsDiagnosticReport.asStateFlow()
+    private val _isRunningDnsDiagnostics = MutableStateFlow(false)
+    val isRunningDnsDiagnostics: StateFlow<Boolean> = _isRunningDnsDiagnostics.asStateFlow()
+
+    /**
+     * Live working status. The ticker only re-evaluates the pipeline; every value inside the
+     * snapshot is still read from real runtime state (VPN status, loaded rules, measured
+     * resolver latency and circuit state), never from a guess.
+     */
+    private val _statusTick = MutableStateFlow(0L)
+
+    val protectionStatus: StateFlow<ProtectionPipelineStatus> = combine(vpnState, settingsState, _statusTick) { vpn, settings, _ ->
+        ProtectionStatusEvaluator.evaluate(
+            vpn = vpn,
+            settings = settings,
+            health = upstreamDnsResolver.providerHealthSnapshots(),
+            nowMs = System.currentTimeMillis()
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        ProtectionStatusEvaluator.evaluate(VpnRuntimeState(), AppSettingsState(), emptyList(), System.currentTimeMillis())
+    )
 
     private val _isUpdatingFilters = MutableStateFlow(false)
     val isUpdatingFilters: StateFlow<Boolean> = _isUpdatingFilters.asStateFlow()
@@ -214,6 +249,12 @@ class AdShieldViewModel @Inject constructor(
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                _statusTick.value = System.currentTimeMillis()
+            }
+        }
         viewModelScope.launch {
             customRules.collect {
                 refreshRuleConflicts()
@@ -506,6 +547,21 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun runDnsDiagnostics(domain: String) {
+        if (_isRunningDnsDiagnostics.value) return
+        viewModelScope.launch {
+            _isRunningDnsDiagnostics.value = true
+            try {
+                _dnsDiagnosticReport.value = upstreamDnsResolver.runDiagnostics(domain, settingsState.value.resolverConfig)
+            } catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                showFeedback("DNS diagnostic failed: ${error.message ?: error.javaClass.simpleName}")
+            } finally {
+                _isRunningDnsDiagnostics.value = false
+            }
+        }
+    }
+
     // --- Filter List Updates & Sources ---
 
     fun triggerManualFilterUpdate() {
@@ -689,8 +745,10 @@ class AdShieldViewModel @Inject constructor(
 
     fun loadInstalledApps() {
         viewModelScope.launch {
-            val excluded = settingsState.value.excludedAppPackages
-            _installedApps.value = repository.getInstalledApps(excluded)
+            val settings = settingsState.value
+            _installedApps.value = repository.getInstalledApps(
+                settings.excludedAppPackages, settings.dnsFirewallPolicy.appPolicies
+            )
         }
     }
 
@@ -702,6 +760,42 @@ class AdShieldViewModel @Inject constructor(
             showFeedback(
                 if (excluded) "Excluded $packageName from VPN tunnel."
                 else "Included $packageName in VPN protection."
+            )
+        }
+    }
+
+    fun setAppDnsPolicy(packageName: String, policy: AppDnsPolicy) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            val updated = current.appPolicies.toMutableMap().apply {
+                if (policy == AppDnsPolicy.DEFAULT) remove(packageName) else put(packageName, policy)
+            }
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(appPolicies = updated))
+            upstreamDnsResolver.clearCache()
+            loadInstalledApps()
+            showFeedback("${packageName}: ${policy.label}")
+        }
+    }
+
+    fun setTransportProtected(transport: NetworkTransportPolicy, protected: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            val transports = current.protectedTransports.toMutableSet().apply {
+                if (protected) add(transport) else remove(transport)
+            }
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(protectedTransports = transports))
+            showFeedback("${transport.label} DNS filtering ${if (protected) "enabled" else "set to passthrough"}")
+        }
+    }
+
+    fun setEmergencyAllowlistOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(emergencyAllowlistOnly = enabled))
+            upstreamDnsResolver.clearCache()
+            showFeedback(
+                if (enabled) "Emergency DNS mode enabled: only explicit user/system allowlisted domains resolve."
+                else "Emergency DNS mode disabled. Global and per-app policies restored."
             )
         }
     }
@@ -750,6 +844,52 @@ class AdShieldViewModel @Inject constructor(
                 blockThirdPartyCookies = blockThirdPartyCookies,
                 javaScriptEnabled = jsEnabled
             )
+        }
+    }
+
+    fun updatePrivateSearchOptions(
+        provider: SearchProvider,
+        privateMode: Boolean,
+        historyEnabled: Boolean,
+        suggestionsEnabled: Boolean,
+        automaticDeletion: Boolean
+    ) {
+        viewModelScope.launch {
+            preferencesRepository.updatePrivateSearchOptions(
+                provider, privateMode, historyEnabled, suggestionsEnabled, automaticDeletion
+            )
+        }
+    }
+
+    fun recordSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            preferencesRepository.recordSearch(
+                SearchHistoryEntry(
+                    query = trimmed.take(500),
+                    provider = settingsState.value.searchProvider,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun clearSearchHistory() {
+        viewModelScope.launch { preferencesRepository.clearSearchHistory() }
+    }
+
+    fun fetchSearchSuggestions(query: String, onResult: (List<String>) -> Unit) {
+        val settings = settingsState.value
+        if (!settings.searchSuggestionsEnabled) {
+            onResult(emptyList())
+            return
+        }
+        viewModelScope.launch {
+            val suggestions = runCatching {
+                searchSuggestionClient.fetch(query, settings.searchProvider)
+            }.getOrDefault(emptyList())
+            onResult(suggestions)
         }
     }
 
@@ -901,8 +1041,12 @@ class AdShieldViewModel @Inject constructor(
             val startedAt = System.currentTimeMillis()
             val scanned = securityEngine.scanUriContent(uri, displayName)
             if (scanned != null) {
+                // sourceUri keeps the SAF handle so the report can offer a verified delete later.
                 val record = scanJournalStore.record(
-                    scanned.copy(durationMs = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L))
+                    scanned.copy(
+                        durationMs = (System.currentTimeMillis() - startedAt).coerceAtLeast(0L),
+                        sourceUri = uri.toString()
+                    )
                 )
                 _fileScanResult.value = record
                 lastScannedUri = uri
@@ -1070,6 +1214,37 @@ class AdShieldViewModel @Inject constructor(
             threatSignatures = signatures,
             vpnActive = vpnActive
         )
+    }
+
+    fun deleteScannedDocument(record: SecurityScanRecord) {
+        val source = record.sourceUri
+        if (source == null) {
+            showFeedback("This report has no deletable SAF document. Use the file manager to grant access first.")
+            return
+        }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val rows = appContext.contentResolver.delete(Uri.parse(source), null, null)
+                    if (rows <= 0) error("The storage provider did not delete the document")
+                }
+            }
+            result.fold(
+                onSuccess = {
+                    scanJournalStore.removeHistory(record.id)
+                    if (_fileScanResult.value?.id == record.id) _fileScanResult.value = null
+                    showFeedback("Deleted the selected document. This action cannot be undone by AdShield.")
+                },
+                onFailure = { showFeedback("Delete failed; the original remains: ${it.message ?: "storage provider error"}") }
+            )
+        }
+    }
+
+    fun clearSecurityHistory() {
+        viewModelScope.launch {
+            scanJournalStore.clearHistory()
+            showFeedback("Persisted security scan history cleared.")
+        }
     }
 
     private fun scanFeedback(record: SecurityScanRecord, label: String): String = when (record.threatLevel) {

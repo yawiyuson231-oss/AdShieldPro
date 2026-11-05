@@ -21,7 +21,9 @@ import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsPacketCodec
+import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -72,6 +74,7 @@ class AdShieldVpnService : VpnService() {
     private var isPaused: Boolean = false
 
     private var connectivityManager: ConnectivityManager? = null
+    @Volatile private var currentTransport: NetworkTransportPolicy = NetworkTransportPolicy.OTHER
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate() {
@@ -375,10 +378,17 @@ class AdShieldVpnService : VpnService() {
             return upstream.responseBytes
         }
 
-        // Layer 1 & Layer 4: Evaluate queried domain against FilterRuleEngine
+        // DNS-only app/network policy is enforced before upstream resolution. Non-DNS packets
+        // are not routed through this service and therefore are not governed by these controls.
         val evaluation = filterRuleEngine.evaluate(query.questionDomain)
+        val decision = DnsFirewallPolicyDecider.evaluate(
+            evaluation = evaluation,
+            appPackageName = app?.packageName,
+            transport = currentTransport,
+            policy = currentSettings.dnsFirewallPolicy
+        )
 
-        if (evaluation.isBlocked) {
+        if (decision.isBlocked) {
             val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
             val blockedBytes = DnsPacketCodec.buildBlockedResponse(
                 query = query,
@@ -388,9 +398,9 @@ class AdShieldVpnService : VpnService() {
                 domain = query.questionDomain,
                 queryType = query.qTypeName,
                 isBlocked = true,
-                category = evaluation.matchedCategory,
-                matchedRule = evaluation.matchedRule,
-                sourceList = evaluation.sourceName,
+                category = decision.matchedCategory,
+                matchedRule = decision.matchedRule,
+                sourceList = decision.sourceName,
                 latencyMs = 0,
                 protocolUsed = if (mode.blockSinkholeZeroIp) "Sinkhole 0.0.0.0" else "Local NXDOMAIN",
                 fromCache = false,
@@ -408,8 +418,8 @@ class AdShieldVpnService : VpnService() {
             queryType = query.qTypeName,
             isBlocked = false,
             category = null,
-            matchedRule = evaluation.matchedRule,
-            sourceList = evaluation.sourceName,
+            matchedRule = decision.matchedRule,
+            sourceList = decision.sourceName,
             latencyMs = upstreamResult.latencyMs,
             protocolUsed = upstreamResult.protocolUsed,
             fromCache = upstreamResult.fromCache,
@@ -432,10 +442,12 @@ class AdShieldVpnService : VpnService() {
     private fun registerNetworkCallback() {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
         connectivityManager = cm
+        currentTransport = detectCurrentTransport()
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 runCatching { setUnderlyingNetworks(arrayOf(network)) }
+                currentTransport = detectCurrentTransport()
                 val label = detectCurrentNetworkLabel()
                 if (vpnInterface != null && !isPaused) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
@@ -465,6 +477,19 @@ class AdShieldVpnService : VpnService() {
                 .build()
             cm.registerNetworkCallback(req, callback)
         }
+    }
+
+    private fun detectCurrentTransport(): NetworkTransportPolicy {
+        val manager = connectivityManager ?: return NetworkTransportPolicy.OTHER
+        val network = manager.activeNetwork ?: return NetworkTransportPolicy.OTHER
+        return manager.getNetworkCapabilities(network)?.let(::transportFrom) ?: NetworkTransportPolicy.OTHER
+    }
+
+    private fun transportFrom(capabilities: NetworkCapabilities): NetworkTransportPolicy = when {
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkTransportPolicy.WIFI
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkTransportPolicy.CELLULAR
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkTransportPolicy.ETHERNET
+        else -> NetworkTransportPolicy.OTHER
     }
 
     private fun detectCurrentNetworkLabel(): String {

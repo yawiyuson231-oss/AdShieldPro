@@ -1,7 +1,7 @@
 package com.adshield.pro
 
 import com.adshield.pro.engine.browser.PrivateSearch
-import com.adshield.pro.engine.browser.SearchProvider
+import com.adshield.pro.domain.model.SearchProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
