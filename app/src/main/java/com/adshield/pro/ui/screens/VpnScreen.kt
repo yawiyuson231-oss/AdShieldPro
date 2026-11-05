@@ -96,7 +96,7 @@ fun VpnScreen(viewModel: VpnViewModel) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item { VpnControlCenter(connectionState, activeServer, stats, status, servers, viewModel) }
-        item { VpnMapPanel(servers, activeServer, viewModel) }
+        item { VpnMapPanel(servers, activeServer, viewModel, onImport = { showImport = true }) }
         item { VpnIntelligencePanel(servers, viewModel) }
         item { VpnThreatCenter(threats, viewModel) }
         item { VpnPrivacyPanel(stats, viewModel) }
@@ -287,12 +287,12 @@ private fun GlowingShield(connected: Boolean) {
 
 /** Stylized world panel: server pins by region + real measured latency. No fake attack map. */
 @Composable
-private fun VpnMapPanel(servers: List<VpnServer>, active: VpnServer?, viewModel: VpnViewModel) {
+private fun VpnMapPanel(servers: List<VpnServer>, active: VpnServer?, viewModel: VpnViewModel, onImport: () -> Unit) {
     var showAdd by remember { mutableStateOf(false) }
     CyberPanel(
         title = "Global Network Map", subtitle = "Real server endpoints you configured — tap a pin to connect",
         trailing = {
-            IconButton(onClick = { showImport = true }) { Icon(Icons.Default.VpnKey, contentDescription = "Import WireGuard config", tint = CyberCyan) }
+            IconButton(onClick = onImport) { Icon(Icons.Default.VpnKey, contentDescription = "Import WireGuard config", tint = CyberCyan) }
             IconButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, contentDescription = "Add server", tint = CyberCyan) }
         }
     ) {
