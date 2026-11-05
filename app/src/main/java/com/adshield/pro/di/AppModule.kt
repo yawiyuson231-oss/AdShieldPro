@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.adshield.pro.data.local.db.AdShieldDao
 import com.adshield.pro.data.local.db.AdShieldDatabase
+import com.adshield.pro.data.local.db.CloudDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
