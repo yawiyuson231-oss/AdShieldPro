@@ -66,12 +66,10 @@ class BatteryTelemetrySource @Inject constructor(
      * engine treats as "charging" — never as "fast charging".
      */
     private fun detectFastCharge(): FastChargeSignal {
-        val manager = batteryManager ?: return FastChargeSignal.NONE
         val status = runCatching {
-            manager.getIntProperty(FastChargeSignal.PROPERTY_STATUS)
+            batteryManager?.getIntProperty(FastChargeSignal.PROPERTY_STATUS)
         }.getOrNull()?.takeIf { it != Int.MIN_VALUE }
-        val protocol = runCatching { manager.getProperty("charge_protocol") }.getOrNull()
-            ?: runCatching { manager.getProperty("charger_type") }.getOrNull()
+        val protocol = batteryStringProperty("charge_protocol") ?: batteryStringProperty("charger_type")
         return FastChargeSignal.from(status, protocol)
     }
 
@@ -355,6 +353,19 @@ class BatteryTelemetrySource @Inject constructor(
             chargingSource = chargingSource
         )
     }
+
+    /**
+     * Reads an optional *string* battery property.
+     *
+     * `BatteryManager.getProperty` does not exist; `getStringProperty(String)` arrived in API 34 and
+     * is still absent on many vendor builds, so it is called by reflection and any failure simply
+     * means "this device publishes no charger protocol" — which the status engine treats as "no
+     * fast-charge claim".
+     */
+    private fun batteryStringProperty(key: String): String? = runCatching {
+        val method = BatteryManager::class.java.getMethod("getStringProperty", String::class.java)
+        (method.invoke(batteryManager, key) as? String)?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     /**
      * Reads an optional BatteryManager property by field name. These counters exist only on some
