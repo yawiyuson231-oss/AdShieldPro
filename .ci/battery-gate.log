@@ -1,0 +1,2 @@
+Battery Command Center gate FAILED on Python 3.14.4:
+  - BatterySessionStore.kt: BatterySession.toStored is not declared in app/src/main/java/com/adshield/pro/engine/battery/BatteryModels.kt
