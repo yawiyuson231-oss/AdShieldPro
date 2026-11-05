@@ -369,9 +369,11 @@ fun GpsMapScreen(
             }
         }
 
-        if (mapError != null) {
+        // Only a real engine failure is shown here; there is no placeholder loading state.
+        val styleError = state.mapStyleError
+        if (styleError != null) {
             Box(Modifier.align(Alignment.Center).padding(24.dp)) {
-                Text(mapError ?: "", color = GpsRed, fontSize = 11.sp)
+                Text(styleError, color = GpsRed, fontSize = 11.sp)
             }
         }
     }

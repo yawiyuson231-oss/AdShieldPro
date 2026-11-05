@@ -198,7 +198,7 @@ class GnssLocationSource(
         val registered: Boolean = try {
             LocationManagerCompat.registerGnssStatusCallback(
                 manager,
-                androidx.core.os.HandlerCompat.createAsync(Looper.getMainLooper()),
+                ContextCompat.getMainExecutor(context),
                 callback
             )
         } catch (error: SecurityException) {

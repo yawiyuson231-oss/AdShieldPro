@@ -103,7 +103,7 @@ fun GpsHubScreen(
     val gateLog by viewModel.trafficGateLog.collectAsStateWithLifecycle()
     val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
-    val online by rememberOnlineState()
+    val online = rememberOnlineState()
 
     var section by rememberSaveable { mutableStateOf(initialSection.name) }
     val currentSection = runCatching { GpsSection.valueOf(section) }.getOrDefault(GpsSection.MAP)
@@ -132,6 +132,8 @@ fun GpsHubScreen(
     }
 
     DisposableEffect(Unit) {
+        engine.onStyleLoaded = { viewModel.onMapStyleFailed(null) }
+        engine.onStyleError = { reason -> viewModel.onMapStyleFailed(reason) }
         viewModel.attachMapEngine(engine)
         viewModel.onScreenVisible()
         onDispose { viewModel.onScreenHidden() }

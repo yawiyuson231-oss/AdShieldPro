@@ -367,6 +367,11 @@ class GpsViewModel @Inject constructor(
         _state.value = _state.value.copy(mapAttached = true)
     }
 
+    /** Records a style-load failure so the map screen can say why it is blank. */
+    fun onMapStyleFailed(reason: String?) {
+        _state.value = _state.value.copy(mapStyleError = reason)
+    }
+
     fun onCameraIdle(center: GeoPoint, zoom: Double) {
         lastCamera = center
         _state.value = _state.value.copy(cameraCenter = center, cameraZoom = zoom)

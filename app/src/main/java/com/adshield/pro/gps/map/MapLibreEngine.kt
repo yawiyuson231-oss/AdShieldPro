@@ -60,6 +60,9 @@ class MapLibreEngine(
     val isReady: Boolean get() = map != null && style != null
 
     var onStyleLoaded: (() -> Unit)? = null
+
+    /** Invoked with a human reason when the style cannot be loaded (offline first launch, 404). */
+    var onStyleError: ((String) -> Unit)? = null
     var onCameraIdle: ((lat: Double, lon: Double, zoom: Double, bearing: Double, tilt: Double) -> Unit)? = null
     var onMapClick: ((GeoPoint) -> Unit)? = null
 
@@ -114,12 +117,20 @@ class MapLibreEngine(
         }
         currentStyleUrl = styleUrl
         style = null
-        mapLibreMap.setStyle(styleUrl) { loaded ->
-            style = loaded
-            addTerrainAndBuildings(loaded)
-            hasRouteLayers = false
-            hasTrafficLayers = false
-            onStyleLoaded?.invoke()
+        try {
+            mapLibreMap.setStyle(styleUrl) { loaded ->
+                style = loaded
+                addTerrainAndBuildings(loaded)
+                hasRouteLayers = false
+                hasTrafficLayers = false
+                onStyleLoaded?.invoke()
+            }
+        } catch (error: Exception) {
+            val detail = error.message ?: "unknown error"
+            Log.w(TAG, "Style could not be loaded: $detail")
+            onStyleError?.invoke(
+                "Map style could not be loaded ($detail). An already-downloaded region still works offline."
+            )
         }
     }
 
