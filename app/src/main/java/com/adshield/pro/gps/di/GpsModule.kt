@@ -2,17 +2,20 @@ package com.adshield.pro.gps.di
 
 import android.content.Context
 import androidx.room.Room
-import com.adshield.pro.gps.data.GeocodingClient
 import com.adshield.pro.gps.data.GpsDao
 import com.adshield.pro.gps.data.GpsDatabase
 import com.adshield.pro.gps.data.GpsHttpClientFactory
 import com.adshield.pro.gps.data.GpsPreferences
-import com.adshield.pro.gps.data.TrafficApiClient
+import com.adshield.pro.gps.data.GpsHttpClient
+import com.adshield.pro.gps.engine.GnssLocationSource
 import com.adshield.pro.gps.engine.GpsEngine
+import com.adshield.pro.gps.engine.GpsIntegrityMonitor
+import com.adshield.pro.gps.engine.HeadingFusion
+import com.adshield.pro.gps.engine.HeadingSensor
+import com.adshield.pro.gps.engine.StationaryDetector
 import com.adshield.pro.gps.nav.TtsVoiceGuidance
 import com.adshield.pro.gps.nav.VoiceGuidanceApi
 import com.adshield.pro.gps.traffic.SegmentMatcher
-import com.adshield.pro.gps.traffic.TrafficRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -23,7 +26,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
-import javax.inject.Qualifier
 import javax.inject.Singleton
 
 /**
@@ -33,7 +35,8 @@ import javax.inject.Singleton
  * depends on none of them and can be removed again without touching their providers. The only
  * shared objects are the application Context and the OkHttp builder (a fresh client instance).
  */
-@Qualifier
+/** Qualifier for the GPS module's own coroutine scope (see [GpsModule.provideGpsScope]). */
+@javax.inject.Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class GpsScope
 
@@ -61,6 +64,7 @@ object GpsModule {
 
     @Provides
     @Singleton
+    @GpsHttpClient
     fun provideGpsHttpClient(factory: GpsHttpClientFactory): OkHttpClient = factory.create()
 
     @Provides
@@ -72,21 +76,19 @@ object GpsModule {
     fun provideGpsEngine(
         @ApplicationContext context: Context,
         @GpsScope scope: CoroutineScope
-    ): GpsEngine = GpsEngine(context, scope).also { GpsEngineHolder.install(it) }
+    ): GpsEngine = GpsEngine(
+        context = context,
+        scope = scope,
+        locationSource = GnssLocationSource(context),
+        headingSensor = HeadingSensor(context),
+        integrityMonitor = GpsIntegrityMonitor(),
+        stationaryDetector = StationaryDetector(),
+        headingFusion = HeadingFusion()
+    ).also { GpsEngineHolder.install(it) }
 
     @Provides
     @Singleton
     fun provideSegmentMatcher(): SegmentMatcher = SegmentMatcher(emptyList())
-
-    @Provides
-    @Singleton
-    fun provideTrafficRepository(
-        @ApplicationContext context: Context,
-        dao: GpsDao,
-        preferences: GpsPreferences,
-        apiClient: TrafficApiClient,
-        geocoding: GeocodingClient
-    ): TrafficRepository = TrafficRepository(context, dao, preferences, apiClient, geocoding)
 }
 
 @Module

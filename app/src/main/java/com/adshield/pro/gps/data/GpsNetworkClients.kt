@@ -53,7 +53,7 @@ import javax.inject.Singleton
 class GeocodingClient @Inject constructor(
     private val context: Context,
     private val preferences: GpsPreferences,
-    private val httpClient: OkHttpClient
+    @GpsHttpClient private val httpClient: OkHttpClient
 ) {
 
     private val limiter = TokenBucketRateLimiter(capacity = 3, refillPerMinute = 40)
@@ -179,7 +179,7 @@ object NetworkMonitor {
 class RoutingClient @Inject constructor(
     private val context: Context,
     private val preferences: GpsPreferences,
-    private val httpClient: OkHttpClient
+    @GpsHttpClient private val httpClient: OkHttpClient
 ) {
     private val limiter = TokenBucketRateLimiter(capacity = 4, refillPerMinute = 30)
     private var lastRequestAtMs = 0L
@@ -326,7 +326,7 @@ internal suspend fun <T> kotlinx.coroutines.flow.Flow<T>.collectOnce(): T {
 class TrafficApiClient @Inject constructor(
     private val context: Context,
     private val preferences: GpsPreferences,
-    private val httpClient: OkHttpClient
+    @GpsHttpClient private val httpClient: OkHttpClient
 ) {
     private val limiter = TokenBucketRateLimiter(capacity = 6, refillPerMinute = 40)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -506,6 +506,15 @@ class TrafficApiClient @Inject constructor(
         }
     }
 }
+
+/**
+ * Qualifier for the GPS module's own OkHttp client. Without it the cloud module's unqualified
+ * OkHttpClient binding would collide with this one, and the GPS client (short timeouts, no retry
+ * storm) would be injected into cloud code by accident.
+ */
+@javax.inject.Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class GpsHttpClient
 
 /** Shared OkHttp client for the GPS module (separate instance from the DNS/cloud clients). */
 @Singleton
