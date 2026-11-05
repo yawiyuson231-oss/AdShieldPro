@@ -40,7 +40,8 @@ class CapabilityRegistryTest {
             )
             assertTrue(
                 "${capability.id}: ${capability.code} must look like a source path",
-                capability.code.endsWith(".kt") || capability.code.endsWith(".yml") || capability.code.endsWith(".py")
+                listOf(".kt", ".yml", ".py", ".mjs", ".js", ".sql")
+                    .any { capability.code.endsWith(it) }
             )
             assertTrue(
                 "${capability.id}: must document verification",

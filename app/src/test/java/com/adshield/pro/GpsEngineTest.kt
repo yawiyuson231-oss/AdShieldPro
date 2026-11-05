@@ -176,12 +176,17 @@ class GpsEngineTest {
         // An ordinary motorway reading: the receiver reports the speed it is actually doing.
         monitor.inspect(
             fix(latitude = 14.5995, longitude = 120.9842, accuracy = 8f, speedMps = 29.2f, bearing = 0f,
-                timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L)
+                timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L),
+            nowMs = 1_000_000L
         )
         val report = monitor.inspect(
             fix(latitude = 14.5997624, longitude = 120.9842, accuracy = 8f, speedMps = 29.2f, bearing = 0f,
-                timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
+                timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L),
+            nowMs = 1_001_000L
         )
+        // A clean interval yields no findings at all. (Anything at all — e.g. an INFO-level course
+        // note — would downgrade the verdict to DEGRADED, so assert the stronger property.)
+        assertTrue("unexpected findings: ${report.findings}", report.findings.isEmpty())
         assertEquals(IntegrityVerdict.TRUSTED, report.verdict)
         assertFalse(report.shouldRejectObservation)
     }

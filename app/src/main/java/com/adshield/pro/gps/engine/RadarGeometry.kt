@@ -92,7 +92,7 @@ object RadarGeometry {
         gnssAvailable: Boolean = true,
         receivedReport: Boolean = false
     ): String = when {
-        !hasPermission -> "Grant precise location to read satellite status"
+        !hasPermission -> "Grant the precise location permission to read satellite status"
         !locationEnabled -> "System location is switched off"
         !gnssAvailable -> "This device's receiver does not report GnssStatus to apps"
         !receivedReport -> "Waiting for the first satellite report…"
