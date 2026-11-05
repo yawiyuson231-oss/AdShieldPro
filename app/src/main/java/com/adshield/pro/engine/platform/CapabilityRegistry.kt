@@ -317,16 +317,6 @@ object CapabilityRegistry {
             "SecurityCenterTestSuite.testFileScanner_detectsEicarTestSignature and related cases"
         ),
         cap(
-            "scan-yara-lite", "Local YARA-compatible rule subset (offline file triage)", CapabilityArea.THREAT_SCANNING,
-            CapabilityStatus.PARTIAL, "engine/security/YaraLiteEngine.kt", emptyList(),
-            listOf("Quoted ASCII/wide/nocase strings and hex byte strings with ?? wildcards, any/all/N-of-them conditions"),
-            listOf(
-                "Not the native YARA engine: no regex, no file/process modules, no external rule packs",
-                "Unsupported syntax is rejected at parse time and the built-in rule set is a small starter set"
-            ),
-            "CybersecurityPlatformTestSuite.yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax and fileScannerUsesRealYaraRuleOutcomes"
-        ),
-        cap(
             "scan-apk", "APK binary manifest analysis (package, permissions, risk)", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/ApkAnalyzer.kt", emptyList(),
             listOf("Binary AXML parser over the APK zip"),

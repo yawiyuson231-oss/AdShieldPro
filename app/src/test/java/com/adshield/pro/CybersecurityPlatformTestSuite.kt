@@ -18,7 +18,6 @@ import com.adshield.pro.engine.dns.DnsResponseValidator
 import com.adshield.pro.engine.dns.DnssecStatus
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.security.FileThreatScanner
-import com.adshield.pro.engine.security.YaraLiteEngine
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -180,37 +179,13 @@ class CybersecurityPlatformTestSuite {
     }
 
     @Test
-    fun yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax() {
-        val rules = YaraLiteEngine.parse(
-            """
-            rule Hex_Test { strings: ${'$'}h = { 4D 5A ?? 7F } condition: any of them }
-            rule Wide_Test { strings: ${'$'}w = "evil" wide nocase condition: any of them }
-            """.trimIndent()
-        )
-        val engine = YaraLiteEngine(rules)
-        assertEquals(listOf("Hex_Test"), engine.scan("xxMZ?\u007f").map { it.ruleName })
-        assertEquals(listOf("Wide_Test"), engine.scan("E\u0000V\u0000I\u0000L\u0000").map { it.ruleName })
-        assertThrows(IllegalArgumentException::class.java) {
-            YaraLiteEngine.parse("rule Bad { condition: true }")
-        }
-        // Braces inside quoted strings must not terminate the rule body (regression: the EICAR signature).
-        val braceRule = YaraLiteEngine.parse(
-            """
-            rule Braced_String { strings: ${'$'}b = "a}b}c" condition: any of them }
-            """.trimIndent()
-        )
-        assertEquals(listOf("Braced_String"), YaraLiteEngine(braceRule).scan("xxa}b}c").map { it.ruleName })
-        assertTrue(YaraLiteEngine().scan("X5O!P%@AP[4\\PZX54(P^)7CC)7}${'$'}EICAR-STANDARD-ANTIVIRUS-TEST-FILE!${'$'}H+H*").isNotEmpty())
-    }
-
-    @Test
-    fun fileScannerUsesRealYaraRuleOutcomes() {
-        val file = Files.createTempFile("adshield-yara", ".ps1").toFile()
+    fun fileScannerFlagsEncodedPowerShellDropper() {
+        val file = Files.createTempFile("adshield-dropper", ".ps1").toFile()
         file.writeText("powershell.exe -WindowStyle hidden -enc SQBFAFgA")
         try {
             val verdict = FileThreatScanner().scanFile(file)
             assertEquals(FileThreatScanner.ThreatLevel.DANGEROUS, verdict.threatLevel)
-            assertTrue(verdict.findings.any { it.contains("PowerShell_Encoded_Dropper") })
+            assertTrue(verdict.findings.any { it.contains("Obfuscated PowerShell dropper command") })
         } finally {
             file.delete()
         }
@@ -252,15 +227,4 @@ class CybersecurityPlatformTestSuite {
         assertEquals(2, rcode)
     }
 
-    @Test
-    fun yaraParsingRejectsOversizedOrUnboundedRuleInput() {
-        val huge = "rule Big { strings: ${'$'}s = \"" + "a".repeat(5_000) + "\" condition: any of them }"
-        assertThrows(IllegalArgumentException::class.java) { YaraLiteEngine.parse(huge) }
-        assertThrows(IllegalArgumentException::class.java) {
-            YaraLiteEngine.parse("rule NoStrings { strings: condition: any of them }")
-        }
-        assertThrows(IllegalArgumentException::class.java) {
-            YaraLiteEngine.parse("rule BadCondition { strings: ${'$'}s = \"x\" condition: 2 of them }")
-        }
-    }
 }

@@ -2,8 +2,7 @@
 
 This document describes the cybersecurity slice added on top of the existing Android
 application: resilient upstream DNS resolution, strict response validation, honest DNSSEC
-reporting, deterministic DNS-only policy enforcement, and a bounded local YARA-compatible
-scanner subset.
+reporting and deterministic DNS-only policy enforcement.
 
 Everything below is DNS-level or file-level on-device behaviour. The tunnel still routes
 **only** `10.215.173.2/32` and `fd00:ad5:1e1d::2/128`; no non-DNS socket is inspected, and
@@ -89,27 +88,19 @@ evidence and per-provider health.
 configured resolver path and upstream behaviour, not whether some other resolver on the network
 can also observe the device.
 
-## 6. YARA-compatible scanner subset
+## 6. Local file scanning (no YARA)
 
-`engine/security/YaraLiteEngine.kt` adds an offline, dependency-free rule subset used by
-`FileThreatScanner` alongside the existing signature and structural checks.
+`FileThreatScanner` keeps the pre-existing, purely local checks: exact signature matches
+(industry-standard EICAR test string), polyglot/steganographic executables hidden inside image
+and PDF containers, script-based droppers (PowerShell `-enc`, `certutil -urlcache`, `mshta`,
+`curl | sh`), macro-laden Office documents, zip-slip archive entries and suspicious
+double-extension naming.
 
-Supported:
-
-- named rules with a `strings:` and a `condition:` section;
-- quoted ASCII strings with `nocase`, `wide` and `ascii` modifiers, including `\n`, `\r`, `\t`,
-  `\\`, `\"` and `\xHH` escapes;
-- hex byte strings with `??` wildcards;
-- conditions `any of them`, `all of them`, `N of them`.
-
-Not supported, and rejected at parse time rather than silently ignored: regular expressions,
-`at`/`in` ranges, `filesize`, module imports (`pe`, `elf`, `math`, …), unbounded jumps in hex
-strings, external variables, private rules and rule imports. Parsing is bounded (1 MiB of rule
-text, 128 rules, 256 strings per rule), and rule bodies are brace-matched so braces inside quoted
-strings do not truncate a rule.
-
-The shipped starter rule set covers the EICAR test file, PowerShell `-enc` style droppers, and
-`curl | sh` loaders. This is explicitly **not** the native YARA engine, and it is not ClamAV.
+A YARA-compatible rule subset was implemented and then **removed** at the maintainer's request,
+together with its tests, its capability row and its documentation. The scanner therefore does
+**not** support YARA rules: no rule parser ships in this build, and native YARA and ClamAV are
+not integrated. Detection remains signature- and structure-based, which the honest limitation
+below repeats.
 
 ## 7. Verification evidence
 
@@ -125,8 +116,7 @@ JVM tests in `app/src/test/java/com/adshield/pro/CybersecurityPlatformTestSuite.
 | `resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt` | open circuit is skipped without inflating failure counts |
 | `appNetworkAndEmergencyPoliciesAreDeterministic` | per-app, per-transport and emergency decisions |
 | `diagnosticQueryUsesEdns0AndNormalisesCase` | EDNS0/DO diagnostic query construction and input validation |
-| `yaraSubsetMatchesAsciiHexWideAndRejectsUnsupportedSyntax` | hex + wide matching, brace-in-string parsing, unsupported syntax rejection |
-| `fileScannerUsesRealYaraRuleOutcomes` | scanner verdicts driven by real rule matches |
+| `fileScannerFlagsEncodedPowerShellDropper` | scanner verdict is driven by a real dropper-pattern match |
 
 CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, assembled the
 debug and R8 release APKs, ran the full JVM suite, Android lint, the test-count gate and the APK
@@ -139,5 +129,6 @@ installability gate successfully.
 - No live interoperability campaign against NextDNS, Control D or a custom IPv6 resolver from a
   real handset.
 - No external DNS leak test, as stated above.
-- No malware corpus benchmark for the YARA subset; it is a triage aid, not a detection claim.
+- No malware corpus benchmark and no YARA/native-engine integration: the scanner is a signature and
+  structure triage aid, not a detection claim.
 - No local DNSSEC validation, no DoH3/oblivious DoH, and no general IP-level firewalling.

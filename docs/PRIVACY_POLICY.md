@@ -23,7 +23,7 @@ AdShield Pro uses the Android `android.net.VpnService` API strictly to establish
    - **Blocked Domains:** Immediately answered on-device with `NXDOMAIN` or `0.0.0.0` / `::` sinkhole in `< 1 ms`.
    - **Allowed Domains:** Forwarded using the protocol you select: encrypted **DNS-over-HTTPS (DoH, RFC 8484)** or **DNS-over-TLS (DoT, RFC 7858)**, or unencrypted UDP/TCP port 53. If DoH or DoT is unavailable, the app returns DNS `SERVFAIL` instead of silently downgrading that query to plaintext.
 3. **Resilience Controls (Local):** Per-app DNS policies, per-network (Wi-Fi / mobile data / Ethernet / other) policies, an emergency allowlist-only mode, optional failover between providers **you** select, and DNSSEC evidence reporting are all evaluated on-device from local settings. These settings never leave the device, are stored only in on-device DataStore, and are included in the local configuration backup you export yourself. Enabling failover means additional providers you selected may receive queries when the primary fails; an encrypted protocol never falls back to plaintext.
-4. **Local File Scanning:** The YARA-compatible scanner subset runs entirely on-device over files you choose; no file content, hash or verdict is uploaded.
+4. **Local File Scanning:** File scanning runs entirely on-device over files you choose using signature and structural checks; no YARA rule engine is bundled, and no file content, hash or verdict is uploaded.
 
 ---
 
