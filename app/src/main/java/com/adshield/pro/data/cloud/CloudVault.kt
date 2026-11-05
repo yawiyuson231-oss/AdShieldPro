@@ -14,6 +14,9 @@ import javax.crypto.spec.SecretKeySpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** PBKDF2 work factor. Shared so the stored value and the default can never drift apart. */
+private const val PBKDF2_DEFAULT_ITERATIONS = 120_000
+
 /** Where the vault keeps its salt and verifier. Kept small so the vault is unit-testable. */
 interface VaultStorage {
     fun salt(): ByteArray?
@@ -26,7 +29,7 @@ class PreferencesVaultStorage(context: Context) : VaultStorage {
     private val preferences = context.getSharedPreferences("adshield_cloud_vault", Context.MODE_PRIVATE)
     override fun salt(): ByteArray? = preferences.getString(KEY_SALT, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
     override fun verifier(): ByteArray? = preferences.getString(KEY_VERIFIER, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
-    override fun iterations(): Int = preferences.getInt(KEY_ITERATIONS, DEFAULT_ITERATIONS)
+    override fun iterations(): Int = preferences.getInt(KEY_ITERATIONS, PBKDF2_DEFAULT_ITERATIONS)
     override fun save(salt: ByteArray, verifier: ByteArray, iterations: Int) {
         preferences.edit()
             .putString(KEY_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
@@ -142,12 +145,11 @@ class CloudVault @Inject constructor(
     }
 
     private companion object {
-        const val DEFAULT_ITERATIONS = PBKDF2_ITERATIONS
         const val SALT_BYTES = 16
         const val NONCE_BYTES = 12
         const val KEY_BITS = 256
         const val GCM_TAG_BITS = 128
-        const val PBKDF2_ITERATIONS = 120_000
+        const val PBKDF2_ITERATIONS = PBKDF2_DEFAULT_ITERATIONS
         val VERIFIER_PLAINTEXT = "adshield-cloud-vault-v1".toByteArray(Charsets.UTF_8)
     }
 }

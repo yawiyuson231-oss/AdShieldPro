@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Card
@@ -71,7 +72,11 @@ import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.browser.PrivateSearch
+import com.adshield.pro.engine.onion.OnionRoutingManager
+import com.adshield.pro.engine.onion.TorState
+import com.adshield.pro.engine.onion.TorStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
@@ -99,6 +104,11 @@ fun BrowserScreen(
     var blockedPopups by remember { mutableLongStateOf(browserContentBlocker.getBlockedPopupCount()) }
     var strippedTrackers by remember { mutableLongStateOf(browserContentBlocker.getStrippedTrackerParamCount()) }
     var showBrowserShieldSheet by remember { mutableStateOf(false) }
+    var showTorSheet by remember { mutableStateOf(false) }
+    var torEnabled by remember { mutableStateOf(false) }
+    var torStatus by remember { mutableStateOf(TorStatus()) }
+    val onion = remember(context) { OnionRoutingManager(context) }
+    val browserScope = rememberCoroutineScope()
     var searchSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
     var appliedPrivateMode by remember { mutableStateOf(settings.privateBrowsingEnabled) }
     val latestSettings = rememberUpdatedState(settings)
@@ -263,6 +273,14 @@ fun BrowserScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = CyberCyan
                         )
+                        if (torEnabled) {
+                            Text(
+                                text = if (torStatus.isConnected) "Tor: ON" else "Tor: connecting",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (torStatus.isConnected) EmeraldPrimary else WarningAmber,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
                     if (currentHost.isNotEmpty()) {
@@ -349,11 +367,14 @@ fun BrowserScreen(
                                 allowlistedSites = appSettings.browserSiteExceptions
                             )
                             blockedSubresources = browserContentBlocker.getBlockedSubresourceCount()
-                            return if (decision.shouldBlock) {
-                                browserContentBlocker.createEmptyBlockedResponse()
-                            } else {
-                                null
+                            if (decision.shouldBlock) return browserContentBlocker.createEmptyBlockedResponse()
+                            // Onion routing: fetch the allowed request through Orbot's SOCKS proxy.
+                            // POST bodies and media streams are not interceptable on Android, so they
+                            // still use the ordinary path — the UI states that limitation.
+                            if (torEnabled && request?.method.equals("GET", ignoreCase = true)) {
+                                onion.fetch(reqUrl, request?.requestHeaders ?: emptyMap())?.let { return it }
                             }
+                            return null
                         }
 
                         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -428,6 +449,53 @@ fun BrowserScreen(
         )
     }
 
+    if (showTorSheet) {
+        AlertDialog(
+            onDismissRequest = { showTorSheet = false },
+            title = { Text("Onion routing") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = torStatus.detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "AdShield Pro routes through the Orbot app (127.0.0.1:9050). It is verified by asking Tor's own check service what it sees — no connection, no claim of privacy.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Limitation: Android only lets an app intercept GET requests, so POST forms and some media streams still use the normal path.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = WarningAmber
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    browserScope.launch {
+                        torStatus = TorStatus(TorState.STARTING, "Checking the Tor route…")
+                        val verified = onion.verify()
+                        torStatus = verified
+                        torEnabled = verified.isConnected
+                        if (verified.isConnected) showTorSheet = false
+                    }
+                }) { Text("Retry check") }
+            },
+            dismissButton = {
+                Row {
+                    if (torStatus.state == TorState.NOT_INSTALLED) {
+                        TextButton(onClick = {
+                            runCatching { context.startActivity(onion.installIntent()) }
+                        }) { Text("Install Orbot") }
+                    }
+                    TextButton(onClick = { showTorSheet = false }) { Text("Close") }
+                }
+            }
+        )
+    }
+
     if (showBrowserShieldSheet) {
         var customCssSelector by remember { mutableStateOf("") }
 
@@ -460,6 +528,39 @@ fun BrowserScreen(
                                 settings.searchProvider, it, settings.searchHistoryEnabled,
                                 settings.searchSuggestionsEnabled, settings.automaticSearchHistoryDeletion
                             )
+                        }
+                    )
+                    BrowserSwitchRow(
+                        title = "Route through Tor (Orbot)",
+                        subtitle = when {
+                            torStatus.isConnected -> "Onion routing confirmed by check.torproject.org${torStatus.exitIp?.let { " (exit $it)" } ?: ""}."
+                            torStatus.state == TorState.NOT_INSTALLED -> "Install Orbot to route browser traffic through Tor."
+                            torStatus.state == TorState.STARTING -> "Waiting for Orbot to build a circuit…"
+                            torStatus.state == TorState.STOPPED -> "Orbot is installed but not connected."
+                            else -> torStatus.detail
+                        },
+                        checked = torEnabled,
+                        onCheckedChange = { enable ->
+                            if (!enable) {
+                                torEnabled = false
+                                torStatus = TorStatus()
+                            } else {
+                                browserScope.launch {
+                                    val installed = onion.installedTorApps()
+                                    if (installed.isEmpty()) {
+                                        torStatus = TorStatus(TorState.NOT_INSTALLED)
+                                        torEnabled = false
+                                        showTorSheet = true
+                                        return@launch
+                                    }
+                                    onion.requestStart(installed.first())
+                                    torStatus = TorStatus(TorState.STARTING, "Asking Orbot to connect…")
+                                    val verified = onion.verify()
+                                    torStatus = verified
+                                    torEnabled = verified.isConnected
+                                    if (!verified.isConnected) showTorSheet = true
+                                }
+                            }
                         }
                     )
                     BrowserSwitchRow(
