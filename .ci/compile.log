@@ -10,29 +10,22 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugRFile
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:200:21 None of the following candidates is applicable:
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt:199:35 None of the following candidates is applicable:
 
-fun registerGnssStatusCallback(p0: GnssStatus.Callback, p1: Handler?): Boolean:
-  Argument type mismatch: actual type is 'Looper!', but 'Handler?' was expected.
+static fun registerGnssStatusCallback(p0: LocationManager, p1: GnssStatusCompat.Callback, p2: Handler): Boolean:
+  Argument type mismatch: actual type is 'Handler', but 'GnssStatusCompat.Callback' was expected.
+  Argument type mismatch: actual type is '<anonymous>', but 'Handler' was expected.
 
-fun registerGnssStatusCallback(p0: Executor, p1: GnssStatus.Callback): Boolean:
-  Argument type mismatch: actual type is '<anonymous>', but 'Executor' was expected.
-  Argument type mismatch: actual type is 'Looper!', but 'GnssStatus.Callback' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsHubScreen.kt:105:16 Property delegate must have a 'getValue(Nothing?, KProperty0<*>)' method. None of the following functions is applicable:
+static fun registerGnssStatusCallback(p0: LocationManager, p1: Executor, p2: GnssStatusCompat.Callback): Boolean:
+  Argument type mismatch: actual type is 'Handler', but 'Executor' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsHubScreen.kt:106:16 Property delegate must have a 'getValue(Nothing?, KProperty0<*>)' method. None of the following functions is applicable:
 fun FloatState.getValue(thisObj: Any?, property: KProperty<*>): Float
 fun DoubleState.getValue(thisObj: Any?, property: KProperty<*>): Double
 fun IntState.getValue(thisObj: Any?, property: KProperty<*>): Int
 fun LongState.getValue(thisObj: Any?, property: KProperty<*>): Long
 fun <T> State<T>.getValue(thisObj: Any?, property: KProperty<*>): T
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsViewModel.kt:565:29 Unresolved reference 'maplibreRegionId' on receiver of type 'OfflinePackUi'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsViewModel.kt:573:32 Argument type mismatch: actual type is 'Any', but 'Long' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsViewModel.kt:584:29 Unresolved reference 'maplibreRegionId' on receiver of type 'OfflinePackUi'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/GpsViewModel.kt:585:54 Argument type mismatch: actual type is 'Any', but 'Long' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/GpsMapScreen.kt:90:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/GpsMapScreen.kt:90:32 Unresolved reference 'mutableStateOf'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/GpsMapScreen.kt:356:13 Unresolved reference 'not' for operator '!'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/TrafficScreen.kt:26:47 Unresolved reference 'Hazardous'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/TrafficScreen.kt:510:42 Unresolved reference 'Hazardous' on receiver of type 'Icons.Filled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/GpsMapScreen.kt:372:13 Unresolved reference 'mapError'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/ui/screens/GpsMapScreen.kt:374:22 Unresolved reference 'mapError'.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -47,13 +40,13 @@ Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.a
        Kotlin compiler error
          None of the following candidates is applicable:
      
-         fun registerGnssStatusCallback(p0: GnssStatus.Callback, p1: Handler?): Boolean:
-           Argument type mismatch: actual type is 'Looper!', but 'Handler?' was expected.
+         static fun registerGnssStatusCallback(p0: LocationManager, p1: GnssStatusCompat.Callback, p2: Handler): Boolean:
+           Argument type mismatch: actual type is 'Handler', but 'GnssStatusCompat.Callback' was expected.
+           Argument type mismatch: actual type is '<anonymous>', but 'Handler' was expected.
      
-         fun registerGnssStatusCallback(p0: Executor, p1: GnssStatus.Callback): Boolean:
-           Argument type mismatch: actual type is '<anonymous>', but 'Executor' was expected.
-           Argument type mismatch: actual type is 'Looper!', but 'GnssStatus.Callback' was expected.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt line 200
+         static fun registerGnssStatusCallback(p0: LocationManager, p1: Executor, p2: GnssStatusCompat.Callback): Boolean:
+           Argument type mismatch: actual type is 'Handler', but 'Executor' was expected.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/gps/engine/GnssLocationSource.kt line 199
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -216,12 +209,12 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	... 30 more
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: None of the following candidates is applicable:
 
-fun registerGnssStatusCallback(p0: GnssStatus.Callback, p1: Handler?): Boolean:
-  Argument type mismatch: actual type is 'Looper!', but 'Handler?' was expected.
+static fun registerGnssStatusCallback(p0: LocationManager, p1: GnssStatusCompat.Callback, p2: Handler): Boolean:
+  Argument type mismatch: actual type is 'Handler', but 'GnssStatusCompat.Callback' was expected.
+  Argument type mismatch: actual type is '<anonymous>', but 'Handler' was expected.
 
-fun registerGnssStatusCallback(p0: Executor, p1: GnssStatus.Callback): Boolean:
-  Argument type mismatch: actual type is '<anonymous>', but 'Executor' was expected.
-  Argument type mismatch: actual type is 'Looper!', but 'GnssStatus.Callback' was expected.
+static fun registerGnssStatusCallback(p0: LocationManager, p1: Executor, p2: GnssStatusCompat.Callback): Boolean:
+  Argument type mismatch: actual type is 'Handler', but 'Executor' was expected.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -258,5 +251,5 @@ fun registerGnssStatusCallback(p0: Executor, p1: GnssStatus.Callback): Boolean:
 	... 2 more
 
 
-BUILD FAILED in 2m 29s
+BUILD FAILED in 2m 13s
 8 actionable tasks: 8 executed
