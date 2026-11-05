@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.CapabilityRegistryTest" tests="5" skipped="0" failures="1" errors="0" timestamp="2026-11-05T21:41:42.750Z" hostname="runnervmwuk1x" time="0.016">
+<testsuite name="com.adshield.pro.CapabilityRegistryTest" tests="5" skipped="0" failures="1" errors="0" timestamp="2026-11-05T22:41:39.022Z" hostname="runnervmwuk1x" time="0.013">
   <properties/>
-  <testcase name="testSummaryCountsMatchTheRegistry" classname="com.adshield.pro.CapabilityRegistryTest" time="0.006"/>
-  <testcase name="testNoCapabilityClaimsCloudAiOrChargeControl" classname="com.adshield.pro.CapabilityRegistryTest" time="0.001"/>
+  <testcase name="testSummaryCountsMatchTheRegistry" classname="com.adshield.pro.CapabilityRegistryTest" time="0.003"/>
+  <testcase name="testNoCapabilityClaimsCloudAiOrChargeControl" classname="com.adshield.pro.CapabilityRegistryTest" time="0.004"/>
   <testcase name="testEveryCapabilityHasUniqueIdAndHonestStatus" classname="com.adshield.pro.CapabilityRegistryTest" time="0.0"/>
-  <testcase name="testImplementedCapabilitiesPointAtRealCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.007">
+  <testcase name="testImplementedCapabilitiesPointAtRealCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.005">
     <failure message="java.lang.AssertionError: gps-traffic-backend: gps-backend/api/server.mjs must look like a source path" type="java.lang.AssertionError">java.lang.AssertionError: gps-traffic-backend: gps-backend/api/server.mjs must look like a source path
 	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.assertTrue(Assert.java:42)
@@ -53,7 +53,7 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="testUnavailableCapabilitiesClaimNoCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.002"/>
+  <testcase name="testUnavailableCapabilitiesClaimNoCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

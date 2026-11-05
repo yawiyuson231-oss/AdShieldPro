@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsEngineTest" tests="34" skipped="0" failures="2" errors="0" timestamp="2026-11-05T21:41:46.815Z" hostname="runnervmwuk1x" time="0.057">
+<testsuite name="com.adshield.pro.GpsEngineTest" tests="35" skipped="0" failures="2" errors="0" timestamp="2026-11-05T22:41:42.997Z" hostname="runnervmwuk1x" time="0.03">
   <properties/>
   <testcase name="testRadarZenithSatelliteSitsInTheCentre" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testRadarEmptyReasonIsSpecificAboutTheCause" classname="com.adshield.pro.GpsEngineTest" time="0.002">
@@ -7,7 +7,7 @@
 	at org.junit.Assert.fail(Assert.java:87)
 	at org.junit.Assert.assertTrue(Assert.java:42)
 	at org.junit.Assert.assertTrue(Assert.java:53)
-	at com.adshield.pro.GpsEngineTest.testRadarEmptyReasonIsSpecificAboutTheCause(GpsEngineTest.kt:318)
+	at com.adshield.pro.GpsEngineTest.testRadarEmptyReasonIsSpecificAboutTheCause(GpsEngineTest.kt:330)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
@@ -52,28 +52,31 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="testEtaFallsBackToSpeedLimitWhenStopped" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testAccuracyBandThresholds" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testGeodesyDistanceBetweenManilaAndQuezonCity" classname="com.adshield.pro.GpsEngineTest" time="0.008"/>
-  <testcase name="testGeoBoundsAroundContainsCentreAndNotFarAwayPoint" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.007"/>
+  <testcase name="testEtaFallsBackToSpeedLimitWhenStopped" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testAccuracyBandThresholds" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testGeodesyDistanceBetweenManilaAndQuezonCity" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testGeoBoundsAroundContainsCentreAndNotFarAwayPoint" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testSnrRatioClampsOutOfRangeValues" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testMapProjectionTileCountForSmallRegion" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testIntegrityMonitorFlagsClockGoingBackwards" classname="com.adshield.pro.GpsEngineTest" time="0.005"/>
-  <testcase name="testStationaryDetectorClassifiesHighwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testIntegrityMonitorFlagsClockGoingBackwards" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testStationaryDetectorClassifiesHighwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testSeverityOrderingIsExplicit" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testSatelliteSnapshotQualityNoteExplainsFewSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testSegmentProjectionSnapsToNearestPointOnRoad" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testSegmentProjectionSnapsToNearestPointOnRoad" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testEtaUsesMeasuredSpeedWhenMoving" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testStationaryDetectorClassifiesStoppedVehicle" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
-  <testcase name="testFixWithoutAltitudeKeepsNullInsteadOfZero" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testSkyScoreRisesWithAFullSky" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testStationaryDetectorClassifiesStoppedVehicle" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testFixWithoutAltitudeKeepsNullInsteadOfZero" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testSkyScoreRisesWithAFullSky" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testIntegrityStatisticsAccumulate" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testSkyScoreIsZeroWithoutSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testIntegrityMonitorAcceptsNormalDriving" classname="com.adshield.pro.GpsEngineTest" time="0.004">
-    <failure message="java.lang.AssertionError: normal motion must not be flagged critical, got SUSPICIOUS" type="java.lang.AssertionError">java.lang.AssertionError: normal motion must not be flagged critical, got SUSPICIOUS
+  <testcase name="testIntegrityMonitorAcceptsNormalDriving" classname="com.adshield.pro.GpsEngineTest" time="0.001">
+    <failure message="java.lang.AssertionError: expected:&lt;TRUSTED&gt; but was:&lt;SUSPICIOUS&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;TRUSTED&gt; but was:&lt;SUSPICIOUS&gt;
 	at org.junit.Assert.fail(Assert.java:89)
-	at org.junit.Assert.assertTrue(Assert.java:42)
-	at com.adshield.pro.GpsEngineTest.testIntegrityMonitorAcceptsNormalDriving(GpsEngineTest.kt:184)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at com.adshield.pro.GpsEngineTest.testIntegrityMonitorAcceptsNormalDriving(GpsEngineTest.kt:185)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
@@ -118,18 +121,18 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="testRadarEastIsPositiveX" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testIntegrityMonitorFlagsImpossibleJump" classname="com.adshield.pro.GpsEngineTest" time="0.007"/>
+  <testcase name="testRadarEastIsPositiveX" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testIntegrityMonitorFlagsImpossibleJump" classname="com.adshield.pro.GpsEngineTest" time="0.004"/>
   <testcase name="testSpeedIsAbsentWhenProviderDoesNotReportIt" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testMapProjectionRejectsPolarLatitude" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testConstellationCodeIsShortAndStable" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testConfidenceDropsForMockedAndCachedFixes" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testMapProjectionRejectsPolarLatitude" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testConstellationCodeIsShortAndStable" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testConfidenceDropsForMockedAndCachedFixes" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testIncidentValidatorRejectsCompromisedLocation" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testGeodesyBearingAndDestinationRoundTrip" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testGeodesyBearingAndDestinationRoundTrip" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testRadarRingsAreHorizonZenithAndMid" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testSatelliteSnapshotUsedRatioIsZeroWithoutSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testRadarPlacesNorthernSatelliteAboveCentre" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testEtaWithoutAnySpeedInformationStillTerminates" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testEtaWithoutAnySpeedInformationStillTerminates" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testStationaryDetectorInfersMotionWithoutDopplerSpeed" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testIntegrityMonitorFlagsMockProvider" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

@@ -29,8 +29,8 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:processDebugJavaRes UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest
-> Task :app:bundleDebugClassesToCompileJar
 > Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
 
 > Task :app:compileDebugUnitTestKotlin
@@ -256,7 +256,9 @@ DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
 GpsEngineTest > testRadarZenithSatelliteSitsInTheCentre PASSED
 
 GpsEngineTest > testRadarEmptyReasonIsSpecificAboutTheCause FAILED
-    java.lang.AssertionError at GpsEngineTest.kt:318
+    java.lang.AssertionError at GpsEngineTest.kt:330
+
+GpsEngineTest > testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed PASSED
 
 GpsEngineTest > testEtaFallsBackToSpeedLimitWhenStopped PASSED
 
@@ -293,7 +295,7 @@ GpsEngineTest > testIntegrityStatisticsAccumulate PASSED
 GpsEngineTest > testSkyScoreIsZeroWithoutSatellites PASSED
 
 GpsEngineTest > testIntegrityMonitorAcceptsNormalDriving FAILED
-    java.lang.AssertionError at GpsEngineTest.kt:184
+    java.lang.AssertionError at GpsEngineTest.kt:185
 
 GpsEngineTest > testRadarEastIsPositiveX PASSED
 
@@ -531,7 +533,7 @@ SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
 
 SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
 
-241 tests completed, 3 failed
+242 tests completed, 3 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -693,5 +695,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 39s
+BUILD FAILED in 32s
 33 actionable tasks: 9 executed, 24 up-to-date
