@@ -683,8 +683,8 @@ private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolea
 @Composable
 private fun ScanResultCard(
     record: SecurityScanRecord,
-    onDeleteScannedDocument: (SecurityScanRecord) -> Unit = {}
-    ) {
+    onDeleteScannedDocument: (SecurityScanRecord) -> Unit
+) {
     var showDeleteConfirmation by remember(record.id) { mutableStateOf(false) }
     val (tint, label) = when (record.threatLevel) {
         SecurityLevel.DANGEROUS -> com.adshield.pro.ui.theme.AlertRed to "THREAT DETECTED"

@@ -74,7 +74,6 @@ data class AppSettingsState(
     val batteryMode: BatteryMode = BatteryMode.SMART_AUTOMATIC,
     val lastSmartBoostEpochMs: Long = 0L,
     // --- Private search & scheduled scanning ---
-    val searchProvider: SearchProvider = SearchProvider.DUCKDUCKGO,
     val scheduledScanEnabled: Boolean = false,
     val scheduledScanIntervalHours: Int = 24
 )
@@ -147,7 +146,6 @@ class UserPreferencesRepository @Inject constructor(
         val LAST_SMART_BOOST_MS = longPreferencesKey("last_smart_boost_epoch_ms")
 
         // Private search & scheduled scanning
-        val SEARCH_PROVIDER = stringPreferencesKey("search_provider")
         val SCHEDULED_SCAN_ENABLED = booleanPreferencesKey("scheduled_scan_enabled")
         val SCHEDULED_SCAN_HOURS = intPreferencesKey("scheduled_scan_interval_hours")
     }
@@ -250,7 +248,6 @@ class UserPreferencesRepository @Inject constructor(
             gameSessionRecords = gameSessions,
             batteryMode = batteryMode,
             lastSmartBoostEpochMs = prefs[Keys.LAST_SMART_BOOST_MS] ?: 0L,
-            searchProvider = SearchProvider.fromName(prefs[Keys.SEARCH_PROVIDER]),
             scheduledScanEnabled = prefs[Keys.SCHEDULED_SCAN_ENABLED] ?: false,
             scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168)
         )
