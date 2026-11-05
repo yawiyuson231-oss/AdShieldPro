@@ -11,9 +11,11 @@ name: Deploy website
 # Safe to re-run: the job is idempotent.
 #
 # Pages enablement: actions/configure-pages@v5 with `enablement: true` turns Pages on
-# (Source: GitHub Actions) for repositories it is allowed to configure, so this workflow no
-# longer needs a manual admin step. That call falls back to a plain "is Pages on?" probe when
-# the token cannot enable it, and reports the exact manual step instead of failing obscurely.
+# (Source: GitHub Actions). Creating a Pages site is one of the few operations the default
+# GITHUB_TOKEN is never allowed to perform, so an admin must either click Settings -> Pages ->
+# Source: GitHub Actions once, or add a fine-grained PAT with "Pages: read and write" as the
+# repository secret PAGES_TOKEN (used here when present). Either way the workflow reports the
+# exact manual step instead of failing obscurely.
 
 on:
   workflow_dispatch:
@@ -69,14 +71,17 @@ jobs:
           test -s app.js
           ls -l docs/index.html docs/404.html docs/og-image.png docs/PRIVACY_POLICY.md
 
-      # The default GITHUB_TOKEN cannot create a Pages site, so `enablement: true` succeeds only
-      # where the repository or organization allows it. When it cannot, the step keeps going and
-      # the action's own "no Pages site" error is turned into the manual instruction instead.
+      # The default GITHUB_TOKEN can configure a Pages site but can never create one, so this
+      # step is allowed to fail: the next step checks whether Pages exists and prints the exact
+      # one-time fix instead of an obscure "Create Pages site failed".
       - name: Configure Pages (enables Pages when the token is allowed to)
         id: pages-config
         continue-on-error: true
         uses: actions/configure-pages@v5
         with:
+          # PAGES_TOKEN (optional) is a PAT that can create the Pages site; falls back to the
+          # workflow token, which can configure but not create it.
+          token: ${{ secrets.PAGES_TOKEN || secrets.GITHUB_TOKEN }}
           enablement: true
 
       - name: Explain a Pages site that could not be enabled
@@ -88,7 +93,7 @@ jobs:
             echo "::error::GitHub Pages is already enabled, but configure-pages failed. See the step above."
             exit 1
           fi
-          echo "::error::GitHub Pages is not enabled for ${GITHUB_REPOSITORY} and the workflow token may not enable it. A repository admin must open Settings -> Pages and set Source to \"GitHub Actions\", then re-run this workflow (or re-run it once enablement is allowed for the token)."
+          echo "::error::GitHub Pages is not enabled for ${GITHUB_REPOSITORY}, and the token used here cannot create it. Fix it once, either way: (a) open https://github.com/${GITHUB_REPOSITORY}/settings/pages and set Source to \"GitHub Actions\"; or (b) add a repository secret PAGES_TOKEN holding a fine-grained PAT with \"Pages: read and write\", which lets this workflow enable Pages itself. Then re-run this job."
           exit 1
 
       - name: Set up Node

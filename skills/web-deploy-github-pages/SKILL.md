@@ -58,11 +58,17 @@ deploy-website.yml --ref main`), so the site's download links never lag a releas
 
 ## One-time setup (fork or new owner)
 
-1. **Enable Pages once.** Settings → Pages → **Source: GitHub Actions**. The workflow tries to do
-   this itself (`enablement: true`) and, when the token is not allowed to, fails with that exact
-   instruction instead of an obscure "Get Pages site failed" error. The default `GITHUB_TOKEN`
-   cannot create a Pages site; a repository/organization admin can either click the setting or
-   allow the token to do it.
+1. **Enable Pages once.** Creating a Pages site is the one deployment operation the default
+   `GITHUB_TOKEN` is *never* allowed to perform, so this cannot be automated away with the
+   workflow token. Pick one:
+   - **Click it:** Settings → Pages → **Source: GitHub Actions**. Takes effect immediately; re-run
+     the deploy workflow afterwards.
+   - **Delegate it:** add a repository secret `PAGES_TOKEN` — a fine-grained PAT scoped to this
+     repository with **Pages: read and write**. The workflow passes it to `configure-pages` with
+     `enablement: true` and enables Pages by itself.
+
+   Either way, the workflow's failure message names this exact choice rather than the action's raw
+   "Create Pages site failed" error.
 2. **Confirm the environment.** Settings → Environments → `github-pages` must exist (it is created
    on the first deploy). If protection rules were added, allow the `main` branch.
 3. **Set the origin.** Put the published URL in `docs/canonical.txt` (one line, no trailing slash)
@@ -103,7 +109,8 @@ Checks that catch real regressions and are easy to forget by hand:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Workflow fails at *Configure Pages* | Pages not enabled and the token may not enable it | Settings → Pages → Source: GitHub Actions, then re-run |
+| *Create Pages site failed: Resource not accessible by integration* | Pages has never been enabled and the workflow token cannot create it | Settings → Pages → Source: GitHub Actions (or set `PAGES_TOKEN`), then re-run |
+| Workflow fails at *Configure Pages* | Pages is enabled but Pages config is stale/locked | Re-run `configure-pages`; check the `github-pages` environment exists |
 | *Deployment failed, try again later* | Pages environment protection or a concurrent deploy | Re-run; `concurrency: pages-${{ github.ref }}` already serialises per branch |
 | 404 on every page but `index.html` | Pages built from a branch (`main /`) instead of the artifact | Set Source to **GitHub Actions**, not "Deploy from a branch" |
 | Site loads, `/app/` is blank | A module or feed was not staged | `npm run stage` fails first — if it passed, check the console for a network 404 and add the file to `APP_ROOT_FILES`/`APP_DIRS` |
