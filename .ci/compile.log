@@ -8,49 +8,77 @@ Daemon will be stopped at the end of the build
 > Task :app:processDebugNavigationResources
 > Task :app:parseDebugLocalResources
 > Task :app:generateDebugRFile FROM-CACHE
-
 > Task :app:kspDebugKotlin
-e: [ksp] ModuleProcessingStep was unable to process 'com.adshield.pro.di.AppModule' because 'CloudDao' could not be resolved.
 
-Dependency trace:
-    => element (OBJECT): com.adshield.pro.di.AppModule
-    => element (METHOD): provideCloudDao(com.adshield.pro.data.local.db.AdShieldDatabase)
-    => type (ERROR return type): CloudDao
+> Task :app:compileDebugKotlin
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:92:34 Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:93:30 Unresolved reference 'VpnKey' on receiver of type 'Icons.Filled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudRepository.kt:89:9 Return type mismatch: expected 'Result<Unit>', actual 'Result<CloudFile>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:44 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:79 Unresolved reference 'first'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:106:104 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:148:60 Suspension functions can only be called within coroutine body.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:165:17 Suspension functions can only be called within coroutine body.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:203:24 Unresolved reference 'toRequestBody' on receiver of type 'ByteArray'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:227:43 No value passed for parameter 'byteCount'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:227:48 Argument type mismatch: actual type is 'ByteArray', but 'Buffer' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:228:29 Operator '==' cannot be applied to 'Long' and 'Int'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:229:30 None of the following candidates is applicable:
 
-If type 'CloudDao' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'CloudDao' is on your classpath.
-e: [ksp] BindingMethodProcessingStep was unable to process 'provideAdShieldDatabase(android.content.Context)' because 'CloudDao' could not be resolved.
+fun write(byteString: ByteString, offset: Int, byteCount: Int): BufferedSink:
+  Argument type mismatch: actual type is 'ByteArray', but 'ByteString' was expected.
 
-Dependency trace:
-    => element (OBJECT): com.adshield.pro.di.AppModule
-    => element (METHOD): provideCloudDao(com.adshield.pro.data.local.db.AdShieldDatabase)
-    => type (ERROR return type): CloudDao
+fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:229:47 Argument type mismatch: actual type is 'Long', but 'Int' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:254:28 Unresolved reference 'skip' on receiver of type 'Source'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:258:48 Argument type mismatch: actual type is 'ByteArray', but 'Buffer' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:258:59 Too many arguments for 'fun read(sink: Buffer, byteCount: Long): Long'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:259:29 Operator '==' cannot be applied to 'Long' and 'Int'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:260:30 None of the following candidates is applicable:
 
-If type 'CloudDao' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'CloudDao' is on your classpath.
-e: [ksp] BindingMethodProcessingStep was unable to process 'provideAdShieldDao(com.adshield.pro.data.local.db.AdShieldDatabase)' because 'CloudDao' could not be resolved.
+fun write(byteString: ByteString, offset: Int, byteCount: Int): BufferedSink:
+  Argument type mismatch: actual type is 'ByteArray', but 'ByteString' was expected.
 
-Dependency trace:
-    => element (OBJECT): com.adshield.pro.di.AppModule
-    => element (METHOD): provideCloudDao(com.adshield.pro.data.local.db.AdShieldDatabase)
-    => type (ERROR return type): CloudDao
+fun write(source: ByteArray, offset: Int, byteCount: Int): BufferedSink
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:260:47 Argument type mismatch: actual type is 'Long', but 'Int' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:44 Unresolved reference 'servers'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:67 Candidate 'fun <T, R> T.let(block: (T) -> R): R' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:71 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:153:110 Unresolved reference 'servers'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:157:73 Unresolved reference 'servers'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/VpnScreen.kt:171:13 Unresolved reference 'servers'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:160:81 Unresolved reference 'CloudDaoHolder'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:161:10 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/CloudViewModel.kt:161:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:42:78 Unresolved reference 'run'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:55:64 Unresolved reference 'catalog'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:56:60 Unresolved reference 'catalog'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:57:62 Unresolved reference 'catalog'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/VpnViewModel.kt:58:50 Unresolved reference 'catalog'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/vpn/VpnLatencyProber.kt:22:9 None of the following candidates is applicable:
 
-If type 'CloudDao' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'CloudDao' is on your classpath.
-e: [ksp] BindingMethodProcessingStep was unable to process 'provideCloudDao(com.adshield.pro.data.local.db.AdShieldDatabase)' because 'CloudDao' could not be resolved.
+suspend fun <T> withTimeoutOrNull(timeMillis: Long, block: suspend CoroutineScope.() -> T): T?:
+  Argument type mismatch: actual type is 'Int', but 'Long' was expected.
 
-Dependency trace:
-    => element (OBJECT): com.adshield.pro.di.AppModule
-    => element (METHOD): provideCloudDao(com.adshield.pro.data.local.db.AdShieldDatabase)
-    => type (ERROR return type): CloudDao
+suspend fun <T> withTimeoutOrNull(timeout: Duration, block: suspend CoroutineScope.() -> T): T?:
+  Argument type mismatch: actual type is 'Int', but 'Duration' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/CloudTransferWorker.kt:25:13 Check for instance is always 'false'.
 
-If type 'CloudDao' is a generated type, check above for compilation errors that may have prevented the type from being generated. Otherwise, ensure that type 'CloudDao' is on your classpath.
+> Task :app:compileDebugKotlin FAILED
 
-> Task :app:kspDebugKotlin FAILED
+[Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':app:kspDebugKotlin' (registered by plugin 'com.android.internal.application').
-> A failure occurred while executing com.google.devtools.ksp.gradle.KspAAWorkerAction
-   > KSP failed with exit code: PROCESSING_ERROR
+Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: UNRESOLVED_REFERENCE
+       Kotlin compiler error
+         Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt line 92
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -58,7 +86,7 @@ Execution failed for task ':app:kspDebugKotlin' (registered by plugin 'com.andro
 > Get more help at https://help.gradle.org.
 
 * Exception is:
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:kspDebugKotlin' (registered by plugin 'com.android.internal.application').
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:135)
 	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:288)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:133)
@@ -92,7 +120,7 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:ksp
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing com.google.devtools.ksp.gradle.KspAAWorkerAction
+Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
 	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:273)
 	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:132)
 	at org.gradle.internal.Factories$1.create(Factories.java:30)
@@ -211,8 +239,10 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
-	at com.google.devtools.ksp.gradle.KspAAWorkerAction.execute(KspAATask.kt:903)
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'Cloud' on receiver of type 'Icons.Filled'.
+	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
+	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
+	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:68)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)
 	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)
@@ -246,5 +276,5 @@ Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
 	... 2 more
 
 
-BUILD FAILED in 19s
-7 actionable tasks: 5 executed, 2 from cache
+BUILD FAILED in 40s
+8 actionable tasks: 6 executed, 2 from cache
