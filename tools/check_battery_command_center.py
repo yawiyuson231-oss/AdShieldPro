@@ -181,6 +181,59 @@ def declared_members(code: str, type_name: str) -> set[str]:
     return members
 
 
+
+# Keywords/literals that must never be treated as identifiers, plus `apply`-receiver members that
+# are legal without a declaration in the enclosing function.
+NON_IDENTIFIERS = {
+    "null", "true", "false", "it", "this", "super", "text", "add", "zeroBaseline",
+    "isActive", "value", "size", "isEmpty", "isNotEmpty", "first", "last", "name",
+}
+
+
+def undeclared_references(code: str, allow: set[str] | None = None) -> set[str]:
+    """Names used as a value or argument that are never declared in this file or parameter list.
+
+    This is the offline stand-in for "Unresolved reference": it catches a misspelt local variable
+    passed as a named argument (e.g. `fastSource` instead of `fastChargeSource`), which is exactly
+    the mistake the compiler flagged after a nine-minute CI round trip.
+    """
+    allowed = set(allow or ()) | NON_IDENTIFIERS
+    declared: set[str] = set()
+    for pattern in (
+        r"\b(?:val|var)\s+([A-Za-z_]\w*)",
+        r"\bfun\s*(?:<[^>]*>)?\s*(?:[\w.<>?]+\.)?([A-Za-z_]\w*)\s*\(",
+        r"\bfor\s*\(\s*([A-Za-z_]\w*)",
+        r"\bcatch\s*\(\s*([A-Za-z_]\w*)",
+        r"\bclass\s+([A-Za-z_]\w*)\s*\(",
+    ):
+        declared.update(re.findall(pattern, code))
+    for header in re.finditer(r"\bfun\s*(?:<[^>]*>)?\s*([\w.]+)\s*\(([^)]*)\)", code):
+        declared.add(header.group(1).rsplit(".", 1)[-1])
+        for part in header.group(2).split(","):
+            name = part.strip().split(":")[0].split("=")[0].strip()
+            if re.fullmatch(r"[A-Za-z_]\w*", name or ""):
+                declared.add(name)
+    for lambda_header in re.finditer(r"\{([^{}\n]*?)->", code):
+        for part in lambda_header.group(1).split(","):
+            name = part.strip().split(":")[0].strip()
+            if re.fullmatch(r"[A-Za-z_]\w*", name or ""):
+                declared.add(name)
+    # Constructor properties (`class X(val a: Int, val b: Int)`) count as declared members.
+    for body_call in re.finditer(r"([a-zA-Z_][\w]*)\s*=", code):
+        declared.add(body_call.group(1))
+
+    suspects: set[str] = set()
+    for match in re.finditer(r"=\s*([a-z][A-Za-z0-9_]*)\s*[,)\n]", code):
+        name = match.group(1)
+        if name not in declared and name not in allowed:
+            suspects.add(name)
+    for match in re.finditer(r"[(,]\s*([a-z][A-Za-z0-9_]*)\s*[,)]", code):
+        name = match.group(1)
+        if name not in declared and name not in allowed:
+            suspects.add(name)
+    return suspects
+
+
 def all_sources() -> dict[Path, str]:
     return {path: path.read_text(encoding="utf-8") for path in SRC.rglob("*.kt")}
 
@@ -279,6 +332,17 @@ for path in SLICE:
             if member not in members:
                 owner = owners[type_name][0].relative_to(ROOT) if owners[type_name] else "?"
                 fail(f"{path.name}: {type_name}.{member} is not declared in {owner}")
+
+# ---------------------------------------------------------------------------------------------
+# 1b. No unresolved bare identifiers in the battery slice
+# ---------------------------------------------------------------------------------------------
+
+for path in SLICE:
+    raw = read(path)
+    if not raw:
+        continue
+    for suspect in sorted(undeclared_references(strip_comments_and_strings(raw))):
+        fail(f"{path.name}: '{suspect}' is used but never declared (likely a typo)")
 
 # ---------------------------------------------------------------------------------------------
 # 3. Honesty rules

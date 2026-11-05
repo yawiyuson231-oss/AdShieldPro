@@ -580,7 +580,7 @@ object BatteryMonitor {
             detail = detail,
             evidence = evidence,
             fastChargeDetected = fastCharge,
-            fastChargeSource = fastSource,
+            fastChargeSource = fastChargeSource,
             usableSensors = usable,
             totalSensors = 4
         )
