@@ -306,6 +306,9 @@ object BatteryMonitor {
             errors > 0 -> MonitoringState.ERROR
             engineState == EngineState.ERROR -> MonitoringState.ERROR
             freshness == DataFreshness.NO_DATA -> MonitoringState.WAITING
+            // Every component can be healthy while the *data* is old; that is partial monitoring,
+            // not full monitoring, and the header must not claim otherwise.
+            freshness != DataFreshness.LIVE -> MonitoringState.PARTIAL
             operational == scored.size -> MonitoringState.OPERATIONAL
             else -> MonitoringState.PARTIAL
         }
@@ -470,7 +473,9 @@ object BatteryMonitor {
 
         // --- Primary condition, safety first -------------------------------------------------
         val primary = when {
-            thermalCritical -> BatteryCondition.TEMPERATURE_WARNING
+            // At or above the warm threshold the abnormal temperature *is* the status: a phone that
+            // is merely "discharging" at 41 °C leaves the most important fact unsaid.
+            thermalWarn -> BatteryCondition.TEMPERATURE_WARNING
             telemetry.isFull -> BatteryCondition.FULLY_CHARGED
             telemetry.isCharging -> when {
                 fastCharge -> BatteryCondition.FAST_CHARGING
@@ -482,14 +487,28 @@ object BatteryMonitor {
             else -> BatteryCondition.DISCHARGING
         }
 
-        val tone = when (primary) {
-            BatteryCondition.TEMPERATURE_WARNING, BatteryCondition.HEALTH_WARNING -> BatteryConditionTone.CRITICAL
+        // A red dot for a quietly boiling battery must also cover the case where the health flag is
+        // the worst thing happening, so the tone is the worst of every active condition.
+        fun toneOf(condition: BatteryCondition): BatteryConditionTone = when (condition) {
+            BatteryCondition.TEMPERATURE_WARNING ->
+                if (thermalCritical) BatteryConditionTone.CRITICAL else BatteryConditionTone.CAUTION
+            BatteryCondition.HEALTH_WARNING -> BatteryConditionTone.CRITICAL
             BatteryCondition.HIGH_POWER_DRAIN, BatteryCondition.SLOW_CHARGING,
-            BatteryCondition.CONNECTED_NOT_CHARGING, BatteryCondition.INSUFFICIENT_DATA -> BatteryConditionTone.CAUTION
+            BatteryCondition.CONNECTED_NOT_CHARGING, BatteryCondition.INSUFFICIENT_DATA ->
+                BatteryConditionTone.CAUTION
             BatteryCondition.CHARGING, BatteryCondition.FAST_CHARGING, BatteryCondition.FULLY_CHARGED ->
                 BatteryConditionTone.POSITIVE
             BatteryCondition.DISCHARGING, BatteryCondition.NOT_CHARGING -> BatteryConditionTone.NOMINAL
         }
+        fun severity(tone: BatteryConditionTone): Int = when (tone) {
+            BatteryConditionTone.NEUTRAL -> 0
+            BatteryConditionTone.NOMINAL -> 1
+            BatteryConditionTone.POSITIVE -> 2
+            BatteryConditionTone.CAUTION -> 3
+            BatteryConditionTone.CRITICAL -> 4
+        }
+        val activeConditions = listOf(primary) + secondary.toList().filter { it != primary }
+        val tone = activeConditions.map(::toneOf).maxBy(::severity)
 
         val headline = when (primary) {
             BatteryCondition.TEMPERATURE_WARNING ->

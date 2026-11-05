@@ -117,7 +117,8 @@ command center and unchanged in behaviour.
 
 `BatteryMonitor.condition(...)` resolves the headline status, safety first:
 
-1. `Temperature warning` — measured ≥ 40 °C (≥ 45 °C is critical).
+1. `Temperature warning` — measured ≥ 40 °C (caution) or ≥ 45 °C (critical). This outranks
+   charging/discharging: reporting only "discharging" at 41 °C would hide the important fact.
 2. `Fully charged` — Android reports `BATTERY_STATUS_FULL`.
 3. `Fast charging` — **only** with a platform signal (`BATTERY_PROPERTY_STATUS` fast-charge value or
    an unambiguous OEM protocol string) *and* a measured rate ≥ 30 %/h (or a rate still being

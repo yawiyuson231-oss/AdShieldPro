@@ -243,7 +243,7 @@ class BatteryCommandCenterTestSuite {
             assertEquals("${it.name} should be operational", SensorState.OPERATIONAL, it.state)
         }
         assertTrue("power is computed, not measured", !power.measured)
-        assertEquals("6.23 W", power.statusValue)
+        assertEquals("the power tile shows the same rounding as every other surface", "6.2 W", power.statusValue)
     }
 
     @Test
@@ -426,8 +426,11 @@ class BatteryCommandCenterTestSuite {
         assertTrue(hot.headline.contains("critical"))
 
         val warm = condition(telemetry(temperatureCelsius = 41f))
-        assertEquals(BatteryCondition.TEMPERATURE_WARNING, warm.primary)
-        assertTrue(warm.secondary.contains(BatteryCondition.TEMPERATURE_WARNING).not())
+        assertEquals("41 °C is an abnormal temperature even while discharging",
+            BatteryCondition.TEMPERATURE_WARNING, warm.primary)
+        assertEquals(BatteryConditionTone.CAUTION, warm.tone)
+        assertFalse(warm.headline.contains("critical"))
+        assertTrue(warm.detail.contains("41"))
     }
 
     @Test
@@ -570,12 +573,19 @@ class BatteryCommandCenterTestSuite {
         )
         assertEquals(20, report.totalSamples)
         assertEquals(9, report.observationMinutes)
-        assertEquals(2000f, report.averageCurrentMilliAmps!!, 1f)
+        assertEquals("average is the mean magnitude of the observed currents", 2000f, report.averageCurrentMilliAmps!!, 1f)
         assertEquals(8.4f, report.averagePowerWatts!!, 0.01f)
         assertTrue("28 %/h is above the 20 %/h threshold", report.abnormalDrainDetected)
         assertFalse(report.overheatingDetected)
-        assertTrue(report.notes.any { it.contains("Screen-on versus screen-off") })
-        assertTrue(report.notes.any { it.contains("Average current is not exposed") })
+        assertTrue(
+            "the panel must state that display-state figures are observation-limited",
+            report.notes.any { it.contains("Screen-on versus screen-off") }
+        )
+        assertTrue(
+            "a missing CURRENT_AVERAGE must be stated rather than silently averaged",
+            report.notes.any { it.contains("Average current") }
+        )
+        assertEquals("the sample window is taken from real timestamps", 20, report.totalSamples)
     }
 
     @Test
