@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -105,6 +106,14 @@ fun VpnScreen(viewModel: VpnViewModel) {
     if (showAdd) AddServerDialog(onDismiss = { showAdd = false }, onAdd = { server ->
         viewModel.addServer(server); showAdd = false
     })
+    if (showImport) ImportConfigDialog(
+        onDismiss = { showImport = false },
+        onImport = { text ->
+            val error = viewModel.importWireGuardConfig(text)
+            if (error == null) showImport = false
+            error
+        }
+    )
 }
 
 @Composable
@@ -140,7 +149,7 @@ private fun VpnControlCenter(
                     fontSize = 11.sp, color = if (stats.publicIp != null) CyberCyan else WarningAmber, maxLines = 1
                 )
                 Text(
-                    "Kill switch: ${if (stats.killSwitchActive) "ACTIVE (blocking mode)" else "OFF"} • Encryption: ${if (state == VpnConnectionState.CONNECTED) "tunnel up (AES/WireGuard profile)" else "no tunnel"}",
+                    "Kill switch: ${if (stats.killSwitchActive) "ACTIVE (blocking mode)" else "OFF"} • ${if (state == VpnConnectionState.CONNECTED) "tunnel up — encrypted forwarding active only with a configured server profile" else "no tunnel"}",
                     fontSize = 10.sp, color = TextSecondaryDark, maxLines = 1
                 )
             }
@@ -279,9 +288,11 @@ private fun GlowingShield(connected: Boolean) {
 @Composable
 private fun VpnMapPanel(servers: List<VpnServer>, active: VpnServer?, viewModel: VpnViewModel) {
     var showAdd by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
     CyberPanel(
-        title = "Global Network Map", subtitle = "Real server endpoints you configured — tap to connect",
+        title = "Global Network Map", subtitle = "Real server endpoints you configured — tap a pin to connect",
         trailing = {
+            IconButton(onClick = { showImport = true }) { Icon(Icons.Default.VpnKey, contentDescription = "Import WireGuard config", tint = CyberCyan) }
             IconButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, contentDescription = "Add server", tint = CyberCyan) }
         }
     ) {
@@ -437,6 +448,30 @@ private fun VpnFeatureStatusPanel() {
             }
         }
     }
+}
+
+@Composable
+private fun ImportConfigDialog(onDismiss: () -> Unit, onImport: (String) -> String?) {
+    var text by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { error = onImport(text) }) { Text("Import") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Import WireGuard .conf", fontSize = 14.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    text, { text = it }, singleLine = false, minLines = 5,
+                    placeholder = { Text("[Interface]\nPrivateKey = …\n[Peer]\nEndpoint = host:51820 …", fontSize = 10.sp) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error != null) Text(error!!, color = AlertRed, fontSize = 11.sp)
+            }
+        }
+    )
 }
 
 @Composable

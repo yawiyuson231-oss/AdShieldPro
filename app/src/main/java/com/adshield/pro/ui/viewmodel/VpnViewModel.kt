@@ -53,6 +53,27 @@ class VpnViewModel @Inject constructor(
     fun checkIp() = viewModelScope.launch { engine.checkPublicIp() }
     fun dnsLeakProbe() = viewModelScope.launch { engine.dnsLeakProbe() }
     fun addServer(server: VpnServer) = viewModelScope.launch { catalog.addServer(server) }
+
+    /**
+     * Imports a WireGuard .conf: parses the real endpoint and registers it as a server.
+     * Returns an error message when the file is not a valid profile — never a fake entry.
+     */
+    fun importWireGuardConfig(raw: String): String? {
+        val profile = com.adshield.pro.vpn.WireGuardConfigParser.parse(raw)
+        if (profile == null) return "Not a valid WireGuard config (missing Endpoint/PublicKey)."
+        viewModelScope.launch {
+            catalog.addServer(
+                VpnServer(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = profile.serverName,
+                    country = "Imported", city = profile.endpointHost,
+                    host = profile.endpointHost, port = profile.endpointPort,
+                    protocol = com.adshield.pro.vpn.VpnProtocol.WIREGUARD
+                )
+            )
+        }
+        return null
+    }
     fun removeServer(id: String) = viewModelScope.launch { catalog.removeServer(id) }
     fun toggleFavorite(id: String) = viewModelScope.launch { catalog.toggleFavorite(id) }
     fun clearThreats() = viewModelScope.launch { catalog.clearThreats() }
