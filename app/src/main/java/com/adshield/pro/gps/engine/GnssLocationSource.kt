@@ -13,6 +13,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.core.location.GnssStatusCompat
+import androidx.core.location.LocationManagerCompat
 import com.adshield.pro.gps.geo.GeoPoint
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
@@ -143,65 +145,63 @@ class GnssLocationSource(
             close()
             return@callbackFlow
         }
-        // Local, self-contained builder: a private function would capture the channel differently
-        // and a nested one is easier to keep free of outer state.
-        val onStatus: (GnssStatus) -> Unit = { status ->
-            val visible = status.satelliteCount
-            var usedInFix = 0
-            var snrSum = 0.0
-            var snrCount = 0
-            var best = 0.0f
-            val constellations = LinkedHashSet<String>()
-            val satellites = ArrayList<SatelliteInfo>(visible)
-            for (index in 0 until visible) {
-                val constellation = constellationName(status.getConstellationType(index))
-                constellations += constellation
-                val usedInFixAtIndex = status.usedInFix(index)
-                if (usedInFixAtIndex) usedInFix++
-                val snr = status.getCn0DbHz(index)
-                if (usedInFixAtIndex && snr > 0f) {
-                    snrSum += snr
-                    snrCount++
-                    if (snr > best) best = snr
+        // LocationManagerCompat is used instead of the raw platform call: it has a stable
+        // (LocationManager, Executor, Callback) overload across API levels, whereas the platform
+        // LocationManager.registerGnssStatusCallback varies by SDK.
+        val callback = object : GnssStatusCompat.Callback() {
+            override fun onSatelliteStatusChanged(status: GnssStatusCompat) {
+                val visible = status.satelliteCount
+                var usedInFix = 0
+                var snrSum = 0.0
+                var snrCount = 0
+                var best = 0.0f
+                val constellations = LinkedHashSet<String>()
+                val satellites = ArrayList<SatelliteInfo>(visible)
+                for (index in 0 until visible) {
+                    val constellation = constellationName(status.getConstellationType(index))
+                    constellations += constellation
+                    val satelliteUsed = status.usedInFix(index)
+                    if (satelliteUsed) usedInFix++
+                    val snr = status.getCn0DbHz(index)
+                    if (satelliteUsed && snr > 0f) {
+                        snrSum += snr
+                        snrCount++
+                        if (snr > best) best = snr
+                    }
+                    // Almanac/ephemeris flags are not part of the public GNSS API surface: a
+                    // receiver that knows them does not expose them to apps, so they stay
+                    // "unknown" (false) here rather than being guessed.
+                    satellites += SatelliteInfo(
+                        svid = status.getSvid(index),
+                        constellation = constellation,
+                        azimuthDegrees = status.getAzimuthDegrees(index),
+                        elevationDegrees = status.getElevationDegrees(index),
+                        snrDbHz = snr,
+                        usedInFix = satelliteUsed
+                    )
                 }
-                // Almanac/ephemeris flags are not part of the public GnssStatus API: a receiver that
-                // knows them does not expose them to apps, so they stay "unknown" (false) here
-                // rather than being guessed.
-                satellites += SatelliteInfo(
-                    svid = status.getSvid(index),
-                    constellation = constellation,
-                    azimuthDegrees = status.getAzimuthDegrees(index),
-                    elevationDegrees = status.getElevationDegrees(index),
-                    snrDbHz = snr,
-                    usedInFix = usedInFixAtIndex
+                val snapshot = SatelliteSnapshot(
+                    satellitesVisible = visible,
+                    satellitesUsedInFix = usedInFix,
+                    averageSnrDbHz = if (snrCount > 0) snrSum / snrCount else null,
+                    bestSnrDbHz = if (best > 0f) best.toDouble() else null,
+                    constellations = constellations.toList(),
+                    satellites = satellites
                 )
-            }
-            val snapshot = SatelliteSnapshot(
-                satellitesVisible = visible,
-                satellitesUsedInFix = usedInFix,
-                averageSnrDbHz = if (snrCount > 0) snrSum / snrCount else null,
-                bestSnrDbHz = if (best > 0f) best.toDouble() else null,
-                constellations = constellations.toList(),
-                satellites = satellites
-            )
-            _satellites.tryEmit(snapshot)
-            trySend(snapshot)
-        }
-
-        val callback = object : GnssStatus.Callback() {
-            override fun onSatelliteStatusChanged(status: GnssStatus) {
-                onStatus(status)
+                _satellites.tryEmit(snapshot)
+                trySend(snapshot)
             }
         }
 
-        // Register and remember whether it actually worked: a receiver that refuses the callback
-        // must surface as an empty radar, not as a silent never-emitting flow.
+        // A receiver that refuses the callback must surface as an empty radar, not as a flow that
+        // registers nothing and never emits.
         val registered: Boolean = try {
-            manager.registerGnssStatusCallback(callback, Looper.getMainLooper())
-            true
+            LocationManagerCompat.registerGnssStatusCallback(
+                manager,
+                androidx.core.os.HandlerCompat.createAsync(Looper.getMainLooper()),
+                callback
+            )
         } catch (error: SecurityException) {
-            false
-        } catch (error: IllegalArgumentException) {
             false
         }
 
@@ -212,7 +212,7 @@ class GnssLocationSource(
 
         awaitClose {
             try {
-                manager.unregisterGnssStatusCallback(callback)
+                LocationManagerCompat.unregisterGnssStatusCallback(manager, callback)
             } catch (error: IllegalArgumentException) {
                 // Already unregistered (e.g. the provider was torn down); nothing to do.
             }

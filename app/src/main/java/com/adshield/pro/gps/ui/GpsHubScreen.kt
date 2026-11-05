@@ -95,10 +95,11 @@ fun GpsHubScreen(
     val context = LocalContext.current
     val frame by viewModel.frame.collectAsStateWithLifecycle()
     val satellites by viewModel.satellites.collectAsStateWithLifecycle()
-    val state by viewModel.state.collectAsStateWithLifecycle()  // GpsUiState: policy, packs, trips, route
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val trafficSegments by viewModel.trafficSegments.collectAsStateWithLifecycle()
     val trafficStatus by viewModel.trafficStatus.collectAsStateWithLifecycle()
-    val incidents by viewModel.incidents.collectAsStateWithLifecycle()
+    val incidents: List<com.adshield.pro.gps.traffic.TrafficIncident> by
+        viewModel.incidents.collectAsStateWithLifecycle()
     val gateLog by viewModel.trafficGateLog.collectAsStateWithLifecycle()
     val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()

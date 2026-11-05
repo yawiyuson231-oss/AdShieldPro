@@ -23,7 +23,7 @@ import androidx.compose.material.icons.filled.CarCrash
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.Engineering
-import androidx.compose.material.icons.filled.Hazardous
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.LocalPolice
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Sync
@@ -507,7 +507,7 @@ private fun StatBlock(label: String, value: String, color: androidx.compose.ui.g
 
 private fun kindIcon(kind: IncidentKind): ImageVector = when (kind) {
     IncidentKind.ACCIDENT -> Icons.Default.CarCrash
-    IncidentKind.HAZARD -> Icons.Default.Hazardous
+    IncidentKind.HAZARD -> Icons.Default.WarningAmber
     IncidentKind.CONSTRUCTION -> Icons.Default.Construction
     IncidentKind.ROAD_CLOSED -> Icons.Default.Engineering
     IncidentKind.POLICE -> Icons.Default.LocalPolice

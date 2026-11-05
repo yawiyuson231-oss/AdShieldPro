@@ -562,7 +562,7 @@ class GpsViewModel @Inject constructor(
     }
 
     fun updateOfflinePack(pack: OfflinePackUi, mapEngine: MapLibreEngine) {
-        val regionId = pack.maplibreRegionId
+        val regionId = pack.mapLibreRegionId
         if (regionId == null) {
             _state.value = _state.value.copy(
                 offlineMessage = "This pack has no MapLibre region id — delete and re-download it",
@@ -581,7 +581,7 @@ class GpsViewModel @Inject constructor(
     }
 
     fun deleteOfflinePack(pack: OfflinePackUi, mapEngine: MapLibreEngine) {
-        val regionId = pack.maplibreRegionId
+        val regionId = pack.mapLibreRegionId
         if (regionId != null) mapEngine.deleteRegion(regionId) {}
         viewModelScope.launch {
             pack.graphFileName?.let { name -> withContext(Dispatchers.IO) { File(offlineGraphDir(), name).delete() } }
