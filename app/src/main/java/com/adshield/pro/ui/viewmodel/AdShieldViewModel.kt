@@ -1093,24 +1093,9 @@ class AdShieldViewModel @Inject constructor(
     private val _isDiagnosingBattery = MutableStateFlow(false)
     val isDiagnosingBattery: StateFlow<Boolean> = _isDiagnosingBattery.asStateFlow()
 
-    private val _batteryHealthScore = MutableStateFlow(batteryRepository.healthScore())
-    val batteryHealthScore: StateFlow<Int> = _batteryHealthScore.asStateFlow()
-
-    private val _batteryMinutesToFull = MutableStateFlow<Int?>(null)
-    val batteryMinutesToFull: StateFlow<Int?> = _batteryMinutesToFull.asStateFlow()
-
-    private val _batteryMinutesToEmpty = MutableStateFlow<Int?>(null)
-    val batteryMinutesToEmpty: StateFlow<Int?> = _batteryMinutesToEmpty.asStateFlow()
-
-    private val _batteryChargeRate = MutableStateFlow<Float?>(null)
-    val batteryChargeRate: StateFlow<Float?> = _batteryChargeRate.asStateFlow()
-
-    private fun refreshBatteryDerived() {
-        _batteryHealthScore.value = batteryRepository.healthScore()
-        _batteryChargeRate.value = batteryRepository.chargeRatePercentPerHour()
-        _batteryMinutesToFull.value = batteryRepository.minutesToFull()
-        _batteryMinutesToEmpty.value = batteryRepository.minutesToEmpty()
-    }
+    // There is deliberately no second copy of health score / rates / projections here: those are
+    // derived inside BatteryIntelligenceRepository.BatteryDashboardState, so a number on screen can
+    // never come from a stale duplicate. The ViewModel only forwards commands.
 
     /** Runs the on-device diagnostic chain against live readings. */
     fun runBatteryDiagnosis() {
@@ -1118,8 +1103,8 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             _isDiagnosingBattery.value = true
             // Sample the sensors once more so the report reflects "now" rather than the last broadcast.
+            batteryRepository.refreshNow()
             batteryRepository.runDiagnostics()
-            refreshBatteryDerived()
             val worst = batteryRepository.diagnostics.value.maxByOrNull { it.severity.ordinal }
             showFeedback(
                 when (worst?.severity) {
@@ -1137,7 +1122,6 @@ class AdShieldViewModel @Inject constructor(
 
     fun refreshBatteryReadings() {
         batteryRepository.refreshNow()
-        refreshBatteryDerived()
     }
 
     /**
@@ -1146,7 +1130,6 @@ class AdShieldViewModel @Inject constructor(
      */
     fun startBatteryMonitoring() {
         batteryRepository.startMonitoring()
-        refreshBatteryDerived()
     }
 
     /** Stops the 1 Hz poll when the Battery screen leaves the foreground (keeps the receiver). */

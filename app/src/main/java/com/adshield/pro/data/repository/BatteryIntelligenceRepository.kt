@@ -173,7 +173,7 @@ class BatteryIntelligenceRepository @Inject constructor(
             livePolling = livePolling,
             engineState = engineState
         )
-    }.stateIn(scope, SharingStarted.Eagerly, initialState())
+    }.stateIn(scope, SharingStarted.WhileSubscribed(SUBSCRIPTION_GRACE_MS), initialState())
 
     init {
         // Session bookkeeping only needs the event stream; the engine already owns the receiver.
@@ -353,5 +353,7 @@ class BatteryIntelligenceRepository @Inject constructor(
 
     private companion object {
         const val MIN_SESSION_MS = 60_000L
+        /** Keep derivations warm across a screen rotation without keeping them alive forever. */
+        const val SUBSCRIPTION_GRACE_MS = 5_000L
     }
 }
