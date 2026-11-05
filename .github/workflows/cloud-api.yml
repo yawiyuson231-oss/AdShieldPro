@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Check the runtime supports node:sqlite
+        run: node -e "const { DatabaseSync } = require('node:sqlite'); new DatabaseSync(':memory:').exec('create table t(a)'); console.log('node:sqlite OK', process.version)"
+
       - name: Install dependencies
         working-directory: cloud
         run: npm install --no-audit --no-fund
@@ -39,14 +42,12 @@ jobs:
         working-directory: cloud
         run: npm test
 
-      - name: Refuse a production bucket in test mode
+      - name: Refuse an active test-mode override
         working-directory: cloud
         run: |
           set -euo pipefail
-          if grep -q "AUTH_MODE = \"test\"" wrangler.toml; then
-            echo "::error::wrangler.toml ships with AUTH_MODE=test enabled."
+          if grep -qE '^[[:space:]]*AUTH_MODE[[:space:]]*=' wrangler.toml; then
+            echo "::error::wrangler.toml ships with an active AUTH_MODE override."
             exit 1
           fi
-          if grep -qE "REPLACE_WITH_(D1_DATABASE_ID|BUCKET_NAME|BUCKET_ID)" wrangler.toml; then
-            echo "wrangler.toml still holds placeholder bindings (expected until provisioning)."
-          fi
+          echo "wrangler.toml has no active AUTH_MODE override (placeholder bindings are expected until provisioning)."
