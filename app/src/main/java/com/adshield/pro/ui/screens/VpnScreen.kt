@@ -89,6 +89,7 @@ fun VpnScreen(viewModel: VpnViewModel) {
     val threats by viewModel.threats.collectAsStateWithLifecycle()
 
     var showAdd by remember { mutableStateOf(false) }
+    var showImport by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -288,7 +289,6 @@ private fun GlowingShield(connected: Boolean) {
 @Composable
 private fun VpnMapPanel(servers: List<VpnServer>, active: VpnServer?, viewModel: VpnViewModel) {
     var showAdd by remember { mutableStateOf(false) }
-    var showImport by remember { mutableStateOf(false) }
     CyberPanel(
         title = "Global Network Map", subtitle = "Real server endpoints you configured — tap a pin to connect",
         trailing = {
