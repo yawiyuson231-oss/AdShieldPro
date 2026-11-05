@@ -393,6 +393,13 @@ class BatteryCommandCenterTestSuite {
         assertEquals(BatteryCondition.FAST_CHARGING, reported.primary)
         assertTrue(reported.fastChargeDetected)
         assertTrue(reported.detail.contains("BATTERY_PROPERTY_STATUS"))
+        assertEquals("the evidence string is what the UI prints",
+            "BATTERY_PROPERTY_STATUS = fast charging", reported.fastChargeSource)
+
+        // No platform signal -> the report must carry no fast-charge source at all.
+        val unproven = condition(telemetry(charging = true, currentMilliAmps = 3000), chargeRate = 70f)
+        assertFalse(unproven.fastChargeDetected)
+        assertNull(unproven.fastChargeSource)
     }
 
     @Test

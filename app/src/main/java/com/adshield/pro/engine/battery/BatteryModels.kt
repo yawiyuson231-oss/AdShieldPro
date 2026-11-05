@@ -374,6 +374,8 @@ data class BatteryStatusReport(
     val detail: String,
     val evidence: List<String>,
     val fastChargeDetected: Boolean,
+    /** The platform evidence behind a fast-charge claim, or null when nothing was published. */
+    val fastChargeSource: String?,
     val usableSensors: Int,
     val totalSensors: Int
 )

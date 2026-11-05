@@ -929,6 +929,29 @@ private fun ChargingAnalyticsSection(state: BatteryIntelligenceRepository.Batter
         )
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "CHARGING TECHNOLOGY",
+                color = ConsoleMuted,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp,
+                fontFamily = MonoFont
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = listOfNotNull(
+                    telemetry.technology.takeIf { it != "Not reported" }?.let { "cell: $it" },
+                    state.status.fastChargeSource,
+                    if (telemetry.chargingSource != com.adshield.pro.engine.battery.ChargingSource.NOT_PLUGGED) {
+                        "source: ${telemetry.chargingSource.name.lowercase()}"
+                    } else null
+                ).joinToString(" · ").ifBlank { "not published by this device" },
+                color = Color(0xFFCBDDE4),
+                fontSize = 10.sp,
+                maxLines = 2
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Default.Bolt,
                 contentDescription = null,

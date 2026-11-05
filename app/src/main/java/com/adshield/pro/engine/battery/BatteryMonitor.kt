@@ -441,6 +441,7 @@ object BatteryMonitor {
                     "charge-rate analysis cannot be performed. Level and charging state are still read from Android.",
                 evidence = evidence,
                 fastChargeDetected = false,
+                fastChargeSource = null,
                 usableSensors = 0,
                 totalSensors = 4
             )
@@ -579,6 +580,7 @@ object BatteryMonitor {
             detail = detail,
             evidence = evidence,
             fastChargeDetected = fastCharge,
+            fastChargeSource = fastSource,
             usableSensors = usable,
             totalSensors = 4
         )
