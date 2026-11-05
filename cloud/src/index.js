@@ -167,7 +167,7 @@ export function buildApp(env) {
       id, user.id, parentId, name, now(), now()
     )
     await audit(c.env.DB, { userId: user.id, action: 'folder_create', detail: name })
-    return c.json({ node: { id, name, parent_id: parentId, kind: 'folder' } }, 201)
+    return c.json({ node: { id, name, parentId, kind: 'folder' } }, 201)
   })
 
   app.post('/v1/nodes/:id/rename', async (c) => nodeAction(c, 'rename', async (node, body) => {
@@ -184,7 +184,7 @@ export function buildApp(env) {
       if (!(await ownsNode(c, parentId))) return { status: 404, error: 'target not found' }
     }
     await run(c.env.DB, `UPDATE nodes SET parent_id = ?, updated_at = ? WHERE id = ?`, parentId, now(), node.id)
-    return { status: 200, node: { id: node.id, parent_id: parentId } }
+    return { status: 200, node: { id: node.id, parentId } }
   }))
 
   app.post('/v1/nodes/:id/copy', async (c) => nodeAction(c, 'copy', async (node) => {
