@@ -659,7 +659,13 @@ fun BrowserScreen(
                             FilterChip(
                                 selected = settings.searchProvider == provider,
                                 onClick = {
-                                    onChangeSearchProvider(provider)
+                                    onUpdatePrivateSearch(
+                                        provider,
+                                        settings.privateBrowsingEnabled,
+                                        settings.searchHistoryEnabled,
+                                        settings.searchSuggestionsEnabled,
+                                        settings.automaticSearchHistoryDeletion
+                                    )
                                     onShowFeedback("Search provider set to ${provider.label}.")
                                 },
                                 label = { Text(provider.label, maxLines = 1) }
