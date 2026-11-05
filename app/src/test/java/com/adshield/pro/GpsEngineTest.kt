@@ -172,20 +172,32 @@ class GpsEngineTest {
     @Test
     fun testIntegrityMonitorAcceptsNormalDriving() {
         val monitor = GpsIntegrityMonitor()
-        // Two consecutive fixes at a constant 13 m/s, ~13 m apart. A realistic driveway.
+        // Two consecutive fixes at a constant 29.2 m/s (~105 km/h), 29.3 m apart, 1 s later.
+        // An ordinary motorway reading: the receiver reports the speed it is actually doing.
         monitor.inspect(
-            fix(latitude = 14.5995, longitude = 120.9842, accuracy = 8f, speedMps = 13f, bearing = 0f,
+            fix(latitude = 14.5995, longitude = 120.9842, accuracy = 8f, speedMps = 29.2f, bearing = 0f,
                 timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L)
         )
         val report = monitor.inspect(
-            fix(latitude = 14.59962, longitude = 120.9842, accuracy = 8f, speedMps = 13f, bearing = 0f,
+            fix(latitude = 14.5997624, longitude = 120.9842, accuracy = 8f, speedMps = 29.2f, bearing = 0f,
                 timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
         )
-        assertTrue(
-            "normal motion must not be flagged critical, got ${report.verdict}",
-            report.verdict == IntegrityVerdict.TRUSTED || report.verdict == IntegrityVerdict.DEGRADED
-        )
+        assertEquals(IntegrityVerdict.TRUSTED, report.verdict)
         assertFalse(report.shouldRejectObservation)
+    }
+
+    @Test
+    fun testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed() {
+        val monitor = GpsIntegrityMonitor()
+        // The device says it is doing 90 km/h but moves 1 m in a second: inconsistent.
+        monitor.inspect(fix(accuracy = 8f, speedMps = 25f, timeMs = 1_000_000L, elapsedNanos = 1_000_000_000L))
+        val report = monitor.inspect(
+            fix(latitude = 14.59951, accuracy = 8f, speedMps = 25f, timeMs = 1_001_000L, elapsedNanos = 2_000_000_000L)
+        )
+        assertTrue(
+            "a stationary device claiming 90 km/h must be flagged, got ${report.verdict}",
+            report.findings.any { it.kind == IntegrityFindingKind.IMPOSSIBLE_SPEED }
+        )
     }
 
     @Test
@@ -317,9 +329,18 @@ class GpsEngineTest {
     fun testRadarEmptyReasonIsSpecificAboutTheCause() {
         assertTrue(RadarGeometry.emptyReason(false, true, true).contains("permission", ignoreCase = true))
         assertTrue(RadarGeometry.emptyReason(true, false, true).contains("switched off", ignoreCase = true))
-        // gnssReported == true with an empty satellite list is "still waiting", not a hardware gap.
-        assertTrue(RadarGeometry.emptyReason(true, true, true).contains("Waiting", ignoreCase = true))
-        assertTrue(RadarGeometry.emptyReason(true, true, false).contains("GnssStatus"))
+        // The receiver cannot report satellite status at all: a hardware/API gap.
+        assertTrue(RadarGeometry.emptyReason(true, true, gnssAvailable = false).contains("GnssStatus"))
+        // It can, but nothing has arrived yet: still searching, not broken.
+        assertTrue(
+            RadarGeometry.emptyReason(true, true, gnssAvailable = true, receivedReport = false)
+                .contains("Waiting", ignoreCase = true)
+        )
+        // A report arrived and it is genuinely empty (indoor, tunnel, blocked antenna).
+        assertTrue(
+            RadarGeometry.emptyReason(true, true, gnssAvailable = true, receivedReport = true)
+                .contains("no satellite", ignoreCase = true)
+        )
     }
 
     @Test

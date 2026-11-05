@@ -77,10 +77,25 @@ object RadarGeometry {
     }
 
     /** What the radar should say when it has nothing to show. */
-    fun emptyReason(hasPermission: Boolean, locationEnabled: Boolean, gnssReported: Boolean): String = when {
+    /**
+     * @param hasPermission precise location granted
+     * @param locationEnabled system location switch is on
+     * @param gnssAvailable the receiver *can* report satellite status (`GnssStatus`)
+     * @param receivedReport true once a status callback has actually arrived
+     *
+     * The two last flags are separate on purpose: "this phone has no GNSS status support" and
+     * "the receiver is still searching" are different problems and must not share a message.
+     */
+    fun emptyReason(
+        hasPermission: Boolean,
+        locationEnabled: Boolean,
+        gnssAvailable: Boolean = true,
+        receivedReport: Boolean = false
+    ): String = when {
         !hasPermission -> "Grant precise location to read satellite status"
         !locationEnabled -> "System location is switched off"
-        !gnssReported -> "This device's receiver does not report GnssStatus to apps"
-        else -> "Waiting for the first satellite report…"
+        !gnssAvailable -> "This device's receiver does not report GnssStatus to apps"
+        !receivedReport -> "Waiting for the first satellite report…"
+        else -> "The receiver reported an empty sky — no satellite is visible"
     }
 }

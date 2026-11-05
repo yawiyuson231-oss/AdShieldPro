@@ -252,7 +252,9 @@ class StationaryDetector(
  *
  *  - coordinate jumps: a displacement that cannot be explained by the reported accuracy and the
  *    elapsed time (this is what "GPS drift" looks like when the receiver briefly re-locks);
- *  - impossible speeds: implied velocity above [Geodesy.PHYSICAL_MAX_SPEED_MPS];
+ *  - impossible speeds: implied velocity above [Geodesy.PHYSICAL_MAX_SPEED_MPS], or an implied
+ *    velocity that disagrees with the receiver's own speed reading by more than 4x in either
+ *    direction (a fixed device claiming 90 km/h, or a jump the receiver did not report);
  *  - stale fixes: the provider stopped updating;
  *  - clock anomalies: wall-clock going backwards between fixes, or a wall-clock/elapsed-realtime
  *    divergence (a strong signal of a device clock being played with);
@@ -371,13 +373,50 @@ class GpsIntegrityMonitor(
                 )
             }
 
-            if (impliedSpeed > Geodesy.PHYSICAL_MAX_SPEED_MPS && deltaSeconds > 0) {
-                impossibleSpeedCount++
-                findings += IntegrityFinding(
-                    kind = IntegrityFindingKind.IMPOSSIBLE_SPEED,
-                    severity = IntegritySeverity.CRITICAL,
-                    detail = "Implied speed ${(impliedSpeed * 3.6).toInt()} km/h exceeds any road vehicle."
-                )
+            // Only a disagreement between the receiver's own speed and the observed displacement is
+            // an anomaly. A vehicle genuinely doing 105 km/h reports it and is left alone.
+            val reportedSpeedMps = fix.speedMps?.let { maxOf(it, previousFix.speedMps ?: it).toDouble() }
+            val speedDiscontinuity = reportedSpeedMps == null ||
+                impliedSpeed > reportedSpeedMps * jumpAccuracyMultiplier
+
+            if (deltaSeconds > 0) {
+                when {
+                    // Faster than any road vehicle, whatever the receiver claims.
+                    impliedSpeed > Geodesy.PHYSICAL_MAX_SPEED_MPS && speedDiscontinuity -> {
+                        impossibleSpeedCount++
+                        findings += IntegrityFinding(
+                            kind = IntegrityFindingKind.IMPOSSIBLE_SPEED,
+                            severity = IntegritySeverity.CRITICAL,
+                            detail = "Implied speed ${(impliedSpeed * 3.6).toInt()} km/h exceeds any road vehicle."
+                        )
+                    }
+                    // Within the physical limit, but the position moved several times faster than
+                    // the receiver says it is moving (or it moved while reporting zero speed).
+                    reportedSpeedMps != null && reportedSpeedMps >= 0.5 &&
+                        impliedSpeed > reportedSpeedMps * jumpAccuracyMultiplier &&
+                        impliedSpeed - reportedSpeedMps > 5.0 -> {
+                        impossibleSpeedCount++
+                        findings += IntegrityFinding(
+                            kind = IntegrityFindingKind.IMPOSSIBLE_SPEED,
+                            severity = IntegritySeverity.WARNING,
+                            detail = "Position moved at ${(impliedSpeed * 3.6).toInt()} km/h while the " +
+                                "receiver reported ${(reportedSpeedMps * 3.6).toInt()} km/h."
+                        )
+                    }
+                    // The mirror image: the receiver claims motorway speed while the device barely
+                    // moved. That is what a stationary spoof or a stuck speed field looks like.
+                    reportedSpeedMps != null && reportedSpeedMps > 8.0 &&
+                        impliedSpeed < reportedSpeedMps / jumpAccuracyMultiplier &&
+                        reportedSpeedMps - impliedSpeed > 5.0 -> {
+                        impossibleSpeedCount++
+                        findings += IntegrityFinding(
+                            kind = IntegrityFindingKind.IMPOSSIBLE_SPEED,
+                            severity = IntegritySeverity.WARNING,
+                            detail = "Receiver reported ${(reportedSpeedMps * 3.6).toInt()} km/h but the " +
+                                "device moved ${impliedSpeed.toInt()} m in this interval."
+                        )
+                    }
+                }
             }
 
             val courseChange = fix.bearingDegrees?.let { current ->
