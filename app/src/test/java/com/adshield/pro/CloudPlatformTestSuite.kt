@@ -101,7 +101,10 @@ class CloudPlatformTestSuite {
 
         runBlocking {
             val refused = runCatching { api.register("turnstile") }
-            assertTrue(refused.exceptionOrNull() is CloudException)
+            assertTrue(
+                "register should throw CloudException, got ${refused.exceptionOrNull()}",
+                refused.exceptionOrNull() is CloudException
+            )
             val first = refused.exceptionOrNull() as CloudException
             assertEquals(403, first.status)
             assertEquals("bot protection failed", first.code)
@@ -112,8 +115,11 @@ class CloudPlatformTestSuite {
             assertEquals("quota exceeded", second.code)
             assertTrue(second.detail?.contains("remainingBytes") == true)
         }
-        assertTrue(backend.requests.all { it.startsWith("POST") })
-        assertTrue(backend.seenHeaders.values.all { headers -> headers.containsKey("Authorization") })
+        assertTrue("non-POST request: ${backend.requests}", backend.requests.all { it.startsWith("POST") })
+        assertTrue(
+            "missing auth header on: ${backend.seenHeaders.filterValues { !it.containsKey("Authorization") }.keys}",
+            backend.seenHeaders.values.all { headers -> headers.containsKey("Authorization") }
+        )
         assertEquals("Bearer jwt-token", backend.seenHeaders.values.first()["Authorization"])
     }
 
@@ -160,7 +166,8 @@ class CloudPlatformTestSuite {
             assertEquals(UploadState.COMPLETED, resumed.state)
         }
         assertEquals(1, backend.partAttempts[1]) // part 1 was never re-sent
-        assertEquals(3, backend.partAttempts[3])
+        // The failed run stopped at part 2, so the resume sends part 3 for the first time.
+        assertEquals(1, backend.partAttempts[3])
         assertArrayEquals(file, backend.assembledBytes())
     }
 
@@ -174,7 +181,7 @@ class CloudPlatformTestSuite {
         val job = runBlocking {
             engine.run(UploadRequest(source = ByteArrayUploadSource(file), name = "doc.pdf"))
         }
-        assertEquals(UploadState.COMPLETED, job.state)
+        assertEquals("upload failed: ${job.lastError}", UploadState.COMPLETED, job.state)
         assertEquals(2, backend.partAttempts[2])
         assertArrayEquals(file, backend.assembledBytes())
     }
@@ -192,7 +199,11 @@ class CloudPlatformTestSuite {
             delay(60)
             engine.cancel(jobId)
             val state = waitFor(engine, jobId) { it == UploadState.CANCELLED || it == UploadState.COMPLETED }
-            assertEquals(UploadState.CANCELLED, state)
+            assertEquals(
+                "cancel failed: ${engine.snapshot(jobId)?.lastError}",
+                UploadState.CANCELLED,
+                state
+            )
         }
         assertTrue(backend.requests.any { it.contains("/v1/uploads/up_1/cancel") })
         assertFalse(backend.requests.any { it.contains("/complete") })
