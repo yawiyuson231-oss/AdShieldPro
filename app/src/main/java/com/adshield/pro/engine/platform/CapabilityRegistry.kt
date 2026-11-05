@@ -650,6 +650,118 @@ object CapabilityRegistry {
             "n/a — external infrastructure and adapter required"
         ),
         cap(
+            "adshield-cloud-api", "AdShield Cloud API client (accounts, files, shares, backups, usage)", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("AdShield Cloud Worker /v1 endpoints over HTTPS with a Supabase access token"),
+            listOf("Needs the user's own free Worker, D1 and Backblaze B2 project; nothing works offline and the DNS blocker does not depend on it"),
+            "CloudPlatformTestSuite.cloudApiBuildsTheDocumentedPathsAndParsesRealResponses"
+        ),
+        cap(
+            "adshield-cloud-uploads", "Resumable multipart uploads with pause, resume, retry and cancel", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudUploadEngine.kt", listOf(PERM_INTERNET),
+            listOf("Part URLs issued by POST /v1/uploads/init, bytes streamed straight to Backblaze B2"),
+            listOf("Pause takes effect at a part boundary; a part interrupted mid-flight is re-sent from its offset"),
+            "CloudPlatformTestSuite.uploadEngineResumesOnlyThePartsTheServerIsStillMissing"
+        ),
+        cap(
+            "adshield-cloud-upload-integrity", "Per-part SHA-1 verification before storage accepts a part", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudUploadEngine.kt", listOf(PERM_INTERNET),
+            listOf("SHA-1 of the exact bytes streamed, declared in X-Bz-Content-Sha1"),
+            listOf("SHA-1 is what the B2 large-file API requires; the whole-file hash is the provider's concatenation of part digests"),
+            "CloudPlatformTestSuite.uploadEngineStreamsEveryPartWithItsRealSha1AndCompletes"
+        ),
+        cap(
+            "adshield-cloud-background-uploads", "Background uploads that survive leaving the screen", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "worker/CloudUploadWorker.kt", listOf(PERM_INTERNET),
+            listOf("WorkManager one-time work with a persisted job record in app-private storage"),
+            listOf("Job metadata is persisted, not the file bytes; the source Uri must still be readable when the worker runs"),
+            "Manual: start an upload, close the app, and confirm the job completes or reports a real failure"
+        ),
+        cap(
+            "adshield-cloud-file-operations", "Folders, rename, move, copy, trash, restore and permanent delete", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/CloudRepository.kt", listOf(PERM_INTERNET),
+            listOf("POST /v1/folders and per-node action endpoints; permanent delete removes the stored object first"),
+            listOf("Trash retention is 30 days by default; a copy shares the stored object until one side is deleted"),
+            "Manual: `cd cloud && npm test` covers the folder lifecycle, purge frees quota and version pruning"
+        ),
+        cap(
+            "adshield-cloud-versioning", "Version history with pruning beyond five stored versions", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("GET /v1/nodes/:id/versions and the versions table written on re-upload"),
+            listOf("Older versions are deleted for real, so history costs storage until it is pruned"),
+            "Manual: `cd cloud && npm test` — re-uploading the same name keeps a history and prunes beyond five"
+        ),
+        cap(
+            "adshield-cloud-sharing", "Expiring share links that can be revoked", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("Random share tokens, server-side expiry, short-lived signed download URLs"),
+            listOf("Read-only links; anyone with the token can open it until it expires or is revoked"),
+            "Manual: `cd cloud && npm test` — share links work, expire and can be revoked"
+        ),
+        cap(
+            "adshield-cloud-duplicates", "Duplicate detection grouped by real content hash", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("SHA-1 recorded for every uploaded object, grouped server-side"),
+            listOf("Only files uploaded through AdShield Cloud carry a hash; identical content under different names is still grouped"),
+            "Manual: `cd cloud && npm test` — duplicate detection groups files by their real content hash"
+        ),
+        cap(
+            "adshield-cloud-quota-truth", "Quota accounting reconciled against what the provider stores", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("GET /v1/account and POST /v1/account/reconcile, which lists the objects B2 actually reports"),
+            listOf("Reconciliation pages through up to 50 000 objects per call; counters are corrected, never guessed"),
+            "Manual: `cd cloud && npm test` — reconciliation rebuilds usage from what the provider actually stores"
+        ),
+        cap(
+            "adshield-cloud-usage", "Live usage monitoring from the backend, never a local estimate", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "ui/viewmodel/CloudViewModel.kt", listOf(PERM_INTERNET),
+            listOf("Quota, used bytes, remaining bytes, trashed bytes and 24-hour request counters from the API"),
+            listOf("Percentages and bars are hidden until the account answers; the free allowance is 10 GB on Backblaze B2"),
+            "CloudPlatformTestSuite.cloudApiBuildsTheDocumentedPathsAndParsesRealResponses"
+        ),
+        cap(
+            "adshield-cloud-backup", "DNS configuration backup, integrity verification and restore", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudBackup.kt", listOf(PERM_INTERNET),
+            listOf("Resolver, protection mode, rules, filter lists, per-app firewall and preferences, hashed with SHA-256"),
+            listOf("Restore replaces rules and filter lists; the backup is re-downloaded and re-hashed before it is applied"),
+            "CloudPlatformTestSuite.backupCodecRoundTripsAndRefusesATamperedPayload"
+        ),
+        cap(
+            "adshield-cloud-vault", "Optional client-side AES-256-GCM encryption for backups", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudVault.kt", emptyList(),
+            listOf("PBKDF2-HMAC-SHA256 key derivation, Android Keystore-free passphrase vault, GCM tag verification"),
+            listOf("Backups only; a forgotten passphrase is unrecoverable; resumable multipart file uploads are not encrypted client-side"),
+            "CloudPlatformTestSuite.vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne"
+        ),
+        cap(
+            "adshield-cloud-scan", "Pre-upload malware scan with quarantine", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/CloudRepository.kt", emptyList(),
+            listOf("On-device FileThreatScanner verdict over the first 8 MiB of the file"),
+            listOf("Files rated DANGEROUS are refused and listed in the Cloud Security screen; SUSPICIOUS files upload but are reported"),
+            "Manual: pick an EICAR test file and confirm the upload is refused and appears in Quarantine"
+        ),
+        cap(
+            "adshield-cloud-audit", "Server-side audit log of every mutating action", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("audit_log rows written inside the Worker for uploads, shares, deletes and restores"),
+            listOf("The newest 100 entries are readable in the app; IP addresses come from Cloudflare's connecting-IP header"),
+            "Manual: `cd cloud && npm test` — every mutating action is written to the per-user audit log"
+        ),
+        cap(
+            "adshield-cloud-credential-safety", "No storage credentials inside the APK", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.IMPLEMENTED, "data/cloud/CloudApi.kt", listOf(PERM_INTERNET),
+            listOf("Only public endpoints: the Worker URL, the Supabase project URL and anon key, and the Turnstile site key"),
+            listOf("Bucket keys live only in Worker secrets; the app never sees them and cannot leak them"),
+            "Manual: unzip the release APK and confirm no Backblaze key material is present"
+        ),
+        cap(
+            "onion-routing", "Onion routing through Orbot with a real Tor check", CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.PARTIAL, "engine/onion/OnionRoutingManager.kt", listOf(PERM_INTERNET),
+            listOf("Orbot's SOCKS proxy at 127.0.0.1:9050 and check.torproject.org/api/ip"),
+            listOf("Requires Orbot to be installed and connected; Android only lets an app intercept GET requests, so POST forms and some media streams use the normal path; AdShield cannot bundle a Tor daemon"),
+            "OnionRoutingTestSuite.orbotStatusBroadcastMapsToHonestStates"
+        ),
+        cap(
             "saf-universal-files", "SAF file/folder management, import, preview, share and search", CapabilityArea.FILE_MANAGEMENT,
             CapabilityStatus.PARTIAL, "data/repository/SafFileRepository.kt", emptyList(),
             listOf("DocumentsContract trees explicitly granted by the user and external viewer/share apps"),

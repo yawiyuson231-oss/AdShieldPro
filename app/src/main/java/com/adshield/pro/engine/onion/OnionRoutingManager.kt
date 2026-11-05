@@ -16,6 +16,9 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
+private const val SOCKS_PORT_DEFAULT = 9050
+private const val HTTP_PORT_DEFAULT = 8118
+
 enum class TorState(val label: String) {
     NOT_INSTALLED("Orbot is not installed"),
     STOPPED("Orbot is installed but not running"),
@@ -30,8 +33,8 @@ data class TorCheckResponse(val IsTor: Boolean = false, val IP: String? = null)
 data class TorStatus(
     val state: TorState = TorState.NOT_INSTALLED,
     val detail: String = TorState.NOT_INSTALLED.label,
-    val socksPort: Int = DEFAULT_SOCKS_PORT,
-    val httpPort: Int = DEFAULT_HTTP_PORT,
+    val socksPort: Int = SOCKS_PORT_DEFAULT,
+    val httpPort: Int = HTTP_PORT_DEFAULT,
     val exitIp: String? = null
 ) {
     val isConnected: Boolean get() = state == TorState.CONNECTED
@@ -170,8 +173,8 @@ class OnionRoutingManager(private val context: Context) {
         const val STATUS_STARTING = "STARTING"
         const val STATUS_OFF = "OFF"
         const val PROXY_HOST = "127.0.0.1"
-        const val DEFAULT_SOCKS_PORT = 9050
-        const val DEFAULT_HTTP_PORT = 8118
+        const val DEFAULT_SOCKS_PORT = SOCKS_PORT_DEFAULT
+        const val DEFAULT_HTTP_PORT = HTTP_PORT_DEFAULT
         const val TOR_CHECK_URL = "https://check.torproject.org/api/ip"
 
         val KNOWN_TOR_PACKAGES = listOf(ORBOT_PACKAGE, TOR_BROWSER_PACKAGE)
