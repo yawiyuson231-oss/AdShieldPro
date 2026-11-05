@@ -71,7 +71,9 @@ jobs:
       - name: Battery Command Center gates (imports, honesty rules, lifecycle, docs)
         run: |
           chmod +x tools/check_battery_command_center.py
-          python3 tools/check_battery_command_center.py
+          mkdir -p .ci
+          set -o pipefail
+          python3 tools/check_battery_command_center.py 2>&1 | tee .ci/battery-gate.log
 
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |

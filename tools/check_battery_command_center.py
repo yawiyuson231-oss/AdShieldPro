@@ -165,7 +165,9 @@ def declared_members(code: str, type_name: str) -> set[str]:
         r"\b(?:class|object|interface)\s+([A-Za-z_]\w*)",
         r"^\s*([A-Za-z_]\w*)\s*[,;(]",
     ):
-        members.update(re.findall(pattern, body, re.MULTILINE if "^" in pattern else 0))
+        members.update(
+            re.findall(pattern, body, re.MULTILINE) if "^" in pattern else re.findall(pattern, body)
+        )
     # Enum entries
     for match in re.finditer(r"^\s*([A-Z][A-Za-z0-9_]*)\s*[,;(]", body, re.MULTILINE):
         members.add(match.group(1))
@@ -335,7 +337,7 @@ if docs:
             fail(f"docs/BATTERY_COMMAND_CENTER.md: does not document section '{section}'")
 
 if problems:
-    print("Battery Command Center gate FAILED:")
+    print(f"Battery Command Center gate FAILED on Python {sys.version.split()[0]}:")
     for problem in problems:
         print(f"  - {problem}")
     sys.exit(1)
