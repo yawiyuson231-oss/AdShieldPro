@@ -21,12 +21,15 @@ object VpnLatencyProber {
     suspend fun measure(server: VpnServer): Long? = withContext(Dispatchers.IO) {
         withTimeoutOrNull(TIMEOUT_MS) {
             val start = System.nanoTime()
-            runCatching {
-                Socket().use { socket ->
-                    socket.connect(InetSocketAddress(server.host, server.port), TIMEOUT_MS)
-                }
+            val socket = Socket()
+            try {
+                socket.connect(InetSocketAddress(server.host, server.port), TIMEOUT_MS)
                 (System.nanoTime() - start) / 1_000_000L
-            }.getOrNull()
+            } catch (e: Exception) {
+                null
+            } finally {
+                runCatching { socket.close() }
+            }
         }
     }
 

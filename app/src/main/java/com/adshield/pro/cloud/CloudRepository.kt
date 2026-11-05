@@ -86,7 +86,7 @@ class CloudRepository @Inject constructor(
     }
 
     suspend fun createFolder(path: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching { api.createFolder(baseUrl(), token(), path) }
+        runCatching { api.createFolder(baseUrl(), token(), path); Unit }
     }
 
     suspend fun renameFile(id: String, newName: String) = withContext(Dispatchers.IO) {

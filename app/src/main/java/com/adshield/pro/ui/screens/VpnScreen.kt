@@ -93,7 +93,7 @@ fun VpnScreen(viewModel: VpnViewModel) {
         modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { VpnControlCenter(connectionState, activeServer, stats, status, viewModel) }
+        item { VpnControlCenter(connectionState, activeServer, stats, status, servers, viewModel) }
         item { VpnMapPanel(servers, activeServer, viewModel) }
         item { VpnIntelligencePanel(servers, viewModel) }
         item { VpnThreatCenter(threats, viewModel) }
@@ -122,7 +122,7 @@ private fun StatusBadge(state: VpnConnectionState) {
 @Composable
 private fun VpnControlCenter(
     state: VpnConnectionState, server: VpnServer?, stats: com.adshield.pro.vpn.VpnStats,
-    status: FeatureStatus?, viewModel: VpnViewModel
+    status: FeatureStatus?, servers: List<VpnServer>, viewModel: VpnViewModel
 ) {
     CyberPanel(title = "Global VPN Control Center", subtitle = "Single shared VPNService — coordinated with DNS, never competing") {
         Row(verticalAlignment = Alignment.CenterVertically) {

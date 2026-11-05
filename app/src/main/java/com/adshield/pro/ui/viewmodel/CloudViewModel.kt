@@ -156,7 +156,4 @@ class CloudViewModel @Inject constructor(
 
     fun clearMessage() { message.value = null }
 
-    // exposed for the screen via repository flows
-    private fun cloudFilesFlow(folder: String) = com.adshield.pro.data.local.db.CloudDaoHolder.dao.observeFiles(folder)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

@@ -21,10 +21,8 @@ class CloudTransferWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val transferId = inputData.getString(KEY_TRANSFER_ID) ?: return Result.failure()
-        return when (engine.runTransfer(transferId)) {
-            is Result.Success -> Result.success()
-            else -> Result.retry()
-        }
+        val result = engine.runTransfer(transferId)
+        return if (result.isSuccess) Result.success() else Result.retry()
     }
 
     companion object {

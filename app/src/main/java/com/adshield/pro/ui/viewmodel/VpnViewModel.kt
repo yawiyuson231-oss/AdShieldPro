@@ -21,7 +21,7 @@ import javax.inject.Inject
 @HiltViewModel
 class VpnViewModel @Inject constructor(
     private val engine: VpnEngine,
-    catalog: VpnServerCatalog
+    private val catalog: VpnServerCatalog
 ) : ViewModel() {
 
     val connectionState: StateFlow<VpnConnectionState> = engine.connectionState
@@ -39,9 +39,9 @@ class VpnViewModel @Inject constructor(
     val threats: StateFlow<List<VpnThreatEvent>> = catalog.threatsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val displayServers: StateFlow<List<VpnServer>> = kotlinx.coroutines.flow.run {
-        servers.map { VpnServerSelection.sortedForDisplay(it) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val displayServers: StateFlow<List<VpnServer>> = servers
+        .map { VpnServerSelection.sortedForDisplay(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun connect(server: VpnServer) = viewModelScope.launch { engine.connect(server) }
     fun disconnect() = viewModelScope.launch { engine.disconnect() }

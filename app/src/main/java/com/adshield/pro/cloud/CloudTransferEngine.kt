@@ -13,13 +13,14 @@ import com.adshield.pro.data.local.db.CloudTransferEntity
 import com.adshield.pro.worker.CloudTransferWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSink
-import okio.source
 import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -97,13 +98,8 @@ class CloudTransferEngine @Inject constructor(
     }
 
     private suspend fun updateState(id: String, state: String) {
-        val current = cloudDao.observeTransfers().let { flow ->
-            // read once via a one-shot query path: use pending list + flows is overkill here
-            null
-        }
-        // simpler: fetch through pending + all is racy; do a direct state flip via update of the row
         val row = cloudDao.pendingTransfers().firstOrNull { it.id == id }
-            ?: cloudDao.observeTransfers().let { f -> kotlinx.coroutines.flow.first(f) }.firstOrNull { it.id == id }
+            ?: first(cloudDao.observeTransfers()).firstOrNull { it.id == id }
         if (row != null) {
             cloudDao.updateTransfer(row.copy(state = state, updatedAtEpochMs = System.currentTimeMillis()))
         }
@@ -145,7 +141,7 @@ class CloudTransferEngine @Inject constructor(
         } else {
             val signed = api.signedUploadUrl(baseUrl, token, record.id, size, transfer.sha256)
             checkSigned(signed)
-            putFile(signed, uri, size, transfer) { done -> mark(transfer, "RUNNING", done) }
+            putFile(signed, uri, size) { done -> mark(transfer, "RUNNING", done) }
         }
         mark(transfer.copy(fileId = record.id), "DONE", size)
     }
@@ -161,7 +157,7 @@ class CloudTransferEngine @Inject constructor(
             val length = minOf(chunk, size - offset)
             val signed = api.signedChunkUrl(baseUrl, token, fileId, part, uploadId = fileId)
             checkSigned(signed)
-            putRange(signed, uri, offset, length, transfer, part.toLong() * chunk) { done ->
+            putRange(signed, uri, offset, length) { done ->
                 mark(transfer, "RUNNING", (part - 1) * chunk + done)
             }
             parts.add(part)
@@ -215,22 +211,27 @@ class CloudTransferEngine @Inject constructor(
         }
     }
 
-    private fun putFile(signed: SignedUrlResponse, uri: Uri, size: Long, transfer: CloudTransferEntity, onProgress: (Long) -> Unit) {
+    private suspend fun putFile(
+        signed: SignedUrlResponse, uri: Uri, size: Long,
+        onProgress: suspend (Long) -> Unit
+    ) {
         val body = object : RequestBody() {
             override fun contentType() = "application/octet-stream".toMediaType()
             override fun contentLength() = size
             override fun writeTo(sink: BufferedSink) {
-                context.contentResolver.openInputStream(uri)!!.source().use { source ->
-                    var written = 0L
+                val out = sink.outputStream()
+                context.contentResolver.openInputStream(uri)!!.use { input ->
                     val buffer = ByteArray(64 * 1024)
+                    var written = 0L
                     while (true) {
-                        val read = source.read(buffer)
+                        val read = input.read(buffer)
                         if (read == -1) break
-                        sink.write(buffer, 0, read)
+                        out.write(buffer, 0, read)
                         written += read
-                        if (written % (512 * 1024) == 0L) onProgress(written)
+                        if (written % (512 * 1024) == 0L) {
+                            kotlinx.coroutines.runBlocking { onProgress(written) }
+                        }
                     }
-                    onProgress(written)
                 }
             }
         }
@@ -240,26 +241,33 @@ class CloudTransferEngine @Inject constructor(
         http.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("Upload failed: HTTP ${response.code}")
         }
+        onProgress(size)
     }
 
-    private fun putRange(
+    private suspend fun putRange(
         signed: SignedUrlResponse, uri: Uri, offset: Long, length: Long,
-        transfer: CloudTransferEntity, baseDone: Long, onProgress: (Long) -> Unit
+        onProgress: suspend (Long) -> Unit
     ) {
         val body = object : RequestBody() {
             override fun contentType() = "application/octet-stream".toMediaType()
             override fun contentLength() = length
             override fun writeTo(sink: BufferedSink) {
-                context.contentResolver.openInputStream(uri)!!.source().use { source ->
-                    source.skip(offset)
+                val out = sink.outputStream()
+                context.contentResolver.openInputStream(uri)!!.use { input ->
+                    var skipped = 0L
+                    while (skipped < offset) {
+                        val n = input.skip(offset - skipped)
+                        if (n <= 0) throw IOException("Cannot seek to $offset")
+                        skipped += n
+                    }
                     var remaining = length
                     val buffer = ByteArray(64 * 1024)
                     while (remaining > 0) {
-                        val read = source.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                        val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
                         if (read == -1) throw IOException("Unexpected end of file at $offset")
-                        sink.write(buffer, 0, read)
+                        out.write(buffer, 0, read)
                         remaining -= read
-                        onProgress(length - remaining)
+                        kotlinx.coroutines.runBlocking { onProgress(length - remaining) }
                     }
                 }
             }
