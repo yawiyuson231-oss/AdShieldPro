@@ -205,19 +205,16 @@ object WorldMapData {
             GeoPoint(-75f, -15f), GeoPoint(-79f, -8f), GeoPoint(-81f, -5f), GeoPoint(-80f, -2f),
             GeoPoint(-77f, 2f)
         ),
-        // Europe
+        // Europe (incl. Scandinavia; simple outline, no self-intersections)
         listOf(
-            GeoPoint(-9f, 37f), GeoPoint(-9f, 43f), GeoPoint(-1f, 44f), GeoPoint(-4f, 48f),
-            GeoPoint(0f, 50f), GeoPoint(4f, 52f), GeoPoint(8f, 54f), GeoPoint(8f, 57f),
-            GeoPoint(12f, 58f), GeoPoint(18f, 56f), GeoPoint(22f, 58f), GeoPoint(28f, 60f),
-            GeoPoint(30f, 63f), GeoPoint(28f, 67f), GeoPoint(24f, 71f), GeoPoint(18f, 70f),
-            GeoPoint(13f, 66f), GeoPoint(10f, 62f), GeoPoint(5f, 61f), GeoPoint(5f, 58f),
-            GeoPoint(7f, 57f), GeoPoint(9f, 55f), GeoPoint(6f, 53f), GeoPoint(2f, 51f),
-            GeoPoint(-2f, 49f), GeoPoint(-6f, 48f), GeoPoint(-2f, 44f), GeoPoint(3f, 42f),
-            GeoPoint(7f, 43f), GeoPoint(10f, 44f), GeoPoint(13f, 45f), GeoPoint(15f, 42f),
-            GeoPoint(18f, 40f), GeoPoint(16f, 38f), GeoPoint(12f, 38f), GeoPoint(10f, 42f),
-            GeoPoint(6f, 43f), GeoPoint(3f, 42f), GeoPoint(0f, 40f), GeoPoint(-1f, 37f),
-            GeoPoint(-5f, 36f)
+            GeoPoint(-9f, 37f), GeoPoint(-9f, 43f), GeoPoint(-4f, 48f), GeoPoint(-1f, 49f),
+            GeoPoint(2f, 51f), GeoPoint(5f, 53f), GeoPoint(8f, 55f), GeoPoint(8f, 57f),
+            GeoPoint(10f, 62f), GeoPoint(13f, 66f), GeoPoint(18f, 70f), GeoPoint(24f, 71f),
+            GeoPoint(28f, 67f), GeoPoint(30f, 63f), GeoPoint(30f, 60f), GeoPoint(30f, 56f),
+            GeoPoint(28f, 52f), GeoPoint(26f, 48f), GeoPoint(24f, 44f), GeoPoint(22f, 40f),
+            GeoPoint(19f, 39f), GeoPoint(16f, 38f), GeoPoint(15f, 40f), GeoPoint(13f, 44f),
+            GeoPoint(10f, 44f), GeoPoint(7f, 43f), GeoPoint(3f, 42f), GeoPoint(0f, 40f),
+            GeoPoint(-1f, 37f), GeoPoint(-5f, 36f)
         ),
         // Africa
         listOf(
@@ -262,11 +259,18 @@ object WorldMapData {
             GeoPoint(-5f, 50f), GeoPoint(-3f, 53f), GeoPoint(-5f, 56f), GeoPoint(-3f, 58f),
             GeoPoint(-1f, 57f), GeoPoint(0f, 53f), GeoPoint(1f, 51f)
         ),
-        // Japan
+        // Italian peninsula
         listOf(
-            GeoPoint(130f, 31f), GeoPoint(132f, 34f), GeoPoint(136f, 35f), GeoPoint(140f, 36f),
-            GeoPoint(141f, 40f), GeoPoint(142f, 43f), GeoPoint(144f, 44f), GeoPoint(143f, 42f),
-            GeoPoint(140f, 38f), GeoPoint(137f, 34f), GeoPoint(133f, 33f)
+            GeoPoint(9f, 44f), GeoPoint(13f, 44f), GeoPoint(14f, 42f), GeoPoint(16f, 41f),
+            GeoPoint(18f, 40f), GeoPoint(16f, 38f), GeoPoint(15f, 39f), GeoPoint(13f, 41f),
+            GeoPoint(11f, 43f), GeoPoint(8f, 44f)
+        ),
+        // Japan (Honshu arc with enough width to render as land)
+        listOf(
+            GeoPoint(130f, 31f), GeoPoint(132f, 33f), GeoPoint(134f, 33.5f), GeoPoint(137f, 34.5f),
+            GeoPoint(140f, 35.5f), GeoPoint(142f, 38f), GeoPoint(143f, 41f), GeoPoint(144f, 43f),
+            GeoPoint(145f, 44f), GeoPoint(144f, 42.5f), GeoPoint(142f, 40f), GeoPoint(140f, 37f),
+            GeoPoint(137f, 34f), GeoPoint(134f, 33f), GeoPoint(131f, 31.5f)
         ),
         // Sumatra
         listOf(GeoPoint(95f, 5f), GeoPoint(98f, 3f), GeoPoint(102f, -1f), GeoPoint(105f, -5f), GeoPoint(103f, -5f), GeoPoint(99f, 0f)),
