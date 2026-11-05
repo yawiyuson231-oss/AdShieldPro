@@ -16,7 +16,7 @@ import java.net.Socket
  */
 object VpnLatencyProber {
 
-    const val TIMEOUT_MS = 4000
+    const val TIMEOUT_MS = 4000L
 
     suspend fun measure(server: VpnServer): Long? = withContext(Dispatchers.IO) {
         withTimeoutOrNull(TIMEOUT_MS) {

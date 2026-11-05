@@ -98,8 +98,9 @@ class CloudTransferEngine @Inject constructor(
     }
 
     private suspend fun updateState(id: String, state: String) {
-        val row = cloudDao.pendingTransfers().firstOrNull { it.id == id }
-            ?: first(cloudDao.observeTransfers()).firstOrNull { it.id == id }
+        val pending: List<CloudTransferEntity> = cloudDao.pendingTransfers()
+        val row = pending.find { it.id == id }
+            ?: first(cloudDao.observeTransfers()).find { it.id == id }
         if (row != null) {
             cloudDao.updateTransfer(row.copy(state = state, updatedAtEpochMs = System.currentTimeMillis()))
         }
@@ -120,7 +121,8 @@ class CloudTransferEngine @Inject constructor(
 
     suspend fun runTransfer(transferId: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val transfer = cloudDao.pendingTransfers().firstOrNull { it.id == transferId }
+            val pending: List<CloudTransferEntity> = cloudDao.pendingTransfers()
+            val transfer = pending.find { it.id == transferId }
                 ?: error("Transfer $transferId is no longer pending.")
             mark(transfer, "RUNNING", transfer.doneBytes)
             if (transfer.direction == "UPLOAD") runUpload(transfer) else runDownload(transfer)
