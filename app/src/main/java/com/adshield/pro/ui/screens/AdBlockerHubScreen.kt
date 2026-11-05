@@ -62,7 +62,10 @@ fun AdBlockerHubScreen(
     onToggleSiteException: (String, Boolean) -> Unit,
     onUpdateBrowserPrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onAddCustomCosmeticSelector: (String) -> Unit,
-    onShowFeedback: (String) -> Unit
+    onShowFeedback: (String) -> Unit,
+    onToggleTorMode: (Boolean) -> Unit = {},
+    onUpdateTorProxy: (String, Int) -> Unit = { _, _ -> },
+    onToggleOnionOnly: (Boolean) -> Unit = {}
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -149,7 +152,10 @@ fun AdBlockerHubScreen(
                     onToggleSiteException = onToggleSiteException,
                     onUpdateBrowserPrivacy = onUpdateBrowserPrivacy,
                     onAddCustomCosmeticSelector = onAddCustomCosmeticSelector,
-                    onShowFeedback = onShowFeedback
+                    onShowFeedback = onShowFeedback,
+                    onToggleTorMode = onToggleTorMode,
+                    onUpdateTorProxy = onUpdateTorProxy,
+                    onToggleOnionOnly = onToggleOnionOnly
                 )
             }
         }

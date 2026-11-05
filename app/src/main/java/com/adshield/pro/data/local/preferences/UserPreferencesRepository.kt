@@ -48,6 +48,11 @@ data class AppSettingsState(
     val browserPopupBlockingEnabled: Boolean = true,
     val browserBlockThirdPartyCookies: Boolean = true,
     val browserJavaScriptEnabled: Boolean = true,
+    // --- Private (Tor / onion) browsing ---
+    val torModeEnabled: Boolean = false,
+    val torSocksHost: String = "127.0.0.1",
+    val torSocksPort: Int = 9050,
+    val onionOnlyMode: Boolean = false,
     val customCosmeticSelectors: Set<String> = emptySet(),
     // --- Phone Optimizer & AI Smart Boost Settings ---
     val smartAutoOptimizeEnabled: Boolean = true,
@@ -108,6 +113,10 @@ class UserPreferencesRepository @Inject constructor(
         val BROWSER_BLOCK_3P_COOKIES = booleanPreferencesKey("browser_block_3p_cookies")
         val BROWSER_JS_ENABLED = booleanPreferencesKey("browser_js_enabled")
         val CUSTOM_COSMETIC_SELECTORS = stringSetPreferencesKey("custom_cosmetic_selectors")
+        val TOR_MODE = booleanPreferencesKey("tor_mode_enabled")
+        val TOR_SOCKS_HOST = stringPreferencesKey("tor_socks_host")
+        val TOR_SOCKS_PORT = intPreferencesKey("tor_socks_port")
+        val ONION_ONLY = booleanPreferencesKey("onion_only_mode")
 
         // Optimizer & Smart Boost keys
         val SMART_AUTO_OPTIMIZE = booleanPreferencesKey("smart_auto_optimize_enabled")
@@ -188,6 +197,10 @@ class UserPreferencesRepository @Inject constructor(
             browserPopupBlockingEnabled = prefs[Keys.BROWSER_POPUP_BLOCK] ?: true,
             browserBlockThirdPartyCookies = prefs[Keys.BROWSER_BLOCK_3P_COOKIES] ?: true,
             browserJavaScriptEnabled = prefs[Keys.BROWSER_JS_ENABLED] ?: true,
+            torModeEnabled = prefs[Keys.TOR_MODE] ?: false,
+            torSocksHost = prefs[Keys.TOR_SOCKS_HOST] ?: "127.0.0.1",
+            torSocksPort = prefs[Keys.TOR_SOCKS_PORT] ?: 9050,
+            onionOnlyMode = prefs[Keys.ONION_ONLY] ?: false,
             customCosmeticSelectors = prefs[Keys.CUSTOM_COSMETIC_SELECTORS] ?: emptySet(),
             smartAutoOptimizeEnabled = prefs[Keys.SMART_AUTO_OPTIMIZE] ?: true,
             autoJunkCleanIntervalHours = prefs[Keys.AUTO_JUNK_CLEAN_HOURS] ?: 24,
@@ -403,5 +416,23 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.AETHER_PRIVACY_LEVEL] = if (privacyLevel in setOf("minimal", "balanced", "strict")) privacyLevel else "balanced"
             prefs[Keys.AETHER_EXPLAIN_LEVEL] = if (explanationLevel in setOf("beginner", "intermediate", "professional")) explanationLevel else "beginner"
         }
+    }
+
+    // --- Private (Tor / onion) browsing -------------------------------------
+
+    /** Routes the in-app browser through a user-supplied Tor SOCKS proxy (e.g. Orbot). */
+    suspend fun setTorModeEnabled(enabled: Boolean) {
+        context.adShieldDataStore.edit { prefs -> prefs[Keys.TOR_MODE] = enabled }
+    }
+
+    suspend fun setTorProxy(host: String, port: Int) {
+        context.adShieldDataStore.edit { prefs ->
+            prefs[Keys.TOR_SOCKS_HOST] = host.trim().ifBlank { "127.0.0.1" }
+            prefs[Keys.TOR_SOCKS_PORT] = port.coerceIn(1, 65535)
+        }
+    }
+
+    suspend fun setOnionOnlyMode(enabled: Boolean) {
+        context.adShieldDataStore.edit { prefs -> prefs[Keys.ONION_ONLY] = enabled }
     }
 }

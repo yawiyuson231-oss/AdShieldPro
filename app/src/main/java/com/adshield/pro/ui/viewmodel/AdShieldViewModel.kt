@@ -738,4 +738,18 @@ class AdShieldViewModel @Inject constructor(
             appContext.startService(intent)
         }
     }
+
+    // --- Private (Tor / onion) browser mode ---------------------------------
+
+    fun setTorModeEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setTorModeEnabled(enabled) }
+    }
+
+    fun updateTorProxy(host: String, port: Int) {
+        viewModelScope.launch { preferencesRepository.setTorProxy(host, port) }
+    }
+
+    fun setOnionOnlyMode(enabled: Boolean) {
+        viewModelScope.launch { preferencesRepository.setOnionOnlyMode(enabled) }
+    }
 }

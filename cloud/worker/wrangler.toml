@@ -1,0 +1,55 @@
+# AdShield Pro — CyberShield Cloud backend
+#
+# 100% free-tier configuration:
+#   * Workers Free   : 100,000 requests/day, no payment method required
+#   * D1 Free        : 5 GB storage, 5M rows read/day, 100k rows written/day, no payment method
+#   * R2 Free        : 10 GB storage, 1M Class A + 10M Class B ops/month
+#                      >>> R2 REQUIRES A PAYMENT METHOD ON FILE TO ACTIVATE <<<
+#                      It stays $0 while inside the free allowance, but Cloudflare will not
+#                      enable the R2 dashboard without billing activation.
+#                      If you refuse to add a card, set STORAGE_PROVIDER = "supabase"
+#                      and use Supabase Storage's 1 GB free bucket instead (no card).
+#   * Supabase Auth  : 50,000 MAU free, no payment method required
+#   * Turnstile      : free, no payment method required
+#
+# NOTHING in this file enables a paid plan. Do not run `wrangler ... --paid`.
+
+name = "adshield-cloud"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# --- Object storage (R2). Comment this block out when using Supabase Storage. ---
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "adshield-cloud-files"
+
+# --- Metadata database ---
+[[d1_databases]]
+binding = "DB"
+database_name = "adshield_cloud"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+ENVIRONMENT = "production"
+STORAGE_PROVIDER = "r2"           # "r2" (10 GB free, needs card) | "supabase" (1 GB free, no card)
+DEFAULT_QUOTA_BYTES = "1073741824"     # 1 GiB per user
+GLOBAL_SAFETY_CAP_BYTES = "9663676416" # 9 GiB soft ceiling under R2's 10 GB free tier
+MAX_SINGLE_UPLOAD_BYTES = "104857600"  # 100 MB (Workers request body ceiling)
+PART_SIZE_BYTES = "8388608"            # 8 MiB multipart chunks
+SIGNED_URL_TTL_SECONDS = "300"
+RATE_LIMIT_GENERAL_PER_MINUTE = "240"
+TRASH_RETENTION_DAYS = "30"
+DAILY_REQUEST_BUDGET = "100000"        # Workers free tier requests/day
+ALLOWED_ORIGINS = "*"
+TURNSTILE_SITE_KEY = "REPLACE_WITH_TURNSTILE_SITE_KEY"
+
+# Secrets (set with `wrangler secret put NAME`, never commit real values):
+#   SERVER_SECRET              - 32+ random bytes, HMAC key for signed URLs
+#   SUPABASE_URL               - https://<project>.supabase.co
+#   SUPABASE_ANON_KEY          - publishable anon key (also compiled into the app)
+#   SUPABASE_SERVICE_ROLE_KEY  - only needed for STORAGE_PROVIDER="supabase"
+#   SUPABASE_JWT_SECRET        - only for legacy HS256 projects
+#   TURNSTILE_SECRET           - Turnstile secret key

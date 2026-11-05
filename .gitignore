@@ -39,3 +39,10 @@ aether/intel/trusted_keys/runtime-*.pem
 # Public Ed25519 verification keys for signed feeds ARE committed (private keys
 # live in aether/data/keys and stay ignored via `aether/data/` above).
 !aether/intel/trusted_keys/*.pem
+
+# Cloud worker local development artifacts
+cloud/worker/.dev.vars
+cloud/worker/.wrangler/
+cloud/worker/node_modules/
+cloud/worker/test/last-run.json
+cloud/worker/test/worker-dev.log

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -53,6 +54,7 @@ import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
 import com.adshield.pro.ui.screens.AetherScreen
+import com.adshield.pro.cloud.ui.CloudScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
 import com.adshield.pro.ui.screens.SettingsScreen
@@ -66,6 +68,7 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     STATISTICS("Statistics", Icons.Default.Analytics),
     AETHER("Aether AI", Icons.Default.AutoAwesome),
+    CLOUD("Cloud", Icons.Default.Cloud),
     SETTINGS("Settings", Icons.Default.Settings)
 }
 
@@ -324,7 +327,10 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onToggleSiteException = viewModel::toggleBrowserSiteException,
                     onUpdateBrowserPrivacy = viewModel::updateBrowserPrivacySettings,
                     onAddCustomCosmeticSelector = viewModel::addCustomCosmeticSelector,
-                    onShowFeedback = viewModel::showFeedback
+                    onShowFeedback = viewModel::showFeedback,
+                    onToggleTorMode = viewModel::setTorModeEnabled,
+                    onUpdateTorProxy = viewModel::updateTorProxy,
+                    onToggleOnionOnly = viewModel::setOnionOnlyMode
                 )
 
                 MainNavDestination.OPTIMIZER -> OptimizerScreen(
@@ -382,6 +388,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 )
 
                 MainNavDestination.AETHER -> AetherScreen()
+
+                MainNavDestination.CLOUD -> CloudScreen()
 
                 MainNavDestination.SETTINGS -> SettingsScreen(
                     showAboutScreen = showAboutScreen,

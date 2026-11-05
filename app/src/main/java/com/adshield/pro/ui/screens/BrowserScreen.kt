@@ -60,8 +60,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.ProxyConfig
+import androidx.webkit.ProxyController
+import androidx.webkit.WebViewFeature
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.SwitchDefaults
+import java.util.concurrent.Executors
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.OnionAddress
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
@@ -75,7 +83,10 @@ fun BrowserScreen(
     onToggleSiteException: (String, Boolean) -> Unit,
     onUpdateBrowserPrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onAddCustomCosmeticSelector: (String) -> Unit,
-    onShowFeedback: (String) -> Unit
+    onShowFeedback: (String) -> Unit,
+    onToggleTorMode: (Boolean) -> Unit = {},
+    onUpdateTorProxy: (String, Int) -> Unit = { _, _ -> },
+    onToggleOnionOnly: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     var urlInput by remember { mutableStateOf("https://example.com") }
@@ -95,6 +106,32 @@ fun BrowserScreen(
 
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
 
+    // --- Private (Tor / onion) mode ---------------------------------------------------
+    val proxySupported = remember { WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE) }
+    val reachability = remember(currentPageUrl, settings.torModeEnabled) {
+        OnionAddress.reachability(currentPageUrl, settings.torModeEnabled, proxySupported)
+    }
+
+    DisposableEffect(settings.torModeEnabled, settings.torSocksHost, settings.torSocksPort, proxySupported) {
+        val controller = if (proxySupported) ProxyController.getInstance() else null
+        val executor = Executors.newSingleThreadExecutor()
+        if (settings.torModeEnabled && controller != null) {
+            val proxyUrl = "socks://${settings.torSocksHost}:${settings.torSocksPort}"
+            val config = ProxyConfig.Builder()
+                .addProxyRule(proxyUrl)
+                .addDirect()
+                .build()
+            runCatching { controller.setProxyOverride(config, executor) {} }
+                .onFailure { onShowFeedback("Could not apply the Tor proxy in this WebView build") }
+        }
+        onDispose {
+            if (controller != null) {
+                runCatching { controller.clearProxyOverride(executor) {} }
+            }
+            executor.shutdown()
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             webViewRef.value?.stopLoading()
@@ -102,6 +139,28 @@ fun BrowserScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Private / onion status banner — never claims anonymity it does not have.
+        when (reachability) {
+            OnionAddress.Reachability.ONION_VIA_PROXY -> TorBanner(
+                text = "Onion mode • routed through Tor at ${settings.torSocksHost}:${settings.torSocksPort}",
+                color = EmeraldPrimary
+            )
+            OnionAddress.Reachability.ONION_WITHOUT_PROXY -> TorBanner(
+                text = "This is a .onion address. Start Orbot (free) and enable Tor mode in the shield settings.",
+                color = WarningAmber
+            )
+            OnionAddress.Reachability.ONION_PROXY_DISABLED -> TorBanner(
+                text = "Tor mode is off — .onion services cannot be reached directly.",
+                color = WarningAmber
+            )
+            OnionAddress.Reachability.CLEARNET -> if (settings.torModeEnabled) {
+                TorBanner(
+                    text = "Tor mode active • traffic exits through the Tor network (slower, private)",
+                    color = CyberCyan
+                )
+            } else Unit
+        }
+
         // Top Browser Address & Shield Toolbar
         Surface(
             color = MaterialTheme.colorScheme.surface,
@@ -314,7 +373,10 @@ fun BrowserScreen(
                         }
                     }
 
-                    webView.loadUrl(currentPageUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+                    val blockedByOnionOnly = settings.onionOnlyMode && !OnionAddress.isOnion(currentPageUrl)
+                    if (!blockedByOnionOnly) {
+                        webView.loadUrl(currentPageUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+                    }
                 }
             },
             update = { webView ->
@@ -329,6 +391,8 @@ fun BrowserScreen(
 
     if (showBrowserShieldSheet) {
         var customCssSelector by remember { mutableStateOf("") }
+        var torHostInput by remember { mutableStateOf(settings.torSocksHost) }
+        var torPortInput by remember { mutableStateOf(settings.torSocksPort.toString()) }
 
         AlertDialog(
             onDismissRequest = { showBrowserShieldSheet = false },
@@ -341,6 +405,77 @@ fun BrowserScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Tor / onion mode", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "Routes this browser through a local Tor SOCKS proxy (Orbot). " +
+                                            "AdShield does not bundle the Tor daemon.",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = settings.torModeEnabled,
+                                    onCheckedChange = { onToggleTorMode(it) },
+                                    colors = SwitchDefaults.colors(checkedTrackColor = EmeraldPrimary)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(
+                                    value = torHostInput,
+                                    onValueChange = { torHostInput = it },
+                                    label = { Text("SOCKS host") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1.4f)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                OutlinedTextField(
+                                    value = torPortInput,
+                                    onValueChange = { torPortInput = it.filter { ch -> ch.isDigit() } },
+                                    label = { Text("Port") },
+                                    singleLine = true,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            TextButton(onClick = {
+                                onUpdateTorProxy(torHostInput, torPortInput.toIntOrNull() ?: 9050)
+                                onShowFeedback("Tor proxy saved")
+                            }) { Text("Save proxy", fontSize = 12.sp) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Onion-only tab", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "Blocks clearnet navigation in this tab so nothing leaks outside Tor.",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = settings.onionOnlyMode,
+                                    onCheckedChange = { onToggleOnionOnly(it) },
+                                    colors = SwitchDefaults.colors(checkedTrackColor = CyberCyan)
+                                )
+                            }
+                        }
+                    }
+
                     Text(
                         text = "Built-in WebView protections apply to pages opened inside AdShield Pro Browser. (Note: Non-root Android apps cannot inject cosmetic CSS into external third-party browsers.)",
                         style = MaterialTheme.typography.labelMedium,
@@ -524,5 +659,22 @@ private fun normalizeNavigationInput(raw: String): String {
         "https://$trimmed"
     } else {
         "https://duckduckgo.com/?q=${Uri.encode(trimmed)}"
+    }
+}
+
+@Composable
+private fun TorBanner(text: String, color: androidx.compose.ui.graphics.Color) {
+    Surface(
+        color = color.copy(alpha = 0.14f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 2)
+        }
     }
 }

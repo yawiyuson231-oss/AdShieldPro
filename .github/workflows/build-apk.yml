@@ -11,6 +11,7 @@ on:
   push:
     branches:
       - arena/b1d244c1-adshieldpro
+      - arena/40a64c9a-adshieldpro
     paths-ignore:
       - 'build-logs/**'
       - 'apk/**'

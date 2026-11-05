@@ -12,6 +12,24 @@ val githubUpdateRepository = providers.gradleProperty("githubUpdateRepository")
     .orElse("hillman3948-cyber/AdShieldPro")
     .get()
 val escapedGithubUpdateRepository = githubUpdateRepository.replace("\\", "\\\\").replace("\"", "\\\"")
+// Public cloud deployment values. These are *publishable* identifiers only (a Worker URL and
+// the Supabase anon key) — never a secret. Leave them empty to ship the app unconfigured and
+// let the user paste their own deployment in Cloud ▸ Settings.
+val defaultCloudApiUrl = providers.gradleProperty("cloudApiBaseUrl")
+    .orElse(providers.environmentVariable("CLOUD_API_BASE_URL"))
+    .orElse("")
+    .get()
+val defaultSupabaseUrl = providers.gradleProperty("cloudSupabaseUrl")
+    .orElse(providers.environmentVariable("CLOUD_SUPABASE_URL"))
+    .orElse("")
+    .get()
+val defaultSupabaseAnonKey = providers.gradleProperty("cloudSupabaseAnonKey")
+    .orElse(providers.environmentVariable("CLOUD_SUPABASE_ANON_KEY"))
+    .orElse("")
+    .get()
+fun escapeBuildConfig(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"")
+
 val releaseKeystorePath = providers.gradleProperty("adshieldKeystorePath")
     .orElse(providers.environmentVariable("ADSHIELD_KEYSTORE_PATH"))
     .orNull
@@ -69,6 +87,9 @@ android {
             "GITHUB_UPDATE_REPOSITORY",
             "\"$escapedGithubUpdateRepository\""
         )
+        buildConfigField("String", "DEFAULT_CLOUD_API_URL", "\"${escapeBuildConfig(defaultCloudApiUrl)}\"")
+        buildConfigField("String", "DEFAULT_SUPABASE_URL", "\"${escapeBuildConfig(defaultSupabaseUrl)}\"")
+        buildConfigField("String", "DEFAULT_SUPABASE_ANON_KEY", "\"${escapeBuildConfig(defaultSupabaseAnonKey)}\"")
 
     }
 

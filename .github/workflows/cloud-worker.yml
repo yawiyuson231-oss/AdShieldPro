@@ -1,0 +1,44 @@
+name: Cloud backend — typecheck & integration tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - arena/b1d244c1-adshieldpro
+      - arena/40a64c9a-adshieldpro
+    paths:
+      - 'cloud/**'
+      - '.github/workflows/cloud-worker.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: cloud/worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloud/worker/package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: Integration tests (real workerd + local D1 + R2)
+        run: node test/run-tests.mjs
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-test-report
+          path: cloud/worker/test/last-run.json
+          if-no-files-found: warn
