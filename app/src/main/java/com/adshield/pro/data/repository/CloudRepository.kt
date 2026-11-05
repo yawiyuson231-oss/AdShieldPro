@@ -116,8 +116,9 @@ class CloudRepository @Inject constructor(
         parentId: String? = null,
         kind: String? = null,
         search: String? = null,
-        trashed: Boolean = false
-    ): List<CloudNodeDto> = api.nodes(parentId, kind, search, trashed)
+        trashed: Boolean = false,
+        recursive: Boolean = false
+    ): List<CloudNodeDto> = api.nodes(parentId, kind, search, trashed, recursive)
 
     suspend fun kinds(): KindCountsDto = api.kinds()
 

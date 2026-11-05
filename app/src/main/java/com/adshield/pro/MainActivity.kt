@@ -16,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -48,6 +50,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -430,7 +434,37 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
 }
 
 @Composable
-private fun CloudDestination(viewModel: CloudStorageViewModel = hiltViewModel()) {
+private fun CloudDestination() {
+    var showLegacyProviders by remember { mutableStateOf(false) }
+    if (showLegacyProviders) {
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = { showLegacyProviders = false }) {
+                    Text("\u2190 AdShield Cloud", fontSize = 12.sp)
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Legacy WebDAV providers",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp
+                )
+            }
+            Box(Modifier.weight(1f)) { LegacyCloudDestination() }
+        }
+    } else {
+        com.adshield.pro.ui.screens.cloud.CloudDashboardScreen(
+            onOpenLegacyProviders = { showLegacyProviders = true }
+        )
+    }
+}
+
+@Composable
+private fun LegacyCloudDestination(viewModel: CloudStorageViewModel = hiltViewModel()) {
     val providers by viewModel.providers.collectAsStateWithLifecycle()
     val capacity by viewModel.capacity.collectAsStateWithLifecycle()
     val selectedProviderId by viewModel.selectedProviderId.collectAsStateWithLifecycle()

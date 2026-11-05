@@ -42,7 +42,8 @@ interface CloudApi {
         parentId: String? = null,
         kind: String? = null,
         search: String? = null,
-        trashed: Boolean = false
+        trashed: Boolean = false,
+        recursive: Boolean = false
     ): List<CloudNodeDto>
 
     suspend fun kinds(): KindCountsDto
@@ -163,10 +164,12 @@ class CloudApiClient internal constructor(
         parentId: String?,
         kind: String?,
         search: String?,
-        trashed: Boolean
+        trashed: Boolean,
+        recursive: Boolean
     ): List<CloudNodeDto> = decode<NodesResponseDto>(
         get("/v1/nodes") {
             if (trashed) it.addQueryParameter("trashed", "1")
+            else if (recursive) it.addQueryParameter("recursive", "1")
             else if (parentId != null) it.addQueryParameter("parentId", parentId)
             if (!kind.isNullOrBlank() && kind != "all") it.addQueryParameter("kind", kind)
             if (!search.isNullOrBlank()) it.addQueryParameter("search", search)

@@ -9,6 +9,7 @@ import com.adshield.pro.data.cloud.AuditEntryDto
 import com.adshield.pro.data.cloud.BackupRowDto
 import com.adshield.pro.data.cloud.CloudBackupManager
 import com.adshield.pro.data.cloud.CloudEndpoints
+import com.adshield.pro.data.cloud.CloudFileKind
 import com.adshield.pro.data.cloud.CloudNodeDto
 import com.adshield.pro.data.cloud.CloudQuotaWarningDto
 import com.adshield.pro.data.cloud.CloudShareDto
@@ -433,6 +434,25 @@ class CloudViewModel @Inject constructor(
             }
         }
     }
+
+    /** A short-lived signed URL for previews and external players. */
+    suspend fun urlFor(nodeId: String): String? = runCatching { repository.downloadUrl(nodeId) }.getOrNull()?.url
+
+    /** Lists every file of a media kind, across folders. */
+    suspend fun media(kind: CloudFileKind): List<CloudNodeDto> {
+        val kindParam = when (kind) {
+            CloudFileKind.PHOTO -> "photo"
+            CloudFileKind.VIDEO -> "video"
+            CloudFileKind.AUDIO -> "audio"
+            CloudFileKind.DOCUMENT -> "document"
+            else -> "file"
+        }
+        return runCatching { repository.nodes(kind = kindParam, recursive = true) }.getOrDefault(emptyList())
+    }
+
+    fun endpointsBaseUrl(): String = repository.endpoints().apiBaseUrl
+
+    suspend fun verifySession(): Boolean = repository.verifySession()
 
     fun loadVersions(node: CloudNodeDto) {
         viewModelScope.launch {

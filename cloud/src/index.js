@@ -109,7 +109,7 @@ export function buildApp(env) {
 
   app.get('/v1/nodes', async (c) => {
     const user = userOf(c)
-    const { parentId = null, kind, search, trashed } = c.req.query()
+    const { parentId = null, kind, search, trashed, recursive } = c.req.query()
     const params = [user.id]
     let sql = `SELECT id, parent_id, kind, name, size_bytes, content_type, sha1, created_at, updated_at, deleted_at, purge_at
                FROM nodes WHERE user_id = ?`
@@ -117,15 +117,24 @@ export function buildApp(env) {
       sql += ` AND deleted_at IS NOT NULL`
     } else {
       sql += ` AND deleted_at IS NULL`
-      sql += parentId ? ` AND parent_id = ?` : ` AND parent_id IS NULL`
-      if (parentId) params.push(parentId)
+      // `recursive=1` skips the folder filter so media sections can list every file the user owns.
+      if (recursive !== '1') {
+        sql += parentId ? ` AND parent_id = ?` : ` AND parent_id IS NULL`
+        if (parentId) params.push(parentId)
+      }
     }
-    if (kind && kind !== 'all') {
+    if (kind === 'photo') {
+      sql += ` AND kind = 'file' AND content_type LIKE 'image/%'`
+    } else if (kind === 'video') {
+      sql += ` AND kind = 'file' AND content_type LIKE 'video/%'`
+    } else if (kind === 'audio') {
+      sql += ` AND kind = 'file' AND content_type LIKE 'audio/%'`
+    } else if (kind === 'document') {
+      sql += ` AND kind = 'file' AND (content_type LIKE '%pdf%' OR content_type LIKE 'text/%'`
+      sql += ` OR content_type LIKE 'application/%' OR content_type LIKE '%document%')`
+    } else if (kind && kind !== 'all') {
       sql += ` AND kind = ?`
       params.push(kind)
-    } else if (kind === 'media') {
-      sql += ` AND kind = 'file' AND content_type LIKE ?`
-      params.push('image/%')
     }
     if (search) {
       sql += ` AND name LIKE ? ESCAPE '\\'`
