@@ -51,7 +51,7 @@ class GpsPreferences @Inject constructor(
         val CUSTOM_VALHALLA = stringPreferencesKey("custom_valhalla_url")
         val CUSTOM_NOMINATIM = stringPreferencesKey("custom_nominatim_url")
         val TRAFFIC_BACKEND = stringPreferencesKey("traffic_backend_url")
-        val TRAFFIC_BACKEND_TOKEN = stringPreferencesKey("traffic_backend_enabled")
+        val TRAFFIC_BACKEND_ENABLED = booleanPreferencesKey("traffic_backend_enabled")
         val LAST_LAT = stringPreferencesKey("last_lat")
         val LAST_LON = stringPreferencesKey("last_lon")
         val LAST_ZOOM = stringPreferencesKey("last_zoom")
@@ -143,7 +143,7 @@ class GpsPreferences @Inject constructor(
     val customValhallaUrl: Flow<String?> = context.gpsDataStore.data.map { it[Keys.CUSTOM_VALHALLA] }
     val customNominatimUrl: Flow<String?> = context.gpsDataStore.data.map { it[Keys.CUSTOM_NOMINATIM] }
     val trafficBackendUrl: Flow<String?> = context.gpsDataStore.data.map { it[Keys.TRAFFIC_BACKEND] }
-    val trafficBackendEnabled: Flow<Boolean> = context.gpsDataStore.data.map { it[Keys.TRAFFIC_BACKEND_TOKEN] ?: false }
+    val trafficBackendEnabled: Flow<Boolean> = context.gpsDataStore.data.map { it[Keys.TRAFFIC_BACKEND_ENABLED] ?: false }
 
     suspend fun setEndpoint(key: String, value: String?) {
         val preferenceKey = when (key) {
@@ -159,7 +159,7 @@ class GpsPreferences @Inject constructor(
     }
 
     suspend fun setTrafficBackendEnabled(enabled: Boolean) {
-        context.gpsDataStore.edit { it[Keys.TRAFFIC_BACKEND_TOKEN] = enabled }
+        context.gpsDataStore.edit { it[Keys.TRAFFIC_BACKEND_ENABLED] = enabled }
     }
 
     val lastCamera: Flow<GeoPoint?> = context.gpsDataStore.data.map { prefs ->

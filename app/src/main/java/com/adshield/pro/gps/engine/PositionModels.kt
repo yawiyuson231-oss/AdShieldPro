@@ -496,7 +496,7 @@ class HeadingFusion(
             ?.takeIf { fix.speedMps != null && fix.speedMps >= 2.2f && fix.bearingAccuracyDegrees.let { acc -> acc == null || acc <= 45f } }
         val compassHeading = compass?.degrees
 
-        val target: Double? = when {
+        val target: Double = when {
             gnssCourse != null && compassHeading != null -> {
                 val speed = fix.speedMps?.toDouble() ?: 0.0
                 val weight = (speed / courseWeightMaxSpeedMps).coerceIn(0.0, 0.85)

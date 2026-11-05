@@ -143,38 +143,37 @@ class GnssLocationSource(
             close()
             return@callbackFlow
         }
-        var latest: SatelliteSnapshot? = null
-        var usedInFix = 0
-        var visible = 0
-
-        fun onStatus(status: GnssStatus) {
-            visible = status.satelliteCount
-            usedInFix = 0
+        // Local, self-contained builder: a private function would capture the channel differently
+        // and a nested one is easier to keep free of outer state.
+        val onStatus: (GnssStatus) -> Unit = { status ->
+            val visible = status.satelliteCount
+            var usedInFix = 0
             var snrSum = 0.0
             var snrCount = 0
             var best = 0.0f
             val constellations = LinkedHashSet<String>()
-            val satellites = ArrayList<SatelliteInfo>(status.satelliteCount)
-            for (index in 0 until status.satelliteCount) {
+            val satellites = ArrayList<SatelliteInfo>(visible)
+            for (index in 0 until visible) {
                 val constellation = constellationName(status.getConstellationType(index))
                 constellations += constellation
-                val used = status.usedInFix(index)
-                if (used) usedInFix++
+                val usedInFixAtIndex = status.usedInFix(index)
+                if (usedInFixAtIndex) usedInFix++
                 val snr = status.getCn0DbHz(index)
-                if (used && snr > 0f) {
+                if (usedInFixAtIndex && snr > 0f) {
                     snrSum += snr
                     snrCount++
                     if (snr > best) best = snr
                 }
+                // Almanac/ephemeris flags are not part of the public GnssStatus API: a receiver that
+                // knows them does not expose them to apps, so they stay "unknown" (false) here
+                // rather than being guessed.
                 satellites += SatelliteInfo(
                     svid = status.getSvid(index),
                     constellation = constellation,
                     azimuthDegrees = status.getAzimuthDegrees(index),
                     elevationDegrees = status.getElevationDegrees(index),
                     snrDbHz = snr,
-                    usedInFix = used,
-                    hasAlmanac = status.hasAlmanac(index),
-                    hasEphemeris = status.hasEphemeris(index)
+                    usedInFix = usedInFixAtIndex
                 )
             }
             val snapshot = SatelliteSnapshot(
@@ -185,13 +184,14 @@ class GnssLocationSource(
                 constellations = constellations.toList(),
                 satellites = satellites
             )
-            latest = snapshot
             _satellites.tryEmit(snapshot)
             trySend(snapshot)
         }
 
         val callback = object : GnssStatus.Callback() {
-            override fun onSatelliteStatusChanged(status: GnssStatus) = onStatus(status)
+            override fun onSatelliteStatusChanged(status: GnssStatus) {
+                onStatus(status)
+            }
         }
 
         val registered = runCatching {

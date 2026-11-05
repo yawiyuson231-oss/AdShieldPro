@@ -386,7 +386,7 @@ class TrafficApiClient @Inject constructor(
             }.toString()
             postJson("$base/v1/traffic/observations", payload)?.let { body ->
                 runCatching {
-                    body.jsonObject["accepted"]?.jsonPrimitive?.content?.toIntOrNull()
+                    json.parseToJsonElement(body).jsonObject["accepted"]?.jsonPrimitive?.content?.toIntOrNull()
                 }.getOrNull() ?: observations.size
             } ?: -1
         }
