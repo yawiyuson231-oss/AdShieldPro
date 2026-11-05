@@ -109,7 +109,10 @@ fun GpsRadarScreen(
                             detail = RadarGeometry.emptyReason(
                                 hasPermission = state.permissionAudit?.fineLocationGranted != false,
                                 locationEnabled = state.permissionAudit?.locationEnabled != false,
-                                gnssReported = satellites != null
+                                // GNSS hardware is present when the platform exposes the status API;
+                                // a snapshot means a report has actually arrived.
+                                gnssAvailable = state.gnssStatusSupported,
+                                receivedReport = satellites != null
                             ),
                             icon = Icons.Default.SatelliteAlt,
                             accent = GpsGrey

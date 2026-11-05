@@ -267,7 +267,15 @@ class GpsViewModel @Inject constructor(
     fun refreshPermissionAudit() {
         viewModelScope.launch {
             val audit = withContext(Dispatchers.Default) { buildPermissionAudit() }
-            _state.value = _state.value.copy(permissionAudit = audit)
+            val gnssPresent = withContext(Dispatchers.Default) {
+                runCatching {
+                    context.packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)
+                }.getOrDefault(true)
+            }
+            _state.value = _state.value.copy(
+                permissionAudit = audit,
+                gnssStatusSupported = gnssPresent
+            )
         }
     }
 
@@ -808,7 +816,13 @@ data class GpsUiState(
     /** Self-hosted community traffic server, blank when the user has not configured one. */
     val trafficBackendUrl: String = "",
     /** Incident markers drawn on the map (real reports, never synthetic). */
-    val incidentPoints: List<GeoPoint> = emptyList()
+    val incidentPoints: List<GeoPoint> = emptyList(),
+    /**
+     * True when this device can report satellite status at all. Checked from the platform
+     * capability, not assumed: an emulator or a navigational device without GNSS reports false and
+     * the radar says so instead of spinning forever.
+     */
+    val gnssStatusSupported: Boolean = true
 ) {
     /** One-line operational status used by the GPS header of every tab. */
     fun statusLine(frame: GpsFrame): String = when {
