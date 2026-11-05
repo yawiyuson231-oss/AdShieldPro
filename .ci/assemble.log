@@ -11,40 +11,40 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugRFile UP-TO-DATE
 > Task :app:kspDebugKotlin UP-TO-DATE
 > Task :app:compileDebugKotlin UP-TO-DATE
-> Task :app:generateDebugAssets UP-TO-DATE
-> Task :app:javaPreCompileDebug
-> Task :app:mergeDebugAssets
+> Task :app:javaPreCompileDebug FROM-CACHE
 > Task :app:compileDebugJavaWithJavac
-> Task :app:compressDebugAssets
-> Task :app:generateDebugGlobalSynthetics
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:compressDebugAssets FROM-CACHE
+> Task :app:generateDebugGlobalSynthetics FROM-CACHE
 > Task :app:processDebugJavaRes
-> Task :app:mergeDebugJavaResource
-> Task :app:desugarDebugFileDependencies
+> Task :app:desugarDebugFileDependencies FROM-CACHE
 > Task :app:hiltCollectClassesDebug
 > Task :app:checkDebugDuplicateClasses
-> Task :app:hiltAggregateDepsDebug
-> Task :app:mergeExtDexDebug
-> Task :app:mergeLibDexDebug
+> Task :app:hiltAggregateDepsDebug FROM-CACHE
+> Task :app:mergeExtDexDebug FROM-CACHE
+> Task :app:mergeLibDexDebug FROM-CACHE
+> Task :app:mergeDebugJavaResource
 > Task :app:hiltJavaCompileDebug
-> Task :app:mapDebugSourceSetPaths
 > Task :app:checkDebugAarMetadata
-> Task :app:compileDebugNavigationResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources FROM-CACHE
+> Task :app:mergeDebugResources FROM-CACHE
 > Task :app:createDebugCompatibleScreenManifests
-> Task :app:extractDeepLinksDebug
-> Task :app:processDebugMainManifest
-> Task :app:mergeDebugResources
-> Task :app:processDebugManifest
+> Task :app:extractDeepLinksDebug FROM-CACHE
+> Task :app:processDebugMainManifest FROM-CACHE
+> Task :app:processDebugManifest FROM-CACHE
+> Task :app:processDebugManifestForPackage FROM-CACHE
+> Task :app:processDebugResources FROM-CACHE
 > Task :app:mergeDebugJniLibFolders
-> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugNativeLibs
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
 
 > Task :app:stripDebugDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so, libmaplibre.so. Run with --info option to learn more.
 
-> Task :app:processDebugResources
-> Task :app:validateSigningDebug
-> Task :app:writeDebugAppMetadata
-> Task :app:writeDebugSigningConfigVersions
 > Task :app:transformDebugClassesWithAsm
 > Task :app:dexBuilderDebug
 > Task :app:mergeProjectDexDebug
@@ -52,6 +52,6 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 1m 55s
-42 actionable tasks: 34 executed, 8 up-to-date
+BUILD SUCCESSFUL in 45s
+42 actionable tasks: 20 executed, 14 from cache, 8 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

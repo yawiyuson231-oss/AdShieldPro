@@ -28,7 +28,7 @@ Daemon will be stopped at the end of the build
 > Task :app:transformDebugClassesWithAsm UP-TO-DATE
 > Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:processDebugJavaRes UP-TO-DATE
-> Task :app:javaPreCompileDebugUnitTest
+> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
 > Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
@@ -40,7 +40,7 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshie
 > Task :app:processDebugUnitTestJavaRes
 > Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
 > Task :app:hiltCollectClassesDebugUnitTest
-> Task :app:hiltAggregateDepsDebugUnitTest
+> Task :app:hiltAggregateDepsDebugUnitTest FROM-CACHE
 > Task :app:hiltJavaCompileDebugUnitTest NO-SOURCE
 > Task :app:transformDebugUnitTestClassesWithAsm
 
@@ -176,8 +176,7 @@ CapabilityRegistryTest > testNoCapabilityClaimsCloudAiOrChargeControl PASSED
 
 CapabilityRegistryTest > testEveryCapabilityHasUniqueIdAndHonestStatus PASSED
 
-CapabilityRegistryTest > testImplementedCapabilitiesPointAtRealCode FAILED
-    java.lang.AssertionError at CapabilityRegistryTest.kt:41
+CapabilityRegistryTest > testImplementedCapabilitiesPointAtRealCode PASSED
 
 CapabilityRegistryTest > testUnavailableCapabilitiesClaimNoCode PASSED
 
@@ -255,8 +254,7 @@ DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
 
 GpsEngineTest > testRadarZenithSatelliteSitsInTheCentre PASSED
 
-GpsEngineTest > testRadarEmptyReasonIsSpecificAboutTheCause FAILED
-    java.lang.AssertionError at GpsEngineTest.kt:330
+GpsEngineTest > testRadarEmptyReasonIsSpecificAboutTheCause PASSED
 
 GpsEngineTest > testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed PASSED
 
@@ -294,8 +292,7 @@ GpsEngineTest > testIntegrityStatisticsAccumulate PASSED
 
 GpsEngineTest > testSkyScoreIsZeroWithoutSatellites PASSED
 
-GpsEngineTest > testIntegrityMonitorAcceptsNormalDriving FAILED
-    java.lang.AssertionError at GpsEngineTest.kt:185
+GpsEngineTest > testIntegrityMonitorAcceptsNormalDriving PASSED
 
 GpsEngineTest > testRadarEastIsPositiveX PASSED
 
@@ -324,6 +321,65 @@ GpsEngineTest > testEtaWithoutAnySpeedInformationStillTerminates PASSED
 GpsEngineTest > testStationaryDetectorInfersMotionWithoutDopplerSpeed PASSED
 
 GpsEngineTest > testIntegrityMonitorFlagsMockProvider PASSED
+
+GpsOfflineGraphTest > testOfflineRouterProducesATurnByTurnPlan FAILED
+    java.lang.AssertionError at GpsOfflineGraphTest.kt:189
+
+GpsOfflineGraphTest > testGraphRoundTripsThroughTheBinaryFormat PASSED
+
+GpsOfflineGraphTest > testEstimatedSizeGrowsWithTheGraph PASSED
+
+GpsOfflineGraphTest > testRoutingOutsideTheDownloadedRegionIsRefusedNotApproximated PASSED
+
+GpsOfflineGraphTest > testShortestPathFindsTheLShapedRoute FAILED
+    java.lang.AssertionError at GpsOfflineGraphTest.kt:48
+
+GpsOfflineGraphTest > testTruncatedFileFailsInsteadOfProducingAPartialGraph PASSED
+
+GpsOfflineGraphTest > testNearestNodeSnapsAnOffRoadCoordinate PASSED
+
+GpsOfflineGraphTest > testCorruptNodeCountIsBounded PASSED
+
+GpsOfflineGraphTest > testCompressedFileRoundTripOnDisk PASSED
+
+GpsOfflineGraphTest > testForeignFileIsRejectedWithAReason PASSED
+
+GpsOfflineGraphTest > testSnapToRoadLandsOnTheSegmentNotOnANode PASSED
+
+GpsOfflineGraphTest > testSnapToRoadReturnsNullBeyondItsSearchRadius PASSED
+
+GpsOfflineGraphTest > testWrongVersionIsRejectedInsteadOfParsedAnyway PASSED
+
+GpsOfflineGraphTest > testDescribeReportsRealRoadKilometresNotEdgeCounts PASSED
+
+GpsOfflineGraphTest > testShortestPathIsDirectionAwareAcrossTheOneWayPair FAILED
+    java.lang.NullPointerException at GpsOfflineGraphTest.kt:167
+
+GpsOfflineGraphTest > testRegionIdIsNotPartOfTheFileSoTheCallerSuppliesIt PASSED
+
+GpsOfflineGraphTest > testDistanceToCoverageIsZeroInsideAndPositiveOutside PASSED
+
+GpsSecureStoreTest > testEmptyPayloadStillRoundTrips PASSED
+
+GpsSecureStoreTest > testWrongKeyIsRejected PASSED
+
+GpsSecureStoreTest > testEncryptedContainerIsNotThePlaintext PASSED
+
+GpsSecureStoreTest > testHeaderOnlyFileIsRejectedAsTruncated PASSED
+
+GpsSecureStoreTest > testRoundTripRestoresTheExactBytes PASSED
+
+GpsSecureStoreTest > testTamperedCiphertextFailsAuthentication PASSED
+
+GpsSecureStoreTest > testHeaderLayoutMatchesTheDocumentedFormat PASSED
+
+GpsSecureStoreTest > testRestoredKeyDecryptsEarlierData PASSED
+
+GpsSecureStoreTest > testTamperedIvFailsAuthentication PASSED
+
+GpsSecureStoreTest > testSameKeyTwiceProducesDifferentContainers PASSED
+
+GpsSecureStoreTest > testPlaintextFileIsNotMistakenForAContainer PASSED
 
 GpsTrafficSecurityTest > testStandstillTrafficIsRed PASSED
 
@@ -533,7 +589,7 @@ SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
 
 SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
 
-242 tests completed, 3 failed
+270 tests completed, 3 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -695,5 +751,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 32s
-33 actionable tasks: 9 executed, 24 up-to-date
+BUILD FAILED in 37s
+33 actionable tasks: 7 executed, 2 from cache, 24 up-to-date
