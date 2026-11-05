@@ -19,6 +19,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
+    @Inject lateinit var cyberShieldPrefs: com.adshield.pro.cybershield.data.CyberShieldPrefs
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -42,6 +43,10 @@ class AdShieldApplication : Application(), Configuration.Provider {
                 context = this@AdShieldApplication,
                 enabled = settings.smartAutoOptimizeEnabled,
                 intervalHours = settings.autoJunkCleanIntervalHours
+            )
+            com.adshield.pro.worker.ThreatIntelRefreshWorker.scheduleOrCancel(
+                context = this@AdShieldApplication,
+                enabled = cyberShieldPrefs.intelEnabled
             )
         }
     }

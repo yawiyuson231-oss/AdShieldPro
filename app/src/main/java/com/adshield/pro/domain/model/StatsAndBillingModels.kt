@@ -10,7 +10,9 @@ data class DnsActivityRecord(
     val matchedRule: String?,
     val sourceList: String,
     val latencyMs: Int,
-    val protocolUsed: String
+    val protocolUsed: String,
+    val appPackageName: String? = null,
+    val appName: String? = null
 )
 
 data class DomainBlockCount(

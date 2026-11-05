@@ -27,7 +27,7 @@ object AppModule {
             AdShieldDatabase::class.java,
             AdShieldDatabase.DATABASE_NAME
         )
-            .addMigrations(AdShieldDatabase.MIGRATION_1_2)
+            .addMigrations(AdShieldDatabase.MIGRATION_1_2, AdShieldDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }

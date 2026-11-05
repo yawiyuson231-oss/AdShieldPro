@@ -12,7 +12,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FilterSourceEntity::class,
         DailyStatEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AdShieldDatabase : RoomDatabase() {
@@ -33,6 +33,17 @@ abstract class AdShieldDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_dns_logs_is_blocked ON dns_logs(is_blocked)"
                 )
+            }
+        }
+
+        /**
+         * v2 → v3: per-app attribution on DNS history rows (CyberShield AI
+         * threat details / activity feed). Existing rows keep NULL attribution.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE dns_logs ADD COLUMN app_package TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE dns_logs ADD COLUMN app_label TEXT DEFAULT NULL")
             }
         }
     }

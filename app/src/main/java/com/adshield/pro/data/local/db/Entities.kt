@@ -33,7 +33,11 @@ data class DnsLogEntity(
     @ColumnInfo(name = "latency_ms")
     val latencyMs: Int,
     @ColumnInfo(name = "protocol_used")
-    val protocolUsed: String
+    val protocolUsed: String,
+    @ColumnInfo(name = "app_package", defaultValue = "NULL")
+    val appPackage: String? = null,
+    @ColumnInfo(name = "app_label", defaultValue = "NULL")
+    val appLabel: String? = null
 )
 
 @Entity(

@@ -104,7 +104,9 @@ class AdShieldRepository @Inject constructor(
                 matchedRule = entity.matchedRule,
                 sourceList = entity.sourceList,
                 latencyMs = entity.latencyMs,
-                protocolUsed = entity.protocolUsed
+                protocolUsed = entity.protocolUsed,
+                appPackageName = entity.appPackage,
+                appName = entity.appLabel
             )
         }
     }
@@ -319,7 +321,9 @@ class AdShieldRepository @Inject constructor(
                     matchedRule = matchedRule,
                     sourceList = sourceList,
                     latencyMs = latencyMs,
-                    protocolUsed = protocolUsed
+                    protocolUsed = protocolUsed,
+                    appPackage = appPackageName?.takeIf { it.isNotBlank() },
+                    appLabel = appName?.takeIf { it.isNotBlank() }
                 )
             )
         }

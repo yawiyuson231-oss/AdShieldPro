@@ -17,12 +17,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
@@ -61,7 +65,7 @@ import com.adshield.pro.ui.viewmodel.AdShieldViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
-    HOME("Home", Icons.Default.Home),
+    HOME("CyberShield", Icons.Default.Security),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     OPTIMIZER("Optimizer", Icons.Default.Bolt),
     STATISTICS("Statistics", Icons.Default.Analytics),
@@ -90,9 +94,11 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
+    var showClassicHome by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     BackHandler(enabled = showAboutScreen) { showAboutScreen = false }
+    BackHandler(enabled = showClassicHome && !showAboutScreen) { showClassicHome = false }
 
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
@@ -270,7 +276,22 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 .padding(innerPadding)
         ) {
             when (currentTab) {
-                MainNavDestination.HOME -> HomeScreen(
+                MainNavDestination.HOME -> if (!showClassicHome) {
+                    com.adshield.pro.ui.cybershield.CyberShieldDashboardScreen(
+                        onToggleProtection = handleToggleVpn,
+                        onPauseResume = {
+                            if (vpnState.status == VpnStatus.PAUSED) {
+                                viewModel.resumeVpnService()
+                            } else {
+                                viewModel.pauseVpnService()
+                            }
+                        },
+                        onOpenClassicHome = { showClassicHome = true },
+                        onOpenStatistics = { currentTab = MainNavDestination.STATISTICS },
+                        onShowFeedback = viewModel::showFeedback
+                    )
+                } else ClassicHomeWrapper(onBack = { showClassicHome = false }) {
+                    HomeScreen(
                     vpnState = vpnState,
                     settings = settings,
                     allTimeTotal = allTimeTotal,
@@ -298,7 +319,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
                     onRunOptimizeNow = viewModel::runOneTapSmartBoost,
                     onOpenOptimizerTab = { currentTab = MainNavDestination.OPTIMIZER }
-                )
+                    )
+                }
 
                 MainNavDestination.AD_BLOCKER -> AdBlockerHubScreen(
                     sources = filterSources,
@@ -399,5 +421,34 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The original AdShield Home experience, kept fully intact and reachable from
+ * the CyberShield dashboard header (home icon). Nothing was removed.
+ */
+@Composable
+private fun ClassicHomeWrapper(onBack: () -> Unit, content: @Composable () -> Unit) {
+    androidx.compose.foundation.layout.Column(modifier = Modifier.fillMaxSize()) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            androidx.compose.material3.IconButton(onClick = onBack) {
+                Icon(
+                    Icons.Default.ArrowBack, "Back to CyberShield",
+                    tint = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                "Classic Home",
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground
+            )
+        }
+        androidx.compose.foundation.layout.Box(modifier = Modifier.weight(1f)) { content() }
     }
 }
