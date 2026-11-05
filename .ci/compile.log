@@ -11,21 +11,15 @@ Daemon will be stopped at the end of the build
 > Task :app:kspDebugKotlin
 
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:102:16 None of the following candidates is applicable:
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:103:16 None of the following candidates is applicable:
 
 suspend fun <T> Flow<T>.first(): T:
   Candidate 'suspend fun <T> Flow<T>.first(): T' is inapplicable because of a receiver type mismatch.
 
 suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
   Candidate 'suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T' is inapplicable because of a receiver type mismatch.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:102:65 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/vpn/VpnLatencyProber.kt:22:9 None of the following candidates is applicable:
-
-suspend fun <T> withTimeoutOrNull(timeMillis: Long, block: suspend CoroutineScope.() -> T): T?:
-  Argument type mismatch: actual type is 'Int', but 'Long' was expected.
-
-suspend fun <T> withTimeoutOrNull(timeout: Duration, block: suspend CoroutineScope.() -> T): T?:
-  Argument type mismatch: actual type is 'Int', but 'Duration' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt:103:58 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/vpn/VpnLatencyProber.kt:26:77 Argument type mismatch: actual type is 'Long', but 'Int' was expected.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -45,7 +39,7 @@ Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.a
      
          suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
            Candidate 'suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T' is inapplicable because of a receiver type mismatch.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt line 102
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/cloud/CloudTransferEngine.kt line 103
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -249,5 +243,5 @@ suspend fun <T> Flow<T>.first(predicate: suspend (T) -> Boolean): T:
 	... 2 more
 
 
-BUILD FAILED in 32s
+BUILD FAILED in 51s
 8 actionable tasks: 6 executed, 2 from cache
