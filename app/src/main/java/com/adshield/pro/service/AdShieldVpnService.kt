@@ -71,6 +71,19 @@ class AdShieldVpnService : VpnService() {
     @Volatile
     private var isPaused: Boolean = false
 
+    /**
+     * Global VPN mode requested by the VPN module. When true the same single tunnel routes ALL
+     * traffic (0.0.0.0/0, ::/0) with setBlocking(true) so a dead tunnel leaks nothing (kill
+     * switch). Non-DNS packets are dropped by the packet loop unless an upstream tunnel is
+     * configured — the app never pretends to forward traffic it cannot encrypt.
+     */
+    @Volatile
+    var globalVpnMode: Boolean = false
+        private set
+
+    var globalVpnServerHost: String? = null
+        private set
+
     private var connectivityManager: ConnectivityManager? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -87,6 +100,8 @@ class AdShieldVpnService : VpnService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP_VPN -> {
+                globalVpnMode = false
+                globalVpnServerHost = null
                 // The user explicitly turned protection off: this must be durable before
                 // stopSelf() tears down the service scope, otherwise the pending DataStore
                 // write is cancelled and protection would silently come back after a reboot.
@@ -115,6 +130,13 @@ class AdShieldVpnService : VpnService() {
                 } else {
                     startVpnTunnel()
                 }
+                return START_STICKY
+            }
+            ACTION_START_GLOBAL_VPN -> {
+                globalVpnMode = true
+                globalVpnServerHost = intent?.getStringExtra(EXTRA_SERVER_HOST)
+                startForegroundWithNotification()
+                startVpnTunnel()
                 return START_STICKY
             }
             ACTION_RELOAD_TUNNEL_CONFIG -> {
@@ -154,10 +176,16 @@ class AdShieldVpnService : VpnService() {
                     .addRoute(VIRTUAL_IPV4_DNS, 32)
                     .addDnsServer(VIRTUAL_IPV4_DNS)
 
+                if (globalVpnMode) {
+                    // Global VPN: route everything through the single shared tunnel.
+                    builder.addRoute("0.0.0.0", 0)
+                }
+
                 if (settings.resolverConfig.enableIpv6) {
                     builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
                     builder.addRoute(VIRTUAL_IPV6_DNS, 128)
                     builder.addDnsServer(VIRTUAL_IPV6_DNS)
+                    if (globalVpnMode) builder.addRoute("::", 0)
                 }
 
                 // Always exclude AdShield Pro itself so upstream requests never loop

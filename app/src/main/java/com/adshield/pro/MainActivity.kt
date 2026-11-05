@@ -238,6 +238,8 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.OPTIMIZER -> OptimizerDestination(viewModel)
                 MainNavDestination.BATTERY -> BatteryDestination(viewModel)
+                MainNavDestination.CLOUD -> CloudDestination()
+                MainNavDestination.VPN -> VpnDestination()
                 MainNavDestination.STATISTICS -> StatisticsDestination(viewModel)
                 MainNavDestination.SETTINGS -> SettingsDestination(
                     viewModel = viewModel,
