@@ -566,7 +566,9 @@ class BatteryCommandCenterTestSuite {
         }
         val report = BatteryMonitor.intelligence(
             samples = history,
-            telemetry = telemetry(),
+            // This device exposes no CURRENT_AVERAGE, which is exactly when the panel must say the
+            // average below is computed from observed samples instead.
+            telemetry = telemetry(averageMilliAmps = null),
             chargeRatePercentPerHour = null,
             drainRatePercentPerHour = 28f,
             capacityWattHours = 15f
