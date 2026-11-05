@@ -1,22 +1,30 @@
 package com.adshield.pro.data.repository
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnostics
+import com.adshield.pro.engine.battery.BatteryIntelligenceReport
+import com.adshield.pro.engine.battery.BatteryMonitor
+import com.adshield.pro.engine.battery.BatteryMonitoringEngine
 import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.battery.BatterySessionStore
+import com.adshield.pro.engine.battery.BatteryStatusReport
 import com.adshield.pro.engine.battery.BatteryTelemetry
-import com.adshield.pro.engine.battery.BatteryTelemetrySource
+import com.adshield.pro.engine.battery.DataFreshness
+import com.adshield.pro.engine.battery.EngineState
+import com.adshield.pro.engine.battery.FastChargeSignal
+import com.adshield.pro.engine.battery.MonitoringStatus
+import com.adshield.pro.engine.battery.SensorStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,23 +32,26 @@ import javax.inject.Singleton
 /**
  * AdShield Pro — Battery Intelligence state holder.
  *
- * Receives the system's ACTION_BATTERY_CHANGED broadcasts (the only source of real hardware
- * battery values on Android), keeps a rolling in-memory history for the charts and measured
- * rates, and records charging/discharging sessions locally.
+ * Owns nothing about Android hardware itself: [BatteryMonitoringEngine] does the reading. This
+ * class turns measured state into the derived view models the Command Center renders (status,
+ * monitoring health, intelligence report, diagnostics, sessions) and keeps those derivations in
+ * lock-step with the live flow, so the UI never displays a status computed from an older reading.
  */
 @Singleton
 class BatteryIntelligenceRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val telemetrySource: BatteryTelemetrySource,
+    private val engine: BatteryMonitoringEngine,
     private val sessionStore: BatterySessionStore
 ) {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    val telemetry: StateFlow<BatteryTelemetry> = telemetrySource.telemetry
-
-    private val _history = MutableStateFlow<List<BatteryDiagnostics.Sample>>(emptyList())
-    val history: StateFlow<List<BatteryDiagnostics.Sample>> = _history.asStateFlow()
+    val telemetry: StateFlow<BatteryTelemetry> = engine.telemetry
+    val history: StateFlow<List<BatteryDiagnostics.Sample>> = engine.history
+    val freshness: StateFlow<DataFreshness> = engine.freshness
+    val sensors: StateFlow<List<SensorStatus>> = engine.sensors
+    val engineState: StateFlow<EngineState> = engine.engineState
+    val fastCharge: StateFlow<FastChargeSignal> = engine.fastCharge
+    val livePolling: StateFlow<Boolean> = engine.livePolling
+    val screenOn: StateFlow<Boolean> = engine.screenOn
 
     private val _sessions = MutableStateFlow(sessionStore.load())
     val sessions: StateFlow<List<BatterySession>> = _sessions.asStateFlow()
@@ -53,6 +64,8 @@ class BatteryIntelligenceRepository @Inject constructor(
 
     private val _lastDiagnosticAtMs = MutableStateFlow(0L)
     val lastDiagnosticAtMs: StateFlow<Long> = _lastDiagnosticAtMs.asStateFlow()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Open session bookkeeping (not exposed; mirrored into _sessions when it closes).
     private var sessionStartMs = System.currentTimeMillis()
@@ -67,62 +80,181 @@ class BatteryIntelligenceRepository @Inject constructor(
     private var sessionInterruptions = 0
     private var lastChargingState = telemetry.value.isCharging
 
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
-            onBatteryChanged()
+    /**
+     * Everything the Command Center shows, recomputed from the newest reading and the observed
+     * history. One combined flow means "last measurement time", "status" and "freshness" can never
+     * disagree with each other.
+     */
+    data class BatteryDashboardState(
+        val telemetry: BatteryTelemetry,
+        val freshness: DataFreshness,
+        val sensors: List<SensorStatus>,
+        val monitoring: MonitoringStatus,
+        val status: BatteryStatusReport,
+        val intelligence: BatteryIntelligenceReport,
+        val healthScore: Int,
+        val chargeRatePercentPerHour: Float?,
+        val drainRatePercentPerHour: Float?,
+        val minutesToFull: Int?,
+        val minutesToEmpty: Int?,
+        val livePolling: Boolean,
+        val engineState: EngineState
+    )
+
+    /** Internally combined live inputs; four flows is the widest typed `combine` overload. */
+    private data class LiveCore(
+        val telemetry: BatteryTelemetry,
+        val freshness: DataFreshness,
+        val history: List<BatteryDiagnostics.Sample>,
+        val fastCharge: FastChargeSignal
+    )
+
+    private val liveCore: kotlinx.coroutines.flow.Flow<LiveCore> = combine(
+        engine.telemetry,
+        engine.freshness,
+        engine.history,
+        engine.fastCharge
+    ) { telemetry, freshness, history, fastCharge -> LiveCore(telemetry, freshness, history, fastCharge) }
+
+    val dashboard: StateFlow<BatteryDashboardState> = combine(
+        liveCore,
+        engine.sensors,
+        engine.engineState,
+        engine.livePolling
+    ) { core, sensors, engineState, livePolling ->
+        val snapshot = core.telemetry
+        val samples = core.history
+        val chargeRate = BatteryDiagnostics.chargeRatePercentPerHour(samples)
+        val drainRate = BatteryDiagnostics.drainRatePercentPerHour(samples)
+        val averagePower = samples.mapNotNull { it.powerWatts }.takeLast(60)
+            .takeIf { it.isNotEmpty() }?.average()?.toFloat()
+        val recentTemperatures = samples.mapNotNull { it.temperatureCelsius }.takeLast(60)
+        val healthScore = BatteryDiagnostics.healthScore(
+            telemetry = snapshot,
+            capacityHealthPercent = snapshot.capacityHealthPercent,
+            averageTemperatureCelsius = recentTemperatures.takeIf { it.size >= 3 }?.average()?.toFloat(),
+            cycleCount = snapshot.cycleCount.rawValue
+        )
+        val monitoring = BatteryMonitor.monitoringStatus(
+            telemetry = snapshot,
+            sensors = sensors,
+            freshness = core.freshness,
+            engineState = engineState,
+            nowElapsedRealtimeMs = snapshot.elapsedRealtimeMs
+        )
+        BatteryDashboardState(
+            telemetry = snapshot,
+            freshness = core.freshness,
+            sensors = sensors,
+            monitoring = monitoring,
+            status = BatteryMonitor.condition(
+                telemetry = snapshot,
+                freshness = core.freshness,
+                chargeRatePercentPerHour = chargeRate,
+                drainRatePercentPerHour = drainRate,
+                averagePowerWatts = averagePower,
+                healthScore = healthScore,
+                hasFastChargeSignal = core.fastCharge.isPresent,
+                fastChargeSource = core.fastCharge.source
+            ),
+            intelligence = BatteryMonitor.intelligence(
+                samples = samples,
+                telemetry = snapshot,
+                chargeRatePercentPerHour = chargeRate,
+                drainRatePercentPerHour = drainRate,
+                capacityWattHours = BatteryMonitor.capacityWattHours(snapshot)
+            ),
+            healthScore = healthScore,
+            chargeRatePercentPerHour = chargeRate,
+            drainRatePercentPerHour = drainRate,
+            minutesToFull = BatteryDiagnostics.minutesToFull(snapshot.levelPercent.rawValue, chargeRate),
+            minutesToEmpty = BatteryDiagnostics.minutesToEmpty(snapshot.levelPercent.rawValue, drainRate),
+            livePolling = livePolling,
+            engineState = engineState
+        )
+    }.stateIn(scope, SharingStarted.Eagerly, initialState())
+
+    init {
+        // Session bookkeeping only needs the event stream; the engine already owns the receiver.
+        scope.launch {
+            var sawFirst = false
+            engine.telemetry.collect { snapshot ->
+                if (!sawFirst) {
+                    sawFirst = true
+                    sessionStartLevel = snapshot.levelPercent.rawValue
+                    sessionWasCharging = snapshot.isCharging || snapshot.isFull
+                    lastChargingState = sessionWasCharging
+                    return@collect
+                }
+                onNewReading(snapshot)
+            }
         }
     }
 
-    init {
-        // ACTION_BATTERY_CHANGED is a sticky, non-exported system broadcast: registering with a
-        // null receiver at first read already yields the current state, and an explicit receiver
-        // keeps history building while the Battery tab is open. Android stops delivering these to
-        // a stopped app, which is why history restarts on launch and the UI says so.
-        context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        sessionStartLevel = telemetry.value.levelPercent.rawValue
-        onBatteryChanged()
+    private fun initialState(): BatteryDashboardState {
+        val snapshot = telemetry.value
+        val fast = engine.fastCharge.value
+        return BatteryDashboardState(
+            telemetry = snapshot,
+            freshness = DataFreshness.of(null),
+            sensors = sensors.value,
+            monitoring = BatteryMonitor.monitoringStatus(
+                snapshot, sensors.value, DataFreshness.of(null), EngineState.PAUSED, snapshot.elapsedRealtimeMs
+            ),
+            status = BatteryMonitor.condition(
+                telemetry = snapshot,
+                freshness = DataFreshness.of(null),
+                chargeRatePercentPerHour = null,
+                drainRatePercentPerHour = null,
+                averagePowerWatts = null,
+                healthScore = 100,
+                hasFastChargeSignal = fast.isPresent,
+                fastChargeSource = fast.source
+            ),
+            intelligence = BatteryMonitor.intelligence(
+                samples = emptyList(),
+                telemetry = snapshot,
+                chargeRatePercentPerHour = null,
+                drainRatePercentPerHour = null,
+                capacityWattHours = BatteryMonitor.capacityWattHours(snapshot)
+            ),
+            healthScore = 100,
+            chargeRatePercentPerHour = null,
+            drainRatePercentPerHour = null,
+            minutesToFull = null,
+            minutesToEmpty = null,
+            livePolling = false,
+            engineState = EngineState.PAUSED
+        )
     }
 
-    private fun onBatteryChanged() {
-        val snapshot = telemetrySource.refresh()
-        val sample = BatteryDiagnostics.Sample(
-            timestampEpochMs = snapshot.timestampEpochMs,
-            levelPercent = snapshot.levelPercent.rawValue,
-            isCharging = snapshot.isCharging || snapshot.isFull,
-            temperatureCelsius = snapshot.temperatureCelsius.rawValue,
-            voltageVolts = snapshot.voltageVolts.rawValue,
-            currentMilliAmps = snapshot.currentMilliAmps.rawValue,
-            powerWatts = snapshot.powerWatts.rawValue
-        )
-
-        // Keep the newest 360 samples (~ up to a few hours at Android's 1% granularity).
-        _history.value = (_history.value + sample).takeLast(MAX_SAMPLES)
-
-        sessionPeakTemp = listOfNotNull(sessionPeakTemp, sample.temperatureCelsius).maxOrNull()
-        sample.voltageVolts?.let { sessionVoltageSum += it; sessionVoltageCount++ }
-        sample.currentMilliAmps?.let { sessionCurrentSum += kotlin.math.abs(it); sessionCurrentCount++ }
-        sessionPeakPower = listOfNotNull(sessionPeakPower, sample.powerWatts).maxOrNull()
-
+    private fun onNewReading(snapshot: BatteryTelemetry) {
+        val now = System.currentTimeMillis()
+        val level = snapshot.levelPercent.rawValue
         val chargingNow = snapshot.isCharging || snapshot.isFull
+
+        snapshot.temperatureCelsius.rawValue?.let {
+            sessionPeakTemp = listOfNotNull(sessionPeakTemp, it).maxOrNull()
+        }
+        snapshot.voltageVolts.rawValue?.let { sessionVoltageSum += it; sessionVoltageCount++ }
+        snapshot.currentMilliAmps.rawValue?.let { sessionCurrentSum += kotlin.math.abs(it); sessionCurrentCount++ }
+        snapshot.powerWatts.rawValue?.let {
+            sessionPeakPower = listOfNotNull(sessionPeakPower, it).maxOrNull()
+        }
+
         if (lastChargingState && !chargingNow) sessionInterruptions++
         lastChargingState = chargingNow
 
-        // A session ends when the charging state flips (plug/unplug) after real time has passed.
-        if (chargingNow != sessionWasCharging) {
-            closeSession(chargingNow)
-        }
+        if (chargingNow != sessionWasCharging) closeSession(now, chargingNow, level)
 
-        _averageTemperature.value = _history.value.mapNotNull { it.temperatureCelsius }
+        _averageTemperature.value = history.value.mapNotNull { it.temperatureCelsius }
             .takeLast(60)
             .takeIf { it.size >= 3 }
             ?.average()
             ?.toFloat()
     }
 
-    private fun closeSession(nextCharging: Boolean) {
-        val now = System.currentTimeMillis()
-        val endLevel = telemetry.value.levelPercent.rawValue
+    private fun closeSession(now: Long, nextCharging: Boolean, endLevel: Int?) {
         val startLevel = sessionStartLevel
         val durationMs = now - sessionStartMs
         // Ignore blips shorter than 60 s or sessions without a readable level.
@@ -157,18 +289,31 @@ class BatteryIntelligenceRepository @Inject constructor(
         lastChargingState = nextCharging
     }
 
-    /**
-     * Runs the diagnostic chain against the current readings plus the session history.
-     * Only real readings are used; missing ones are reported as missing.
-     */
+    // --- Monitoring lifecycle (driven by the screen) -------------------------------------------
+
+    /** Start live monitoring; called when the Battery screen is visible. */
+    fun startMonitoring(liveRefresh: Boolean = true) {
+        engine.start(enableFastPolling = liveRefresh)
+    }
+
+    /** Stop the 1 Hz poll (screen off / tab changed). The event receiver stays registered. */
+    fun pauseMonitoring() {
+        engine.pause()
+    }
+
+    /** One-shot re-read of every hardware input, triggered by the "Re-read hardware" action. */
+    fun refreshNow(): BatteryTelemetry = engine.refreshNow()
+
+    // --- Diagnostics / projections -------------------------------------------------------------
+
     fun runDiagnostics(): List<BatteryDiagnostic> {
         val snapshot = telemetry.value
-        val history = _history.value
+        val samples = history.value
         val result = BatteryDiagnostics.diagnose(
             telemetry = snapshot,
-            history = history,
-            chargeRatePercentPerHour = BatteryDiagnostics.chargeRatePercentPerHour(history),
-            drainRatePercentPerHour = BatteryDiagnostics.drainRatePercentPerHour(history),
+            history = samples,
+            chargeRatePercentPerHour = BatteryDiagnostics.chargeRatePercentPerHour(samples),
+            drainRatePercentPerHour = BatteryDiagnostics.drainRatePercentPerHour(samples),
             interruptions = sessionInterruptions
         )
         _diagnostics.value = result
@@ -176,16 +321,11 @@ class BatteryIntelligenceRepository @Inject constructor(
         return result
     }
 
-    fun healthScore(): Int = BatteryDiagnostics.healthScore(
-        telemetry = telemetry.value,
-        capacityHealthPercent = telemetry.value.capacityHealthPercent,
-        averageTemperatureCelsius = _averageTemperature.value,
-        cycleCount = telemetry.value.cycleCount.rawValue
-    )
+    fun healthScore(): Int = dashboard.value.healthScore
 
-    fun chargeRatePercentPerHour(): Float? = BatteryDiagnostics.chargeRatePercentPerHour(_history.value)
+    fun chargeRatePercentPerHour(): Float? = BatteryDiagnostics.chargeRatePercentPerHour(history.value)
 
-    fun drainRatePercentPerHour(): Float? = BatteryDiagnostics.drainRatePercentPerHour(_history.value)
+    fun drainRatePercentPerHour(): Float? = BatteryDiagnostics.drainRatePercentPerHour(history.value)
 
     fun minutesToFull(): Int? = BatteryDiagnostics.minutesToFull(
         telemetry.value.levelPercent.rawValue,
@@ -203,7 +343,6 @@ class BatteryIntelligenceRepository @Inject constructor(
     }
 
     private companion object {
-        const val MAX_SAMPLES = 360
         const val MIN_SESSION_MS = 60_000L
     }
 }

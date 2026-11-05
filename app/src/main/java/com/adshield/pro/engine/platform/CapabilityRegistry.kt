@@ -338,6 +338,31 @@ object CapabilityRegistry {
             "BatteryIntelligenceTestSuite"
         ),
         cap(
+            "battery-command-center", "Battery Command Center with live monitoring engine", CapabilityArea.BATTERY,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/BatteryScreen.kt", emptyList(),
+            listOf(
+                "ACTION_BATTERY_CHANGED (event path)",
+                "BATTERY_PROPERTY_CURRENT_NOW re-read at 1 Hz while the screen is visible",
+                "SystemClock.elapsedRealtime for freshness"
+            ),
+            listOf(
+                "The 1 Hz path runs only while the Battery screen is in the foreground",
+                "History covers the time this app observed the device; Android delivers no battery broadcasts to stopped apps",
+                "Screen-on vs screen-off drain is limited to observed samples, not system-wide history"
+            ),
+            "BatteryCommandCenterTestSuite; tools/check_battery_command_center.py"
+        ),
+        cap(
+            "battery-monitoring-status", "Per-component monitoring status (sensor diagnostics)", CapabilityArea.BATTERY,
+            CapabilityStatus.IMPLEMENTED, "engine/battery/BatteryMonitor.kt", emptyList(),
+            listOf("BatteryManager properties, EXTRA_* extras, computed presence of each input"),
+            listOf(
+                "States are Operational/Unsupported/Unavailable/Invalid/Waiting — never a guessed value",
+                "Fast charging is claimed only with a platform signal plus a measured rate"
+            ),
+            "BatteryCommandCenterTestSuite.testMonitoringStatus_isPartialWhenASensorIsMissing"
+        ),
+        cap(
             "battery-power", "Battery-side power (V × I) and slow-charge detection", CapabilityArea.BATTERY,
             CapabilityStatus.IMPLEMENTED, "engine/battery/BatteryDiagnostics.kt", emptyList(),
             listOf("Measured voltage and current"),

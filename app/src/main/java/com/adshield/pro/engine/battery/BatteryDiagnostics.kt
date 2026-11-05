@@ -12,7 +12,13 @@ import kotlin.math.abs
  */
 object BatteryDiagnostics {
 
-    /** One point of the rolling history used to judge stability and rate. */
+    /**
+     * One point of the rolling history used to judge stability, rate and trend.
+     *
+     * [screenOn] and [elapsedRealtimeMs] are optional because they were added with the monitoring
+     * engine; older call sites (and the persisted JSON) simply leave them null/zero and every
+     * consumer degrades to "not observed" rather than guessing.
+     */
     data class Sample(
         val timestampEpochMs: Long,
         val levelPercent: Int?,
@@ -20,7 +26,9 @@ object BatteryDiagnostics {
         val temperatureCelsius: Float?,
         val voltageVolts: Float?,
         val currentMilliAmps: Int?,
-        val powerWatts: Float?
+        val powerWatts: Float?,
+        val screenOn: Boolean? = null,
+        val elapsedRealtimeMs: Long = 0L
     )
 
     /**

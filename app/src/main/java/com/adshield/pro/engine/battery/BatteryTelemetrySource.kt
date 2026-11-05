@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
+import android.os.SystemClock
 import com.adshield.pro.engine.platform.DeviceCompatibility
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,17 +34,118 @@ class BatteryTelemetrySource @Inject constructor(
     private val batteryManager: BatteryManager? =
         context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
 
+    private val powerManager: PowerManager? =
+        context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+
     private val _telemetry = MutableStateFlow(read())
     val telemetry: StateFlow<BatteryTelemetry> = _telemetry.asStateFlow()
 
-    /** Called by the repository after each battery broadcast so the flow stays live. */
+    /**
+     * Set by the monitoring engine after it has decided what the newest reading proves about
+     * fast charging. It is *not* a guess: [FastChargeSignal.detect] feeds it from a platform
+     * property or the charger protocol string, and the UI shows the source next to the claim.
+     */
+    @Volatile
+    var fastChargeSignal: FastChargeSignal = FastChargeSignal.NONE
+        private set
+
+    /**
+     * Re-reads every input. [publish] = false is used by the fast current-poll path, where only
+     * the current changed and republishing the whole snapshot would fight the broadcast receiver.
+     */
     fun refresh(): BatteryTelemetry {
         val snapshot = read()
         _telemetry.value = snapshot
+        fastChargeSignal = detectFastCharge()
         return snapshot
     }
 
+    /**
+     * Asks the platform for a fast-charge indication. Both inputs are optional vendor/framework
+     * properties: when neither exists the answer is [FastChargeSignal.NONE], which the status
+     * engine treats as "charging" — never as "fast charging".
+     */
+    private fun detectFastCharge(): FastChargeSignal {
+        val manager = batteryManager ?: return FastChargeSignal.NONE
+        val status = runCatching {
+            manager.getIntProperty(FastChargeSignal.PROPERTY_STATUS)
+        }.getOrNull()?.takeIf { it != Int.MIN_VALUE }
+        val protocol = runCatching { manager.getProperty("charge_protocol") }.getOrNull()
+            ?: runCatching { manager.getProperty("charger_type") }.getOrNull()
+        return FastChargeSignal.from(status, protocol)
+    }
+
     fun current(): BatteryTelemetry = _telemetry.value
+
+    /**
+     * Cheap re-read of the two live current properties only.
+     *
+     * Why this exists: `ACTION_BATTERY_CHANGED` is throttled by the framework (in practice it is
+     * emitted on a ~10 s cadence, plus on state changes), but `BATTERY_PROPERTY_CURRENT_NOW`
+     * updates roughly once per second. Polling nothing but that property while the Battery screen
+     * is visible gives a genuinely live mA reading without re-reading level/temperature/health
+     * (which only change on the broadcast) and without a wake lock.
+     *
+     * Returns null when the device has no current sensor, so the caller can stop polling instead
+     * of burning CPU on a property that does not exist.
+     */
+    fun refreshCurrent(): BatteryTelemetry? {
+        val manager = batteryManager ?: return null
+        val nowMicroAmps = runCatching {
+            manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        }.getOrDefault(Int.MIN_VALUE)
+        if (nowMicroAmps == Int.MIN_VALUE) return null
+        val averageMicroAmps = runCatching {
+            manager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE)
+        }.getOrDefault(Int.MIN_VALUE)
+
+        val previous = _telemetry.value
+        val nowMilliAmps = nowMicroAmps / 1000
+        val currentReading = when {
+            nowMicroAmps == 0 -> BatteryReading.unavailable("mA", "Driver reports 0 mA")
+            !DeviceCompatibility.isPlausibleCurrentMilliAmps(nowMilliAmps) ->
+                BatteryReading.unavailable("mA", "Driver reported an implausible current ($nowMilliAmps mA)")
+            else -> BatteryReading.measured(nowMilliAmps, "mA", "BATTERY_PROPERTY_CURRENT_NOW")
+        }
+        val averageReading = if (averageMicroAmps != Int.MIN_VALUE) {
+            BatteryReading.measured(averageMicroAmps / 1000, "mA", "BATTERY_PROPERTY_CURRENT_AVERAGE")
+        } else {
+            previous.currentAverageMilliAmps
+        }
+        val volts = previous.voltageVolts.rawValue
+        val magnitudeAmps = currentReading.rawValue?.let { kotlin.math.abs(it) / 1000f }
+        val power = if (volts != null && magnitudeAmps != null) {
+            BatteryReading.computed(
+                volts * magnitudeAmps,
+                "W",
+                "Battery-side power: voltage x measured current (never charger-side output)"
+            )
+        } else {
+            previous.powerWatts
+        }
+        val updated = previous.copy(
+            timestampEpochMs = System.currentTimeMillis(),
+            elapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            currentMilliAmps = currentReading,
+            currentAverageMilliAmps = averageReading,
+            powerWatts = power,
+            currentSignKnown = currentReading.rawValue?.let { amps ->
+                if (previous.isCharging) amps > 0 else true
+            } ?: false
+        )
+        _telemetry.value = updated
+        return updated
+    }
+
+    /** True when this device exposes a battery current sensor at all. */
+    fun hasCurrentSensor(): Boolean = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+        ?.let { it != Int.MIN_VALUE } == true
+
+    /** True while the display is on, from PowerManager (the source Android itself uses). */
+    fun isScreenOn(): Boolean = runCatching { powerManager?.isInteractive ?: false }.getOrDefault(false)
+
+    /** Monotonic clock used for freshness; never affected by wall-clock/NTP changes. */
+    fun elapsedRealtimeMs(): Long = SystemClock.elapsedRealtime()
 
     private fun stickyBatteryIntent(): Intent? =
         runCatching {
@@ -117,12 +220,8 @@ class BatteryTelemetrySource @Inject constructor(
         val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING
         val isFull = status == BatteryManager.BATTERY_STATUS_FULL
         val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        val pluggedLabel = when (plugged) {
-            BatteryManager.BATTERY_PLUGGED_AC -> "AC charger"
-            BatteryManager.BATTERY_PLUGGED_USB -> "USB port"
-            BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
-            else -> "Not plugged in"
-        }
+        val chargingSource = ChargingSource.fromRawPlugged(plugged)
+        val pluggedLabel = chargingSource.label
         val statusLabel = when (status) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
             BatteryManager.BATTERY_STATUS_DISCHARGING -> "Discharging"
@@ -243,7 +342,9 @@ class BatteryTelemetrySource @Inject constructor(
             chargeFullMicroAmpHours = chargeFullUah?.let {
                 BatteryReading.measured(it, "µAh", "BATTERY_PROPERTY_CHARGE_COUNTER_FULL")
             } ?: BatteryReading.unsupported("µAh", "Full-charge capacity is not exposed to apps on this device"),
-            currentSignKnown = signKnown
+            currentSignKnown = signKnown,
+            elapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            chargingSource = chargingSource
         )
     }
 

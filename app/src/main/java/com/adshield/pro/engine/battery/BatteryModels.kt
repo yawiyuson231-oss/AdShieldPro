@@ -61,6 +61,37 @@ data class BatteryReading<T>(
  */
 enum class BatteryHealthStatus { GOOD, OVERHEAT, DEAD, OVER_VOLTAGE, COLD, FAILURE, UNKNOWN }
 
+/**
+ * Charging source, mapped from ACTION_BATTERY_CHANGED's EXTRA_PLUGGED.
+ *
+ * [DOCK] exists only on API 33+, so it is mapped from the raw extra value rather than a
+ * compile-time constant; older platforms simply never produce it.
+ */
+enum class ChargingSource(val label: String) {
+    NOT_PLUGGED("Not plugged in"),
+    AC("AC charger"),
+    USB("USB port"),
+    WIRELESS("Wireless charger"),
+    DOCK("Dock"),
+    UNKNOWN("Unknown source");
+
+    companion object {
+        /**
+         * Maps `BatteryManager.EXTRA_PLUGGED` to a source. AC/USB/WIRELESS are documented
+         * constants (1/2/4) that have never changed; DOCK is bit 8 (API 33+). Comparing the raw
+         * integer avoids referencing a constant that does not exist on API 29.
+         */
+        fun fromRawPlugged(raw: Int): ChargingSource = when {
+            raw and 1 != 0 -> AC
+            raw and 2 != 0 -> USB
+            raw and 4 != 0 -> WIRELESS
+            raw and 8 != 0 -> DOCK
+            raw == 0 -> NOT_PLUGGED
+            else -> UNKNOWN
+        }
+    }
+}
+
 /** Full, timestamped snapshot of what this device actually reports. */
 data class BatteryTelemetry(
     val timestampEpochMs: Long,
@@ -93,9 +124,25 @@ data class BatteryTelemetry(
      * listen to battery broadcasts while stopped), so rate/temperature history restarts on launch.
      * The UI states this instead of implying continuous background monitoring.
      */
-    val historyCoverage: HistoryCoverage = HistoryCoverage.APP_FOREGROUND_ONLY
+    val historyCoverage: HistoryCoverage = HistoryCoverage.APP_FOREGROUND_ONLY,
+    /**
+     * Monotonic (SystemClock.elapsedRealtime) stamp of the read. Wall-clock time can jump when
+     * the user or the network changes the timezone/NTP, which would make "freshness" lie; the
+     * monotonic stamp cannot go backwards while the device is awake.
+     */
+    val elapsedRealtimeMs: Long = 0L,
+    /** Source of charge, mapped from EXTRA_PLUGGED (AC / USB / wireless / dock). */
+    val chargingSource: ChargingSource = ChargingSource.UNKNOWN
 ) {
     val temperatureFahrenheit: Float? get() = temperatureCelsius.rawValue?.let { it * 9f / 5f + 32f }
+
+    /** Age of this snapshot against a monotonic `now`; never negative. */
+    fun ageMs(nowElapsedRealtimeMs: Long): Long =
+        (nowElapsedRealtimeMs - elapsedRealtimeMs).coerceAtLeast(0L)
+
+    /** True when both halves of V x I are present, i.e. power can be computed at all. */
+    val hasPowerInputs: Boolean
+        get() = voltageVolts.rawValue != null && currentMilliAmps.rawValue != null
 
     /** Share of the design capacity Android currently believes is stored, when both are exposed. */
     val capacityHealthPercent: Float?
@@ -157,3 +204,216 @@ data class BatterySession(
             return levelDelta.toFloat() / (durationMinutes / 60f)
         }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Monitoring engine state (latency-independent: all durations are supplied by the caller so the
+// rules can be unit-tested without a clock).
+// ---------------------------------------------------------------------------------------------
+
+/** How old the newest hardware broadcast is, bucketed so the UI can colour it. */
+enum class DataFreshness(val label: String) {
+    /** Something arrived within the live window — the dashboard may call itself live. */
+    LIVE("Live"),
+    /** Between the live and stale windows: still real, but the driver has gone quiet. */
+    DELAYED("Delayed"),
+    /** Older than the stale window: values are shown but flagged as historical. */
+    STALE("Stale"),
+    /** Not a single broadcast has been received since the engine started. */
+    NO_DATA("No data");
+
+    companion object {
+        /** Live window: 5 s, i.e. five missed one-second reads before we stop saying "live". */
+        const val LIVE_WINDOW_MS = 5_000L
+        /** Stale window: 30 s. */
+        const val STALE_WINDOW_MS = 30_000L
+
+        /**
+         * Classifies an age in milliseconds. A negative age (clock moved backwards) is treated
+         * as live rather than as an error: monotonic timestamps never go backwards in practice,
+         * but the engine must not claim "no data" if a vendor RTC does.
+         */
+        fun of(ageMs: Long?): DataFreshness = when {
+            ageMs == null -> NO_DATA
+            ageMs <= LIVE_WINDOW_MS -> LIVE
+            ageMs <= STALE_WINDOW_MS -> DELAYED
+            else -> STALE
+        }
+    }
+}
+
+/** Condition of one individual hardware input, as this device actually exposes it. */
+enum class SensorState(val label: String) {
+    OPERATIONAL("Operational"),
+    DELAYED("Delayed"),
+    UNSUPPORTED("Unsupported"),
+    UNAVAILABLE("Unavailable"),
+    INVALID("Invalid reading"),
+    WAITING("Waiting for data")
+}
+
+/** One row of the Sensor Diagnostics panel. */
+data class SensorStatus(
+    val name: String,
+    val state: SensorState,
+    /** The API or property behind this sensor; shown verbatim so it can be verified. */
+    val source: String,
+    val detail: String,
+    /** True when the value shown by this sensor is a measurement rather than a computation. */
+    val measured: Boolean,
+    /** Exactly what the diagnostics table prints for this sensor, e.g. "4.21 V" or "—". */
+    val statusValue: String = "—"
+) {
+    val isUsable: Boolean get() = state == SensorState.OPERATIONAL || state == SensorState.DELAYED
+}
+
+/** Real status of each monitoring component (section 8 of the directive). */
+enum class MonitoringState(val label: String) {
+    OPERATIONAL("Operational"),
+    ACTIVE("Active"),
+    PAUSED("Paused"),
+    PARTIAL("Partial"),
+    WAITING("Waiting for data"),
+    UNSUPPORTED("Unsupported"),
+    ERROR("Error"),
+    UNAVAILABLE("Unavailable")
+}
+
+/** Heartbeat state of the monitoring engine itself. */
+enum class EngineState(val label: String) {
+    ACTIVE("Active"),
+    PAUSED("Paused"),
+    STOPPED("Stopped"),
+    ERROR("Error")
+}
+
+/**
+ * A single component's live status. [value] is the human-readable current value or "-" when the
+ * component has nothing to show, so the panel never renders an empty cell that looks like a zero.
+ */
+data class ComponentStatus(
+    val component: String,
+    val state: MonitoringState,
+    val value: String,
+    val detail: String
+)
+
+/**
+ * The whole monitoring-system status block. [scorePercent] counts operational components so the
+ * header can show "Monitoring system: 94%" without inventing a health number.
+ */
+data class MonitoringStatus(
+    val batteryApi: ComponentStatus,
+    val currentSensor: ComponentStatus,
+    val voltageSensor: ComponentStatus,
+    val temperatureSensor: ComponentStatus,
+    val powerCalculation: ComponentStatus,
+    val engine: ComponentStatus,
+    val freshness: DataFreshness,
+    val overall: MonitoringState,
+    val scorePercent: Int,
+    val components: List<ComponentStatus>
+)
+
+/**
+ * High-level battery condition derived only from measured state. This is what the dashboard's
+ * large status line renders; [detail] always names the evidence behind it.
+ */
+enum class BatteryCondition(val label: String) {
+    CHARGING("Charging"),
+    FAST_CHARGING("Fast charging"),
+    SLOW_CHARGING("Slow charging"),
+    DISCHARGING("Discharging"),
+    FULLY_CHARGED("Fully charged"),
+    NOT_CHARGING("Not charging"),
+    CONNECTED_NOT_CHARGING("Connected, not charging"),
+    HIGH_POWER_DRAIN("High power consumption"),
+    TEMPERATURE_WARNING("Abnormal temperature"),
+    HEALTH_WARNING("Battery health warning"),
+    INSUFFICIENT_DATA("Insufficient sensor information")
+}
+
+/** Severity derived from a [BatteryCondition] so the UI can pick an accent without duplicating rules. */
+enum class BatteryConditionTone { NOMINAL, POSITIVE, CAUTION, CRITICAL, NEUTRAL }
+
+/**
+ * The result of the status engine. [estimatesOnlyFromMeasurements] documents that any projection
+ * inside [detail] was extrapolated from measured rates rather than assumed.
+ */
+data class BatteryStatusReport(
+    val primary: BatteryCondition,
+    val secondary: List<BatteryCondition>,
+    val tone: BatteryConditionTone,
+    val headline: String,
+    val detail: String,
+    val evidence: List<String>,
+    val fastChargeDetected: Boolean,
+    val usableSensors: Int,
+    val totalSensors: Int
+)
+
+/** Trend of power consumption over the observed window. */
+enum class PowerTrend(val label: String) {
+    RISING("Rising"),
+    FALLING("Falling"),
+    STEADY("Steady"),
+    INSUFFICIENT_DATA("Insufficient data")
+}
+
+/** Charging efficiency estimate — explicitly an estimate, never a measurement. */
+data class ChargingEfficiency(
+    val batterySideWatts: Float?,
+    val levelGainWatts: Float?,
+    val efficiencyPercent: Float?,
+    val chargerName: String,
+    val explanation: String
+) {
+    val isMeasured: Boolean get() = efficiencyPercent != null
+}
+
+/**
+ * Screen-on versus screen-off drain analysis. Android does not expose per-display-state battery
+ * history to apps, so the split is derived from samples recorded while this process observed the
+ * display state — labelled as observed rather than system-wide.
+ */
+data class DisplayStateDrain(
+    val screenOnSamples: Int,
+    val screenOffSamples: Int,
+    val screenOnAverageMilliAmps: Float?,
+    val screenOffAverageMilliAmps: Float?,
+    val screenOnMinutes: Int,
+    val screenOffMinutes: Int
+) {
+    val hasComparison: Boolean
+        get() = screenOnAverageMilliAmps != null && screenOffAverageMilliAmps != null &&
+            screenOnSamples >= MIN_SAMPLES && screenOffSamples >= MIN_SAMPLES
+
+    /** How much more power the screen-on state draws, as a multiple of screen-off. */
+    val ratio: Float?
+        get() {
+            val on = screenOnAverageMilliAmps ?: return null
+            val off = screenOffAverageMilliAmps?.takeIf { it > 1f } ?: return null
+            return on / off
+        }
+
+    companion object {
+        const val MIN_SAMPLES = 5
+    }
+}
+
+/** What the battery intelligence panel shows; every field is either measured or clearly derived. */
+data class BatteryIntelligenceReport(
+    val totalSamples: Int,
+    val observationMinutes: Int,
+    val averageCurrentMilliAmps: Float?,
+    val averagePowerWatts: Float?,
+    val peakPowerWatts: Float?,
+    val averageTemperatureCelsius: Float?,
+    val powerTrend: PowerTrend,
+    val drainTrendPerHour: Float?,
+    val chargeTrendPerHour: Float?,
+    val displayDrain: DisplayStateDrain,
+    val efficiency: ChargingEfficiency,
+    val abnormalDrainDetected: Boolean,
+    val overheatingDetected: Boolean,
+    val notes: List<String>
+)

@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
@@ -470,27 +471,32 @@ private fun OptimizerDestination(viewModel: AdShieldViewModel) {
     )
 }
 
+/**
+ * Battery Command Center.
+ *
+ * Monitoring is bound to the screen's lifecycle, not to the process: the 1 Hz current poll starts
+ * when the tab becomes visible and stops as soon as it leaves the foreground, so watching the
+ * dashboard cannot drain the battery while the user is somewhere else in the app.
+ */
 @Composable
 private fun BatteryDestination(viewModel: AdShieldViewModel) {
-    val batteryTelemetry by viewModel.batteryTelemetry.collectAsStateWithLifecycle()
+    val batteryState by viewModel.batteryDashboard.collectAsStateWithLifecycle()
     val batteryHistory by viewModel.batteryHistory.collectAsStateWithLifecycle()
     val batterySessions by viewModel.batterySessions.collectAsStateWithLifecycle()
     val batteryDiagnostics by viewModel.batteryDiagnostics.collectAsStateWithLifecycle()
     val batteryLastDiagnosticAtMs by viewModel.batteryLastDiagnosticAtMs.collectAsStateWithLifecycle()
     val isDiagnosingBattery by viewModel.isDiagnosingBattery.collectAsStateWithLifecycle()
-    val batteryHealthScore by viewModel.batteryHealthScore.collectAsStateWithLifecycle()
-    val batteryMinutesToFull by viewModel.batteryMinutesToFull.collectAsStateWithLifecycle()
-    val batteryMinutesToEmpty by viewModel.batteryMinutesToEmpty.collectAsStateWithLifecycle()
-    val batteryChargeRate by viewModel.batteryChargeRate.collectAsStateWithLifecycle()
+
+    LifecycleStartEffect(viewModel) {
+        viewModel.startBatteryMonitoring()
+        onStopOrDispose { viewModel.pauseBatteryMonitoring() }
+    }
+
     BatteryScreen(
-        telemetry = batteryTelemetry,
+        state = batteryState,
         diagnostics = batteryDiagnostics,
         sessions = batterySessions,
         history = batteryHistory,
-        healthScore = batteryHealthScore,
-        chargeRatePercentPerHour = batteryChargeRate,
-        minutesToFull = batteryMinutesToFull,
-        minutesToEmpty = batteryMinutesToEmpty,
         isDiagnosing = isDiagnosingBattery,
         lastDiagnosticAtMs = batteryLastDiagnosticAtMs,
         onDetect = viewModel::runBatteryDiagnosis,

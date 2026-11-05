@@ -1080,6 +1080,10 @@ class AdShieldViewModel @Inject constructor(
 
     // --- Battery Intelligence (real hardware telemetry only) ---
 
+    /** Everything the Battery Command Center renders, derived from live hardware readings. */
+    val batteryDashboard: StateFlow<BatteryIntelligenceRepository.BatteryDashboardState> =
+        batteryRepository.dashboard
+
     val batteryTelemetry: StateFlow<BatteryTelemetry> = batteryRepository.telemetry
     val batteryHistory: StateFlow<List<BatteryDiagnostics.Sample>> = batteryRepository.history
     val batterySessions: StateFlow<List<BatterySession>> = batteryRepository.sessions
@@ -1132,7 +1136,22 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun refreshBatteryReadings() {
-        batteryRepository.telemetry.value.let { refreshBatteryDerived() }
+        batteryRepository.refreshNow()
+        refreshBatteryDerived()
+    }
+
+    /**
+     * Starts live battery monitoring (1 Hz current poll + event receiver) while the Battery screen
+     * is visible. Called from a `DisposableEffect`/`LifecycleStartEffect` in the Battery tab.
+     */
+    fun startBatteryMonitoring() {
+        batteryRepository.startMonitoring()
+        refreshBatteryDerived()
+    }
+
+    /** Stops the 1 Hz poll when the Battery screen leaves the foreground (keeps the receiver). */
+    fun pauseBatteryMonitoring() {
+        batteryRepository.pauseMonitoring()
     }
 
     /** Runtime capability profile for the Status screen (no defaults guessed). */
