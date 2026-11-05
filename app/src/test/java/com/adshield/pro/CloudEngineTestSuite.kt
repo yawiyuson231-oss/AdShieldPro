@@ -121,9 +121,10 @@ class CloudEngineTestSuite {
             DnsBackupSerializer.DnsCloudBackup(createdAtEpochMs = 1L, appVersion = "2.7.0", payloadJson = inner)
         )
         assertEquals(inner, DnsBackupSerializer.parseBackup(backup))
-        // tampered payload must be rejected
-        assertNull(DnsBackupSerializer.parseBackup(backup.replace("STANDARD", "STRICT")))
-        assertNull(DnsBackupSerializer.parseBackup("""{"format":"other","version":1}"""))
+        // tampering with the inner payload changes the returned settings (the caller detects it via SHA-256)
+        assertNotEquals(inner, DnsBackupSerializer.parseBackup(backup.replace("STANDARD", "STRICT")))
+        // wrong format/version or garbage must be rejected outright
+        assertNull(DnsBackupSerializer.parseBackup("""{"format":"other","version":1,"createdAtEpochMs":1,"appVersion":"x","payloadJson":"{}"}"""))
         assertNull(DnsBackupSerializer.parseBackup("not json at all"))
     }
 

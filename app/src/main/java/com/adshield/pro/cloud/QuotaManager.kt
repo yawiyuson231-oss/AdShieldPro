@@ -14,10 +14,11 @@ object QuotaManager {
 
     fun stateFor(usedBytes: Long, quotaBytes: Long): QuotaState {
         if (quotaBytes <= 0L) return QuotaState.UNKNOWN
+        // epsilon so exact boundary values (80.0%, 95.0%) are treated as reached
         val fraction = usedBytes.toDouble() / quotaBytes.toDouble()
         return when {
-            fraction >= CloudConfig.QUOTA_BLOCK_FRACTION -> QuotaState.BLOCKED
-            fraction >= CloudConfig.QUOTA_WARNING_FRACTION -> QuotaState.WARNING
+            fraction >= CloudConfig.QUOTA_BLOCK_FRACTION - 1e-9 -> QuotaState.BLOCKED
+            fraction >= CloudConfig.QUOTA_WARNING_FRACTION - 1e-9 -> QuotaState.WARNING
             else -> QuotaState.OK
         }
     }
