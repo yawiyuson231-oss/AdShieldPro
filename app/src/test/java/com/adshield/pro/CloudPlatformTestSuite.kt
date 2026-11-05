@@ -116,11 +116,13 @@ class CloudPlatformTestSuite {
             assertTrue(second.detail?.contains("remainingBytes") == true)
         }
         assertTrue("non-POST request: ${backend.requests}", backend.requests.all { it.startsWith("POST") })
+        fun Map<String, String>.authHeader(): String? =
+            entries.firstOrNull { it.key.equals("Authorization", ignoreCase = true) }?.value
         assertTrue(
-            "missing auth header on: ${backend.seenHeaders.filterValues { !it.containsKey("Authorization") }.keys}",
-            backend.seenHeaders.values.all { headers -> headers.containsKey("Authorization") }
+            "missing auth header on: ${backend.seenHeaders.filterValues { it.authHeader() == null }.keys}",
+            backend.seenHeaders.values.all { headers -> headers.authHeader() != null }
         )
-        assertEquals("Bearer jwt-token", backend.seenHeaders.values.first()["Authorization"])
+        assertEquals("Bearer jwt-token", backend.seenHeaders.values.first().authHeader())
     }
 
     // ---------------------------------------------------------------- uploads
@@ -205,7 +207,17 @@ class CloudPlatformTestSuite {
                 state
             )
         }
-        assertTrue(backend.requests.any { it.contains("/v1/uploads/up_1/cancel") })
+        // cancel() marks the job and tells the server from its own coroutine, so give that
+        // call a moment to leave the process instead of racing it.
+        var cancelSent = false
+        for (attempt in 0 until 40) {
+            if (backend.requests.any { it.contains("/v1/uploads/up_1/cancel") }) {
+                cancelSent = true
+                break
+            }
+            Thread.sleep(50)
+        }
+        assertTrue("no cancel request: ${backend.requests}", cancelSent)
         assertFalse(backend.requests.any { it.contains("/complete") })
     }
 
@@ -346,7 +358,7 @@ class CloudPlatformTestSuite {
         }
         backend.route("/v1/uploads/up_1") {
             val done = backend.recordedParts()
-            """{"session":{"id":"up_1","name":"file.bin","status":"open","declaredSize":$sizeBytes,"partSize":$partSize,"totalParts":$totalParts,"uploadedParts":[$done],"uploadedBytes":${done.size * partSize}},"partUrls":[$tickets]}"""
+            """{"session":{"id":"up_1","name":"file.bin","status":"open","declaredSize":$sizeBytes,"partSize":$partSize,"totalParts":$totalParts,"uploadedParts":$done,"uploadedBytes":${done.size * partSize}},"partUrls":[$tickets]}"""
         }
         for (part in 1..totalParts) {
             backend.route("/v1/uploads/up_1/part/$part") {
