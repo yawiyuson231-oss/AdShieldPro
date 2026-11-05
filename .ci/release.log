@@ -10,42 +10,42 @@ Daemon will be stopped at the end of the build
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so. Run with --info option to learn more.
 
 > Task :app:mergeReleaseArtProfile
-> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :app:extractReleaseNativeSymbolTables
+> Task :app:generateReleaseBuildConfig
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
-> Task :app:generateReleaseBuildConfig FROM-CACHE
 > Task :app:generateReleaseResources FROM-CACHE
-> Task :app:packageReleaseResources FROM-CACHE
-> Task :app:processReleaseNavigationResources FROM-CACHE
+> Task :app:packageReleaseResources
+> Task :app:processReleaseNavigationResources
 > Task :app:parseReleaseLocalResources FROM-CACHE
 > Task :app:generateReleaseRFile FROM-CACHE
 > Task :app:javaPreCompileRelease FROM-CACHE
 > Task :app:checkReleaseAarMetadata
 > Task :app:mapReleaseSourceSetPaths
 > Task :app:compileReleaseNavigationResources FROM-CACHE
-> Task :app:mergeReleaseResources FROM-CACHE
 > Task :app:createReleaseCompatibleScreenManifests
-> Task :app:extractDeepLinksRelease FROM-CACHE
-> Task :app:processReleaseMainManifest FROM-CACHE
-> Task :app:processReleaseManifest FROM-CACHE
-> Task :app:processReleaseManifestForPackage FROM-CACHE
-> Task :app:processReleaseResources FROM-CACHE
+> Task :app:extractDeepLinksRelease
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
 > Task :app:extractProguardFiles
 > Task :app:mergeReleaseStartupProfile
 > Task :app:generateReleaseAssets UP-TO-DATE
 > Task :app:mergeReleaseAssets
-> Task :app:compressReleaseAssets FROM-CACHE
+> Task :app:processReleaseManifestForPackage
 > Task :app:extractReleaseVersionControlInfo
+> Task :app:mergeReleaseResources
 > Task :app:collectReleaseDependencies
 > Task :app:sdkReleaseDependencyData
 > Task :app:validateSigningRelease
 > Task :app:writeReleaseAppMetadata
+> Task :app:compressReleaseAssets
 > Task :app:writeReleaseSigningConfigVersions
+> Task :app:processReleaseResources
 > Task :app:kspReleaseKotlin
 > Task :app:compileReleaseKotlin
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:119:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:467:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:511:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:545:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:483:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:527:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:561:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudApi.kt:117:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:272:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudUploadEngine.kt:490:42 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
@@ -63,9 +63,9 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:211:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:276:17 'fun create(contentType: MediaType?, content: String): RequestBody' is deprecated. Moved to extension function. Put the 'content' argument first to fix Java.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BatteryScreen.kt:499:32 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:324:25 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:374:54 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:375:60 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:331:25 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:381:54 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:382:60 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/CloudStorageScreen.kt:264:25 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:301:80 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:302:35 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
@@ -79,10 +79,10 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 > Task :app:hiltAggregateDepsRelease FROM-CACHE
 > Task :app:hiltJavaCompileRelease
 > Task :app:processReleaseJavaRes
-> Task :app:generateReleaseLintVitalReportModel
 > Task :app:transformReleaseClassesWithAsm
-> Task :app:mergeReleaseGeneratedProguardFiles
 > Task :app:mergeReleaseJavaResource
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:mergeReleaseGeneratedProguardFiles
 > Task :app:expandReleaseArtProfileWildcards
 > Task :app:produceReleaseComposeMapping
 > Task :app:reportReleaseComposeMappingErrors
@@ -91,8 +91,8 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 > Task :app:lintVitalReportRelease
 > Task :app:lintVitalRelease
 > Task :app:mergeReleaseComposeMapping
-> Task :app:convertShrunkResourcesToBinaryRelease FROM-CACHE
-> Task :app:optimizeReleaseResources FROM-CACHE
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
 > Task :app:compileReleaseArtProfile
 > Task :app:packageRelease
 > Task :app:createReleaseApkListingFileRedirect
@@ -100,6 +100,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 3m 50s
-57 actionable tasks: 38 executed, 19 from cache
+BUILD SUCCESSFUL in 4m 15s
+57 actionable tasks: 51 executed, 6 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
