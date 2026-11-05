@@ -4,13 +4,13 @@ Daemon will be stopped at the end of the build
 > Task :app:preReleaseBuild
 > Task :app:mergeReleaseJniLibFolders
 > Task :app:mergeReleaseNativeLibs
+> Task :app:checkReleaseDuplicateClasses
 
 > Task :app:stripReleaseDebugSymbols
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libdatastore_shared_counter.so. Run with --info option to learn more.
 
-> Task :app:checkReleaseDuplicateClasses
-> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
 > Task :app:mergeReleaseArtProfile
+> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
 > Task :app:generateReleaseBuildConfig FROM-CACHE
 > Task :app:generateReleaseResources FROM-CACHE
@@ -19,8 +19,8 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:parseReleaseLocalResources FROM-CACHE
 > Task :app:generateReleaseRFile FROM-CACHE
 > Task :app:javaPreCompileRelease FROM-CACHE
-> Task :app:checkReleaseAarMetadata
 > Task :app:mapReleaseSourceSetPaths
+> Task :app:checkReleaseAarMetadata
 > Task :app:compileReleaseNavigationResources FROM-CACHE
 > Task :app:mergeReleaseResources FROM-CACHE
 > Task :app:createReleaseCompatibleScreenManifests
@@ -76,6 +76,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 2m 45s
+BUILD SUCCESSFUL in 3m 37s
 57 actionable tasks: 38 executed, 19 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
