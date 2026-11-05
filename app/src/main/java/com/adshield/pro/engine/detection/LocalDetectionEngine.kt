@@ -187,7 +187,7 @@ object LocalDetectionEngine {
         val buckets = logs.groupBy { (it.timestampEpochMs - first) / ANOMALY_BUCKET_MS }
         val span = ((logs.last().timestampEpochMs - first) / ANOMALY_BUCKET_MS).toInt() + 1
         // Include empty buckets so a quiet baseline is not hidden.
-        val counts = (0 until span).map { buckets[it]?.size?.toDouble() ?: 0.0 }
+        val counts = (0 until span).map { buckets[it.toLong()]?.size?.toDouble() ?: 0.0 }
         val mean = counts.average()
         val variance = counts.sumOf { (it - mean) * (it - mean) } / counts.size
         val stdDev = sqrt(variance)
@@ -196,7 +196,7 @@ object LocalDetectionEngine {
             counts.forEachIndexed { index, count ->
                 val z = (count - mean) / stdDev
                 if (z >= ANOMALY_Z_THRESHOLD && count >= ANOMALY_MIN_BUCKET_COUNT) {
-                    val bucketEvents = buckets[index].orEmpty()
+                    val bucketEvents = buckets[index.toLong()].orEmpty()
                     val blocked = bucketEvents.count { it.isBlocked }
                     findings += Finding(
                         id = "anomaly-rate-$index",

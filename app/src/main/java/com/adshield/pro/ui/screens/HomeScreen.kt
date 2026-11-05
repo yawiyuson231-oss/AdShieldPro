@@ -306,9 +306,9 @@ private fun DashboardTab(
             ConsoleColumn(Modifier.weight(1f).fillMaxHeight()) {
                 item(key = "l-overview") { ThreatOverviewPanel(allTimeBlocked, severityTotals, chartBuckets, recentLogs) }
                 item(key = "l-active") { ActiveThreatsPanel(severityTotals, openSeverity) }
-                item(key = "l-feed") { ActivityFeedPanel(recentLogs, settings.detailedDnsLoggingEnabled) { onOpenTab(CyberShieldTab.THREATS) } }
+                item(key = "l-feed") { ActivityFeedPanel(recentLogs, settings.detailedDnsLoggingEnabled, onViewAll = { onOpenTab(CyberShieldTab.THREATS) }) }
                 item(key = "l-compliance") {
-                    CompliancePanel(complianceReport, isEvaluatingCompliance, { cyberViewModel.evaluateCompliance(flaggedApps) }) { onOpenTab(CyberShieldTab.REPORTS) }
+                    CompliancePanel(complianceReport, isEvaluatingCompliance, onEvaluate = { cyberViewModel.evaluateCompliance(flaggedApps) }, onViewReport = { onOpenTab(CyberShieldTab.REPORTS) })
                 }
             }
             ConsoleColumn(Modifier.weight(1.2f).fillMaxHeight()) {
@@ -363,7 +363,7 @@ private fun DashboardTab(
                     AttackVectorsPanel(liveNetwork.categories)
                 }
                 item(key = "feed", contentType = "panel") {
-                    ActivityFeedPanel(recentLogs, settings.detailedDnsLoggingEnabled) { onOpenTab(CyberShieldTab.THREATS) }
+                    ActivityFeedPanel(recentLogs, settings.detailedDnsLoggingEnabled, onViewAll = { onOpenTab(CyberShieldTab.THREATS) })
                 }
                 item(key = "cards", contentType = "cards") {
                     StatusCardsRow(
@@ -374,7 +374,7 @@ private fun DashboardTab(
                     )
                 }
                 item(key = "compliance", contentType = "panel") {
-                    CompliancePanel(complianceReport, isEvaluatingCompliance, { cyberViewModel.evaluateCompliance(flaggedApps) }) { onOpenTab(CyberShieldTab.REPORTS) }
+                    CompliancePanel(complianceReport, isEvaluatingCompliance, onEvaluate = { cyberViewModel.evaluateCompliance(flaggedApps) }, onViewReport = { onOpenTab(CyberShieldTab.REPORTS) })
                 }
             }
             ScrollToTopButton(state = listState, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp))
