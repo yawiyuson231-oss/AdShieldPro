@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toBitmap
 import com.adshield.pro.domain.model.AppDnsActivity
+import com.adshield.pro.ui.components.RealTimeActivityBarChart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background

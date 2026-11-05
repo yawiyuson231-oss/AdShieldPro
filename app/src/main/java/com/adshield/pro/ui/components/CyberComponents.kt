@@ -294,6 +294,50 @@ fun PrivacyBadge(label: String, icon: ImageVector, active: Boolean, modifier: Mo
     }
 }
 
+/** Stacked total/blocked bar chart used by the Statistics screen (real daily aggregates). */
+@Composable
+fun RealTimeActivityBarChart(
+    buckets: List<com.adshield.pro.domain.model.TimeBucketStat>,
+    modifier: Modifier = Modifier
+) {
+    val maxTotal = (buckets.maxOfOrNull { it.totalQueries } ?: 1L).coerceAtLeast(1L)
+    Column(modifier = modifier) {
+        Canvas(Modifier.fillMaxWidth().weight(1f)) {
+            if (buckets.isEmpty()) return@Canvas
+            val slotWidth = size.width / buckets.size
+            val barWidth = (slotWidth * 0.55f).coerceAtMost(36.dp.toPx())
+            buckets.forEachIndexed { index, bucket ->
+                val centerX = index * slotWidth + slotWidth / 2f
+                val left = centerX - barWidth / 2f
+                val totalRatio = (bucket.totalQueries.toFloat() / maxTotal.toFloat()).coerceIn(0.04f, 1f)
+                val blockedRatio = (bucket.blockedQueries.toFloat() / maxTotal.toFloat()).coerceIn(0f, totalRatio)
+                val totalHeight = size.height * totalRatio
+                val blockedHeight = size.height * blockedRatio
+                drawRoundRect(
+                    color = com.adshield.pro.ui.theme.EmeraldPrimary.copy(alpha = 0.45f),
+                    topLeft = Offset(left, size.height - totalHeight),
+                    size = androidx.compose.ui.geometry.Size(barWidth, totalHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+                )
+                if (blockedHeight > 1f) {
+                    drawRoundRect(
+                        color = com.adshield.pro.ui.theme.AlertRed,
+                        topLeft = Offset(left, size.height - blockedHeight),
+                        size = androidx.compose.ui.geometry.Size(barWidth, blockedHeight),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f)
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+            buckets.forEach { bucket ->
+                Text(bucket.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
 @Composable
 fun ScrollToTopButton(state: LazyListState, modifier: Modifier = Modifier) {
     val visible by remember(state) { derivedStateOf { state.firstVisibleItemIndex > 2 } }

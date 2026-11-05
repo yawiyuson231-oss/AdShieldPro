@@ -31,6 +31,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         GitHubUpdateWorker.schedule(this)
+        com.adshield.pro.worker.ThreatIntelWorker.schedule(this)
         appScope.launch {
             val settings = preferencesRepository.getSettingsSnapshot()
             FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(

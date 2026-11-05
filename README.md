@@ -1,8 +1,30 @@
-# AdShield Pro 2.7.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.8.0 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
 AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+
+## CyberShield AI command center (v2.8)
+
+The Home tab is a full recreation of the CyberShield AI reference console, adapted for Android
+portrait, landscape and tablet widths. Every panel is fed by real data — there is no demo mode:
+
+- **Threat overview & active threats** — persisted severity counters (critical/high/medium/low)
+  written by the DNS VPN itself, with live trend arrows and a severity-filtered threat console.
+- **Global threat map** — interactive dotted world map driven by the public abuse.ch feeds
+  (Feodo Tracker botnet C2 IPs with country data; URLhaus malware URLs). Only indicators with
+  published geolocation are ever placed; offline data is cached and labelled stale.
+- **Threat detection engine** — a four-stage local pipeline (behavior, anomaly, rule-based
+  classification, correlation) over the device's own DNS log. Explainable findings with cited
+  evidence; the coverage bar is real analysis coverage, never a fake scan.
+- **Endpoints / Cloud / Network cards** — this device's app inventory and permission audit,
+  official provider status pages (GitHub, Cloudflare, npm, Bitbucket), and live DNS counters.
+- **Compliance** — a local device-hardening assessment (lock screen, encryption, patch level,
+  filtering, retention…) with an exportable report. It is explicitly **not** a certification.
+
+See [`docs/FEATURE_VERIFICATION.md`](docs/FEATURE_VERIFICATION.md) for the per-component
+verification report and [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) for the
+machine-checked capability list.
 ## Website and downloads
 
 - **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in

@@ -80,6 +80,7 @@ import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
+import com.adshield.pro.ui.viewmodel.CyberShieldViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
@@ -229,7 +230,9 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onOpenOptimizer = { currentTab = MainNavDestination.OPTIMIZER },
                     onOpenLive = { currentTab = MainNavDestination.LIVE },
                     onOpenStatistics = { currentTab = MainNavDestination.STATISTICS },
-                    onOpenStatus = { currentTab = MainNavDestination.STATUS }
+                    onOpenStatus = { currentTab = MainNavDestination.STATUS },
+                    onOpenSettings = { currentTab = MainNavDestination.SETTINGS },
+                    onOpenSecurity = { currentTab = MainNavDestination.SECURITY }
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
@@ -287,6 +290,12 @@ private fun CyberBottomNav(currentTab: MainNavDestination, onSelect: (MainNavDes
     }
 }
 
+/**
+ * CyberShield command center. The dashboard owns two state holders: the app-wide
+ * [AdShieldViewModel] (VPN, DNS, optimizer, security) and the console-specific
+ * [CyberShieldViewModel] (intel feeds, detection pipeline, compliance, cloud status).
+ * Each console tab collects only the flows it renders.
+ */
 @Composable
 private fun HomeDestination(
     viewModel: AdShieldViewModel,
@@ -295,43 +304,20 @@ private fun HomeDestination(
     onOpenOptimizer: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenStatistics: () -> Unit,
-    onOpenStatus: () -> Unit
+    onOpenStatus: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenSecurity: () -> Unit
 ) {
-    val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
-    val settings by viewModel.settingsState.collectAsStateWithLifecycle()
-    val allTimeTotal by viewModel.allTimeTotalQueries.collectAsStateWithLifecycle()
-    val allTimeBlocked by viewModel.allTimeBlockedQueries.collectAsStateWithLifecycle()
-    val allTimeAllowed by viewModel.allTimeAllowedQueries.collectAsStateWithLifecycle()
-    val malwareBlocks by viewModel.malwareBlocks.collectAsStateWithLifecycle()
-    val chartBuckets by viewModel.chartBuckets.collectAsStateWithLifecycle()
-    val recentLogs by viewModel.recentLogs.collectAsStateWithLifecycle()
-    val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
-    val isUpdatingFilters by viewModel.isUpdatingFilters.collectAsStateWithLifecycle()
-    val smartBoostResult by viewModel.smartBoostResult.collectAsStateWithLifecycle()
-    val isRunningSmartBoost by viewModel.isRunningSmartBoost.collectAsStateWithLifecycle()
-    val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsStateWithLifecycle()
+    val cyberViewModel: CyberShieldViewModel = hiltViewModel()
     HomeScreen(
-        vpnState = vpnState,
-        settings = settings,
-        allTimeTotal = allTimeTotal,
-        allTimeBlocked = allTimeBlocked,
-        allTimeAllowed = allTimeAllowed,
-        malwareBlocks = malwareBlocks,
-        chartBuckets = chartBuckets,
-        recentLogs = recentLogs,
-        liveNetwork = liveNetwork,
-        isUpdatingFilters = isUpdatingFilters,
-        smartBoostResult = smartBoostResult,
-        isRunningSmartBoost = isRunningSmartBoost,
-        isCheckingForUpdates = isCheckingForUpdates,
-        onCheckForUpdates = viewModel::checkForUpdates,
+        viewModel = viewModel,
+        cyberViewModel = cyberViewModel,
         onToggleVpn = onToggleVpn,
         onPauseResumeVpn = onPauseResumeVpn,
-        onSelectProtectionMode = viewModel::setProtectionMode,
-        onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
-        onRunOptimizeNow = viewModel::runOneTapSmartBoost,
-        onOpenOptimizerTab = onOpenOptimizer,
+        onOpenSettingsTab = onOpenSettings,
+        onOpenSecurityTab = onOpenSecurity,
         onOpenLiveTab = onOpenLive,
+        onOpenOptimizerTab = onOpenOptimizer,
         onOpenStatisticsTab = onOpenStatistics,
         onOpenStatusTab = onOpenStatus
     )

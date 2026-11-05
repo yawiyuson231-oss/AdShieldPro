@@ -119,4 +119,43 @@ interface AdShieldDao {
 
     @Query("DELETE FROM filter_sources WHERE id = :id AND is_built_in = 0")
     suspend fun deleteCustomFilterSource(id: String)
+
+    // --- Severity breakdown of blocked queries (v3) ---
+    @Query(
+        """
+        SELECT COALESCE(SUM(critical_blocks), 0) AS critical,
+               COALESCE(SUM(high_blocks), 0) AS high,
+               COALESCE(SUM(medium_blocks), 0) AS medium,
+               COALESCE(SUM(low_blocks), 0) AS low
+        FROM daily_stats
+        """
+    )
+    fun observeSeverityTotals(): Flow<SeverityTotalsRow>
+
+    // --- External threat-intelligence cache (v3) ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertIntelIndicators(indicators: List<IntelIndicatorEntity>)
+
+    @Query("DELETE FROM intel_indicators WHERE source_id = :sourceId")
+    suspend fun deleteIntelIndicatorsForSource(sourceId: String)
+
+    @Query("SELECT * FROM intel_indicators ORDER BY fetched_at_epoch_ms DESC")
+    fun observeIntelIndicators(): Flow<List<IntelIndicatorEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertIntelMeta(meta: IntelMetaEntity)
+
+    @Query("SELECT * FROM intel_meta")
+    fun observeIntelMeta(): Flow<List<IntelMetaEntity>>
+
+    @Query("SELECT * FROM intel_meta WHERE source_id = :sourceId LIMIT 1")
+    suspend fun getIntelMetaNow(sourceId: String): IntelMetaEntity?
 }
+
+/** Aggregate severity counters across all persisted daily stats. */
+data class SeverityTotalsRow(
+    val critical: Long,
+    val high: Long,
+    val medium: Long,
+    val low: Long
+)

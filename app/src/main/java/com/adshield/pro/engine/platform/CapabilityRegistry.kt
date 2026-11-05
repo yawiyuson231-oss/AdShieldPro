@@ -138,11 +138,14 @@ object CapabilityRegistry {
             "n/a — architecture only"
         ),
         cap(
-            "dns-anomaly", "Per-domain anomaly scoring", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.PLANNED, "",
-            listOf(PERM_VPN), listOf("Would use the dns_logs table"),
-            listOf("No validated model; shipping an unvalidated score would violate the no-fabrication rule"),
-            "n/a — architecture only"
+            "dns-anomaly", "Statistical anomaly detection over the DNS log", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/detection/LocalDetectionEngine.kt", listOf(PERM_VPN),
+            listOf("dns_logs recent window: 5-minute rate buckets, z-score vs the window baseline, unique-domain ratio"),
+            listOf(
+                "Plain statistics, not a learned model; a stage with too few events reports INSUFFICIENT_DATA instead of guessing",
+                "Findings are review signals with cited evidence, never automatic blocks"
+            ),
+            "LocalDetectionEngineTest (burst, z-score spike, unique-ratio and insufficient-data cases)"
         ),
 
         // ------------------------------------------------------------ FILTERING
@@ -512,11 +515,79 @@ object CapabilityRegistry {
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
         ),
         cap(
-            "cyber-dashboard", "Cyber-console Home dashboard with real device counters", CapabilityArea.PLATFORM,
+            "cyber-dashboard", "CyberShield AI command center recreated from the reference console", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "ui/screens/HomeScreen.kt", emptyList(),
-            listOf("Daily aggregates, recent DNS log, resolver state, protection mode"),
-            listOf("Reference-inspired layout only; no fictional enterprise endpoints, global attack map or compliance certifications"),
-            "DashboardPresentationTest overview/event/motion cases"
+            listOf(
+                "Daily aggregates + persisted severity counters, recent DNS log, resolver state, protection mode",
+                "Room-cached abuse.ch intel, local detection pipeline, compliance signals, provider status pages"
+            ),
+            listOf(
+                "Responsive portrait/landscape/tablet layouts; every panel renders explicit empty/offline/disconnected states",
+                "Cloud cards show public service status only; compliance rings are local checks, not certifications; no fictional endpoint fleet"
+            ),
+            "DashboardPresentationTest + ThreatSeverityTest; manual device smoke (docs/TESTING.md)"
+        ),
+        cap(
+            "threat-intel-feeds", "External threat intelligence (abuse.ch Feodo Tracker + URLhaus)", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "data/repository/ThreatIntelRepository.kt", listOf(PERM_INTERNET),
+            listOf(
+                "Feodo Tracker recommended botnet C2 IP blocklist JSON (with registered country)",
+                "URLhaus recent malware-distribution URL JSON",
+                "Room cache (intel_indicators / intel_meta) + 6-hour WorkManager refresh"
+            ),
+            listOf(
+                "Public feeds only — no private/commercial intel and no account credentials",
+                "URLhaus publishes no geolocation, so its URLs are never placed on the map",
+                "A failed sync keeps the previous cache and shows the real error; data older than 12h is labelled stale"
+            ),
+            "ThreatIntelParserTest (fixture parsing, malformed payloads, country aggregation)"
+        ),
+        cap(
+            "threat-map", "Interactive world threat map from geolocated intelligence", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "ui/cybershield/WorldThreatMap.kt", listOf(PERM_INTERNET),
+            listOf("Country aggregates of Room-cached Feodo Tracker indicators; cached dot-grid land rendering"),
+            listOf(
+                "Markers exist only for countries the feed actually reported; indicator counts drive marker size",
+                "Low-poly dotted world, not a GIS atlas; no invented attack-route arcs between countries",
+                "Tapping a marker shows the country's real indicator count, online count and malware families"
+            ),
+            "WorldMapProjectionTest (projection, land sampling, centroid placement)"
+        ),
+        cap(
+            "detection-pipeline", "Four-stage local detection engine (behavior, anomaly, classification, correlation)", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/detection/LocalDetectionEngine.kt", listOf(PERM_VPN),
+            listOf("The device's own dns_logs window; DomainRiskAnalyzer heuristics for classification"),
+            listOf(
+                "Explainable rule-based pipeline — no ML model and no cloud call",
+                "Coverage bar is the fraction of stages with sufficient data, never a simulated scan",
+                "Multi-list and persistent-block correlation cites its sources; heuristics alone never verify a threat"
+            ),
+            "LocalDetectionEngineTest (all four stages + honest empty state)"
+        ),
+        cap(
+            "compliance-checks", "Device security configuration assessment with exportable report", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "engine/compliance/ComplianceChecker.kt", emptyList(),
+            listOf(
+                "KeyguardManager.isDeviceSecure, DevicePolicyManager.storageEncryptionStatus, Settings.Global ADB/developer options",
+                "Build.VERSION.SECURITY_PATCH, AdShield settings (filter freshness, retention, scheduled scan), app-audit result"
+            ),
+            listOf(
+                "A local hardening checklist — explicitly NOT ISO 27001 / SOC 2 / GDPR / HIPAA certification",
+                "Unreadable signals are UNKNOWN and excluded from the score, never fabricated passes",
+                "Report exports through SAF to a user-chosen location; nothing is uploaded"
+            ),
+            "ComplianceCheckerTest (scoring, unknown handling, patch age, report text)"
+        ),
+        cap(
+            "cloud-status", "Cloud provider service-status monitoring", CapabilityArea.PLATFORM,
+            CapabilityStatus.PARTIAL, "data/repository/CloudStatusRepository.kt", listOf(PERM_INTERNET),
+            listOf("Official Statuspage v2 summary APIs: GitHub, Cloudflare, npm, Bitbucket"),
+            listOf(
+                "Public operational status only — no credentials and no tenant/account access",
+                "Unchecked providers render as Not connected, never as secure",
+                "Account-level cloud security posture (AWS/GCP/Azure) requires an external integration that is not shipped"
+            ),
+            "CloudStatusParserTest (indicator mapping, components, malformed payloads)"
         ),
         cap(
             "lazy-scrolling", "Lazy keyed lists and isolated tab state for smoother scrolling", CapabilityArea.PLATFORM,

@@ -118,6 +118,17 @@ class AdShieldRepository @Inject constructor(
     /** Malware / phishing / scam blocks recorded by the DNS firewall (feeds the Security Center). */
     val malwareBlocksFlow: Flow<Long> = dao.observeMalwareBlockCount()
 
+    /** Persistent severity breakdown of blocked queries, summed across all daily stats. */
+    val severityTotalsFlow: Flow<com.adshield.pro.domain.model.SeverityCounts> =
+        dao.observeSeverityTotals().map { row ->
+            com.adshield.pro.domain.model.SeverityCounts(
+                critical = row.critical,
+                high = row.high,
+                medium = row.medium,
+                low = row.low
+            )
+        }
+
     val customRulesFlow: Flow<List<CustomRule>> = dao.observeCustomRules().map { entities ->
         entities.map { it.toDomain() }
     }
@@ -288,6 +299,7 @@ class AdShieldRepository @Inject constructor(
         val epochDay = now / MILLIS_PER_DAY
 
         // 2. Update persistent daily aggregate counter
+        val severity = com.adshield.pro.domain.model.ThreatSeverity.of(isBlocked, category)
         statsMutex.withLock {
             val existing = dao.getDailyStatForDay(epochDay)
             val updated = if (existing == null) {
@@ -296,14 +308,22 @@ class AdShieldRepository @Inject constructor(
                     totalQueries = 1L,
                     blockedQueries = if (isBlocked) 1L else 0L,
                     allowedQueries = if (isBlocked) 0L else 1L,
-                    cachedQueries = if (fromCache) 1L else 0L
+                    cachedQueries = if (fromCache) 1L else 0L,
+                    criticalBlocks = if (severity == com.adshield.pro.domain.model.ThreatSeverity.CRITICAL) 1L else 0L,
+                    highBlocks = if (severity == com.adshield.pro.domain.model.ThreatSeverity.HIGH) 1L else 0L,
+                    mediumBlocks = if (severity == com.adshield.pro.domain.model.ThreatSeverity.MEDIUM) 1L else 0L,
+                    lowBlocks = if (severity == com.adshield.pro.domain.model.ThreatSeverity.LOW) 1L else 0L
                 )
             } else {
                 existing.copy(
                     totalQueries = existing.totalQueries + 1L,
                     blockedQueries = existing.blockedQueries + if (isBlocked) 1L else 0L,
                     allowedQueries = existing.allowedQueries + if (isBlocked) 0L else 1L,
-                    cachedQueries = existing.cachedQueries + if (fromCache) 1L else 0L
+                    cachedQueries = existing.cachedQueries + if (fromCache) 1L else 0L,
+                    criticalBlocks = existing.criticalBlocks + if (severity == com.adshield.pro.domain.model.ThreatSeverity.CRITICAL) 1L else 0L,
+                    highBlocks = existing.highBlocks + if (severity == com.adshield.pro.domain.model.ThreatSeverity.HIGH) 1L else 0L,
+                    mediumBlocks = existing.mediumBlocks + if (severity == com.adshield.pro.domain.model.ThreatSeverity.MEDIUM) 1L else 0L,
+                    lowBlocks = existing.lowBlocks + if (severity == com.adshield.pro.domain.model.ThreatSeverity.LOW) 1L else 0L
                 )
             }
             dao.upsertDailyStat(updated)

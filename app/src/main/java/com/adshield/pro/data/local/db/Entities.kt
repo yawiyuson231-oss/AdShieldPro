@@ -110,5 +110,75 @@ data class DailyStatEntity(
     @ColumnInfo(name = "allowed_queries")
     val allowedQueries: Long,
     @ColumnInfo(name = "cached_queries")
-    val cachedQueries: Long
+    val cachedQueries: Long,
+    // Severity breakdown of blocked queries (v3). Rows written before v3 keep 0 here; the
+    // dashboard labels the difference as "unclassified earlier blocks" instead of hiding it.
+    @ColumnInfo(name = "critical_blocks", defaultValue = "0")
+    val criticalBlocks: Long = 0L,
+    @ColumnInfo(name = "high_blocks", defaultValue = "0")
+    val highBlocks: Long = 0L,
+    @ColumnInfo(name = "medium_blocks", defaultValue = "0")
+    val mediumBlocks: Long = 0L,
+    @ColumnInfo(name = "low_blocks", defaultValue = "0")
+    val lowBlocks: Long = 0L
+)
+
+/**
+ * Cached external threat-intelligence indicator (abuse.ch Feodo Tracker / URLhaus).
+ * Persisted so the map and lists keep working offline; freshness is tracked per source in
+ * [IntelMetaEntity] and always shown with the data.
+ */
+@Entity(
+    tableName = "intel_indicators",
+    indices = [
+        Index(value = ["source_id"]),
+        Index(value = ["country"])
+    ]
+)
+data class IntelIndicatorEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "key")
+    val key: String,
+    @ColumnInfo(name = "source_id")
+    val sourceId: String,
+    @ColumnInfo(name = "kind")
+    val kind: String,
+    @ColumnInfo(name = "value")
+    val value: String,
+    @ColumnInfo(name = "host")
+    val host: String,
+    @ColumnInfo(name = "port")
+    val port: Int?,
+    @ColumnInfo(name = "country")
+    val country: String?,
+    @ColumnInfo(name = "malware_family")
+    val malwareFamily: String?,
+    @ColumnInfo(name = "threat")
+    val threat: String?,
+    @ColumnInfo(name = "status")
+    val status: String?,
+    @ColumnInfo(name = "first_seen_utc")
+    val firstSeenUtc: String?,
+    @ColumnInfo(name = "last_online_utc")
+    val lastOnlineUtc: String?,
+    @ColumnInfo(name = "reference_url")
+    val referenceUrl: String?,
+    @ColumnInfo(name = "fetched_at_epoch_ms")
+    val fetchedAtEpochMs: Long
+)
+
+/** Per-feed sync metadata: when it last succeeded, how many items, and the last real error. */
+@Entity(tableName = "intel_meta")
+data class IntelMetaEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "source_id")
+    val sourceId: String,
+    @ColumnInfo(name = "status")
+    val status: String,
+    @ColumnInfo(name = "last_fetch_epoch_ms")
+    val lastFetchEpochMs: Long,
+    @ColumnInfo(name = "last_error")
+    val lastError: String?,
+    @ColumnInfo(name = "item_count")
+    val itemCount: Int
 )
