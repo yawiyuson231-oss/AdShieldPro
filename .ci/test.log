@@ -29,8 +29,8 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:processDebugJavaRes UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest
-> Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:kspDebugUnitTestKotlin
 
 > Task :app:compileDebugUnitTestKotlin
@@ -182,18 +182,18 @@ CapabilityRegistryTest > testUnavailableCapabilitiesClaimNoCode PASSED
 CloudPlatformTestSuite > backupCodecRoundTripsAndRefusesATamperedPayload PASSED
 
 CloudPlatformTestSuite > cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage FAILED
-    java.lang.AssertionError at CloudPlatformTestSuite.kt:116
+    java.lang.AssertionError at CloudPlatformTestSuite.kt:119
 
 CloudPlatformTestSuite > vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne PASSED
 
 CloudPlatformTestSuite > uploadEngineResumesOnlyThePartsTheServerIsStillMissing FAILED
-    java.lang.AssertionError at CloudPlatformTestSuite.kt:150
+    java.lang.AssertionError at CloudPlatformTestSuite.kt:156
 
 CloudPlatformTestSuite > uploadEngineCancelsCleanlyAndTellsTheServerToCancelTheSession FAILED
-    java.lang.AssertionError at CloudPlatformTestSuite.kt:197
+    java.lang.AssertionError at CloudPlatformTestSuite.kt:208
 
 CloudPlatformTestSuite > uploadEngineRetriesATransientPartFailureAndThenSucceeds FAILED
-    java.lang.AssertionError at CloudPlatformTestSuite.kt:177
+    java.lang.AssertionError at CloudPlatformTestSuite.kt:184
 
 CloudPlatformTestSuite > backupCodecSummaryAndSupportChecksReportTheTruth PASSED
 
@@ -559,5 +559,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 37s
+BUILD FAILED in 23s
 33 actionable tasks: 9 executed, 24 up-to-date
