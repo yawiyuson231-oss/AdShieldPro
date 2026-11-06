@@ -675,6 +675,55 @@ p { overflow-wrap: break-word; }
 .step h3 { margin: 10px 0 6px; font-size: 1.06rem; }
 .step p { margin: 0; color: var(--muted); font-size: .92rem; }
 
+/* ---------- Aura AI Assistant ---------- */
+.aura-section { overflow: hidden; }
+.aura-promo {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: clamp(28px, 5vw, 56px);
+  align-items: center;
+  padding: clamp(24px, 4vw, 52px);
+  border: 1px solid rgba(167, 139, 250, .28);
+  border-radius: 28px;
+  background:
+    radial-gradient(720px 360px at 88% 12%, rgba(167, 139, 250, .16), transparent 68%),
+    radial-gradient(560px 320px at 4% 96%, rgba(34, 228, 255, .1), transparent 70%),
+    rgba(8, 20, 34, .55);
+  box-shadow: 0 40px 90px -50px rgba(167, 139, 250, .55);
+}
+.aura-promo-copy { min-width: 0; display: grid; justify-items: start; }
+.aura-promo .section-title { font-size: clamp(1.7rem, 4vw, 2.6rem); margin: 14px 0 12px; }
+.aura-promo .section-lead { margin: 0 0 18px; }
+.aura-points { display: grid; gap: 8px; margin: 0 0 22px; padding: 0; list-style: none; }
+.aura-points li { position: relative; padding-left: 22px; color: var(--muted); font-size: .93rem; }
+.aura-points li::before {
+  content: ""; position: absolute; left: 2px; top: .55em; width: 8px; height: 8px;
+  border-radius: 50%; background: var(--grad); box-shadow: 0 0 10px rgba(20, 232, 162, .6);
+}
+.aura-fineprint { display: block; margin: 18px 0 0; color: var(--dim); font-size: .78rem; line-height: 1.6; text-align: left; }
+.aura-promo-stage { display: grid; place-items: center; min-width: 0; }
+.aura-chat-mock {
+  position: relative; width: min(360px, 100%); display: grid; gap: 10px;
+  padding: 22px; border-radius: 22px; border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(9, 22, 38, .92), rgba(5, 13, 22, .96));
+  box-shadow: 0 30px 70px -30px rgba(0, 0, 0, .9);
+}
+.aura-orb-sm {
+  width: 54px; height: 54px; margin: 0 auto 4px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #d7ccff, #7c5cf5 48%, #16294a 78%);
+  box-shadow: 0 0 34px rgba(167, 139, 250, .65);
+  animation: float 6s ease-in-out infinite;
+}
+.mock-q, .mock-a { margin: 0; font-size: .82rem; line-height: 1.55; border-radius: 12px; padding: 9px 12px; }
+.mock-q { justify-self: end; max-width: 88%; background: rgba(20, 232, 162, .1); border: 1px solid var(--line-strong); color: var(--text); }
+.mock-a { background: rgba(167, 139, 250, .1); border: 1px solid rgba(167, 139, 250, .32); color: var(--muted); }
+.mock-meta { font: 600 .64rem var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: #b9a6ff; }
+@media (max-width: 860px) {
+  .aura-promo { grid-template-columns: 1fr; }
+  .aura-promo-stage { order: -1; }
+}
+
 /* ---------- Download ---------- */
 .download { overflow: hidden; }
 .download-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -960,6 +1009,7 @@ p { overflow-wrap: break-word; }
       <nav class="nav" id="site-nav" aria-label="Main navigation">
         <a href="#showcase" data-nav>Showcase</a>
         <a href="#features" data-nav>Protection</a>
+        <a href="#aura" data-nav>Aura AI</a>
         <a href="#demo" data-nav>How it works</a>
         <a href="#download" data-nav>Download</a>
         <a href="https://github.com/yawiyuson231-oss/AdShieldPro">GitHub</a>
@@ -1235,6 +1285,43 @@ p { overflow-wrap: break-word; }
         </div>
 
         <p class="note" data-reveal><strong>What DNS filtering can do:</strong> it can block connections to known domains. It cannot guarantee every ad is removed, inspect encrypted page content, or separate ads served from the same domain as an app or website.</p>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true" data-reveal="line"><span></span></div>
+
+    <!-- ============ AURA AI ASSISTANT ============ -->
+    <section class="section aura-section" id="aura" aria-labelledby="aura-title">
+      <div class="container">
+        <div class="aura-promo">
+          <div class="aura-promo-copy">
+            <div class="eyebrow" data-reveal>Aura AI Assistant</div>
+            <h2 id="aura-title" class="section-title" data-split-words>Ask Aura. <em>See the reasoning.</em></h2>
+            <p class="section-lead" data-reveal>Aura is the assistant in the AdShield Pro family: short, plain-language answers about
+            protection, privacy and installation — with the source of every answer and the confidence it was matched at, kept in view.</p>
+            <ul class="aura-points" data-reveal>
+              <li>Answers run inside your browser tab — no account, no API key, no request leaving the page</li>
+              <li>Declines a question instead of improvising when it has no vetted answer</li>
+              <li>Android build: <code>aura-1.0.582.apk</code>, hosted on MediaFire</li>
+            </ul>
+            <div class="actions" data-reveal>
+              <a class="btn btn-primary magnetic" href="https://www.mediafire.com/file/vqu39py830k1gkl/aura-1.0.582.apk/file" target="_blank" rel="noopener noreferrer">
+                <svg aria-hidden="true"><use href="#i-download"/></svg><span>Download Aura APK</span>
+              </a>
+              <a class="btn btn-ghost glow-border magnetic" href="app/#aura"><span>Try the Aura preview</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            </div>
+            <p class="aura-fineprint" data-reveal>aura-1.0.582.apk · Android · sideloaded, so no store review sits between the file and your
+            device. No SHA-256 has been published for this build — verify the file before installing, and revoke “install unknown apps” afterwards.</p>
+          </div>
+          <div class="aura-promo-stage" aria-hidden="true">
+            <div class="aura-chat-mock">
+              <div class="aura-orb-sm"></div>
+              <p class="mock-q">Where do I download the APK?</p>
+              <p class="mock-a">The Android build is published as aura-1.0.582.apk on MediaFire. Because it is an APK rather than a store install, your device needs “install unknown apps” permission…</p>
+              <span class="mock-meta">high confidence · source: download</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

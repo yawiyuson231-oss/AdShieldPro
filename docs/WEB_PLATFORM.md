@@ -16,8 +16,8 @@ files (GitHub Pages compatible); works offline once visited.
 
 ```bash
 npm install        # jsdom, used only by the integration tests
-npm test           # 166 unit + 19 integration tests
-npm run verify     # 86 static architecture, claim, artifact and packaging gates
+npm test           # 181 unit + 22 integration tests
+npm run verify     # 103 static architecture, claim, artifact and packaging gates
 npm run lint       # house lint rules for shipped runtime code
 npm run stage      # assemble the deployable _site/ (site at /, app at /app/)
 npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
@@ -37,6 +37,7 @@ page still works.
 | **Typosquatting** | Damerau–Levenshtein with transpositions, homoglyph folding, RFC 3492 punycode decoding, brand-in-subdomain and brand-affix detection |
 | **DNS stack** | RFC 1035/6891 wire codec, DoH JSON + RFC 8484 wire transports, 5 real resolvers with health-based fallback and circuit breakers, TTL/negative cache with single-flight |
 | **DNSSEC** | Honest five-state assessment (validated upstream / signed-unverified / unsigned / bogus-suspected / unknown) |
+| **Aura AI Assistant** | A separate page (`#aura`) with an introduction, an offline retrieval assistant (13 curated entries, confidence floor, citations, explicit decline) and the Android build card (`aura-1.0.582.apk`) — no network call, no storage, no fabricated checksum. See [`AURA.md`](AURA.md) |
 | **Firewall AI** | Beaconing, DNS tunnelling, rate-anomaly and fan-out detectors over real observation streams, with `monitor` as the safe default |
 | **Monitoring** | Live dashboard built from measured events only — no synthetic traffic |
 | **Feeds** | Conditional GET, structural validation, SHA-256 integrity, 40 % shrink guard, last-good retention |

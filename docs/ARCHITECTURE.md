@@ -16,11 +16,12 @@ engine.js           deterministic filter engine (the only component that blocks)
 ui/dom.js           DOM helpers — textContent only, no innerHTML
 dns/                encrypted resolution stack
 aether/             threat intelligence and reputation scoring
+aura/               Aura assistant: knowledge corpus, release manifest, matcher, view
 security/           firewall AI, monitor, feeds, backup, privacy, sha256, storage
 assets/             bundled rule feeds (GPLv3, HaGeZi) + curated supplements + icon
 sw.js               offline caching (never caches DoH)
 scripts/verify.mjs  static architecture + honesty-claim verification
-tests/              unit (161) + integration (18) + static gates
+tests/              unit (181) + integration (22) + static gates
 ```
 
 ## 2. Data flow of a single lookup
@@ -188,7 +189,7 @@ builds `_site/` deterministically:
 
 - `_site/` ← `docs/` (the existing marketing site and APK links, unchanged),
 - `_site/app/` ← the web platform (`index.html`, `app.js`, `engine.js`, `sw.js`, the
-  `ui/`, `dns/`, `aether/`, `security/`, `assets/` trees, and the extension ZIP),
+  `ui/`, `dns/`, `aether/`, `aura/`, `security/`, `assets/` trees, and the extension ZIP),
 - anything development-only (`tests/`, `node_modules/`, `package.json`) is rejected if it
   appears in `/app/`,
 - every entry in the service worker's precache list is checked against the staged tree, so a
