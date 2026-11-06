@@ -744,10 +744,17 @@ object ConnectorCatalogue {
 
     // ------------------------------------------------------------------ assembly
 
-    val all: List<ConnectorSpec> by lazy {
-        (cyber() + financial() + privacy() + network() + device() + emergency() + automation() +
-            ConnectorExpansion.all)
+    /**
+     * First-wave catalogue only. Exposed because [ConnectorExpansion] de-duplicates against it;
+     * reading `all` from inside the expansion would recurse forever.
+     */
+    val baseAll: List<ConnectorSpec> by lazy {
+        (cyber() + financial() + privacy() + network() + device() + emergency() + automation())
             .distinctBy { it.id }
+    }
+
+    val all: List<ConnectorSpec> by lazy {
+        (baseAll + ConnectorExpansion.all).distinctBy { it.id }
     }
 
     val byModule: Map<IntelligenceModule, List<ConnectorSpec>> by lazy {

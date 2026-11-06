@@ -810,7 +810,7 @@ object ConnectorExpansion {
 
     val all: List<ConnectorSpec> by lazy {
         (cyber() + financial() + privacy() + network() + device() + emergency() + automation())
-            .filter { spec -> ConnectorCatalogue.find(spec.id) == null }
+            .filter { spec -> ConnectorCatalogue.baseAll.none { it.id == spec.id } }
             .distinctBy { spec -> spec.id }
     }
 
