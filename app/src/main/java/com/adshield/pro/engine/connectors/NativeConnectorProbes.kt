@@ -1,5 +1,6 @@
 package com.adshield.pro.engine.connectors
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.KeyguardManager
 import android.app.NotificationManager
@@ -345,6 +346,10 @@ class NativeConnectorProbes @Inject constructor(
         )
     }
 
+    // PACKAGE_USAGE_STATS is a special (signature|privileged) permission that apps must not
+    // declare; access is granted by the user in Settings. The AppOps mode is checked before every
+    // call, so lint's manifest-based MissingPermission check does not apply.
+    @SuppressLint("MissingPermission")
     private fun usageAccess(): ProbeResult {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "AppOpsManager unavailable")
