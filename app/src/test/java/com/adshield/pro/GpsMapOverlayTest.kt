@@ -37,9 +37,20 @@ class GpsMapOverlayTest {
         // Equator has the largest scale; a higher latitude compresses it by cos(lat).
         // assertTrue takes the message FIRST; swapping the arguments compiles (it boxes the
         // boolean into the Object overload) and then fails at runtime on every device.
+        //
+        // Direction matters here: Web Mercator stretches the world as latitude rises, so one metre
+        // is *fewer* pixels at the equator than at 60° — a 10 m circle drawn at 60° is twice the
+        // pixel size of the same circle at the equator. At sign error here would shrink accuracy
+        // circles everywhere except the tropics.
         assertTrue(
-            "the equator must have a larger scale than 60° north",
-            MapOverlayMath.pixelsPerMeter(0.0, 15.0) > MapOverlayMath.pixelsPerMeter(60.0, 15.0)
+            "a metre must span more pixels at 60° north than at the equator",
+            MapOverlayMath.pixelsPerMeter(60.0, 15.0) > MapOverlayMath.pixelsPerMeter(0.0, 15.0)
+        )
+        close(
+            1.0 / kotlin.math.cos(Math.toRadians(60.0)),
+            MapOverlayMath.pixelsPerMeter(60.0, 15.0) / MapOverlayMath.pixelsPerMeter(0.0, 15.0),
+            1e-9,
+            "the ratio must be exactly 1/cos(latitude)"
         )
     }
 
