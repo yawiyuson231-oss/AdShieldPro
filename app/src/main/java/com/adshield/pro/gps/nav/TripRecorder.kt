@@ -285,7 +285,7 @@ class TripRecorder @Inject constructor(
             }.toString()
         }.toByteArray(Charsets.UTF_8)
 
-        val existing = if (file.isFile) secureStore.read(name).orEmpty() else ByteArray(0)
+        val existing = if (file.isFile) secureStore.read(name) ?: ByteArray(0) else ByteArray(0)
         val merged = ByteArray(existing.size + payload.size).also {
             existing.copyInto(it, 0)
             payload.copyInto(it, existing.size)
