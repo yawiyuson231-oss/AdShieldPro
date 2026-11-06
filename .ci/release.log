@@ -60,9 +60,9 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/browser/SearchSuggestionClient.kt:46:54 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/ConnectorHttp.kt:70:57 Condition is always 'false'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:388:45 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:479:33 'val isInsideSecureHardware: Boolean' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:530:77 'static field INSTALL_NON_MARKET_APPS: String' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:709:37 'static field TYPE_WIFI: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:482:33 'val isInsideSecureHardware: Boolean' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:533:77 'static field INSTALL_NON_MARKET_APPS: String' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:712:37 'static field TYPE_WIFI: Int' is deprecated. Deprecated in Java.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:284:38 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/intelligence/IntelligenceAggregator.kt:701:59 Unnecessary safe call on a non-null receiver of type 'BatteryTelemetry'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/onion/OnionRoutingManager.kt:108:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
@@ -110,6 +110,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 4m 13s
+BUILD SUCCESSFUL in 3m 7s
 57 actionable tasks: 40 executed, 17 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

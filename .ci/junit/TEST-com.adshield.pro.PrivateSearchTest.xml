@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.PrivateSearchTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-06T10:09:00.695Z" hostname="runnervmwuk1x" time="0.003">
+<testsuite name="com.adshield.pro.PrivateSearchTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-06T10:18:14.635Z" hostname="runnervmwuk1x" time="0.004">
   <properties/>
-  <testcase name="providerLabelsAndPrivacyNotesArePresentAndHonest" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="providerLabelsAndPrivacyNotesArePresentAndHonest" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
   <testcase name="searchUrl_encodesUtf8PerByte" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
-  <testcase name="everyProviderSearchesOverHttps" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
-  <testcase name="providerLookup_unknownOrMissingFallsBackToPrivacyDefault" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="everyProviderSearchesOverHttps" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="providerLookup_unknownOrMissingFallsBackToPrivacyDefault" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
   <testcase name="switchingProviderChangesOnlyTheSearchEndpoint" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="searchUrl_cannotInjectExtraQueryParameters" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="searchUrl_encodesSpacesAsPercent20" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
-  <testcase name="addressDetectionMatchesTheDocumentedRule" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
-  <testcase name="bareHostIsUpgradedToHttps" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="addressDetectionMatchesTheDocumentedRule" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="bareHostIsUpgradedToHttps" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
   <testcase name="searchUrl_escapesReservedCharacters" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="searchUrl_trimsAndDoesNotDoubleEncode" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="explicitHttpIsNotSilentlyRewritten" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
