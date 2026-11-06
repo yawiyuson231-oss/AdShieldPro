@@ -47,7 +47,7 @@ class IntelligenceRepository @Inject constructor(
     private val dao: IntelligenceEventDao
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private     private     private val insertCounter = AtomicInteger(0)
+    private val insertCounter = AtomicInteger(0)
 
     val events: Flow<List<IntelligenceEvent>> = dao.observeRecent(IntelligenceLimits.LOADED_EVENTS)
         .map { rows -> rows.mapNotNull(::toDomain) }
