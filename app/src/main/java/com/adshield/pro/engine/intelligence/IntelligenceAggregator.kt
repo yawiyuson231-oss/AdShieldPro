@@ -865,7 +865,7 @@ object IntelligenceAggregator {
         metric("Automation runs 24 h", events.count {
             it.module == IntelligenceModule.AUTOMATION_CORE && now - it.timestampEpochMs <= ALERT_WINDOW_MS
         }.toString(), IntelligenceMetricSource.MEASURED),
-        metric("Events stored", events.size.toString(), IntelligenceMetricSource.MEASURED),
+        metric("Events loaded", events.size.toString(), IntelligenceMetricSource.MEASURED),
         metric("Modules reporting", modules.count { it.module.isNode && it.state != IntelligenceModuleState.OFFLINE }.toString(), IntelligenceMetricSource.COMPUTED)
     )
 

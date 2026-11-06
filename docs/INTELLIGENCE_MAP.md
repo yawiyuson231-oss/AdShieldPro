@@ -118,8 +118,7 @@ module into WARNING, because the issue was already handled.
 | Timeline entry tap | Selects the event, closes the sheet and focuses the map on its module/marker |
 
 Tap detection is cancelled by Compose when movement passes the touch slop
-(`MapGeometry.TAP_SLOP_PX`), so a pan never opens a panel. During layout editing, node drags consume
-their pointer stream, while two-finger pinch still zooms.
+(`MapGeometry.TAP_SLOP_PX`), so a pan never opens a panel. During layout editing a node drag consumes its pointer stream; empty-space drags still pan, and leaving edit mode restores the normal gesture set.
 
 ## 6. Command panel, timeline and filters
 
