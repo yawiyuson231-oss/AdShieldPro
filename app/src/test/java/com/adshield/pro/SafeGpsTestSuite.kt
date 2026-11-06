@@ -289,7 +289,7 @@ class SafeGpsTestSuite {
         )
         val everyday = LocationSafetyAdvisor.buildSharePlan(contradictory, ShareMode.EVERYDAY)
         assertTrue("everyday sharing must be withheld", everyday.blocked)
-        assertTrue(everyday.text.isEmpty(), "no text may be produced for a refused pin")
+        assertTrue("no text may be produced for a refused pin", everyday.text.isEmpty())
         assertTrue(everyday.blockReason!!.contains("disagree"))
 
         val emergency = LocationSafetyAdvisor.buildSharePlan(contradictory, ShareMode.EMERGENCY)
