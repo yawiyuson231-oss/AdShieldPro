@@ -93,17 +93,17 @@ class ConnectorRepository @Inject constructor(
             val previous = dao.stateFor(id)?.toDomain() ?: ConnectorRuntime.initial(spec)
             val now = System.currentTimeMillis()
 
-            if (!spec.implemented) {
-                val blocked = previous.copy(status = ConnectorStatus.NOT_IMPLEMENTED, lastAttemptEpochMs = now)
-                dao.upsertState(blocked.toEntity())
-                return@withLock snapshotOf(spec, blocked)
-            }
             if (spec.requiresKey) {
                 val blocked = previous.copy(
                     status = ConnectorStatus.NOT_CONFIGURED,
                     lastAttemptEpochMs = now,
                     lastError = "provider requires credentials; none are bundled"
                 )
+                dao.upsertState(blocked.toEntity())
+                return@withLock snapshotOf(spec, blocked)
+            }
+            if (!spec.implemented) {
+                val blocked = previous.copy(status = ConnectorStatus.NOT_IMPLEMENTED, lastAttemptEpochMs = now)
                 dao.upsertState(blocked.toEntity())
                 return@withLock snapshotOf(spec, blocked)
             }

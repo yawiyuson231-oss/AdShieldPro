@@ -18,8 +18,10 @@ class ConnectorSyncEngine(
 ) {
 
     fun sync(spec: ConnectorSpec, runtime: ConnectorRuntime): SyncOutcome {
-        if (!spec.implemented) return SyncOutcome.Skipped
+        // Credentials are the honest blocker for key-gated connectors, even when the catalogue
+        // also marks them unimplemented, so this check comes first.
         if (spec.requiresKey) return SyncOutcome.NotConfigured
+        if (!spec.implemented) return SyncOutcome.Skipped
         if (!runtime.enabled) return SyncOutcome.Skipped
 
         val nowMs = now()
