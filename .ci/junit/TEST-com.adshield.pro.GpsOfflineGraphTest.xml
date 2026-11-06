@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsOfflineGraphTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:09:35.282Z" hostname="runnervmwuk1x" time="0.032">
+<testsuite name="com.adshield.pro.GpsOfflineGraphTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:59:45.314Z" hostname="runnervmwuk1x" time="0.022">
   <properties/>
-  <testcase name="testOfflineRouterProducesATurnByTurnPlan" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.011"/>
-  <testcase name="testGraphRoundTripsThroughTheBinaryFormat" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
-  <testcase name="testEstimatedSizeGrowsWithTheGraph" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
+  <testcase name="testOfflineRouterProducesATurnByTurnPlan" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.006"/>
+  <testcase name="testGraphRoundTripsThroughTheBinaryFormat" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
+  <testcase name="testEstimatedSizeGrowsWithTheGraph" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
   <testcase name="testRoutingOutsideTheDownloadedRegionIsRefusedNotApproximated" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
-  <testcase name="testShortestPathFindsTheLShapedRoute" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.004"/>
+  <testcase name="testShortestPathFindsTheLShapedRoute" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
   <testcase name="testShortestPathMinimisesTimeNotDistance" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
   <testcase name="testTruncatedFileFailsInsteadOfProducingAPartialGraph" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
   <testcase name="testNearestNodeSnapsAnOffRoadCoordinate" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
   <testcase name="testCorruptNodeCountIsBounded" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
-  <testcase name="testCompressedFileRoundTripOnDisk" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.006"/>
-  <testcase name="testForeignFileIsRejectedWithAReason" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
-  <testcase name="testSnapToRoadLandsOnTheSegmentNotOnANode" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
+  <testcase name="testCompressedFileRoundTripOnDisk" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.005"/>
+  <testcase name="testForeignFileIsRejectedWithAReason" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
+  <testcase name="testSnapToRoadLandsOnTheSegmentNotOnANode" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
   <testcase name="testSnapToRoadReturnsNullBeyondItsSearchRadius" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
-  <testcase name="testWrongVersionIsRejectedInsteadOfParsedAnyway" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
-  <testcase name="testDescribeReportsRealRoadKilometresNotEdgeCounts" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
+  <testcase name="testWrongVersionIsRejectedInsteadOfParsedAnyway" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
+  <testcase name="testDescribeReportsRealRoadKilometresNotEdgeCounts" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
   <testcase name="testShortestPathIsDirectionAwareAcrossTheOneWayPair" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.001"/>
-  <testcase name="testRegionIdIsNotPartOfTheFileSoTheCallerSuppliesIt" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.002"/>
-  <testcase name="testDistanceToCoverageIsZeroInsideAndPositiveOutside" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
+  <testcase name="testRegionIdIsNotPartOfTheFileSoTheCallerSuppliesIt" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.0"/>
+  <testcase name="testDistanceToCoverageIsZeroInsideAndPositiveOutside" classname="com.adshield.pro.GpsOfflineGraphTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

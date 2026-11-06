@@ -252,6 +252,29 @@ DashboardPresentationTest > overview_recomputesAllowedWhenReportedCounterContrad
 
 DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
 
+GpsAuditRegressionTest > testCollectedPointsAreRestampedWithTheRealTripId PASSED
+
+GpsAuditRegressionTest > testStaleTickKeepsCompromisedStateWhileFixIsFresh PASSED
+
+GpsAuditRegressionTest > testBearingAcrossAntimeridianPointsEast PASSED
+
+GpsAuditRegressionTest > testCompromisedFixStateIsDistinctFromHealthyFix PASSED
+
+GpsAuditRegressionTest > testTrackArchiveOnlyWritesPointsThatAreNotAlreadyOnDisk PASSED
+
+GpsAuditRegressionTest > testArchiveWatermarkPreservesTheOldestPoints PASSED
+
+GpsAuditRegressionTest > testDistanceAcrossAntimeridianMatchesOrdinaryGeometry PASSED
+
+GpsAuditRegressionTest > testSegmentProjectionStillCorrectAwayFromAntimeridian PASSED
+
+GpsAuditRegressionTest > testSegmentProjectionAcrossAntimeridianStaysLocal FAILED
+    java.lang.AssertionError at GpsAuditRegressionTest.kt:26
+
+GpsAuditRegressionTest > testDistanceFormattingIsLocaleIndependent PASSED
+
+GpsAuditRegressionTest > testStoppedEngineFrameHasNoFix PASSED
+
 GpsEngineTest > testRadarZenithSatelliteSitsInTheCentre PASSED
 
 GpsEngineTest > testRadarEmptyReasonIsSpecificAboutTheCause PASSED
@@ -324,8 +347,7 @@ GpsEngineTest > testIntegrityMonitorFlagsMockProvider PASSED
 
 GpsMapOverlayTest > testPointEastOfCentreIsToTheRightOnScreen PASSED
 
-GpsMapOverlayTest > testPixelsPerMeterMatchesWebMercatorGroundResolution FAILED
-    java.lang.AssertionError at GpsMapOverlayTest.kt:40
+GpsMapOverlayTest > testPixelsPerMeterMatchesWebMercatorGroundResolution PASSED
 
 GpsMapOverlayTest > testCameraBearingRotatesTheWholeScene PASSED
 
@@ -617,7 +639,7 @@ SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
 
 SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
 
-285 tests completed, 1 failed
+296 tests completed, 1 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -779,5 +801,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 38s
+BUILD FAILED in 35s
 33 actionable tasks: 7 executed, 2 from cache, 24 up-to-date
