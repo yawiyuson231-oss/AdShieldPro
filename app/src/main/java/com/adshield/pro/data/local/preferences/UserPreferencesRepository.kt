@@ -36,6 +36,12 @@ private val Context.adShieldDataStore: DataStore<Preferences> by preferencesData
 )
 
 data class AppSettingsState(
+    /**
+     * Detailed per-query DNS logging. The VPN resolver reads this on every single
+     * query, so the whole settings state is cached in memory by
+     * [UserPreferencesRepository.cachedSettings] instead of re-reading DataStore
+     * (and re-decoding every JSON preference) once per DNS packet.
+     */
     val vpnShouldRemainActive: Boolean = false,
     val autoStartOnBoot: Boolean = true,
     val darkThemeMode: DarkThemePreference = DarkThemePreference.DARK,
@@ -88,6 +94,18 @@ enum class DarkThemePreference(val label: String) {
 class UserPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    /**
+     * Last decoded settings snapshot.
+     *
+     * Every DNS packet used to call `getSettingsSnapshot()`, which re-reads the
+     * DataStore file, re-maps the whole preference document and re-decodes each
+     * JSON-encoded field (custom rules, scan journal, history, ...). On a page with
+     * dozens of subresources that is hundreds of decodes per second — invisible in
+     * a micro-benchmark and very visible as "the app lags / the site stutters".
+     * One entry is enough: settings are a single document.
+     */
+    private val cachedSettings = java.util.concurrent.atomic.AtomicReference<AppSettingsState?>(null)
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -109,6 +127,7 @@ class UserPreferencesRepository @Inject constructor(
         val DNS_FAILOVER_ENABLED = booleanPreferencesKey("dns_failover_enabled")
         val DNS_FAILOVER_PROVIDERS = stringSetPreferencesKey("dns_failover_providers")
         val DNS_FASTEST_HEALTHY = booleanPreferencesKey("dns_fastest_healthy")
+        val DNS_PREFER_MEDIA_ECS = booleanPreferencesKey("dns_prefer_media_ecs")
         val DNSSEC_MODE = stringPreferencesKey("dnssec_mode")
         val DNS_FIREWALL_POLICY = stringPreferencesKey("dns_firewall_policy_json")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
@@ -151,6 +170,12 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
+        val mapped = buildSettings(prefs)
+        cachedSettings.set(mapped)
+        mapped
+    }
+
+    private fun buildSettings(prefs: Preferences): AppSettingsState {
         val preset = runCatching {
             DnsProviderPreset.valueOf(prefs[Keys.DNS_PRESET] ?: DnsProviderPreset.CLOUDFLARE.name)
         }.getOrDefault(DnsProviderPreset.CLOUDFLARE)
@@ -215,7 +240,8 @@ class UserPreferencesRepository @Inject constructor(
                 failoverEnabled = prefs[Keys.DNS_FAILOVER_ENABLED] ?: false,
                 failoverProviderIds = prefs[Keys.DNS_FAILOVER_PROVIDERS] ?: emptySet(),
                 fastestHealthyProvider = prefs[Keys.DNS_FASTEST_HEALTHY] ?: false,
-                dnssecMode = dnssecMode
+                dnssecMode = dnssecMode,
+                preferGeoAccurateMediaDns = prefs[Keys.DNS_PREFER_MEDIA_ECS] ?: true
             ),
             dnsFirewallPolicy = dnsFirewallPolicy,
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
@@ -264,7 +290,34 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
-    suspend fun getSettingsSnapshot(): AppSettingsState = settingsFlow.first()
+    /**
+     * Settings snapshot for the hot path (one DNS packet per call).
+     *
+     * Returns the cached document when it is warm; DataStore is read only on the
+     * first call after process start. Any preference write invalidates the cache
+     * through [settingsFlow]'s collector, so a change still applies immediately
+     * without restarting the tunnel.
+     */
+    suspend fun getSettingsSnapshot(): AppSettingsState {
+        cachedSettings.get()?.let { return it }
+        val fresh = settingsFlow.first()
+        cachedSettings.set(fresh)
+        return fresh
+    }
+
+    /** Synchronous last-known settings, for callers already on a background thread. */
+    fun cachedSettingsOrNull(): AppSettingsState? = cachedSettings.get()
+
+    /**
+     * Drops the cached snapshot and re-reads it in [getSettingsSnapshot].
+     *
+     * Writes already invalidate through `settingsFlow`, but that is asynchronous:
+     * the resolver could serve one or two queries from the previous document. Any
+     * code that changes DNS behaviour calls this to make the switch immediate.
+     */
+    fun invalidateSettingsCache() {
+        cachedSettings.set(null)
+    }
 
     suspend fun setVpnShouldRemainActive(active: Boolean) {
         context.adShieldDataStore.edit { it[Keys.VPN_ACTIVE] = active }
@@ -279,10 +332,12 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     suspend fun setProtectionMode(mode: ProtectionMode) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { it[Keys.PROTECTION_MODE] = mode.name }
     }
 
     suspend fun updateResolverConfig(config: DnsResolverConfig) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { prefs ->
             prefs[Keys.DNS_PRESET] = config.preset.name
             prefs[Keys.DNS_PROTOCOL] = config.protocol.name
@@ -295,16 +350,19 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.DNS_FAILOVER_ENABLED] = config.failoverEnabled
             prefs[Keys.DNS_FAILOVER_PROVIDERS] = config.failoverProviderIds
             prefs[Keys.DNS_FASTEST_HEALTHY] = config.fastestHealthyProvider
+            prefs[Keys.DNS_PREFER_MEDIA_ECS] = config.preferGeoAccurateMediaDns
             prefs[Keys.DNSSEC_MODE] = config.dnssecMode.name
             prefs[Keys.ENABLE_IPV6] = config.enableIpv6
         }
     }
 
     suspend fun updateDnsFirewallPolicy(policy: DnsFirewallPolicy) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { it[Keys.DNS_FIREWALL_POLICY] = json.encodeToString(policy) }
     }
 
     suspend fun setDetailedDnsLogging(enabled: Boolean) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { it[Keys.DETAILED_LOGGING] = enabled }
     }
 
@@ -347,6 +405,7 @@ class UserPreferencesRepository @Inject constructor(
         blockThirdPartyCookies: Boolean,
         javaScriptEnabled: Boolean
     ) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { prefs ->
             prefs[Keys.BROWSER_COSMETIC] = cosmeticFiltering
             prefs[Keys.BROWSER_POPUP_BLOCK] = popupBlocking
@@ -382,6 +441,7 @@ class UserPreferencesRepository @Inject constructor(
         suggestionsEnabled: Boolean,
         automaticDeletion: Boolean
     ) {
+        invalidateSettingsCache()
         context.adShieldDataStore.edit { prefs ->
             prefs[Keys.SEARCH_PROVIDER] = provider.name
             prefs[Keys.PRIVATE_BROWSING] = privateMode

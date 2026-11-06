@@ -44,7 +44,8 @@ class FilterRuleEngine @Inject constructor() {
         val customBlockExact: Map<String, CustomRule> = emptyMap(),
         val customBlockSubdomain: Map<String, CustomRule> = emptyMap(),
         val customWildcards: List<WildcardEntry> = emptyList(),
-        val builtInAllowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST,
+        val builtInAllowSubdomains: Set<String> =
+            DEFAULT_SAFE_ALLOWLIST + DnsMediaPlaybackGuard.PROTECTED_REGISTRABLE_DOMAINS,
         val filterListSubdomains: Map<String, FilterListEntry> = emptyMap(),
         val filterListExact: Map<String, FilterListEntry> = emptyMap(),
         val filterListWildcards: List<WildcardEntry> = emptyList()
@@ -138,7 +139,10 @@ class FilterRuleEngine @Inject constructor() {
         val previous = snapshotRef.get()
         snapshotRef.set(
             previous.copy(
-                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
+                // Video Safety entries are always present: a media host must resolve
+                // even when a feed (or a future list update) says otherwise.
+                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains +
+                    DnsMediaPlaybackGuard.PROTECTED_REGISTRABLE_DOMAINS,
                 filterListSubdomains = subdomainRules,
                 filterListExact = exactRules,
                 filterListWildcards = wildcardRules
@@ -370,7 +374,12 @@ class FilterRuleEngine @Inject constructor() {
         val wildcardRules: List<WildcardEntry>,
         val allowSubdomains: Set<String>,
         val totalValidRules: Int,
-        val duplicateCount: Int
+        val duplicateCount: Int,
+        /**
+         * Block rules skipped because they would have taken media playback down
+         * (entity-level, substring or shared-CDN rules). Reported, never hidden.
+         */
+        val rejectedVideoUnsafeRules: Int = 0
     )
 
     fun parseFilterListContent(
@@ -391,6 +400,7 @@ class FilterRuleEngine @Inject constructor() {
         val wildcardList = ArrayList<WildcardEntry>()
         val allowSet = HashSet<String>()
         var duplicates = 0
+        var rejectedVideoUnsafe = 0
         var activeCategory = defaultCategory
 
         content.lineSequence().forEach { rawLine ->
@@ -414,6 +424,16 @@ class FilterRuleEngine @Inject constructor() {
 
             // Ignore cosmetic HTML rules (e.g., example.com##.ad) in DNS filter parser
             if (withoutComment.contains("##") || withoutComment.contains("#@#") || withoutComment.contains("#?#")) {
+                return@forEach
+            }
+
+            // Video Safety: an entity-level, substring or shared-CDN block rule
+            // removes media playback itself. Refuse the line and count it, rather
+            // than silently breaking every video on the device.
+            if (!withoutComment.startsWith("@@") &&
+                DnsMediaPlaybackGuard.isVideoUnsafeRule(withoutComment)
+            ) {
+                rejectedVideoUnsafe++
                 return@forEach
             }
 
@@ -495,7 +515,8 @@ class FilterRuleEngine @Inject constructor() {
                 wildcardRules = wildcardList,
                 allowSubdomains = allowSet,
                 totalValidRules = totalValid,
-                duplicateCount = duplicates
+                duplicateCount = duplicates,
+                rejectedVideoUnsafeRules = rejectedVideoUnsafe
             )
         )
     }
