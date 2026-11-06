@@ -401,12 +401,15 @@ class OfflineRoadGraph(
      * kilometres rather than double-counted directed edges.
      */
     fun describe(): String {
-        val roadKm = lengthMeters.sum() / 2_000.0
-        return "${names.size} road names, ${"%.1f".format(roadKm)} km of road, $nodeCount nodes"
+        // Locale.ROOT: this string is shown in the UI and asserted by a unit test, so a decimal
+        // comma from the user's locale must not change the wording of a data summary.
+        val km = String.format(java.util.Locale.ROOT, "%.1f", approximateRoadKilometers)
+        return "${names.size} road names, $km km of road, $nodeCount nodes"
     }
 
+    /** Real road length in kilometres; directed edge lengths are halved to avoid double counting. */
     val approximateRoadKilometers: Double
-        get() = lengthMeters.sum() / 2000.0
+        get() = lengthMeters.sum() / 2_000.0
 
     data class OfflinePath(
         val nodePath: IntArray,

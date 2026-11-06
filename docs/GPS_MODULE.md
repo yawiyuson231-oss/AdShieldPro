@@ -190,11 +190,11 @@ minSdk 29 (Android 10) as before.
   segment filtering, free-flow derivation, rate limiting, incident dedupe, telemetry gate, privacy
   defaults, kill switch, emergency share gating, history rounding/retention, permission findings,
   incident validation, offline tile budget and auto-fit.
-* `GpsOfflineGraphTest` — 17 tests: `ADG1` write/read round-trip (raw, gzipped, on disk), foreign
-  magic, wrong version and truncated/corrupt headers all rejected with a reason, A* over a two-leg
-  network, direction-aware one-way traversal, offline turn-by-turn plan synthesis, refusal to route
-  outside the downloaded pack, nearest-node and on-segment snapping, snap radius, coverage
-  distance, and the pack description string.
+* `GpsOfflineGraphTest` — 18 tests: `ADG1` write/read round-trip (raw, gzipped, on disk), foreign
+  magic, wrong version and truncated/corrupt headers all rejected with a reason, time-optimal A*
+  over a two-leg network, direction-aware one-way traversal, duration/distance arithmetic, offline
+  turn-by-turn plan synthesis, refusal to route outside the downloaded pack, nearest-node and
+  on-segment snapping, snap radius, coverage distance, and the pack description string.
 * `GpsSecureStoreTest` — 11 tests on the `ADSE1` container: exact-byte round-trip, plaintext never
   present in the ciphertext, a fresh IV per write, documented header layout, wrong key rejected,
   bit-flipped ciphertext and IV failing GCM authentication, plaintext and truncated files refused,

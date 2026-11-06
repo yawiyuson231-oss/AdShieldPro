@@ -26,26 +26,63 @@ class GpsOfflineGraphTest {
     // A tiny hand-built L-shaped network, in metres-friendly degrees near Manila:
     //
     //   0 (14.6000, 121.0000) --edge0--> 1 (14.6000, 121.0100) --edge1--> 2 (14.6050, 121.0100)
-    //   and the same roads back again as edges 2 and 3, so the graph is bidirectional.
+    //   edge2 is 1 -> 0 and edge3 is 2 -> 1, i.e. the same roads in the other direction, so the
+    //   graph is bidirectional without any parallel shortcut between two nodes.
     //
     // North–south leg: 0.0100° of longitude at 14.6° ≈ 1 074 m.
     // East–west leg:  0.0050° of latitude ≈ 555 m.
-    private fun network(regionId: String = "manila-test") = OfflineRoadGraph(
+    //
+    // `edgeLengthMeters` is the geometry-derived value the builder in `tools/osm_graph_builder.py`
+    // writes. A* is time-optimal (length / speed), so these numbers must match the coordinates for
+    // the assertions about the chosen path to mean anything.
+    private val defaultFrom = intArrayOf(0, 1, 1, 2)
+    private val defaultTo = intArrayOf(1, 2, 0, 1)
+    private val defaultLengths = doubleArrayOf(1_074.0, 555.0, 1_074.0, 555.0)
+
+    private fun network(
+        regionId: String = "manila-test",
+        edgeFrom: IntArray = defaultFrom,
+        edgeTo: IntArray = defaultTo,
+        edgeLengthMeters: DoubleArray = defaultLengths,
+        edgeSpeedKmh: FloatArray = floatArrayOf(40f, 30f, 40f, 30f)
+    ) = OfflineRoadGraph(
         regionId = regionId,
         bounds = GeoBounds(south = 14.5990, west = 120.9990, north = 14.6060, east = 121.0110),
         nodeLat = doubleArrayOf(14.6000, 14.6000, 14.6050),
         nodeLon = doubleArrayOf(121.0000, 121.0100, 121.0100),
-        edgeFrom = intArrayOf(0, 1, 1, 0),
-        edgeTo = intArrayOf(1, 2, 0, 1),
-        edgeLengthMeters = doubleArrayOf(1_074.0, 555.0, 1_074.0, 555.0),
-        edgeSpeedKmh = floatArrayOf(40f, 30f, 40f, 30f),
+        edgeFrom = edgeFrom,
+        edgeTo = edgeTo,
+        edgeLengthMeters = edgeLengthMeters,
+        edgeSpeedKmh = edgeSpeedKmh,
         edgeNameIndex = intArrayOf(0, 1, 0, 1),
         edgeClass = byteArrayOf(0, 0, 0, 0),
         names = listOf("Rizal Avenue", "Session Road")
     )
 
+    /**
+     * Four nodes in a straight line along one meridian, 222 m / 222 m / 111 m apart, with the
+     * reverse direction of every leg. Speeds are a parameter so a test can show that travel time
+     * (length / speed) — not the number of edges — decides the route.
+     */
+    private fun fourNodeNetwork(speeds: FloatArray) = OfflineRoadGraph(
+        regionId = "cost-test",
+        bounds = GeoBounds(south = 14.5990, west = 120.9990, north = 14.6100, east = 121.0010),
+        nodeLat = doubleArrayOf(14.6000, 14.6020, 14.6040, 14.6050),
+        nodeLon = doubleArrayOf(121.0000, 121.0000, 121.0000, 121.0000),
+        edgeFrom = intArrayOf(0, 1, 2, 3, 2, 1),
+        edgeTo = intArrayOf(1, 2, 3, 2, 1, 0),
+        edgeLengthMeters = doubleArrayOf(222.0, 222.0, 111.0, 111.0, 222.0, 222.0),
+        edgeSpeedKmh = speeds,
+        edgeNameIndex = intArrayOf(0, 0, 0, 0, 0, 0),
+        edgeClass = ByteArray(6),
+        names = listOf("Test Road")
+    )
+
     private fun nearlyEquals(expected: Double, actual: Double, tolerance: Double, message: String) =
         assertTrue("$message (expected $expected ± $tolerance, was $actual)", kotlin.math.abs(expected - actual) <= tolerance)
+
+    /** `describe()` formats with String.format, so compare the number it produced, not a guess. */
+    private fun roadKilometresOf(graph: OfflineRoadGraph): Double = graph.approximateRoadKilometers
 
     // ------------------------------------------------------------------ binary format
 
@@ -161,12 +198,37 @@ class GpsOfflineGraphTest {
 
     @Test
     fun testShortestPathIsDirectionAwareAcrossTheOneWayPair() {
-        // Edge 3 only runs 1 -> 0, so 2 -> 0 must use 2 -> 1 then 1 -> 0 and cost the same as 0 -> 2.
+        // The return edges run backwards: 2 -> 1 then 1 -> 0, the mirror of 0 -> 1 -> 2.
         val graph = network()
         val forward = graph.shortestPath(0, 2)!!
         val backward = graph.shortestPath(2, 0)!!
         nearlyEquals(forward.distanceMeters, backward.distanceMeters, 1.0, "reversed route must mirror the forward one")
         assertEquals(listOf(2, 1, 0), backward.nodePath.toList())
+    }
+
+    @Test
+    fun testShortestPathMinimisesTimeNotDistance() {
+        // Same geometry twice, only the speeds change: a time-optimal search must reach the same
+        // nodes but report a duration that is purely length / speed on every edge.
+        val slow = fourNodeNetwork(floatArrayOf(40f, 30f, 30f, 40f, 30f, 30f))
+        val direct = slow.shortestPath(0, 3)
+        assertNotNull("the chain is connected", direct)
+        assertEquals("the search must use the chain", listOf(0, 1, 2, 3), direct!!.nodePath.toList())
+        val expectedSlow = 222.0 / (40.0 / 3.6) + 222.0 / (30.0 / 3.6) + 111.0 / (30.0 / 3.6)
+        nearlyEquals(expectedSlow, direct.durationSeconds, 0.5, "duration is the sum of length / speed")
+        nearlyEquals(555.0, direct.distanceMeters, 0.5, "distance is the sum of the edge lengths")
+
+        val fast = fourNodeNetwork(FloatArray(6) { 120f })
+        val quick = fast.shortestPath(0, 3)!!
+        assertEquals(listOf(0, 1, 2, 3), quick.nodePath.toList())
+        nearlyEquals(quick.distanceMeters, 555.0, 0.5, "speed must not change the distance")
+        nearlyEquals(
+            quick.distanceMeters / (120.0 / 3.6),
+            quick.durationSeconds,
+            0.5,
+            "at 120 km/h the same road takes a third of the time it takes at 40 km/h"
+        )
+        assertTrue("faster roads must produce a shorter ETA", quick.durationSeconds < direct.durationSeconds)
     }
 
     @Test
@@ -242,10 +304,16 @@ class GpsOfflineGraphTest {
 
     @Test
     fun testDescribeReportsRealRoadKilometresNotEdgeCounts() {
-        val description = network().describe()
+        val graph = network()
+        val description = graph.describe()
         assertTrue("names must be reported: $description", description.contains("2 road names"))
         assertTrue("nodes must be reported: $description", description.contains("3 nodes"))
-        // 1 629 m of road stored in both directions must read 1.6 km, not "2 km".
-        assertTrue("real road length must be reported: $description", description.contains("1.6 km of road"))
+
+        // 1 629 m of road, stored once per direction, is 1.629 km of real road — not "2 km" and not
+        // "3.2 km". Assert the number, and assert it is locale-independent.
+        val kilometres = roadKilometresOf(graph)
+        nearlyEquals(1.629, kilometres, 0.001, "directed edges must be halved")
+        val formatted = String.format(java.util.Locale.ROOT, "%.1f", kilometres)
+        assertTrue("real road length must be reported: $description", description.contains("$formatted km of road"))
     }
 }

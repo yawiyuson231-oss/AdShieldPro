@@ -87,8 +87,8 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 
 ### GPS, navigation and traffic module
 
-Four suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (17) and
-`GpsSecureStoreTest` (11) — cover the whole device-independent core of the GPS module, 96 tests in
+Four suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (18) and
+`GpsSecureStoreTest` (11) — cover the whole device-independent core of the GPS module, 97 tests in
 total. Everything below runs on the JVM with no emulator, no network and no playback of recorded
 traces — these are pure function/state-machine tests, not simulated driving:
 
