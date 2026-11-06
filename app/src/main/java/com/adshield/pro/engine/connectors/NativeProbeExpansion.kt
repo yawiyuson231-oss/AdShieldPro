@@ -27,6 +27,7 @@ import android.os.UserManager
 import android.os.storage.StorageManager
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
+import androidx.core.content.ContextCompat
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.domain.connectors.ConnectorStatus
 import com.adshield.pro.domain.connectors.ProbeResult
@@ -371,6 +372,14 @@ class NativeProbeExpansion @Inject constructor(
 
     @Suppress("DEPRECATION")
     suspend fun wifiSecurity(): ProbeResult {
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_WIFI_STATE) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return ProbeResult(
+                false, ConnectorStatus.DEGRADED, "ACCESS_WIFI_STATE not granted",
+                restriction = "Wi-Fi security state is unavailable without this normal permission."
+            )
+        }
         val manager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "WifiManager unavailable")
         val info = runCatching { manager.connectionInfo }.getOrNull()
