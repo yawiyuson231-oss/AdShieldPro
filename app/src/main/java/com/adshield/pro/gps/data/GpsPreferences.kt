@@ -47,6 +47,7 @@ class GpsPreferences @Inject constructor(
         val INCIDENT_REPORTING = booleanPreferencesKey("allow_incident_reporting")
         val REPORTER_TOKEN = stringPreferencesKey("reporter_token")
         val MAP_STYLE = stringPreferencesKey("map_style")
+        val MAP_TERRAIN_TILT = booleanPreferencesKey("map_terrain_tilt")
         val ROUTER = stringPreferencesKey("routing_provider")
         val CUSTOM_OSRM = stringPreferencesKey("custom_osrm_url")
         val CUSTOM_VALHALLA = stringPreferencesKey("custom_valhalla_url")
@@ -131,8 +132,25 @@ class GpsPreferences @Inject constructor(
 
     // ------------------------------------------------------------------ map
     val mapStyle: Flow<String> = context.gpsDataStore.data.map { it[Keys.MAP_STYLE] ?: DEFAULT_MAP_STYLE }
-    suspend fun setMapStyle(styleUrl: String) {
-        context.gpsDataStore.edit { it[Keys.MAP_STYLE] = styleUrl }
+    /**
+     * Stores the chosen style. Only https URLs are accepted: a plain-http style document would be
+     * modified in transit, and its tile templates could be pointed anywhere.
+     *
+     * @return true when the value was accepted and persisted.
+     */
+    suspend fun setMapStyle(styleUrl: String): Boolean {
+        val trimmed = styleUrl.trim()
+        if (!trimmed.startsWith("https://") || trimmed.length < 12) return false
+        context.gpsDataStore.edit { it[Keys.MAP_STYLE] = trimmed }
+        return true
+    }
+
+    /** 3D buildings and the follow-mode camera tilt, user-switchable from the Layers sheet. */
+    val mapTerrainTilt: Flow<Boolean> =
+        context.gpsDataStore.data.map { it[Keys.MAP_TERRAIN_TILT] ?: true }
+
+    suspend fun setMapTerrainTilt(enabled: Boolean) {
+        context.gpsDataStore.edit { it[Keys.MAP_TERRAIN_TILT] = enabled }
     }
 
     val routerPreference: Flow<String> = context.gpsDataStore.data.map { it[Keys.ROUTER] ?: "OSRM" }

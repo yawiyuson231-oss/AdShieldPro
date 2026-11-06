@@ -56,6 +56,19 @@ class MapLibreEngine(
     private var hasRouteLayers = false
     private var hasTrafficLayers = false
 
+    /**
+     * Last overlay inputs, kept so a style change can re-draw them.
+     *
+     * `setStyle` destroys every source and layer, and the offline pack download rewrites the tile
+     * database, so both call [refreshStyle]. Without this cache the route, the driven trail, the
+     * traffic colours and the incident markers all vanished on a style switch and only came back
+     * when the next GPS fix happened to arrive.
+     */
+    private var lastRoute: List<GeoPoint> = emptyList()
+    private var lastTravelled: List<GeoPoint> = emptyList()
+    private var lastTraffic: List<TrafficSegmentGeometry> = emptyList()
+    private var lastIncidents: List<GeoPoint> = emptyList()
+
     /** Set when the map is ready and the style has loaded; every overlay call is a no-op before that. */
     val isReady: Boolean get() = map != null && style != null
 
@@ -123,6 +136,8 @@ class MapLibreEngine(
                 addTerrainAndBuildings(loaded)
                 hasRouteLayers = false
                 hasTrafficLayers = false
+                // Re-apply what the caller already gave us; a style swap must not blank the route.
+                redrawOverlays()
                 onStyleLoaded?.invoke()
             }
         } catch (error: Exception) {
@@ -206,6 +221,18 @@ class MapLibreEngine(
         )
     }
 
+    /**
+     * Discrete zoom for the HUD buttons. Gestures cover this too, but a one-handed driver cannot
+     * always pinch, and the buttons make the zoom level explicit in a tilt/rotate view.
+     */
+    fun zoomBy(delta: Double) {
+        val mapLibreMap = map ?: return
+        val current = mapLibreMap.cameraPosition?.zoom ?: 14.0
+        val target = (current + delta).coerceIn(2.0, 19.5)
+        if (target == current) return
+        mapLibreMap.animateCamera(CameraUpdateFactory.zoomTo(target), 220)
+    }
+
     fun showBounds(bounds: GeoBounds, paddingPx: Int = 96) {
         val mapLibreMap = map ?: return
         runCatching {
@@ -234,6 +261,8 @@ class MapLibreEngine(
      * touches the sources (`setGeoJson`) and never re-creates layers.
      */
     fun drawRoute(route: List<GeoPoint>, travelled: List<GeoPoint>) {
+        lastRoute = route
+        lastTravelled = travelled
         val loaded = style ?: return
         runCatching {
             ensureRouteLayers(loaded)
@@ -288,6 +317,7 @@ class MapLibreEngine(
      * rather than being hidden (hiding them would make the map look confident).
      */
     fun drawTraffic(segments: List<TrafficSegmentGeometry>) {
+        lastTraffic = segments
         val loaded = style ?: return
         runCatching {
             ensureTrafficLayers(loaded)
@@ -361,6 +391,7 @@ class MapLibreEngine(
     }
 
     fun drawIncidents(incidents: List<GeoPoint>) {
+        lastIncidents = incidents
         val loaded = style ?: return
         runCatching {
             if (loaded.getSource(SOURCE_INCIDENTS) == null) {
@@ -370,6 +401,56 @@ class MapLibreEngine(
             (loaded.getSource(SOURCE_INCIDENTS) as? GeoJsonSource)
                 ?.setGeoJson(FeatureCollection.fromFeatures(features))
         }.onFailure { Log.w(TAG, "drawIncidents failed: ${it.message}") }
+    }
+
+    /**
+     * Re-applies every overlay from the cached inputs. Called after a style load, because a style
+     * swap destroys the sources these layers read from.
+     */
+    private fun redrawOverlays() {
+        if (style == null) return
+        runCatching {
+            drawRoute(lastRoute, lastTravelled)
+            drawTraffic(lastTraffic)
+            drawIncidents(lastIncidents)
+        }.onFailure { Log.w(TAG, "redrawOverlays failed: ${it.message}") }
+    }
+
+    /**
+     * The inverse of [projectToScreen]: a pixel inside the view back to a coordinate.
+     *
+     * MapLibre applies the real tilt and bearing here, so a long press lands where the user pressed.
+     * Returns null before the map is ready, or when the pixel is outside the visible surface — the
+     * caller then ignores the gesture instead of inventing a coordinate.
+     */
+    fun screenToCoordinate(point: ScreenPoint): GeoPoint? {
+        val mapLibreMap = map ?: return null
+        return runCatching {
+            val latLng = mapLibreMap.projection.fromScreenLocation(
+                android.graphics.PointF(point.x.toFloat(), point.y.toFloat())
+            )
+            if (latLng == null || latLng.latitude !in -90.0..90.0 || latLng.longitude !in -180.0..180.0) {
+                null
+            } else {
+                GeoPoint(latLng.latitude, latLng.longitude)
+            }
+        }.getOrNull()
+    }
+
+    /**
+     * The map's own projection: a coordinate to pixels inside the view.
+     *
+     * This is the authoritative answer for the Compose marker because MapLibre applies the real
+     * tilt, bearing and perspective. Returns null before the style is ready, when the renderer has
+     * no size yet, or when the point is behind the camera in a tilted view — the caller then keeps
+     * the marker at its last known position or falls back to [MapOverlayMath].
+     */
+    fun projectToScreen(point: GeoPoint): ScreenPoint? {
+        val mapLibreMap = map ?: return null
+        return runCatching {
+            val projected = mapLibreMap.projection.toScreenLocation(LatLng(point.latitude, point.longitude))
+            if (projected == null) null else ScreenPoint(projected.x.toDouble(), projected.y.toDouble())
+        }.getOrNull()
     }
 
     private fun lineFeature(points: List<GeoPoint>, kind: String): FeatureCollection {

@@ -4,7 +4,9 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -60,6 +63,7 @@ import com.adshield.pro.gps.ui.screens.GpsRadarScreen
 import com.adshield.pro.gps.ui.screens.LocationSecurityScreen
 import com.adshield.pro.gps.ui.screens.NavigationScreen
 import com.adshield.pro.gps.ui.screens.OfflineMapsScreen
+import com.adshield.pro.gps.ui.screens.MapStyleSheet
 import com.adshield.pro.gps.ui.screens.TelemetryScreen
 import com.adshield.pro.gps.ui.screens.TrafficScreen
 import org.maplibre.android.MapLibre
@@ -168,6 +172,7 @@ fun GpsHubScreen(
 
         Box(Modifier.fillMaxSize()) {
             when (currentSection) {
+                // (sheet rendered below, over whichever section is visible)
                 GpsSection.MAP -> GpsMapScreen(
                     state = state,
                     frame = frame,
@@ -185,7 +190,17 @@ fun GpsHubScreen(
                     },
                     onOpenSearch = { section = GpsSection.NAVIGATION.name },
                     onToggleTraffic = { viewModel.setTrafficVisible(!state.trafficVisible) },
-                    onOpenStyleSheet = { section = GpsSection.OFFLINE.name }
+                    onOpenStyleSheet = { viewModel.openMapSheet(MapSheet.STYLE) },
+                    onLongPress = viewModel::onMapLongPress,
+                    onZoomIn = { engine.zoomBy(1.0) },
+                    onZoomOut = { engine.zoomBy(-1.0) },
+                    onFitRoute = viewModel::fitRouteOnMap,
+                    onFitApplied = viewModel::onMapFitApplied,
+                    onRouteToPin = viewModel::routeToDroppedPin,
+                    onClearPin = {
+                        viewModel.clearDroppedPin()
+                        viewModel.openMapSheet(null)
+                    }
                 )
 
                 GpsSection.NAVIGATION -> NavigationScreen(
@@ -272,6 +287,40 @@ fun GpsHubScreen(
                     onLoadGraph = viewModel::loadOfflineGraphForPack,
                     onClearMessage = viewModel::clearOfflineMessage
                 )
+            }
+
+            // ------------------------------------------------------------------ map sheets
+            // Rendered over the active section so a style change takes effect on the map behind it.
+            if (state.mapSheet == MapSheet.STYLE && currentSection == GpsSection.MAP) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(GpsBackground.copy(alpha = 0.55f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { viewModel.openMapSheet(null) }
+                )
+                GpsPanel(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .heightIn(max = 520.dp)
+                        .padding(8.dp),
+                    accent = GpsCyan
+                ) {
+                    MapStyleSheet(
+                        state = state,
+                        onSelectStyle = viewModel::setMapStyle,
+                        onToggleTraffic = { viewModel.setTrafficVisible(!state.trafficVisible) },
+                        onToggleTerrainTilt = viewModel::setMapTerrainTilt,
+                        onRecentre = {
+                            viewModel.setCameraMode(CameraMode.FOLLOW)
+                            viewModel.openMapSheet(null)
+                        },
+                        onDismiss = { viewModel.openMapSheet(null) }
+                    )
+                }
             }
         }
     }

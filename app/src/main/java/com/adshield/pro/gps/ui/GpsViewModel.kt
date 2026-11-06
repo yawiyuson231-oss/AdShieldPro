@@ -55,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -112,11 +113,26 @@ class GpsViewModel @Inject constructor(
     private var observing = false
     private var lastCamera: GeoPoint? = null
 
+    /**
+     * The camera the map should open at on a cold start.
+     *
+     * `null` until the stored position is read, so the map can tell "no saved camera yet" from
+     * "saved at 0,0". It stays at the saved value afterwards and is not overwritten by every idle
+     * callback, which would make the initial camera jump around while the user pans.
+     */
+    private var restoredCamera: GeoPoint? = null
+    private var restoredZoom: Double? = null
+
     init {
         traffic.initialise()
         GpsMaintenanceWorker.schedule(context)
         viewModelScope.launch {
             preferences.mapStyle.collect { style -> _state.value = _state.value.copy(mapStyleUrl = style) }
+        }
+        viewModelScope.launch {
+            preferences.mapTerrainTilt.collect { enabled ->
+                _state.value = _state.value.copy(mapTerrainTilt = enabled)
+            }
         }
         viewModelScope.launch {
             preferences.policy.collect { policy ->
@@ -130,10 +146,17 @@ class GpsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            var last: GeoPoint? = null
-            preferences.lastCamera.collect { last = it; return@collect }
+            // One-shot read of the persisted camera: the map opens where the user left it.
+            val last = preferences.lastCamera.first()
+            val zoom = preferences.lastZoom.first()
             if (last != null) {
-                _state.value = _state.value.copy(cameraCenter = last)
+                restoredCamera = last
+                restoredZoom = zoom.coerceIn(2.0, 19.5)
+                _state.value = _state.value.copy(
+                    cameraCenter = last,
+                    cameraZoom = restoredZoom!!,
+                    cameraRestored = true
+                )
             }
         }
         viewModelScope.launch {
@@ -181,6 +204,29 @@ class GpsViewModel @Inject constructor(
         }
         viewModelScope.launch {
             grabObservers()
+        }
+        viewModelScope.launch {
+            // Download failures arrive on a separate flow (tile server refused, disk full, region
+            // invalid). Nothing collected it before, so a failed pack looked like a frozen one.
+            OfflineProgressBus.errors.collect { event ->
+                val packId = event.first
+                val reason = event.second
+                dao.offlinePack(packId)?.let { pack ->
+                    dao.updatePackProgress(
+                        id = packId,
+                        state = OfflinePackState.FAILED.name,
+                        completed = pack.completedResources,
+                        required = pack.requiredResources,
+                        bytes = pack.bytesDownloaded,
+                        updatedAt = System.currentTimeMillis(),
+                        error = reason
+                    )
+                }
+                _state.value = _state.value.copy(
+                    offlineMessage = "Download failed: $reason",
+                    offlineError = true
+                )
+            }
         }
         refreshPermissionAudit()
     }
@@ -387,12 +433,72 @@ class GpsViewModel @Inject constructor(
         navigation.currentPlan?.let { plan -> refreshSegmentsFor(plan) }
     }
 
+    /**
+     * A long press on the map: drop a destination marker and offer to route to it.
+     *
+     * No reverse geocoding is attempted here on purpose — that would be an extra Nominatim request
+     * per long press, and the OSM usage policy asks for restraint. The label stays the coordinates
+     * until a search or a route resolves a real name.
+     */
+    fun onMapLongPress(point: GeoPoint) {
+        val label = Geodesy.formatCoordinates(point.latitude, point.longitude, 5)
+        _state.value = _state.value.copy(
+            mapDroppedPin = point,
+            mapDroppedPinLabel = label,
+            mapSheet = MapSheet.PIN
+        )
+    }
+
+    /** Confirms the dropped pin as the destination and starts routing. */
+    fun routeToDroppedPin() {
+        val pin = _state.value.mapDroppedPin ?: return
+        planRouteTo(pin, _state.value.mapDroppedPinLabel ?: "Dropped pin")
+        _state.value = _state.value.copy(mapSheet = null)
+    }
+
+    fun clearDroppedPin() {
+        _state.value = _state.value.copy(mapDroppedPin = null, mapDroppedPinLabel = null)
+    }
+
+    fun openMapSheet(sheet: MapSheet?) {
+        _state.value = _state.value.copy(mapSheet = sheet)
+    }
+
+    /** "Fit the whole route on screen": the camera goes to the route bounds, tracking paused. */
+    fun fitRouteOnMap() {
+        _state.value = _state.value.copy(
+            cameraMode = CameraMode.FREE,
+            mapFitRequest = _state.value.routeGeometry.takeIf { it.size >= 2 }
+        )
+    }
+
+    /** Consumed by the map once it has applied the fit, so a recomposition does not re-run it. */
+    fun onMapFitApplied() {
+        _state.value = _state.value.copy(mapFitRequest = null)
+    }
+
     fun setCameraMode(mode: CameraMode) {
         _state.value = _state.value.copy(cameraMode = mode)
     }
 
+    /**
+     * Applies a map style. Rejects non-https URLs and persists the choice; the map picks it up from
+     * the preference flow, so a failed write cannot leave the UI showing a style the map is not using.
+     */
     fun setMapStyle(url: String) = viewModelScope.launch {
-        preferences.setMapStyle(url)
+        val accepted = preferences.setMapStyle(url)
+        if (!accepted) {
+            _state.value = _state.value.copy(
+                mapStyleError = "Only https:// style URLs are accepted — the value was not applied."
+            )
+            return@launch
+        }
+        // A successful change clears any previous load error; the engine re-reports if it fails.
+        _state.value = _state.value.copy(mapStyleError = null, mapSheet = null)
+    }
+
+    fun setMapTerrainTilt(enabled: Boolean) = viewModelScope.launch {
+        preferences.setMapTerrainTilt(enabled)
     }
 
     // ----------------------------------------------------------- destination
@@ -719,6 +825,9 @@ class GpsViewModel @Inject constructor(
 
 // ------------------------------------------------------------------ models
 
+/** Bottom sheets the map screen can raise. */
+enum class MapSheet { STYLE, LAYERS, PIN }
+
 enum class CameraMode(val label: String) {
     FREE("Free"),
     FOLLOW("Follow"),
@@ -822,7 +931,18 @@ data class GpsUiState(
      * capability, not assumed: an emulator or a navigational device without GNSS reports false and
      * the radar says so instead of spinning forever.
      */
-    val gnssStatusSupported: Boolean = true
+    val gnssStatusSupported: Boolean = true,
+    /** True once a persisted camera has been read back; the map opens there on a cold start. */
+    val cameraRestored: Boolean = false,
+    /** A long-pressed map point, waiting for the user to confirm it as a destination. */
+    val mapDroppedPin: GeoPoint? = null,
+    val mapDroppedPinLabel: String? = null,
+    /** Active map bottom sheet, or null. */
+    val mapSheet: MapSheet? = null,
+    /** A pending "fit this polyline on screen" request; cleared once the map applies it. */
+    val mapFitRequest: List<GeoPoint>? = null,
+    /** 3D buildings and follow-mode tilt, switchable from the Layers sheet. */
+    val mapTerrainTilt: Boolean = true
 ) {
     /** One-line operational status used by the GPS header of every tab. */
     fun statusLine(frame: GpsFrame): String = when {
