@@ -691,11 +691,14 @@ class NativeConnectorProbes @Inject constructor(
         }
     }
 
+    // ConnectivityDiagnosticsManager's service name is not in the SDK's @ServiceName list, so the
+    // documented string is used and lint's constant check is suppressed for this lookup only.
+    @SuppressLint("WrongConstant")
     private fun diagnosticsProbe(): ProbeResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return ProbeResult(false, ConnectorStatus.DEGRADED, "ConnectivityDiagnosticsManager requires Android 11+")
         }
-        val manager = context.getSystemService(Context.CONNECTIVITY_DIAGNOSTICS_SERVICE)
+        val manager = context.getSystemService("connectivity_diagnostics")
         return ProbeResult(
             manager != null,
             if (manager != null) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
