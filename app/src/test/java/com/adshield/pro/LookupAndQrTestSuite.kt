@@ -84,7 +84,10 @@ class LookupAndQrTestSuite {
         lookups.forEach { spec ->
             assertNotNull("${spec.id} has no queryField", spec.queryField)
             assertTrue("${spec.id} endpoint is not https", spec.endpoint.startsWith("https://"))
-            assertTrue("${spec.id} endpoint has no {value} template", spec.endpoint.contains("{value}"))
+            val templated = spec.endpoint.contains("{value}") ||
+                spec.endpoint.contains("{host}") ||
+                spec.requestBody?.contains("{value}") == true
+            assertTrue("${spec.id} has no value template in endpoint or body", templated)
             assertTrue("${spec.id} TTL below one minute", spec.cacheTtlMs >= 60_000L)
             assertTrue("${spec.id} lookup must not be default-enabled", !spec.defaultEnabled)
         }

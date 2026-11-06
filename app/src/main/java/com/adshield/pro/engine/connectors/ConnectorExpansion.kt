@@ -272,30 +272,6 @@ object ConnectorExpansion {
             requestBody = "url={value}", contentType = "application/x-www-form-urlencoded"
         ),
         lookup(
-            id = "cyber.malwarebazaar.api", name = "MalwareBazaar hash lookup (Auth-Key)",
-            module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (MalwareBazaar)",
-            endpoint = "https://mb-api.abuse.ch/api/v1/", field = LookupField.HASH_SHA256,
-            handlerId = "none", cacheTtlMs = 6 * HOUR,
-            freeUse = "Free account key required; the public CSV export returns HTTP 410.",
-            restrictions = "No key is bundled; connector stays NOT CONFIGURED and never counts as an integration.",
-            rateLimit = "Key-bound quota.",
-            auth = ConnectorAuth.REQUIRED_KEY, implemented = false,
-            requestBody = "query=get_info&hash={value}",
-            contentType = "application/x-www-form-urlencoded"
-        ),
-        lookup(
-            id = "cyber.threatfox.api", name = "ThreatFox IOC search (Auth-Key)",
-            module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (ThreatFox)",
-            endpoint = "https://threatfox-api.abuse.ch/api/v1/", field = LookupField.IP,
-            handlerId = "none", cacheTtlMs = 6 * HOUR,
-            freeUse = "Free account key required (HTTP 401 without one on 2026-11-06).",
-            restrictions = "No key is bundled; connector stays NOT CONFIGURED.",
-            rateLimit = "Key-bound quota.",
-            auth = ConnectorAuth.REQUIRED_KEY, implemented = false,
-            requestBody = "{\"query\":\"search_ioc\",\"search_term\":\"{value}\"}",
-            contentType = "application/json"
-        ),
-        lookup(
             id = "cyber.virustotal", name = "VirusTotal file lookup",
             module = IntelligenceModule.CYBER_DEFENSE, provider = "VirusTotal",
             endpoint = "https://www.virustotal.com/api/v3/files/{value}", field = LookupField.HASH_SHA256,

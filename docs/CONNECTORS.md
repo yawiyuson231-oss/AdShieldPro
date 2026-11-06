@@ -10,7 +10,7 @@ yourself. The machine-generated, per-connector table lives in
 
 * A **connector** is one concrete way of getting real intelligence: either an HTTPS endpoint whose
   response the app parses locally, or an Android API the app calls on the device.
-* The registry currently contains **178 connectors, 157 of which are implemented**. 21 are declared
+* The registry currently contains **176 connectors, 157 of which are implemented**. 21 are declared
   but not executable: 13 need provider credentials that are never bundled, 6 have no public machine
   interface, 2 are documented API shapes without a working free endpoint. Nothing is counted twice;
   the generator rejects duplicate endpoints.
@@ -191,7 +191,7 @@ Release builds keep `isMinifyEnabled`/R8 configured; parsers avoid reflection an
 
 ## Known gaps (honest list)
 
-* 178/350 of the brief's target; the gap is genuine, not deferred padding.
+* 176/350 of the brief's target; the gap is genuine, not deferred padding.
 * Emergency coverage outside the US/EU feeds depends on GDACS/EMSC aggregation; Philippine official
   sources remain link-outs until they publish machine-readable feeds.
 * GitHub/NVD unauthenticated limits mean a 6 h cadence is the practical ceiling.

@@ -8,13 +8,13 @@ The catalogue is the single source of truth. Every row below is a real HTTPS end
 
 | Metric | Value |
 | --- | --- |
-| Catalogue entries (unique endpoints/APIs) | 178 |
+| Catalogue entries (unique endpoints/APIs) | 176 |
 | Implemented connectors | 157 |
 | Implemented HTTP feeds | 52 |
 | Implemented Android-API connectors | 105 |
 | Verified by JVM tests or on-demand runtime probe | 157 |
 | Enabled by default (bounded background use) | 6 |
-| Credential-gated (declared, never bundled, not counted) | 13 |
+| Credential-gated (declared, never bundled, not counted) | 11 |
 | Sources with no public machine interface | 6 |
 | **Target from the brief** | **350** |
 | **Honest gap to the target** | **193** |
@@ -25,7 +25,7 @@ The target of 50 per module (350 total) is **not** reached, and this report does
 
 | Module | Listed | Implemented | Tested/verified | Credential-gated | Unavailable | Target | Gap |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Cyber Defense | 36 | 26 | 26 | 8 | 2 | 50 | 24 |
+| Cyber Defense | 34 | 26 | 26 | 6 | 2 | 50 | 24 |
 | Financial Defense | 22 | 18 | 18 | 3 | 1 | 50 | 32 |
 | Privacy Defense | 28 | 26 | 26 | 0 | 0 | 50 | 24 |
 | Network Defense | 25 | 25 | 25 | 0 | 0 | 50 | 25 |
@@ -64,8 +64,6 @@ The target of 50 per module (350 total) is **not** reached, and this report does
 | `cyber.exploitdb` — Exploit-DB public exploit index | Offensive Security (Exploit-DB) | HTTPS feed | `https://gitlab.com/exploit-database/exploitdb/-/raw/main/files_exploits.csv` | NONE | IMPLEMENTED, FREE WITH RESTRICTIONS |
 | `cyber.misp.empty-hashes` — MISP warninglist: empty-hash false positives | MISP project | HTTPS feed | `https://raw.githubusercontent.com/MISP/misp-warninglists/main/lists/empty-h…` | NONE | IMPLEMENTED, FREE WITH RESTRICTIONS |
 | `cyber.urlhaus.api` — URLhaus URL lookup (Auth-Key) | abuse.ch (URLhaus) | HTTPS lookup (on demand) | `https://urlhaus-api.abuse.ch/v1/url/` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |
-| `cyber.malwarebazaar.api` — MalwareBazaar hash lookup (Auth-Key) | abuse.ch (MalwareBazaar) | HTTPS lookup (on demand) | `https://mb-api.abuse.ch/api/v1/` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |
-| `cyber.threatfox.api` — ThreatFox IOC search (Auth-Key) | abuse.ch (ThreatFox) | HTTPS lookup (on demand) | `https://threatfox-api.abuse.ch/api/v1/` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |
 | `cyber.virustotal` — VirusTotal file lookup | VirusTotal | HTTPS lookup (on demand) | `https://www.virustotal.com/api/v3/files/{value}` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |
 | `cyber.abuseipdb` — AbuseIPDB IP reputation | AbuseIPDB | HTTPS lookup (on demand) | `https://api.abuseipdb.com/api/v2/check?ipAddress={value}` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |
 | `cyber.sonatype.ossindex` — Sonatype OSS Index component report | Sonatype | HTTPS lookup (on demand) | `https://ossindex.sonatype.org/api/v3/component-report` | REQUIRED_KEY | FREE WITH RESTRICTIONS (credentials) |

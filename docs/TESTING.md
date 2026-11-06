@@ -130,7 +130,7 @@ Those cannot be exercised by JVM unit tests.
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
 18. Open **Intel → Feeds & connectors**, pick a module and confirm the header counts match the
-    registry (178 listed / 157 implemented at the time of writing). Open a feed, press **SYNC NOW**
+    registry (176 listed / 157 implemented at the time of writing). Open a feed, press **SYNC NOW**
     and confirm the status, HTTP code, latency and indicator count are populated from the real
     response — a connector that has never succeeded must not read CONNECTED.
 19. Put the device in airplane mode (or block the host) and sync again: the connector must show
