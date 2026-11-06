@@ -10,6 +10,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.adshield.pro.data.repository.AdShieldRepository
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -22,15 +24,36 @@ import java.util.concurrent.TimeUnit
 class FilterUpdateWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val repository: AdShieldRepository
+    private val repository: AdShieldRepository,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        val startedAt = System.currentTimeMillis()
         repository.enforceLogRetentionPolicy()
         val updateResult = repository.updateAllEnabledFilterLists()
+        val duration = System.currentTimeMillis() - startedAt
         return if (updateResult.isSuccess) {
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Filter list sync",
+                    success = true,
+                    detail = "${updateResult.getOrNull() ?: 0} rule(s) loaded from enabled sources",
+                    durationMs = duration,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             Result.success()
         } else {
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Filter list sync",
+                    success = false,
+                    detail = updateResult.exceptionOrNull()?.message ?: "list download failed",
+                    durationMs = duration,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             Result.retry()
         }
     }

@@ -63,6 +63,11 @@ jobs:
           chmod +x tools/generate_capability_matrix.py
           python3 tools/generate_capability_matrix.py --check
 
+      - name: Verify generated docs match code (connector verification report)
+        run: |
+          chmod +x tools/generate_connector_report.py
+          python3 tools/generate_connector_report.py --check
+
       - name: Verify every capability's claimed test actually runs
         run: |
           chmod +x tools/audit_capability_tests.py

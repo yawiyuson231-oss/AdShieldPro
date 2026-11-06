@@ -11,6 +11,8 @@ import com.adshield.pro.engine.security.QuarantineNaming
 import com.adshield.pro.engine.security.QuarantinedItem
 import com.adshield.pro.engine.security.ScanJournal
 import com.adshield.pro.engine.security.SecurityScanRecord
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -38,7 +40,8 @@ private val Context.scanJournalDataStore: DataStore<Preferences> by preferencesD
  */
 @Singleton
 class ScanJournalStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -85,6 +88,7 @@ class ScanJournalStore @Inject constructor(
             stored = record.copy(id = ScanJournal.nextId(existing, record.timestampEpochMs))
             prefs[Keys.HISTORY_JSON] = json.encodeToString(ScanJournal.append(existing, stored))
         }
+        publishIntelligence(stored)
         return stored
     }
 
@@ -102,7 +106,18 @@ class ScanJournalStore @Inject constructor(
             }.reversed()
             prefs[Keys.HISTORY_JSON] = json.encodeToString(next)
         }
+        stored.forEach(::publishIntelligence)
         return stored
+    }
+
+    /**
+     * Bridges a persisted scan to the unified intelligence event store.
+     * Only records that actually exist are published; the factory re-checks evidence and can
+     * return null, in which case nothing is written.
+     */
+    private fun publishIntelligence(record: SecurityScanRecord) {
+        val event = IntelligenceEventFactory.scanRecord(record, System.currentTimeMillis()) ?: return
+        intelligenceRecorder.record(event)
     }
 
     suspend fun clearHistory() {
