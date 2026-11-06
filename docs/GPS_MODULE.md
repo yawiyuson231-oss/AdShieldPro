@@ -203,6 +203,10 @@ minSdk 29 (Android 10) as before.
 * `tools/osm_graph_builder.py` — graph output verified byte-for-byte against
   `OfflineRoadGraph.readFrom`'s layout (magic, header, arrays, names, no trailing bytes).
 
+The map additions are covered by `GpsMapOverlayTest` (14 tests): Web-Mercator pixel scale,
+the 1/cos(latitude) accuracy-circle ratio, unknown accuracy drawing nothing, cardinal directions,
+camera-bearing rotation, antimeridian wrap, and viewport clamping.
+
 **Requires a physical device (not claimed as verified here):** actual GNSS acquisition, sky-plot
 population, MapLibre rendering/3D buildings, camera smoothness, TTS pronunciation, offline pack
 download against OpenFreeMap's limits, battery/memory under a long drive, and behaviour when the OS

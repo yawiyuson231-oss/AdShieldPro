@@ -87,9 +87,9 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 
 ### GPS, navigation and traffic module
 
-Four suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (18) and
-`GpsSecureStoreTest` (11) — cover the whole device-independent core of the GPS module, 97 tests in
-total. Everything below runs on the JVM with no emulator, no network and no playback of recorded
+Five suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (18),
+`GpsMapOverlayTest` (14) and `GpsSecureStoreTest` (11) — cover the whole device-independent core of
+the GPS module, 111 tests in total. Everything below runs on the JVM with no emulator, no network and no playback of recorded
 traces — these are pure function/state-machine tests, not simulated driving:
 
 | Area | Covered behaviour |
@@ -100,6 +100,7 @@ traces — these are pure function/state-machine tests, not simulated driving:
 | Stationary detection | Stopped vehicle, motorway speed, and motion inferred from displacement when the provider reports no Doppler speed |
 | `RadarGeometry` | Sky-view polar placement (zenith, elevation rings at 1, 2/3, 1/3), constellation short codes, 0–100 sky score, and the distinct empty-state reasons (no permission / location off / no `GnssStatus` support / first report still pending / genuinely empty sky) |
 | `MapProjection` / tiles | Web Mercator projection, tile-count estimate for a small region, rejection of polar latitudes outside the projection's limits |
+| Map HUD overlay | Pixel scale at any zoom/latitude and the exact 1/cos(latitude) ratio, accuracy-circle radius from the reported error (and none when it is unknown), cardinal directions on screen, rotation with the camera bearing, antimeridian wrap, and viewport clamping for off-screen targets |
 | Offline packs | Tile-budget rejection above the free 3 000-tile / 50 MB cap, acceptance of a small neighbourhood, auto-fit zoom search, route-corridor coverage, estimate growth with zoom range, degenerate-bounds rejection with a reason |
 | `ADG1` offline graph | Raw, gzipped and on-disk round-trips, foreign magic / wrong version / truncated / absurd-node-count headers rejected with a reason, A* over a two-leg network, direction-aware one-way traversal, offline plan synthesis (depart, manoeuvres, arrival), refusal to route outside the pack, nearest-node and on-segment snapping, snap radius, coverage distance, honest pack description |
 | `ADSE1` encrypted container | Exact-byte round-trip, plaintext never visible in the ciphertext, fresh IV per write, documented header layout, wrong key rejected, bit-flipped ciphertext **and** IV failing GCM authentication, plaintext/truncated files refused, empty payload, decryption with a key reloaded from storage |
