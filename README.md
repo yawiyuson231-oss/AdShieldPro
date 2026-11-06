@@ -1,4 +1,4 @@
-# AdShield Pro 2.9.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.10.2 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -141,6 +141,34 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 ## How it Works
 
 ![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
+
+## What's new in 2.10.2 — On-demand lookups, verified connectors, QR decoding
+
+- **Ask a provider about one value.** Paste a domain, URL, IPv4 address, CVE, SHA-256 or
+  `ecosystem:name@version` into the Intel registry and the app queries the free providers that
+  accept it: CIRCL hashlookup, CVE.org, OSV.dev, deps.dev, urlscan, RIPEstat prefix/whois, RDAP,
+  IPinfo, ARIN and Cloudflare/Google DNS-over-HTTPS. Answers are cached per provider with its TTL;
+  an unreachable provider falls back to a cached answer explicitly labelled `CACHED`. Lookups run
+  only when you press CHECK — never in the background. See [docs/CONNECTOR_LOOKUPS.md](docs/CONNECTOR_LOOKUPS.md).
+- **Catalogue measured, not padded.** 176 unique connectors, 157 implemented (52 HTTPS feeds,
+  105 Android-API probes), 6 enabled by default. 13 providers need a key, so they are declared and
+  stay `NOT CONFIGURED`; 6 sources have no public machine interface and stay `SOURCE UNAVAILABLE`.
+  URLhaus CSV/text, the abuse.ch CSV exports, MISP `special-use`, ReliefWeb v1 and the HaGeZi
+  `hosts/tif.txt` path were retired after returning HTTP 410/404 — they are no longer counted.
+- **30 new on-device probes**: default roles, device administrators, keyboards, installer
+  provenance, private-DNS mode, VPN transport, TrafficStats, Wi-Fi security type, Widevine level,
+  OpenGL ES, storage volumes, camera inventory, battery energy counters, JobScheduler,
+  ContentObserver/FileObserver, notification channel, exact alarms and DataStore. Reads that need
+  privileged permissions (user count) are dropped instead of faked.
+- **QR images stay on the device.** Pick an image and the bundled ZXing core decodes it locally,
+  then the payload goes through the same URL analyser. No screen capture, no gallery scan, and a
+  decode failure is reported as "no code found" — not as "safe".
+- **Fixed**: six FIN catalogue entries referenced probes that no dispatch branch implemented; the
+  registry check panel now shows per-provider answers next to the local verdict.
+
+Version note: `2.10.0` and `2.10.1` existed only as pre-release test builds, so their version codes
+(21000/21001) are already taken. This stable release uses **21002** so every published build,
+test or stable, can upgrade to it in place.
 
 ## What's new in 2.9.0 — Live Intelligence Map
 

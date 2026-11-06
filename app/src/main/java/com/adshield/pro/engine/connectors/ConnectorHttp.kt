@@ -210,7 +210,7 @@ class OkHttpConnectorTransport(
     }
 
     companion object {
-        const val USER_AGENT = "OmniShieldX/2.9 (+https://github.com/yawiyuson231-oss/AdShieldPro)"
+        const val USER_AGENT = "OmniShieldX/2.10 (+https://github.com/yawiyuson231-oss/AdShieldPro)"
 
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
