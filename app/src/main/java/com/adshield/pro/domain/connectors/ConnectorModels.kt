@@ -120,8 +120,8 @@ data class ConnectorRuntime(
         fun initial(spec: ConnectorSpec) = ConnectorRuntime(
             connectorId = spec.id,
             status = when {
-                !spec.implemented -> ConnectorStatus.NOT_IMPLEMENTED
                 spec.requiresKey -> ConnectorStatus.NOT_CONFIGURED
+                !spec.implemented -> ConnectorStatus.NOT_IMPLEMENTED
                 spec.defaultEnabled -> ConnectorStatus.DEGRADED
                 else -> ConnectorStatus.DISABLED
             },
@@ -140,8 +140,8 @@ data class ConnectorSnapshot(
     val effectiveStatus: ConnectorStatus
         get() {
             val base = runtime.status
-            if (!spec.implemented) return ConnectorStatus.NOT_IMPLEMENTED
             if (spec.requiresKey && runtime.lastSuccessEpochMs == null) return ConnectorStatus.NOT_CONFIGURED
+            if (!spec.implemented) return ConnectorStatus.NOT_IMPLEMENTED
             if (!runtime.enabled && base != ConnectorStatus.SYNCING) return ConnectorStatus.DISABLED
             if (base == ConnectorStatus.CONNECTED && isStale) return ConnectorStatus.DEGRADED
             return base

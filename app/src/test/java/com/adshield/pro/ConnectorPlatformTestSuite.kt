@@ -229,7 +229,7 @@ class ConnectorPlatformTestSuite {
             ftp://files.example/x
             https://second.example/verify
         """.trimIndent()
-        val parsed = ConnectorParsers.parse("openphish", feed("openphish"), payload, now)
+        val parsed = ConnectorParsers.parse("openphish-text", feed("openphish-text"), payload, now)
         val urls = parsed.indicators.filter { it.kind == IndicatorKind.URL }
         assertEquals(2, urls.size)
         assertTrue(urls.none { it.value.startsWith("javascript") })
@@ -323,7 +323,7 @@ class ConnectorPlatformTestSuite {
             transport = FakeTransport(TransportResult.Response(200, csv, "etag-1", null, null, 42L)),
             now = { now }
         )
-        val outcome = engine.sync(feed("urlhaus-csv"), ConnectorRuntime.initial(feed("urlhaus-csv")))
+        val outcome = engine.sync(feed("urlhaus-csv"), armed(feed("urlhaus-csv")))
         assertTrue(outcome is SyncOutcome.Success)
         val success = outcome as SyncOutcome.Success
         assertEquals(200, success.httpCode)
@@ -338,7 +338,7 @@ class ConnectorPlatformTestSuite {
             transport = FakeTransport(TransportResult.Response(304, null, "etag", null, null, 12L)),
             now = { now }
         )
-        val outcome = engine.sync(feed("urlhaus-csv"), ConnectorRuntime.initial(feed("urlhaus-csv")))
+        val outcome = engine.sync(feed("urlhaus-csv"), armed(feed("urlhaus-csv")))
         assertTrue(outcome is SyncOutcome.Success)
         assertTrue((outcome as SyncOutcome.Success).notModified)
         assertTrue(outcome.indicators.isEmpty())
@@ -348,7 +348,7 @@ class ConnectorPlatformTestSuite {
     fun testRateLimitProviderErrorAndAuthFailures() {
         fun syncWith(response: TransportResult): SyncOutcome {
             val engine = ConnectorSyncEngine(FakeTransport(response), now = { now })
-            return engine.sync(feed("cisa-kev"), ConnectorRuntime.initial(feed("cisa-kev")))
+            return engine.sync(feed("cisa-kev"), armed(feed("cisa-kev")))
         }
         val limited = syncWith(TransportResult.Response(429, null, null, null, 60_000L, 5L))
         assertTrue(limited is SyncOutcome.Retryable)
@@ -368,14 +368,14 @@ class ConnectorPlatformTestSuite {
         val offline = ConnectorSyncEngine(
             FakeTransport(TransportResult.Failure(offline = true, reason = "timeout", latencyMs = 8L)),
             now = { now }
-        ).sync(feed("urlhaus-csv"), ConnectorRuntime.initial(feed("urlhaus-csv")))
+        ).sync(feed("urlhaus-csv"), armed(feed("urlhaus-csv")))
         assertTrue(offline is SyncOutcome.Retryable)
         assertTrue((offline as SyncOutcome.Retryable).offline)
 
         val invalid = ConnectorSyncEngine(
             FakeTransport(TransportResult.Response(200, "<html>not json</html>", null, null, null, 9L)),
             now = { now }
-        ).sync(feed("cisa-kev"), ConnectorRuntime.initial(feed("cisa-kev")))
+        ).sync(feed("cisa-kev"), armed(feed("cisa-kev")))
         assertTrue(invalid is SyncOutcome.Failed)
         assertTrue((invalid as SyncOutcome.Failed).reason.startsWith("invalid response"))
     }
@@ -389,7 +389,7 @@ class ConnectorPlatformTestSuite {
                 return TransportResult.Response(200, "{}", null, null, null, 1L)
             }
         }
-        val runtime = ConnectorRuntime.initial(feed("cisa-kev")).copy(
+        val runtime = armed(feed("cisa-kev")).copy(
             status = ConnectorStatus.ERROR,
             nextAllowedEpochMs = now + 120_000L,
             enabled = true
@@ -401,7 +401,7 @@ class ConnectorPlatformTestSuite {
 
     @Test
     fun testDisabledAndKeyRequiredAreSkipped() {
-        val disabled = ConnectorRuntime.initial(feed("cisa-kev")).copy(enabled = false)
+        val disabled = armed(feed("cisa-kev")).copy(enabled = false)
         val outcome = ConnectorSyncEngine(
             FakeTransport(TransportResult.Response(200, "{}", null, null, null, 1L)),
             now = { now }
@@ -551,6 +551,10 @@ class ConnectorPlatformTestSuite {
         handlerId = handlerId,
         verification = VerificationClass.IMPLEMENTED_AND_TESTED
     )
+
+    /** Initial state with the connector switched on, as the UI would have it before a sync. */
+    private fun armed(spec: ConnectorSpec): ConnectorRuntime =
+        ConnectorRuntime.initial(spec).copy(enabled = true, status = ConnectorStatus.DEGRADED)
 
     private fun indicator(source: String, kind: IndicatorKind, value: String, confidence: Int): ThreatIndicator =
         ThreatIndicator(
