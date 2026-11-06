@@ -36,7 +36,6 @@ AREA_LABEL = {
     "AI_INTELLIGENCE": "On-device intelligence",
     "BATTERY": "Battery & power",
     "DEVICE_MAINTENANCE": "Device maintenance",
-    "SAFE_GPS": "Safe GPS & location sharing",
     "MEDIA_ADS": "Video ads & playback safety",
     "CLOUD_STORAGE": "Private cloud & Infinity storage",
     "FILE_MANAGEMENT": "SAF file management",
