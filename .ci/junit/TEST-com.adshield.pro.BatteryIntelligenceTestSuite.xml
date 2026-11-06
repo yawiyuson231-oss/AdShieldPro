@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.BatteryIntelligenceTestSuite" tests="29" skipped="0" failures="0" errors="0" timestamp="2026-11-06T10:18:10.110Z" hostname="runnervmwuk1x" time="0.015">
+<testsuite name="com.adshield.pro.BatteryIntelligenceTestSuite" tests="29" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:02:35.324Z" hostname="runnervmwuk1x" time="0.031">
   <properties/>
-  <testcase name="testCapacityHealth_isNullUnlessBothCountersExist" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
+  <testcase name="testCapacityHealth_isNullUnlessBothCountersExist" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.003"/>
   <testcase name="testSession_metricsDerivedFromStoredValues" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
   <testcase name="testDiagnostics_flagsRealMeasuredCapacityLoss" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
-  <testcase name="testFeatureGates_areCorrectForEverySupportedApiLevel" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.003"/>
+  <testcase name="testFeatureGates_areCorrectForEverySupportedApiLevel" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.007"/>
   <testcase name="testWattsFromMilliAmpsAndMillivolts_conversionIsExact" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
-  <testcase name="testCurrentSign_isNormalisedPerVendorConvention" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
+  <testcase name="testCurrentSign_isNormalisedPerVendorConvention" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
   <testcase name="testDiagnostics_hotBatteryIsCritical_andColdIsWarned" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
-  <testcase name="testFahrenheitConversion_matchesReferenceScreenshot" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
-  <testcase name="testHealthScore_dropsWithRealWearSignals" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
-  <testcase name="testDiagnostics_lowChargePowerCallsOutCableOrCharger" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
+  <testcase name="testFahrenheitConversion_matchesReferenceScreenshot" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
+  <testcase name="testHealthScore_dropsWithRealWearSignals" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.003"/>
+  <testcase name="testDiagnostics_lowChargePowerCallsOutCableOrCharger" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
   <testcase name="testDrainRate_andRuntimeProjection" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
-  <testcase name="testDiagnostics_neverInventsCapacityDegradationWithoutCounters" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
-  <testcase name="testMinutesToFull_isNullWhenFullOrNotMeasurable" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
+  <testcase name="testDiagnostics_neverInventsCapacityDegradationWithoutCounters" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.003"/>
+  <testcase name="testMinutesToFull_isNullWhenFullOrNotMeasurable" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
   <testcase name="testChargeRate_isMeasuredFromRealSamplesOnly" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
   <testcase name="testPower_isVoltageTimesMeasuredCurrent_andNeverInvented" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
   <testcase name="testNavigationFitsEveryScreenWidth" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
-  <testcase name="testFormFactors_coverPhonesTabletsAndFoldables" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
+  <testcase name="testFormFactors_coverPhonesTabletsAndFoldables" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
   <testcase name="testSupportedPlatformRange_matchesTheManifest" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
-  <testcase name="testPlausibilityRejectsVendorGarbageButAcceptsRealPhones" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>
+  <testcase name="testPlausibilityRejectsVendorGarbageButAcceptsRealPhones" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
   <testcase name="testDiagnostics_repeatedDropoutsAreFlagged" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
   <testcase name="testDiagnostics_slowChargingIsExplainedWithEvidence" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.0"/>
   <testcase name="testChargeTimeUnits_areNormalisedOrRejected" classname="com.adshield.pro.BatteryIntelligenceTestSuite" time="0.001"/>

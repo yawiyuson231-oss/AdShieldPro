@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.ProtectionStatusTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-06T10:18:14.640Z" hostname="runnervmwuk1x" time="0.008">
+<testsuite name="com.adshield.pro.ProtectionStatusTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:02:40.884Z" hostname="runnervmwuk1x" time="0.022">
   <properties/>
-  <testcase name="missingRulesAreDegradedRatherThanSilentlyHealthy" classname="com.adshield.pro.ProtectionStatusTest" time="0.006"/>
-  <testcase name="aWorkingTunnelReportsActiveWithAFullHealthScore" classname="com.adshield.pro.ProtectionStatusTest" time="0.0"/>
-  <testcase name="pausedAndOfflineStatesNeverClaimProtection" classname="com.adshield.pro.ProtectionStatusTest" time="0.001"/>
-  <testcase name="policiesAndDnssecModeAreReflectedInBadgesAndStages" classname="com.adshield.pro.ProtectionStatusTest" time="0.001"/>
+  <testcase name="missingRulesAreDegradedRatherThanSilentlyHealthy" classname="com.adshield.pro.ProtectionStatusTest" time="0.016"/>
+  <testcase name="aWorkingTunnelReportsActiveWithAFullHealthScore" classname="com.adshield.pro.ProtectionStatusTest" time="0.001"/>
+  <testcase name="pausedAndOfflineStatesNeverClaimProtection" classname="com.adshield.pro.ProtectionStatusTest" time="0.0"/>
+  <testcase name="policiesAndDnssecModeAreReflectedInBadgesAndStages" classname="com.adshield.pro.ProtectionStatusTest" time="0.003"/>
   <testcase name="emergencyLockdownIsAttentionNotAHealthFault" classname="com.adshield.pro.ProtectionStatusTest" time="0.0"/>
   <testcase name="anIdleTunnelIsNeverDescribedAsWorking" classname="com.adshield.pro.ProtectionStatusTest" time="0.0"/>
   <testcase name="anOpenProviderCircuitIsReportedAsDegradedAndCostsHealth" classname="com.adshield.pro.ProtectionStatusTest" time="0.0"/>
