@@ -61,15 +61,19 @@ jobs:
 
       # Pages must be turned on once with build_type=workflow. A repository admin can do that
       # in Settings -> Pages; the default token cannot, so report it instead of failing silently.
-      - name: Ensure GitHub Pages is enabled
+      - name: Report GitHub Pages state
+        # Informational only. `actions/configure-pages` below is the authoritative check: it fails
+        # with an actionable message when Pages is genuinely unavailable. The REST preflight used to
+        # `exit 1` here, which aborted every deploy even though Pages was enabled and correctly set
+        # to "GitHub Actions" — a token/permission quirk on the read was treated as a site outage.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
-            echo "::error::GitHub Pages is not enabled for this repository yet. A repository admin must open Settings -> Pages and set Source to \"GitHub Actions\", then re-run this workflow."
-            exit 1
+          if OUT="$(gh api "repos/${GITHUB_REPOSITORY}/pages" 2>&1)"; then
+            echo "Pages is enabled: $(echo "$OUT" | head -c 300)"
+          else
+            echo "::warning::Could not read the Pages settings with this token (continuing; configure-pages decides): $(echo "$OUT" | head -c 300)"
           fi
-          echo "Pages is enabled."
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
