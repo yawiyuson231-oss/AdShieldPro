@@ -109,7 +109,7 @@ class ConnectorRepository @Inject constructor(
                 dao.upsertState(
                     previous.copy(lastError = "On-demand lookup — enter a value in the check panel").toEntity()
                 )
-                return@withLock dao.stateFor(id)?.toDomain()
+                return@withLock snapshotOf(spec, dao.stateFor(id)?.toDomain() ?: previous)
             }
 
             if (spec.requiresKey) {

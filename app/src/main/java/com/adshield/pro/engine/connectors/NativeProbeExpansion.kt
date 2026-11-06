@@ -271,11 +271,12 @@ class NativeProbeExpansion @Inject constructor(
             RoleManager.ROLE_BROWSER to "Browser",
             RoleManager.ROLE_HOME to "Home"
         )
-        val details = roles.mapNotNull { (role, label) ->
-            runCatching {
-                val holders = manager.getRoleHolders(role)
-                label to holders.joinToString(", ").ifBlank { "none" }
-            }.getOrNull()
+        val details: List<Pair<String, String>> = roles.mapNotNull { pair ->
+            val role = pair.first
+            val label = pair.second
+            runCatching { manager.isRoleHeld(role) }.getOrNull()?.let { held ->
+                label to if (held) "held by a user-chosen app" else "no holder"
+            }
         }
         return ProbeResult(
             available = details.isNotEmpty(),
