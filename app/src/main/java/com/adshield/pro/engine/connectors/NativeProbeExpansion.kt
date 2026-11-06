@@ -305,14 +305,23 @@ class NativeProbeExpansion @Inject constructor(
     suspend fun workProfile(): ProbeResult {
         val manager = context.getSystemService(Context.USER_SERVICE) as? UserManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "UserManager unavailable")
-        // UserManager.userCount needs MANAGE_USERS (a privileged, non-grantable permission), so it
-        // is not read. Only the documented, unprivileged managed-profile flag is reported.
-        val managed = runCatching { manager.isManagedProfile }.getOrDefault(false)
+        // UserManager.userCount needs MANAGE_USERS (privileged, non-grantable) and the no-argument
+        // isManagedProfile flag only exists from Android 11, so both are handled explicitly instead
+        // of being assumed.
+        val managed: Boolean? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching { manager.isManagedProfile }.getOrNull()
+        } else {
+            null
+        }
         return ProbeResult(
-            available = true,
-            status = ConnectorStatus.CONNECTED,
-            summary = if (managed) "Running inside a managed/work profile" else "Running in a personal profile",
-            details = listOf("managedProfile" to managed.toString()),
+            available = managed != null,
+            status = if (managed == null) ConnectorStatus.DEGRADED else ConnectorStatus.CONNECTED,
+            summary = when (managed) {
+                true -> "Running inside a managed/work profile"
+                false -> "Running in a personal profile"
+                null -> "Managed-profile state requires Android 11+"
+            },
+            details = listOf("managedProfile" to (managed?.toString() ?: "not readable on Android 10")),
             restriction = "Android does not expose the number of users to an ordinary app; the organisation controls policy on a managed device."
         )
     }
