@@ -22,9 +22,9 @@ Daemon will be stopped at the end of the build
 > Task :app:hiltCollectClassesDebug
 > Task :app:checkDebugDuplicateClasses
 > Task :app:hiltAggregateDepsDebug
+> Task :app:mergeDebugJavaResource
 > Task :app:mergeExtDexDebug FROM-CACHE
 > Task :app:mergeLibDexDebug FROM-CACHE
-> Task :app:mergeDebugJavaResource
 > Task :app:hiltJavaCompileDebug
 > Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
@@ -52,6 +52,6 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
 
-BUILD SUCCESSFUL in 25s
+BUILD SUCCESSFUL in 47s
 42 actionable tasks: 21 executed, 13 from cache, 8 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
