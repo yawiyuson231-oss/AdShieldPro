@@ -139,7 +139,7 @@ class IntelligenceMapTestSuite {
         )
         assertNull(IntelligenceEventSanitizer.sanitize(future, now).event)
 
-        val stale = future.copy(timestampEpochMs = now - 400L * 24L * 60L * 60L * 1_000L)
+        val stale = future.copy(timestampEpochMs = now - IntelligenceEventSanitizer.MAX_AGE_MS - 1L)
         assertNull(IntelligenceEventSanitizer.sanitize(stale, now).event)
     }
 
@@ -207,7 +207,7 @@ class IntelligenceMapTestSuite {
         )!!
         assertEquals(IntelligenceModule.CYBER_DEFENSE, apk.module)
         assertEquals(IntelligenceSeverity.WARNING, apk.severity)
-        assertTrue(apk.evidence.contains("APK"))
+        assertTrue(apk.evidence.contains("downloaded.apk"))
 
         val audit = IntelligenceEventFactory.scanRecord(
             scanRecord(
