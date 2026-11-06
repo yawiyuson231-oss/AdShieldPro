@@ -161,6 +161,9 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
   confirmation-gated history clear.
 - **Honest pause** — pausing freezes the visualisation only; DNS protection and scheduled jobs keep
   running, and the header reports how many events arrived while paused.
+- **Measured cost** — aggregating 600 stored events into 8 nodes with filters active takes
+  **1.61 ms average / 2.23 ms p95** on the CI JVM (budget 25/40 ms); the event-feed filter pass is
+  0.68 ms. The JVM suite fails the build if those budgets regress.
 - **Docs** — see [`docs/INTELLIGENCE_MAP.md`](docs/INTELLIGENCE_MAP.md) for architecture, module
   mapping, event catalogue, integration steps and the acceptance-criteria evidence table.
 
