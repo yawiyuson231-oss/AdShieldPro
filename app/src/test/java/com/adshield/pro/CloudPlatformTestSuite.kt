@@ -84,9 +84,9 @@ class CloudPlatformTestSuite {
             assertTrue(nodes[0].isFolder)
             assertEquals(0L, nodes[0].size)
             assertEquals(CloudFileKind.PHOTO, nodes[1].fileKind())
-            assertTrue(backend.requests.any { it.contains("search=hol") })
-            assertTrue(backend.requests.any { it.contains("recursive=1") })
-            assertTrue(backend.requests.any { it.contains("kind=photo") })
+            assertTrue(backend.visited("search=hol"))
+            assertTrue(backend.visited("recursive=1"))
+            assertTrue(backend.visited("kind=photo"))
         }
     }
 
@@ -115,7 +115,7 @@ class CloudPlatformTestSuite {
             assertEquals("quota exceeded", second.code)
             assertTrue(second.detail?.contains("remainingBytes") == true)
         }
-        assertTrue("non-POST request: ${backend.requests}", backend.requests.all { it.startsWith("POST") })
+        assertTrue("non-POST request: ${backend.requestSnapshot()}", backend.requestSnapshot().all { it.startsWith("POST") })
         fun Map<String, String>.authHeader(): String? =
             entries.firstOrNull { it.key.equals("Authorization", ignoreCase = true) }?.value
         assertTrue(
@@ -143,7 +143,7 @@ class CloudPlatformTestSuite {
         // The bytes that reached the storage endpoint are the original file, part for part.
         assertArrayEquals(file, backend.assembledBytes())
         assertEquals(0, backend.sha1Mismatches)
-        assertTrue(backend.requests.any { it.contains("/v1/uploads/up_1/complete") })
+        assertTrue(backend.visited("/v1/uploads/up_1/complete"))
     }
 
     @Test
@@ -211,14 +211,14 @@ class CloudPlatformTestSuite {
         // call a moment to leave the process instead of racing it.
         var cancelSent = false
         for (attempt in 0 until 40) {
-            if (backend.requests.any { it.contains("/v1/uploads/up_1/cancel") }) {
+            if (backend.visited("/v1/uploads/up_1/cancel")) {
                 cancelSent = true
                 break
             }
             Thread.sleep(50)
         }
-        assertTrue("no cancel request: ${backend.requests}", cancelSent)
-        assertFalse(backend.requests.any { it.contains("/complete") })
+        assertTrue("no cancel request: ${backend.requestSnapshot()}", cancelSent)
+        assertFalse(backend.visited("/complete"))
     }
 
     @Test
@@ -418,6 +418,14 @@ private class FakeCloudBackend : Interceptor {
     fun route(path: String, status: Int = 200, body: () -> String) {
         routes[path] = status to { _: Request -> body() }
     }
+
+    /**
+     * Iterating the synchronized list without the monitor is a ConcurrentModificationException
+     * waiting to happen: the engine appends from its own coroutine. Snapshot under the lock.
+     */
+    fun requestSnapshot(): List<String> = synchronized(requests) { requests.toList() }
+
+    fun visited(urlPart: String): Boolean = requestSnapshot().any { it.contains(urlPart) }
 
     fun recordedParts(): List<Int> = partBodies.keys.sorted()
 
