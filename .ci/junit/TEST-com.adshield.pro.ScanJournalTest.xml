@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.ScanJournalTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:38:13.695Z" hostname="runnervmwuk1x" time="0.019">
+<testsuite name="com.adshield.pro.ScanJournalTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:50:05.370Z" hostname="runnervmwuk1x" time="0.013">
   <properties/>
-  <testcase name="historyIsBoundedAndNewestFirst" classname="com.adshield.pro.ScanJournalTest" time="0.005"/>
-  <testcase name="quarantineStoredNamesCannotEscapeTheDirectory" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
+  <testcase name="historyIsBoundedAndNewestFirst" classname="com.adshield.pro.ScanJournalTest" time="0.002"/>
+  <testcase name="quarantineStoredNamesCannotEscapeTheDirectory" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="scanRecordSurvivesPersistenceRoundTrip" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
-  <testcase name="storedFileNameValidationRejectsForeignFiles" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
-  <testcase name="idsStayUniqueWhenManyScansFinishInTheSameMillisecond" classname="com.adshield.pro.ScanJournalTest" time="0.002"/>
-  <testcase name="progressFractionIsClampedAndReportedHonestly" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
+  <testcase name="storedFileNameValidationRejectsForeignFiles" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
+  <testcase name="idsStayUniqueWhenManyScansFinishInTheSameMillisecond" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
+  <testcase name="progressFractionIsClampedAndReportedHonestly" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="batchAppendSortsNewestFirstAndRespectsTheCap" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
   <testcase name="quarantineIndexIsBoundedAndUsageIgnoresNegativeSizes" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
   <testcase name="summaryCountsEveryLevelAndKind" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
@@ -16,7 +16,7 @@
   <testcase name="legacyRecordsWithoutNewFieldsStillDecode" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="nextIdNeverGoesBackwardsEvenIfClockMovesBack" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="nextIdUsesWallClockWhenItIsAhead" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
-  <testcase name="displayNamesAreStrippedOfTraversalAndControlCharacters" classname="com.adshield.pro.ScanJournalTest" time="0.001"/>
+  <testcase name="displayNamesAreStrippedOfTraversalAndControlCharacters" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="progressIsIndeterminateUntilTheTotalIsKnown" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <testcase name="emptyJournalIsNotEvidenceOfACleanDevice" classname="com.adshield.pro.ScanJournalTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
