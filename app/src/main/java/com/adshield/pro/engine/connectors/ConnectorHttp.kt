@@ -75,7 +75,7 @@ class OkHttpConnectorTransport(
                 }
                 TransportResult.Response(
                     code = response.code,
-                    body = bytes?.toString(Charsets.UTF_8),
+                    body = bytes,
                     etag = response.header("ETag"),
                     lastModified = response.header("Last-Modified"),
                     retryAfterMs = parseRetryAfter(response.header("Retry-After")),

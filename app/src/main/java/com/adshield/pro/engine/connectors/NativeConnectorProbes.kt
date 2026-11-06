@@ -25,7 +25,6 @@ import android.provider.Settings
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.view.accessibility.AccessibilityManager
-import androidx.biometric.BiometricManager
 import androidx.core.content.ContextCompat
 import androidx.work.WorkManager
 import com.adshield.pro.data.local.db.ConnectorDao
@@ -36,6 +35,7 @@ import com.adshield.pro.domain.connectors.ConnectorStatus
 import com.adshield.pro.domain.connectors.ProbeResult
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -328,14 +328,20 @@ class NativeConnectorProbes @Inject constructor(
     }
 
     private fun notificationAccess(): ProbeResult {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-            ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "NotificationManager unavailable")
-        val packages = manager.getEnabledListenerPackages(context)
+        // getEnabledListenerPackages() is not in the public SDK stubs, so read the documented
+        // secure setting instead. Only package names are read — never notification content.
+        val raw = runCatching {
+            Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        }.getOrNull().orEmpty()
+        val packages = raw.split(':')
+            .mapNotNull { entry -> entry.substringBefore('/').takeIf { it.isNotBlank() } }
+            .distinct()
         return ProbeResult(
             true,
             if (packages.isEmpty()) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
             "${packages.size} notification listener package(s) enabled",
-            packages.take(8).map { it to "listening" }
+            packages.take(8).map { it to "listening" },
+            restriction = "Notification listeners can read notification content; this probe reads only the list of packages."
         )
     }
 
@@ -366,23 +372,39 @@ class NativeConnectorProbes @Inject constructor(
     private fun appOpsProbe(): ProbeResult {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? android.app.AppOpsManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "AppOpsManager unavailable")
-        val ops = runCatching {
-            @Suppress("DEPRECATION")
-            appOps.getOpsForPackage(android.os.Process.myUid(), context.packageName, null)
-        }.getOrNull()
-        return ProbeResult(
-            ops != null,
-            if (ops != null) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
-            if (ops != null) "AppOps readable: ${ops.sumOf { it.ops.size }} op(s)" else "AppOps read is privileged on this Android version",
-            restriction = if (ops == null) "Most AppOps operations are not readable by normal apps." else null
+        val uid = android.os.Process.myUid()
+        val watched = listOf(
+            android.app.AppOpsManager.OPSTR_CAMERA,
+            android.app.AppOpsManager.OPSTR_RECORD_AUDIO,
+            android.app.AppOpsManager.OPSTR_FINE_LOCATION,
+            android.app.AppOpsManager.OPSTR_READ_CONTACTS
         )
+        val rows = watched.map { op ->
+            val mode = runCatching { appOps.unsafeCheckOpNoThrow(op, uid, context.packageName) }
+                .getOrDefault(android.app.AppOpsManager.MODE_ERRORED)
+            op.removePrefix("android:") to modeName(mode)
+        }
+        return ProbeResult(
+            true, ConnectorStatus.CONNECTED,
+            "AppOps modes readable for this app (${rows.size} operations)",
+            rows,
+            restriction = "Per-package AppOps of other apps are hidden from normal apps; only this app's modes are read."
+        )
+    }
+
+    private fun modeName(mode: Int): String = when (mode) {
+        android.app.AppOpsManager.MODE_ALLOWED -> "allowed"
+        android.app.AppOpsManager.MODE_IGNORED -> "ignored"
+        android.app.AppOpsManager.MODE_ERRORED -> "blocked"
+        android.app.AppOpsManager.MODE_DEFAULT -> "default"
+        else -> "mode $mode"
     }
 
     private fun sensorPrivacy(): ProbeResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             return ProbeResult(false, ConnectorStatus.DEGRADED, "Sensor privacy API requires Android 12+")
         }
-        val manager = context.getSystemService(Context.SENSOR_PRIVACY_SERVICE) as? SensorPrivacyManager
+        val manager = context.getSystemService("sensor_privacy") as? SensorPrivacyManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "SensorPrivacyManager unavailable")
         val mic = manager.supportsSensorToggle(SensorPrivacyManager.Sensors.MICROPHONE)
         val camera = manager.supportsSensorToggle(SensorPrivacyManager.Sensors.CAMERA)
@@ -406,13 +428,21 @@ class NativeConnectorProbes @Inject constructor(
     }
 
     private fun biometricProbe(): ProbeResult {
-        val result = BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-        val ok = result == BiometricManager.BIOMETRIC_SUCCESS
+        val packageManager = context.packageManager
+        val strong = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BIOMETRIC_STRONG)
+        val any = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BIOMETRIC_ANY)
+        } else {
+            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_FINGERPRINT)
+        }
+        val keyguard = (context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)
+            ?.isDeviceSecure == true
         return ProbeResult(
             true,
-            if (ok) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
-            if (ok) "Biometric authentication available" else "Biometric authentication unavailable ($result)",
-            listOf("authenticator" to "BIOMETRIC_WEAK")
+            if (any) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
+            "Biometric hardware: ${if (any) "present" else "absent"} · device credential set: $keyguard",
+            listOf("strong class" to strong.toString(), "any class" to any.toString()),
+            restriction = "Hardware class is reported by PackageManager; enrolled templates are not readable by apps."
         )
     }
 
@@ -845,7 +875,7 @@ class NativeConnectorProbes @Inject constructor(
         }.getOrNull()
         return ProbeResult(
             true, ConnectorStatus.CONNECTED,
-            "Display ${display.widthPx}×${display.heightPx} @ ${display.densityDpi} dpi",
+            "Display ${display.widthPixels}×${display.heightPixels} @ ${display.densityDpi} dpi",
             listOf("refresh rate" to (refresh?.toString() ?: "unavailable"))
         )
     }
@@ -1063,7 +1093,7 @@ class NativeConnectorProbes @Inject constructor(
 
     private suspend fun staleProbe(): ProbeResult {
         val states = connectorDao.observeStates()
-        val count = kotlinx.coroutines.flow.first(states).size
+        val count = states.first().size
         return ProbeResult(
             true, ConnectorStatus.CONNECTED,
             "Staleness rules active on $count connector state(s)",
