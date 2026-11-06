@@ -40,12 +40,12 @@ class GpsMapOverlayTest {
 
     @Test
     fun testAccuracyCircleGrowsWithZoomAndWithReportedError() {
-        val tight = MapOverlayMath.accuracyRadiusPx(5f, 14.6, 17.0)
-        val loose = MapOverlayMath.accuracyRadiusPx(30f, 14.6, 17.0)
+        val tight = MapOverlayMath.accuracyRadiusPx(5f, 14.6, 17.0).toDouble()
+        val loose = MapOverlayMath.accuracyRadiusPx(30f, 14.6, 17.0).toDouble()
         assertTrue("a 30 m error must draw a bigger circle than 5 m", loose > tight)
         close(6.0, loose / tight, 1e-6, "radius is linear in the reported accuracy")
 
-        val zoomedIn = MapOverlayMath.accuracyRadiusPx(5f, 14.6, 19.0)
+        val zoomedIn = MapOverlayMath.accuracyRadiusPx(5f, 14.6, 19.0).toDouble()
         close(4.0, zoomedIn / tight, 1e-6, "two zoom levels in is four times the pixel radius")
     }
 
@@ -113,7 +113,7 @@ class GpsMapOverlayTest {
         val far = ScreenPoint(x = 10_000.0, y = 40.0)
         val clamped = MapOverlayMath.clampToViewport(far, viewportWidthPx = 1080f, viewportHeightPx = 1920f, marginPx = 28f)
         close(1080.0 / 2.0 - 28.0, clamped.x, 0.5, "x must sit on the inset edge")
-        assertTrue(clamped.y <= far.y, "clamping must not move a point further out")
+        assertTrue("clamping must not move a point further out", clamped.y <= far.y)
     }
 
     @Test
