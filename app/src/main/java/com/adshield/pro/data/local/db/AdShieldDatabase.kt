@@ -13,13 +13,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DailyStatEntity::class,
         SecurityScanEntity::class,
         StorageProviderEntity::class,
-        DirectDownloadEntity::class
+        DirectDownloadEntity::class,
+        IntelligenceEventEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AdShieldDatabase : RoomDatabase() {
     abstract fun adShieldDao(): AdShieldDao
+
+    abstract fun intelligenceEventDao(): IntelligenceEventDao
 
     companion object {
         const val DATABASE_NAME = "adshield_pro_v2.db"
@@ -109,6 +112,47 @@ abstract class AdShieldDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_direct_downloads_system_download_id ON direct_downloads(system_download_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_direct_downloads_updated_at_epoch_ms ON direct_downloads(updated_at_epoch_ms)")
+            }
+        }
+
+        /**
+         * Adds the bounded intelligence-event store that feeds the OMNISHIELD X live map.
+         * Index names match Room's generated naming so the identity hash validates after migration.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS intelligence_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        module TEXT NOT NULL,
+                        type_code TEXT NOT NULL,
+                        severity TEXT NOT NULL,
+                        timestamp_epoch_ms INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        evidence TEXT NOT NULL,
+                        evidence_ref TEXT,
+                        related_ids TEXT NOT NULL,
+                        metrics TEXT NOT NULL,
+                        actions TEXT NOT NULL
+                    )"""
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_timestamp_epoch_ms " +
+                        "ON intelligence_events(timestamp_epoch_ms)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_module " +
+                        "ON intelligence_events(module)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_severity " +
+                        "ON intelligence_events(severity)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_module_timestamp_epoch_ms " +
+                        "ON intelligence_events(module, timestamp_epoch_ms)"
+                )
             }
         }
     }

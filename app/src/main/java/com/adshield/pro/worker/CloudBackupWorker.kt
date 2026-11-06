@@ -10,6 +10,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.adshield.pro.data.repository.CloudRepository
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -24,17 +26,37 @@ import java.util.concurrent.TimeUnit
 class CloudBackupWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
-    private val repository: CloudRepository
+    private val repository: CloudRepository,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         if (!repository.isConfigured()) return Result.success()
         if (repository.session.value == null) return Result.success()
         if (!repository.autoBackupEnabled()) return Result.success()
+        val startedAt = System.currentTimeMillis()
         return try {
             repository.uploadBackup(repository.captureBackup(), LABEL)
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Cloud configuration backup",
+                    success = true,
+                    detail = "Encrypted configuration backup uploaded",
+                    durationMs = System.currentTimeMillis() - startedAt,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             Result.success()
         } catch (e: Exception) {
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Cloud configuration backup",
+                    success = false,
+                    detail = e.message ?: "upload failed",
+                    durationMs = System.currentTimeMillis() - startedAt,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             if (runAttemptCount >= MAX_ATTEMPTS) Result.failure() else Result.retry()
         }
     }

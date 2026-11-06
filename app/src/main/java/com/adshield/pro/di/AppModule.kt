@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.adshield.pro.data.local.db.AdShieldDao
 import com.adshield.pro.data.local.db.AdShieldDatabase
+import com.adshield.pro.data.local.db.IntelligenceEventDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,7 +26,11 @@ object AppModule {
             AdShieldDatabase::class.java,
             AdShieldDatabase.DATABASE_NAME
         )
-            .addMigrations(AdShieldDatabase.MIGRATION_1_2, AdShieldDatabase.MIGRATION_2_3)
+            .addMigrations(
+                AdShieldDatabase.MIGRATION_1_2,
+                AdShieldDatabase.MIGRATION_2_3,
+                AdShieldDatabase.MIGRATION_3_4
+            )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }
@@ -34,5 +39,11 @@ object AppModule {
     @Singleton
     fun provideAdShieldDao(database: AdShieldDatabase): AdShieldDao {
         return database.adShieldDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideIntelligenceEventDao(database: AdShieldDatabase): IntelligenceEventDao {
+        return database.intelligenceEventDao()
     }
 }

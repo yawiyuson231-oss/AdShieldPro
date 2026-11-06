@@ -29,6 +29,7 @@ import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +64,8 @@ class AdShieldRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AdShieldDao,
     private val prefs: UserPreferencesRepository,
-    private val filterEngine: FilterRuleEngine
+    private val filterEngine: FilterRuleEngine,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val filterMutex = Mutex()
@@ -205,6 +207,7 @@ class AdShieldRepository @Inject constructor(
         networkLabel: String? = null,
         error: String? = null
     ) {
+        val previousStatus = _vpnRuntimeState.value.status
         _vpnRuntimeState.update { current ->
             val nowConnectedSince = when {
                 status == VpnStatus.CONNECTED && current.connectedSinceEpochMs == null -> System.currentTimeMillis()
@@ -218,6 +221,16 @@ class AdShieldRepository @Inject constructor(
                 loadedRuleCount = filterEngine.getCurrentSnapshot().totalLoadedRules,
                 lastError = error
             )
+        }
+        if (status != previousStatus) {
+            // Real tunnel transition → one intelligence event (deduplicated by the recorder).
+            IntelligenceEventFactory.vpnTransition(
+                previous = previousStatus,
+                current = status,
+                error = error,
+                ruleCount = filterEngine.getCurrentSnapshot().totalLoadedRules,
+                timestampEpochMs = System.currentTimeMillis()
+            )?.let { intelligenceRecorder.record(it) }
         }
     }
 
@@ -312,7 +325,21 @@ class AdShieldRepository @Inject constructor(
             dao.upsertDailyStat(updated)
         }
 
-        // 3. Store detailed DNS log only if enabled by user privacy preferences
+        // 3. Publish a real intelligence event for malware/phishing blocks. Routine ad/tracker
+        //    blocks stay as counters only — the map must not invent "threats" out of ad traffic.
+        if (isBlocked && category == RuleCategory.MALWARE) {
+            IntelligenceEventFactory.dnsThreatBlocked(
+                domain = domain,
+                category = category,
+                matchedRule = matchedRule,
+                sourceList = sourceList,
+                protocolUsed = protocolUsed,
+                appName = appName,
+                timestampEpochMs = now
+            )?.let { intelligenceRecorder.record(it) }
+        }
+
+        // 4. Store detailed DNS log only if enabled by user privacy preferences
         val currentSettings = prefs.getSettingsSnapshot()
         if (currentSettings.detailedDnsLoggingEnabled) {
             dao.insertDnsLog(

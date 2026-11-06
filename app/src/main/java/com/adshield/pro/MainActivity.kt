@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -71,6 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.adshield.pro.domain.intelligence.IntelligenceAction
+import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.ui.model.DashboardPresentation
@@ -82,6 +85,7 @@ import com.adshield.pro.ui.screens.CloudStorageScreen
 import com.adshield.pro.ui.screens.DownloaderScreen
 import com.adshield.pro.ui.screens.FileManagerScreen
 import com.adshield.pro.ui.screens.HomeScreen
+import com.adshield.pro.ui.screens.intelligence.IntelligenceMapScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
 import com.adshield.pro.ui.screens.SecurityScreen
@@ -93,12 +97,14 @@ import com.adshield.pro.ui.viewmodel.AdShieldViewModel
 import com.adshield.pro.ui.viewmodel.CloudStorageViewModel
 import com.adshield.pro.ui.viewmodel.DownloaderViewModel
 import com.adshield.pro.ui.viewmodel.FileManagerViewModel
+import com.adshield.pro.ui.viewmodel.IntelligenceMapViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
+    INTELLIGENCE("Intel", Icons.Default.Hub),
     SECURITY("Security", Icons.Default.Security),
     FILES("Files", Icons.Default.Folder),
     CLOUD("Cloud", Icons.Default.Cloud),
@@ -249,6 +255,11 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
+                MainNavDestination.INTELLIGENCE -> IntelligenceDestination(
+                    adShieldViewModel = viewModel,
+                    onToggleProtection = handleToggleVpn,
+                    onNavigate = { currentTab = it }
+                )
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.FILES -> FilesDestination()
                 MainNavDestination.CLOUD -> CloudDestination()
@@ -402,6 +413,70 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
 private fun LiveDestination(viewModel: AdShieldViewModel) {
     val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
     LiveNetworkScreen(snapshot = liveNetwork)
+}
+
+/** Maps an intelligence module to the app screen that owns its data and controls. */
+private fun navDestinationForModule(module: IntelligenceModule): MainNavDestination = when (module) {
+    IntelligenceModule.CORE -> MainNavDestination.HOME
+    IntelligenceModule.CYBER_DEFENSE -> MainNavDestination.SECURITY
+    IntelligenceModule.FINANCIAL_DEFENSE -> MainNavDestination.SECURITY
+    IntelligenceModule.PRIVACY_DEFENSE -> MainNavDestination.AD_BLOCKER
+    IntelligenceModule.NETWORK_DEFENSE -> MainNavDestination.LIVE
+    IntelligenceModule.DEVICE_INTELLIGENCE -> MainNavDestination.BATTERY
+    IntelligenceModule.EMERGENCY_INTELLIGENCE -> MainNavDestination.SETTINGS
+    IntelligenceModule.AUTOMATION_CORE -> MainNavDestination.OPTIMIZER
+}
+
+/**
+ * Live Intelligence Map destination.
+ *
+ * The map owns its own ViewModel so its heavy aggregation never becomes a dependency of the
+ * dashboard. Module actions are dispatched to the existing [AdShieldViewModel] methods, which means
+ * the map can only do what the rest of the app can already do.
+ */
+@Composable
+private fun IntelligenceDestination(
+    adShieldViewModel: AdShieldViewModel,
+    onToggleProtection: (Boolean) -> Unit,
+    onNavigate: (MainNavDestination) -> Unit,
+    mapViewModel: IntelligenceMapViewModel = hiltViewModel()
+) {
+    val mapState by mapViewModel.uiState.collectAsStateWithLifecycle()
+    IntelligenceMapScreen(
+        uiState = mapState,
+        onToggleLive = mapViewModel::toggleLive,
+        onSelectModule = mapViewModel::selectModule,
+        onSelectEvent = mapViewModel::selectEvent,
+        onCenterOnModule = mapViewModel::centerOnModule,
+        onResetCamera = mapViewModel::resetCamera,
+        onSetEditingLayout = mapViewModel::setEditingLayout,
+        onResetLayout = mapViewModel::resetNodeLayout,
+        onMoveNode = mapViewModel::moveNode,
+        onSetModuleFilter = mapViewModel::setModuleFilter,
+        onSetSeverityFilter = mapViewModel::setSeverityFilter,
+        onSetTimeRange = mapViewModel::setTimeRange,
+        onSetQuery = mapViewModel::setSearchQuery,
+        onClearFilters = mapViewModel::clearFilters,
+        onClearHistory = mapViewModel::clearHistory,
+        onAction = { action, module ->
+            when (action) {
+                IntelligenceAction.OPEN_MODULE -> onNavigate(navDestinationForModule(module))
+                IntelligenceAction.START_PROTECTION -> onToggleProtection(true)
+                IntelligenceAction.STOP_PROTECTION -> onToggleProtection(false)
+                IntelligenceAction.TOGGLE_LOCKDOWN -> {
+                    val settings = adShieldViewModel.settingsState.value
+                    adShieldViewModel.setEmergencyAllowlistOnly(
+                        !settings.dnsFirewallPolicy.emergencyAllowlistOnly
+                    )
+                }
+                IntelligenceAction.SYNC_FILTERS -> adShieldViewModel.triggerManualFilterUpdate()
+                IntelligenceAction.RUN_APP_AUDIT -> adShieldViewModel.auditInstalledApps()
+                IntelligenceAction.RUN_DEVICE_DIAGNOSIS -> adShieldViewModel.runBatteryDiagnosis()
+                IntelligenceAction.SCHEDULE_SCAN -> onNavigate(MainNavDestination.SECURITY)
+            }
+        },
+        onOpenModule = { module -> onNavigate(navDestinationForModule(module)) }
+    )
 }
 
 @Composable

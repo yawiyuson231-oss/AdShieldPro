@@ -21,6 +21,8 @@ import com.adshield.pro.MainActivity
 import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.ScanJournalStore
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.QuarantineManager
 import com.adshield.pro.engine.security.ScanKind
@@ -51,13 +53,15 @@ class ScheduledScanWorker @AssistedInject constructor(
     private val securityEngine: SecurityEngine,
     private val journalStore: ScanJournalStore,
     private val quarantineManager: QuarantineManager,
-    private val preferencesRepository: UserPreferencesRepository
+    private val preferencesRepository: UserPreferencesRepository,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
         val settings = preferencesRepository.getSettingsSnapshot()
         if (!settings.scheduledScanEnabled) return Result.success()
 
+        val jobStartedAt = System.currentTimeMillis()
         return try {
             val startedAt = System.currentTimeMillis()
             val records = mutableListOf<SecurityScanRecord>()
@@ -141,9 +145,30 @@ class ScheduledScanWorker @AssistedInject constructor(
             if (dangerousCount > 0 || suspiciousCount > 0) {
                 postFindingsNotification(dangerousCount, suspiciousCount)
             }
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Scheduled security scan",
+                    success = true,
+                    detail = "${audits.size} app(s) audited · $dangerousCount dangerous · " +
+                        "$suspiciousCount suspicious · ${records.size} record(s) stored",
+                    durationMs = System.currentTimeMillis() - jobStartedAt,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             Result.success()
         } catch (t: Throwable) {
             // Retry on transient failures (PackageManager pressure, IO), never crash the process.
+            runCatching {
+                intelligenceRecorder.emit(
+                    IntelligenceEventFactory.automationJob(
+                        jobLabel = "Scheduled security scan",
+                        success = false,
+                        detail = t.message ?: t::class.java.simpleName,
+                        durationMs = System.currentTimeMillis() - jobStartedAt,
+                        timestampEpochMs = System.currentTimeMillis()
+                    )
+                )
+            }
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }
