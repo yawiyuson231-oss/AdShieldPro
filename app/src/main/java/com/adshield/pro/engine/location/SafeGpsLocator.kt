@@ -9,6 +9,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
@@ -85,8 +86,10 @@ class SafeGpsLocator(private val context: Context) {
                 ) != Settings.Secure.LOCATION_MODE_OFF
             }.getOrNull()
         }
+        // Hidden constant avoided: the public API exposes the same setting.
         val wifiScanning = runCatching {
-            Settings.Global.getInt(resolver, Settings.Global.WIFI_SCAN_ALWAYS_AVAILABLE, 0) == 1
+            (context.getSystemService(Context.WIFI_SERVICE) as? WifiManager)
+                ?.isScanAlwaysAvailable
         }.getOrNull()
         val developerOptions = runCatching {
             Settings.Global.getInt(resolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1

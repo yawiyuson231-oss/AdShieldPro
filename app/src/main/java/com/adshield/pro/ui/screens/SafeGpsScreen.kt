@@ -95,7 +95,14 @@ fun SafeGpsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "header", contentType = "header") {
-            GpsHeader(state = state, onLocate = onLocate, onStop = onStop, onRequestPermission = onRequestPermission)
+            GpsHeader(
+                state = state,
+                onLocate = onLocate,
+                onStop = onStop,
+                onRequestPermission = onRequestPermission,
+                onTargetChange = onTargetChange,
+                onTimeoutChange = onTimeoutChange
+            )
         }
         item(key = "keys", contentType = "keys") {
             GpsKeyMetrics(state)
@@ -158,7 +165,9 @@ private fun GpsHeader(
     state: SafeGpsUiState,
     onLocate: () -> Unit,
     onStop: () -> Unit,
-    onRequestPermission: () -> Unit
+    onRequestPermission: () -> Unit,
+    onTargetChange: (Double) -> Unit,
+    onTimeoutChange: (Long) -> Unit
 ) {
     val permissionGranted = state.permission == com.adshield.pro.engine.location.LocationPermission.GRANTED
     Card(
