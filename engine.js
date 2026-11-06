@@ -26,7 +26,8 @@ import {
   PROTECTED_REGISTRABLE_DOMAINS,
   PROTECTED_HOSTS as VIDEO_PROTECTED_HOSTS,
   explainDanger as explainVideoDanger,
-  classify as classifyVideoHost
+  classify as classifyVideoHost,
+  protectedZone as videoZoneOf
 } from './guard/video-safety.js';
 
 const LABEL_RE = /^[a-z0-9_-]+$/;
@@ -508,31 +509,6 @@ export class OmniShieldFilterEngine {
       }
     }
 
-    // 3b. Video Safety — media delivery hosts resolve no matter what a feed says.
-    //     This runs after user rules (an explicit user block still wins, visibly)
-    //     and before any feed rule, so an advert slot on a media domain
-    //     (ads.twitch.tv) keeps being blocked while the stream itself never is.
-    if (this.videoSafe) {
-      for (const suffix of this._walk(domain)) {
-        if (this.videoAllowSuffix.has(suffix)) {
-          // A name on a media domain is only exempt when it is playback
-          // infrastructure. `ads.twitch.tv` is an advert slot on twitch.tv and
-          // must still be reported as blocked, so it falls through to the feeds.
-          const verdict = classifyVideoHost(domain);
-          if (verdict.protected) {
-            return {
-              domain, blocked: false, source: 'Video Safety', action: 'ALLOW', matched: suffix,
-              reasons: [
-                verdict.reason,
-                'Advert slots (for example pubads.g.doubleclick.net or ads.twitch.tv) are still blocked.'
-              ]
-            };
-          }
-          break;
-        }
-      }
-    }
-
     // 4. List exceptions.
     for (const suffix of this._walk(domain)) {
       if (this.allowSubdomains.has(suffix)) {
@@ -551,10 +527,35 @@ export class OmniShieldFilterEngine {
       }
     }
 
+    /**
+     * Video Safety, applied where it belongs: at the moment a feed rule matches.
+     *
+     * A rule that blocks the media *domain itself* (`||googlevideo.com^`) would
+     * take playback down, so it is ignored for playback hosts. A rule for a
+     * specific host (`||log.byteoversea.com^`, `||views.hulu.com^`) is a
+     * deliberate block of an ad or telemetry endpoint and is always enforced —
+     * exempting whole media domains instead silently unblocked 195 such hosts.
+     */
+    const videoZone = this.videoSafe ? videoZoneOf(domain) : null;
+    const playbackExemption = (matchedSuffix) => {
+      if (!videoZone || matchedSuffix !== videoZone) return null;
+      const verdict = classifyVideoHost(domain);
+      if (!verdict.protected) return null;
+      return {
+        domain, blocked: false, source: 'Video Safety', action: 'ALLOW', matched: matchedSuffix,
+        reasons: [
+          verdict.reason,
+          `The rule blocking ${matchedSuffix} would stop playback; specific ad and telemetry hosts under it stay blocked.`
+        ]
+      };
+    };
+
     // 5. Feed block rules.
     for (const suffix of this._walk(domain)) {
       const hit = this.filterSubdomains.get(suffix);
       if (hit) {
+        const exempt = playbackExemption(suffix);
+        if (exempt) return exempt;
         return {
           domain, blocked: true, source: hit.source, action: 'BLOCK', category: hit.category, matched: suffix,
           reasons: [

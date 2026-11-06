@@ -410,7 +410,38 @@ class AdShieldEngineTestSuite {
         assertTrue(engine.evaluate("pubads.g.doubleclick.net").isBlocked)
         assertFalse(engine.evaluate("rr3---sn-ab5l6nr6.googlevideo.com").isBlocked)
         assertFalse(engine.evaluate("www.youtube.com").isBlocked)
-        assertEquals("System Safety Allowlist", engine.evaluate("rr3---sn-ab5l6nr6.googlevideo.com").sourceName)
+    }
+
+    @Test
+    fun videoSafetyExemptionAppliesOnlyToTheMediaDomainRuleNotToAdHosts() {
+        val engine = FilterRuleEngine()
+        val parsed = engine.parseFilterListContent(
+            listOf(
+                "||googlevideo.com^",          // would break playback: exempted for playback hosts
+                "||log.byteoversea.com^",      // specific telemetry host: must stay blocked
+                "||views.hulu.com^",           // specific ad metrics host: must stay blocked
+                "||mcs.tiktokv.com^"           // specific telemetry host: must stay blocked
+            ).joinToString("\n"),
+            RuleCategory.TRACKERS,
+            "test-feed"
+        ).getOrThrow()
+
+        engine.updateFilterListRules(
+            subdomainRules = parsed.subdomainRules,
+            exactRules = parsed.exactRules,
+            wildcardRules = parsed.wildcardRules,
+            allowSubdomains = parsed.allowSubdomains
+        )
+
+        // Playback host under a blanket media rule stays resolvable.
+        val playback = engine.evaluate("rr3---sn-ab5l6nr6.googlevideo.com")
+        assertFalse(playback.isBlocked)
+        assertEquals("Video Safety", playback.sourceName)
+
+        // A rule naming the specific ad/telemetry host is always enforced.
+        for (host in listOf("log.byteoversea.com", "views.hulu.com", "mcs.tiktokv.com")) {
+            assertTrue("$host must stay blocked", engine.evaluate(host).isBlocked)
+        }
     }
 
     @Test

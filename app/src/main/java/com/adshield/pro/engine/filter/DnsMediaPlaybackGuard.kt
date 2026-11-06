@@ -113,7 +113,14 @@ object DnsMediaPlaybackGuard {
         "doubleclick", "imasdk", "prebid", "vast", "vmap", "adunit",
         "beacon", "analytics", "telemetry", "tracking", "tracker", "metrics",
         "pixel", "sponsor", "sponsored", "promo", "banner", "preroll",
-        "midroll", "postroll", "interstitial"
+        "midroll", "postroll", "interstitial",
+        // Telemetry/log collectors published as subdomains of a media domain: the
+        // names upstream lists deliberately block (views.hulu.com,
+        // log.byteoversea.com, mcs.tiktokv.com, smetrics.disneyplus.com, ...).
+        "log", "logs", "log2", "logger", "logging", "gplog", "maplog", "eventlog",
+        "eventlogger", "eventgateway", "events", "mon", "monitoring", "mcs", "tsa",
+        "smetrics", "perfmetrics", "customerevents", "telemetry2", "pulse", "tags",
+        "promoted", "adeventtracker", "aet", "views", "dradis", "stats"
     )
 
     data class Verdict(
@@ -164,6 +171,20 @@ object DnsMediaPlaybackGuard {
     private fun matchesHostOrSubdomain(domain: String, entry: String): Boolean =
         domain == entry || domain.endsWith(".$entry")
 
+    /**
+     * The protected media zone a host belongs to (`googlevideo.com`), or null.
+     *
+     * Needed by the evaluator: the Video Safety exemption may only apply when the
+     * *blocking rule is the media domain itself*. A rule for a specific host under
+     * the zone (`log.byteoversea.com`, `views.hulu.com`) is a deliberate block of an
+     * ad or telemetry endpoint and must survive.
+     */
+    fun protectedZoneFor(input: String): String? {
+        val domain = normalizeDomain(input)
+        if (domain.isEmpty()) return null
+        return PROTECTED_REGISTRABLE_DOMAINS.firstOrNull { matchesHostOrSubdomain(domain, it) }
+    }
+
     /** True when the host carries an advert-intent *label* (`ads`, `preroll`, ...). */
     fun hasAdvertIntent(domain: String): Boolean {
         val name = normalizeDomain(domain)
@@ -188,7 +209,14 @@ object DnsMediaPlaybackGuard {
         // Compound node names (srv-adserver-3.googlevideo.com) are NOT advert slots.
         val suffix = ".$registrable"
         if (!domain.endsWith(suffix)) return false
-        return domain.removeSuffix(suffix).split('.').any { ADVERT_LABEL_TOKENS.contains(it) }
+        val subLabels = domain.removeSuffix(suffix).split('.')
+        return subLabels.any { label ->
+            if (ADVERT_LABEL_TOKENS.contains(label)) return@any true
+            if (ADVERT_LABEL_TOKENS.contains(label.replace("-", "").replace("_", ""))) return@any true
+            // `ads-service`, `log-gateway`: lead token only, so a per-node name like
+            // `srv-adserver-3.googlevideo.com` is not caught by its middle segment.
+            label.contains('-') && ADVERT_LABEL_TOKENS.contains(label.split('-').first())
+        }
     }
 
     /**

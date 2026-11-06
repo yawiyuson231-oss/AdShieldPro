@@ -218,7 +218,14 @@ const ADVERT_LABEL_TOKENS = Object.freeze([
   'doubleclick', 'imasdk', 'prebid', 'vast', 'vmap', 'vastads', 'adunit',
   'beacon', 'analytics', 'telemetry', 'tracking', 'tracker', 'metrics',
   'pixel', 'sponsor', 'sponsored', 'sponsorads', 'promo', 'banner', 'preroll',
-  'midroll', 'postroll', 'interstitial'
+  'midroll', 'postroll', 'interstitial',
+  // Telemetry/log collectors published as subdomains of a media domain. These
+  // are the names an upstream list deliberately blocks (views.hulu.com,
+  // log.byteoversea.com, mcs.tiktokv.com, smetrics.disneyplus.com, ...).
+  'log', 'logs', 'log2', 'logger', 'logging', 'gplog', 'maplog', 'eventlog',
+  'eventlogger', 'eventgateway', 'events', 'mon', 'monitoring', 'mcs', 'tsa',
+  'smetrics', 'perfmetrics', 'customerevents', 'telemetry2', 'pulse', 'tags',
+  'promoted', 'adeventtracker', 'aet', 'views', 'dradis', 'stats'
 ]);
 
 /** Hostname labels that describe the player itself rather than an advert slot. */
@@ -274,27 +281,53 @@ export function registrableDomain(input) {
   return labels.slice(-2).join('.');
 }
 
-function onProtectedRegistrable(domain) {
-  const registrable = registrableDomain(domain);
-  if (!registrable) return null;
+/**
+ * The protected media zone a host belongs to (`googlevideo.com`), or null.
+ *
+ * Exported because the evaluator needs it: the Video Safety exemption may only
+ * apply when the *blocking rule is the media domain itself* (a blanket rule that
+ * would take playback down). A rule for a specific host under the zone
+ * (`log.byteoversea.com`, `views.hulu.com`) is a deliberate block of an ad or
+ * telemetry endpoint and must survive.
+ */
+export function protectedZone(domain) {
+  const name = normalizeDomain(domain);
+  if (!name) return null;
   for (const entry of PROTECTED_REGISTRABLE_DOMAINS) {
-    if (domain === entry || domain.endsWith(`.${entry}`)) return entry;
+    if (name === entry || name.endsWith(`.${entry}`)) return entry;
   }
   return null;
 }
 
+const onProtectedRegistrable = protectedZone;
+
 /**
- * True when an advert token is used as a *whole subdomain label* under a media
- * domain — `ads.twitch.tv`, `analytics.tiktok.com`, `preroll.youtube.com`.
- * Those are advert slots. Compound node names such as
- * `srv-adserver-3.googlevideo.com` are CDN hosts and are deliberately excluded.
+ * True when an advert/telemetry token appears in the *subdomain* of a media
+ * domain — `ads.twitch.tv`, `analytics.tiktok.com`, `log.byteoversea.com`,
+ * `views.hulu.com`, `player-telemetry.vimeo.com`.
+ *
+ * These are the names upstream lists deliberately block, and the exemption must
+ * never cover them: exempting an entire media registrable domain silently
+ * unblocked 195 ad and telemetry hosts (TikTok ad services, Spotify's ad event
+ * tracker, Hulu's ad views, Netflix telemetry).
+ *
+ * Compound delivery node names such as `srv-adserver-3.googlevideo.com` are the
+ * exception: the token must form a whole label, or the first segment of a
+ * hyphenated label (`ads-service`, `player-telemetry`), not appear mid-word.
  */
 function hasAdvertSubdomainLabel(domain, protectedEntry) {
   if (!protectedEntry) return false;
   const suffix = `.${protectedEntry}`;
   if (!domain.endsWith(suffix)) return false;
   const subLabels = domain.slice(0, -suffix.length).split('.');
-  return subLabels.some((label) => ADVERT_LABEL_TOKENS.includes(label));
+  return subLabels.some((label) => {
+    if (ADVERT_LABEL_TOKENS.includes(label)) return true;
+    if (ADVERT_LABEL_TOKENS.includes(label.replace(/[-_]/g, ''))) return true;
+    const head = label.split(/[-_]/)[0];
+    // `ads-service`, `log-gateway`, `player-telemetry`: lead token only, so a
+    // per-node name like `srv-adserver-3` is not caught by its middle segment.
+    return ADVERT_LABEL_TOKENS.includes(head) && label.includes('-');
+  });
 }
 
 /** The protected verdict, shared by the registrable-domain and explicit-host cases. */
@@ -366,10 +399,20 @@ export function classify(input) {
     };
   }
 
-  // 3. A name that sits on a media delivery domain stays protected even when one
-  //    of its labels contains an advert-ish token. Edge nodes are routinely named
-  //    `srv-adserver-3.<cdn>.googlevideo.com`; breaking those breaks playback, and
-  //    the real ad slots are covered above.
+  // 2b. An advert/telemetry subdomain of a media domain is advert delivery, not
+  //     playback. This is the case that must not be exempted wholesale.
+  if (hasAdvertSubdomainLabel(domain, protectedEntry)) {
+    return {
+      domain,
+      protected: false,
+      adIntent: true,
+      reason: `Advert or telemetry slot on ${protectedEntry}: blocking it removes tracking, not the stream.`,
+      blockedBy: 'advert-subdomain',
+      matched: null
+    };
+  }
+
+  // 3. Any other name on a media delivery domain is playback infrastructure.
   if (protectedEntry || directHost) {
     return protectedBranch(domain, labels, protectedEntry, directHost);
   }
@@ -585,6 +628,7 @@ export default {
   splitSafeRules,
   guardFilterEngine,
   hasAdvertIntent,
+  protectedZone,
   registrableDomain,
   normalizeDomain,
   patternOf

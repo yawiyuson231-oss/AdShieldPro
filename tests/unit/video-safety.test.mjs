@@ -185,6 +185,49 @@ test('feed content is filtered by the guard and counted, not silently dropped', 
   assert.equal(engine.evaluate('rr1.googlevideo.com').blocked, false);
 });
 
+test('the exemption never covers a specific ad/telemetry host (both defence layers)', () => {
+  // The bug this locks down: exempting whole media domains unblocked 195 real
+  // ad/telemetry hosts (TikTok ad services, Spotify's ad event tracker, Hulu's
+  // ad views, Netflix and Zoom telemetry).
+  const engine = new OmniShieldFilterEngine();
+  const loaded = engine.loadFilterList(
+    ['||googlevideo.com^', '||log.byteoversea.com^', '||views.hulu.com^',
+      '||adeventtracker.spotify.com^', '||mcs.tiktokv.com^'].join('\n'),
+    'TRACKERS',
+    'test-feed'
+  );
+
+  // Layer 1: the blanket media rule is refused while loading.
+  assert.equal(loaded.videoRejected, 1);
+  assert.equal(engine.evaluate('rr3---sn-ab5l6nr6.googlevideo.com').blocked, false);
+
+  // Layer 2: even if such a rule reaches the table by another path, the
+  // evaluator ignores it for playback hosts but enforces host-level rules.
+  engine.filterSubdomains.set('googlevideo.com', { category: 'TRACKERS', source: 'imported' });
+  engine._invalidate();
+  const playback = engine.evaluate('rr3---sn-ab5l6nr6.googlevideo.com');
+  assert.equal(playback.blocked, false, 'a blanket media rule must not stop playback');
+  assert.equal(playback.source, 'Video Safety');
+
+  for (const host of ['log.byteoversea.com', 'views.hulu.com',
+    'adeventtracker.spotify.com', 'mcs.tiktokv.com']) {
+    assert.equal(engine.evaluate(host).blocked, true, `${host} is a deliberate block`);
+  }
+});
+
+test('no shipped list rule for a specific ad/telemetry host is exempted', () => {
+  const engine = engineWithBundledLists();
+  const rules = readFileSync('assets/core_lite_ads.txt', 'utf8')
+    .split('\n').map((l) => l.trim()).filter((l) => l.startsWith('||'))
+    .map((l) => l.slice(2).split('^')[0].toLowerCase());
+
+  const wronglyExempted = rules.filter((host) => {
+    const verdict = engine.evaluate(host);
+    return !verdict.blocked && verdict.source === 'Video Safety' && host !== verdict.matched;
+  });
+  assert.deepEqual(wronglyExempted, [], 'a host rule must never be exempted by the media guard');
+});
+
 test('a user block still outranks the video exemption (explicit beats implicit)', () => {
   const engine = new OmniShieldFilterEngine();
   engine.videoSafe = false; // simulate the escape hatch: no guard

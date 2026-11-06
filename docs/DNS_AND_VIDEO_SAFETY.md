@@ -101,8 +101,29 @@ three wherever a list is parsed, with a reason attached:
 - user rules return `false` and are listed in `rejectedRules` so the UI can
   explain the refusal.
 
-Every media registrable domain is also installed as an exception, so a future
-list update cannot take playback down.
+### 2.2b The exemption is scoped to the rule, not the hostname
+
+The exemption fires **only when the matching rule is the media domain itself**
+(`||googlevideo.com^`). It never covers a rule that names a specific host.
+
+This distinction is not cosmetic. An earlier revision exempted whole media
+registrable domains, and an audit of the bundled light feed found that this
+silently unblocked **195 real ad and telemetry hosts**, including:
+
+```
+log.byteoversea.com          ads-api.tiktok.com        adeventtracker.spotify.com
+views.hulu.com               mcs.tiktokv.com           promoted.soundcloud.com
+player-telemetry.vimeo.com   smetrics.disneyplus.com   log-gateway.zoom.us
+```
+
+Those are deliberate blocks by the upstream list, and they stay blocked. The
+regression is covered by two tests, one per defence layer:
+
+- `the exemption never covers a specific ad/telemetry host (both defence layers)`
+- `no shipped list rule for a specific ad/telemetry host is exempted`
+
+Audit result on the shipped list: **0 apex-level rules on media domains, 211
+specific host rules — all still enforced.**
 
 ### 2.3 What remains blocked
 

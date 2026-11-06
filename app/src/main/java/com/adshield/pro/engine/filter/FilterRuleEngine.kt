@@ -44,8 +44,7 @@ class FilterRuleEngine @Inject constructor() {
         val customBlockExact: Map<String, CustomRule> = emptyMap(),
         val customBlockSubdomain: Map<String, CustomRule> = emptyMap(),
         val customWildcards: List<WildcardEntry> = emptyList(),
-        val builtInAllowSubdomains: Set<String> =
-            DEFAULT_SAFE_ALLOWLIST + DnsMediaPlaybackGuard.PROTECTED_REGISTRABLE_DOMAINS,
+        val builtInAllowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST,
         val filterListSubdomains: Map<String, FilterListEntry> = emptyMap(),
         val filterListExact: Map<String, FilterListEntry> = emptyMap(),
         val filterListWildcards: List<WildcardEntry> = emptyList()
@@ -139,10 +138,7 @@ class FilterRuleEngine @Inject constructor() {
         val previous = snapshotRef.get()
         snapshotRef.set(
             previous.copy(
-                // Video Safety entries are always present: a media host must resolve
-                // even when a feed (or a future list update) says otherwise.
-                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains +
-                    DnsMediaPlaybackGuard.PROTECTED_REGISTRABLE_DOMAINS,
+                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
                 filterListSubdomains = subdomainRules,
                 filterListExact = exactRules,
                 filterListWildcards = wildcardRules
@@ -222,9 +218,32 @@ class FilterRuleEngine @Inject constructor() {
 
         val activeCategories = snap.protectionMode.activeCategories
 
+        /**
+         * Video Safety, applied where it belongs: when a feed rule matches.
+         *
+         * A rule that blocks the media *domain itself* (`||googlevideo.com^`) would
+         * take playback down, so it is ignored for playback hosts. A rule for a
+         * specific host (`||log.byteoversea.com^`, `||views.hulu.com^`) is a
+         * deliberate block of an ad or telemetry endpoint and is always enforced.
+         *
+         * Exempting whole media domains in the allowlist step (the previous
+         * behaviour) silently unblocked 195 such ad and telemetry hosts.
+         */
+        val videoZone = DnsMediaPlaybackGuard.protectedZoneFor(domain)
+
+        fun videoExemption(matchedRule: String): FilterEvaluationResult? {
+            if (videoZone == null || matchedRule != videoZone) return null
+            if (!DnsMediaPlaybackGuard.isProtectedPlaybackHost(domain)) return null
+            return buildResult(
+                domain, false, "||$matchedRule^", null, RuleMatchType.SUBDOMAIN,
+                "Video Safety", 70, startNs
+            )
+        }
+
         // 7. Filter List Exact Match
         snap.filterListExact[domain]?.let { entry ->
             if (activeCategories.contains(entry.category)) {
+                videoExemption(domain)?.let { return it }
                 return buildResult(domain, true, domain, entry.category, RuleMatchType.EXACT, entry.sourceName, 50, startNs)
             }
         }
@@ -233,6 +252,7 @@ class FilterRuleEngine @Inject constructor() {
         for (suffix in suffixes) {
             val entry = snap.filterListSubdomains[suffix]
             if (entry != null && activeCategories.contains(entry.category)) {
+                videoExemption(suffix)?.let { return it }
                 return buildResult(domain, true, "||$suffix^", entry.category, RuleMatchType.SUBDOMAIN, entry.sourceName, 50, startNs)
             }
         }
