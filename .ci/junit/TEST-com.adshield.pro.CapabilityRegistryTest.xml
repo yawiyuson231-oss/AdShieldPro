@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.CapabilityRegistryTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:02:35.360Z" hostname="runnervmwuk1x" time="0.014">
+<testsuite name="com.adshield.pro.CapabilityRegistryTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-06T12:14:00.841Z" hostname="runnervmwuk1x" time="0.018">
   <properties/>
   <testcase name="testSummaryCountsMatchTheRegistry" classname="com.adshield.pro.CapabilityRegistryTest" time="0.005"/>
   <testcase name="testNoCapabilityClaimsCloudAiOrChargeControl" classname="com.adshield.pro.CapabilityRegistryTest" time="0.004"/>
   <testcase name="testEveryCapabilityHasUniqueIdAndHonestStatus" classname="com.adshield.pro.CapabilityRegistryTest" time="0.0"/>
-  <testcase name="testImplementedCapabilitiesPointAtRealCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.003"/>
-  <testcase name="testUnavailableCapabilitiesClaimNoCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.0"/>
+  <testcase name="testImplementedCapabilitiesPointAtRealCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.007"/>
+  <testcase name="testUnavailableCapabilitiesClaimNoCode" classname="com.adshield.pro.CapabilityRegistryTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

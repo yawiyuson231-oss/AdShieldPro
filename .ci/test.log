@@ -29,8 +29,8 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugUnitTestBuild UP-TO-DATE
 > Task :app:processDebugJavaRes UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest
-> Task :app:bundleDebugClassesToCompileJar
 > Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
 
 > Task :app:compileDebugUnitTestKotlin
@@ -203,8 +203,7 @@ CloudPlatformTestSuite > cloudApiBuildsTheDocumentedPathsAndParsesRealResponses 
 
 ConnectorPlatformTestSuite > testTextUrlFeedsRejectNonUrlsAndDeduplicate PASSED
 
-ConnectorPlatformTestSuite > testEveryImplementedFeedIsHttpsAndHasMetadata FAILED
-    java.lang.StackOverflowError at ConnectorExpansion.kt:46
+ConnectorPlatformTestSuite > testEveryImplementedFeedIsHttpsAndHasMetadata PASSED
 
 ConnectorPlatformTestSuite > testSuccessfulSyncParsesAndCaps PASSED
 
@@ -222,31 +221,26 @@ ConnectorPlatformTestSuite > testMispListClassifiesValuesAndIgnoresJunk PASSED
 
 ConnectorPlatformTestSuite > testUrlHostExtractionRejectsSpoofedInput PASSED
 
-ConnectorPlatformTestSuite > testUnavailableSourcesAreLabelledUnavailable FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+ConnectorPlatformTestSuite > testUnavailableSourcesAreLabelledUnavailable PASSED
 
 ConnectorPlatformTestSuite > testRiskEngineHonoursSuppressionAndLocalRisk PASSED
 
 ConnectorPlatformTestSuite > testParserRejectsEmptyAndUnknown PASSED
 
 ConnectorPlatformTestSuite > testCatalogueIdsAndEndpointsAreUnique FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:50
 
 ConnectorPlatformTestSuite > testOfflineTimeoutAndInvalidBody PASSED
 
-ConnectorPlatformTestSuite > testOnlyDefaultEnabledFeedsAreScheduled FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+ConnectorPlatformTestSuite > testOnlyDefaultEnabledFeedsAreScheduled PASSED
 
-ConnectorPlatformTestSuite > testDisabledAndNotConfiguredOverrideOldSuccess FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+ConnectorPlatformTestSuite > testDisabledAndNotConfiguredOverrideOldSuccess PASSED
 
 ConnectorPlatformTestSuite > testDiagnosticFeedsValidateResponseAndProduceNoThreats PASSED
 
-ConnectorPlatformTestSuite > testCredentialRequiringConnectorsAreNotEnabledAndNotImplemented FAILED
-    java.lang.StackOverflowError at ConnectorCatalogue.kt:105
+ConnectorPlatformTestSuite > testCredentialRequiringConnectorsAreNotEnabledAndNotImplemented PASSED
 
-ConnectorPlatformTestSuite > testDisabledAndKeyRequiredAreSkipped FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+ConnectorPlatformTestSuite > testDisabledAndKeyRequiredAreSkipped PASSED
 
 ConnectorPlatformTestSuite > testCooldownSkipsNetworkEntirely PASSED
 
@@ -260,8 +254,7 @@ ConnectorPlatformTestSuite > testBackoffIsExponentialAndBounded PASSED
 
 ConnectorPlatformTestSuite > testNotModifiedIsSuccessWithoutIndicators PASSED
 
-ConnectorPlatformTestSuite > testEveryModuleHasRealConnectorsAndHonestGaps FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+ConnectorPlatformTestSuite > testEveryModuleHasRealConnectorsAndHonestGaps PASSED
 
 ConnectorPlatformTestSuite > testRiskEngineExplainsAndCorroborates PASSED
 
@@ -397,26 +390,22 @@ IntelligenceMapTestSuite > testRepositoryDropsCorruptRowsOnRead PASSED
 
 LookupAndQrTestSuite > cidr containment matches real networks PASSED
 
-LookupAndQrTestSuite > retired sources are not implemented FAILED
-    java.lang.StackOverflowError at ConnectorCatalogue.kt:105
+LookupAndQrTestSuite > retired sources are not implemented PASSED
 
 LookupAndQrTestSuite > blank image yields no payload instead of a guess PASSED
 
 LookupAndQrTestSuite > qr encoder and decoder agree on a payload PASSED
 
-LookupAndQrTestSuite > no native handler is dead code FAILED
-    java.lang.StackOverflowError at ConnectorCatalogue.kt:105
+LookupAndQrTestSuite > no native handler is dead code PASSED
 
-LookupAndQrTestSuite > lookup connectors never require a key to be counted as implemented FAILED
-    java.lang.StackOverflowError at ConnectorCatalogue.kt:105
+LookupAndQrTestSuite > lookup connectors never require a key to be counted as implemented PASSED
 
 LookupAndQrTestSuite > lookup connectors are https templated and cacheable FAILED
-    java.lang.StackOverflowError at ConnectorCatalogue.kt:105
+    java.lang.AssertionError at LookupAndQrTestSuite.kt:87
 
 LookupAndQrTestSuite > oversized images are refused before decoding PASSED
 
-LookupAndQrTestSuite > every implemented native probe has a dispatch branch FAILED
-    java.lang.StackOverflowError at ConnectorModels.kt:103
+LookupAndQrTestSuite > every implemented native probe has a dispatch branch PASSED
 
 OnionRoutingTestSuite > orbotStatusBroadcastMapsToHonestStates PASSED
 
@@ -540,7 +529,7 @@ SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
 
 SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
 
-241 tests completed, 13 failed
+241 tests completed, 2 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -702,5 +691,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 43s
+BUILD FAILED in 41s
 33 actionable tasks: 9 executed, 24 up-to-date
