@@ -1,0 +1,64 @@
+name: Intel live source verification
+
+# Records what the outside world actually answers, without an account or an API key.
+# The committed result (docs/INTEL_LIVE_SOURCES.md + docs/intel/live-probe.json) is the
+# evidence behind every "verified reachable" claim in the connector catalogue.
+on:
+  workflow_dispatch:
+  # A branch push re-measures the endpoint set whenever the probe or the catalogue changes.
+  # (workflow_dispatch itself is only offered once this file exists on the default branch.)
+  push:
+    paths:
+      - 'tools/probe_intel_endpoints.py'
+      - '.github/workflows/intel-live-verification.yml'
+      - 'app/src/main/java/com/adshield/pro/engine/connectors/ConnectorCatalogue.kt'
+  schedule:
+    # Weekly drift check: providers move, and the catalogue has to follow.
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: intel-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Probe every keyless connector endpoint
+        run: |
+          set -o pipefail
+          python3 tools/probe_intel_endpoints.py --timeout 20 --workers 5 | tee probe.log
+
+      - name: Upload raw probe evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: intel-live-probe
+          path: |
+            docs/intel/live-probe.json
+            docs/INTEL_LIVE_SOURCES.md
+            probe.log
+          if-no-files-found: error
+
+      - name: Commit refreshed evidence
+        # The Actions log/artifact endpoints are not reachable from every consumer of this
+        # repository, so the measurement is committed to the branch it ran on. `[skip ci]`
+        # stops the commit from retriggering the probe.
+        continue-on-error: true
+        run: |
+          git config user.name "Intel verification"
+          git config user.email "ci@adshield.local"
+          git add docs/intel/live-probe.json docs/INTEL_LIVE_SOURCES.md
+          git diff --cached --quiet && exit 0
+          git commit -m "Refresh live intelligence source evidence [skip ci]"
+          git pull --rebase --autostash origin "$GITHUB_REF_NAME" || true
+          git push origin "HEAD:$GITHUB_REF_NAME" || true

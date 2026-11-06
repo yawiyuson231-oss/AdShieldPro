@@ -13,13 +13,23 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DailyStatEntity::class,
         SecurityScanEntity::class,
         StorageProviderEntity::class,
-        DirectDownloadEntity::class
+        DirectDownloadEntity::class,
+        IntelligenceEventEntity::class,
+        ConnectorStateEntity::class,
+        ThreatIndicatorEntity::class,
+        LookupCacheEntity::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = true
 )
 abstract class AdShieldDatabase : RoomDatabase() {
     abstract fun adShieldDao(): AdShieldDao
+
+    abstract fun intelligenceEventDao(): IntelligenceEventDao
+
+    abstract fun connectorDao(): ConnectorDao
+
+    abstract fun lookupCacheDao(): LookupCacheDao
 
     companion object {
         const val DATABASE_NAME = "adshield_pro_v2.db"
@@ -109,6 +119,126 @@ abstract class AdShieldDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_direct_downloads_system_download_id ON direct_downloads(system_download_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_direct_downloads_updated_at_epoch_ms ON direct_downloads(updated_at_epoch_ms)")
+            }
+        }
+
+        /**
+         * Adds the bounded intelligence-event store that feeds the OMNISHIELD X live map.
+         * Index names match Room's generated naming so the identity hash validates after migration.
+         */
+        /**
+         * Adds the connector platform: persisted connector state and the bounded indicator cache.
+         * Purely additive — DNS logs, rules, filter sources, stats, scans and intelligence events
+         * are untouched, so upgrades keep every existing setting and counter.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS connector_state (
+                        connectorId TEXT NOT NULL PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        enabled INTEGER NOT NULL,
+                        lastAttemptEpochMs INTEGER,
+                        lastSuccessEpochMs INTEGER,
+                        lastError TEXT,
+                        httpCode INTEGER,
+                        indicatorCount INTEGER NOT NULL,
+                        etag TEXT,
+                        lastModified TEXT,
+                        nextAllowedEpochMs INTEGER,
+                        consecutiveFailures INTEGER NOT NULL,
+                        lastSummary TEXT,
+                        latencyMs INTEGER
+                    )"""
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS threat_indicators (
+                        rowId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        kind TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        sourceId TEXT NOT NULL,
+                        module TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        confidence INTEGER NOT NULL,
+                        firstSeenEpochMs INTEGER NOT NULL,
+                        expiresAtEpochMs INTEGER NOT NULL,
+                        attribution TEXT NOT NULL
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_threat_indicators_kind ON threat_indicators(kind)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_threat_indicators_value ON threat_indicators(value)")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_threat_indicators_sourceId_kind_value " +
+                        "ON threat_indicators(sourceId, kind, value)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_threat_indicators_expiresAtEpochMs " +
+                        "ON threat_indicators(expiresAtEpochMs)"
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS intelligence_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        module TEXT NOT NULL,
+                        type_code TEXT NOT NULL,
+                        severity TEXT NOT NULL,
+                        timestamp_epoch_ms INTEGER NOT NULL,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        evidence TEXT NOT NULL,
+                        evidence_ref TEXT,
+                        related_ids TEXT NOT NULL,
+                        metrics TEXT NOT NULL,
+                        actions TEXT NOT NULL
+                    )"""
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_timestamp_epoch_ms " +
+                        "ON intelligence_events(timestamp_epoch_ms)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_module " +
+                        "ON intelligence_events(module)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_severity " +
+                        "ON intelligence_events(severity)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_intelligence_events_module_timestamp_epoch_ms " +
+                        "ON intelligence_events(module, timestamp_epoch_ms)"
+                )
+            }
+        }
+
+        /**
+         * Adds the on-demand lookup cache. Purely additive: every existing table, counter and
+         * preference survives an upgrade.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS lookup_cache (
+                        cacheKey TEXT NOT NULL PRIMARY KEY,
+                        connectorId TEXT NOT NULL,
+                        field TEXT NOT NULL,
+                        query TEXT NOT NULL,
+                        found INTEGER NOT NULL,
+                        riskScore INTEGER NOT NULL,
+                        headline TEXT NOT NULL,
+                        evidenceJson TEXT NOT NULL,
+                        attribution TEXT NOT NULL,
+                        fetchedAtEpochMs INTEGER NOT NULL,
+                        expiresAtEpochMs INTEGER NOT NULL,
+                        httpCode INTEGER
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_lookup_cache_connectorId ON lookup_cache(connectorId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_lookup_cache_expiresAtEpochMs ON lookup_cache(expiresAtEpochMs)")
             }
         }
     }

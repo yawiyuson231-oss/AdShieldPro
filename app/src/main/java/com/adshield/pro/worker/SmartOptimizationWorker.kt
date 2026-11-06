@@ -20,7 +20,9 @@ import androidx.work.WorkerParameters
 import com.adshield.pro.MainActivity
 import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
+import com.adshield.pro.data.repository.IntelligenceRecorder
 import com.adshield.pro.domain.model.JunkCleanMode
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
 import dagger.assisted.Assisted
@@ -32,7 +34,8 @@ class SmartOptimizationWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val optimizerEngine: SystemOptimizerEngine,
-    private val preferencesRepository: UserPreferencesRepository
+    private val preferencesRepository: UserPreferencesRepository,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -47,9 +50,19 @@ class SmartOptimizationWorker @AssistedInject constructor(
         }
 
         // 2. Pause nonessential maintenance during low-battery or overheating conditions
+        val jobStartedAt = System.currentTimeMillis()
         val battery = optimizerEngine.readBatteryThermalSnapshot()
         if ((battery.isLowBattery && !battery.isCharging) || battery.isOverheating) {
             optimizerEngine.runAutoBatteryOptimize()
+            intelligenceRecorder.emit(
+                IntelligenceEventFactory.automationJob(
+                    jobLabel = "Smart maintenance",
+                    success = true,
+                    detail = "Thermal/battery protection path executed instead of background cleaning",
+                    durationMs = System.currentTimeMillis() - jobStartedAt,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+            )
             return Result.success()
         }
 
@@ -79,6 +92,16 @@ class SmartOptimizationWorker @AssistedInject constructor(
             )
         }
 
+        intelligenceRecorder.emit(
+            IntelligenceEventFactory.automationJob(
+                jobLabel = "Smart maintenance",
+                success = true,
+                detail = "Auto-clean ${scanReport.safeAutoCleanBytes} safe byte(s) · " +
+                    "RAM trim · storage ${storage.availableBytes} B free",
+                durationMs = System.currentTimeMillis() - jobStartedAt,
+                timestampEpochMs = System.currentTimeMillis()
+            )
+        )
         return Result.success()
     }
 

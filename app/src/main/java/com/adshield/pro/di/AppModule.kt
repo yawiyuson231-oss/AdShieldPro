@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.adshield.pro.data.local.db.AdShieldDao
 import com.adshield.pro.data.local.db.AdShieldDatabase
+import com.adshield.pro.data.local.db.ConnectorDao
+import com.adshield.pro.data.local.db.IntelligenceEventDao
+import com.adshield.pro.data.local.db.LookupCacheDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,7 +28,13 @@ object AppModule {
             AdShieldDatabase::class.java,
             AdShieldDatabase.DATABASE_NAME
         )
-            .addMigrations(AdShieldDatabase.MIGRATION_1_2, AdShieldDatabase.MIGRATION_2_3)
+            .addMigrations(
+                AdShieldDatabase.MIGRATION_1_2,
+                AdShieldDatabase.MIGRATION_2_3,
+                AdShieldDatabase.MIGRATION_3_4,
+                AdShieldDatabase.MIGRATION_4_5,
+                AdShieldDatabase.MIGRATION_5_6
+            )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
     }
@@ -35,4 +44,40 @@ object AppModule {
     fun provideAdShieldDao(database: AdShieldDatabase): AdShieldDao {
         return database.adShieldDao()
     }
+
+    @Provides
+    @Singleton
+    fun provideIntelligenceEventDao(database: AdShieldDatabase): IntelligenceEventDao {
+        return database.intelligenceEventDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideConnectorDao(database: AdShieldDatabase): ConnectorDao {
+        return database.connectorDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideConnectorTransport(): com.adshield.pro.engine.connectors.ConnectorTransport =
+        com.adshield.pro.engine.connectors.OkHttpConnectorTransport()
+
+    @Provides
+    @Singleton
+    fun provideConnectorSyncEngine(
+        transport: com.adshield.pro.engine.connectors.ConnectorTransport
+    ): com.adshield.pro.engine.connectors.ConnectorSyncEngine =
+        com.adshield.pro.engine.connectors.ConnectorSyncEngine(transport)
+
+    @Provides
+    @Singleton
+    fun provideLookupCacheDao(database: AdShieldDatabase): LookupCacheDao =
+        database.lookupCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideIntelLookupEngine(
+        transport: com.adshield.pro.engine.connectors.ConnectorTransport
+    ): com.adshield.pro.engine.connectors.IntelLookupEngine =
+        com.adshield.pro.engine.connectors.IntelLookupEngine(transport)
 }

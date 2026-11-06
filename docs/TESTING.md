@@ -84,6 +84,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
+| `IntelligenceMapTestSuite` | Event sanitizer (evidence required, size bounds, secret/PII redaction, severity escalation), factory routing (DNS/scan/battery/VPN/automation), aggregator state derivation from real inputs only, dedupe policy, repository round-trip/prune/corrupt rows, hit-testing, pinch focal stability, tap-vs-drag, camera lerp/clamping, recommendations, aggregation performance budget |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
@@ -108,7 +109,42 @@ Those cannot be exercised by JVM unit tests.
    in Security → History with source "Scheduled".
 10. Switch the private search provider in Ad Blocker → Browser → shield controls, search from the
     address bar, and confirm the chosen provider is used after an app restart.
-11. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
+11. Open **Intel**. Drag the map, pinch-zoom, double-tap, tap each of the seven nodes and the core,
+    long-press a node, reset the camera and centre on a module. Confirm a pan never opens a panel
+    and that rotating the device re-fits the map without losing selection.
+12. Tap **Pause** on the map: the header must show the frozen aggregate and a count of events
+    arriving while paused; DNS counters on Home must keep increasing. Resume and confirm the map
+    catches up.
+13. Trigger a real malware DNS block (threat feed test domain) or run a scan that produces a
+    finding; confirm a new event appears in the timeline, the matching node raises its state and a
+    pulse travels to the core.
+14. Use the timeline filters (module, severity, 15 min, search) and confirm both the list and the
+    map markers change accordingly; clear history and confirm the confirmation dialog and the
+    explicit empty state afterwards.
+15. In layout-edit mode drag a node, leave the screen, return and confirm the position persisted.
+    Then use **Reset camera** and confirm the layout is unchanged.
+16. Upgrade-install over the previous version and confirm existing DNS stats, custom rules,
+    filter sources, scan history and settings are intact (additive schema v4 migration).
+17. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
    the scroll-to-top button appears after scrolling, and the shield stops animating when the
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
+18. Open **Intel → Feeds & connectors**, pick a module and confirm the header counts match the
+    registry (176 listed / 157 implemented at the time of writing). Open a feed, press **SYNC NOW**
+    and confirm the status, HTTP code, latency and indicator count are populated from the real
+    response — a connector that has never succeeded must not read CONNECTED.
+19. Put the device in airplane mode (or block the host) and sync again: the connector must show
+    OFFLINE/ERROR with a readable reason and a retry delay, and the rest of the app must keep
+    working from cache. Reconnect and confirm the next sync recovers.
+20. Run a native probe (e.g. installed-app inventory, connectivity, battery, sensor privacy) and
+    confirm every value is a real reading; deny a permission (usage access, location) and confirm
+    the connector reports a restriction instead of inventing data.
+21. Use **Check against cached intelligence** with a domain from a synced feed, then a random
+    domain: the verdict, score and reasons must differ, and the disclaimer ("a match does not
+    prove compromise") must be visible.
+22. Set `connector-sync` to run sooner (or change the device clock), wait for a background cycle
+    and confirm freshness updates in the registry and the Automation node records the job result.
+    Then force-stop the app and confirm the stored state — including failures — survives restart.
+23. Upgrade-install over the previous version and confirm DNS stats, rules, scan history and the
+    intelligence event log survive the additive schema v5 migration (connector_state and
+    threat_indicators are new tables).

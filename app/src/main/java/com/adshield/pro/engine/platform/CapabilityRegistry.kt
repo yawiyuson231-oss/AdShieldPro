@@ -832,6 +832,74 @@ object CapabilityRegistry {
             emptyList(), listOf("Would summarise telemetry, rule counts, last errors"),
             listOf("Not implemented yet; must scrub identifiers before shipping"),
             "n/a — planned"
+        ),
+        cap(
+            "intel-event-system", "Unified intelligence event store with bounded retention",
+            CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "data/repository/IntelligenceRepository.kt",
+            emptyList(),
+            listOf(
+                "Room intelligence_events table fed by DNS blocks, scan journal records, VPN transitions, " +
+                    "battery threshold crossings, settings changes and WorkManager results",
+                "Per-type de-duplication cooldowns from IntelligenceDedupePolicy"
+            ),
+            listOf(
+                "Keeps at most 800 rows and 14 days; older evidence is deleted",
+                "Only security-relevant DNS blocks (malware/phishing categories) become events; routine ad/tracker " +
+                    "blocks stay as counters so the feed is not flooded",
+                "Events are only stored while the process is alive; Android cannot run this observer while the app is stopped"
+            ),
+            "IntelligenceMapTestSuite.testSanitizerRejectsEventWithoutEvidence and " +
+                "testRepositoryRoundtripPersistsSanitizedEvents"
+        ),
+        cap(
+            "intel-live-map", "Interactive live intelligence map with camera, nodes and event pulses",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/intelligence/IntelligenceMapScreen.kt",
+            emptyList(),
+            listOf(
+                "Real module snapshots from VPN runtime, preferences, scan journal, quarantine index and battery telemetry",
+                "Stored intelligence events for the event feed, timeline and map pulses"
+            ),
+            listOf(
+                "This is an internal system map, not a geographic or network-topology map",
+                "Pausing visual updates freezes the rendering only; DNS protection and scheduled jobs keep running",
+                "The pulse animation runs only while a real event is in flight; an idle map performs no frame work"
+            ),
+            "IntelligenceMapTestSuite.testGeometryPinchZoomKeepsFocalPointStable and " +
+                "testAggregatorBuildsOnlyFromRealInputs"
+        ),
+        cap(
+            "intel-event-sources", "Module services publish structured events to the map",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/intelligence/IntelligenceEventFactory.kt",
+            emptyList(),
+            listOf(
+                "Malware/phishing DNS blocks observed by AdShieldVpnService",
+                "Security scan journal records (APK, file, URL, installed-app audit)",
+                "Measured battery temperature/health thresholds",
+                "VPN state transitions and WorkManager job results"
+            ),
+            listOf(
+                "Payment-link attribution uses deterministic URL/finding tokens; it is classification, not reputation",
+                "A factory that cannot attach real evidence returns null, so nothing is written"
+            ),
+            "IntelligenceMapTestSuite.testFactoryNeverEmitsWithoutRealEvidence and " +
+                "testScanRecordRoutesToCyberFinancialAndPrivacy"
+        ),
+        cap(
+            "intel-map-performance", "Frame-safe map aggregation with a measured budget",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/intelligence/IntelligenceAggregator.kt",
+            emptyList(),
+            listOf(
+                "600 stored events, 8 nodes, active module/severity/range/query filters"
+            ),
+            listOf(
+                "The budget is measured on the CI JVM, not on a device; on-device frame timing still needs a manual check",
+                "The UI draws at most 8 nodes, 7 connectors, 7 markers and 12 concurrent pulses; pulses are pruned when expired"
+            ),
+            "IntelligenceMapTestSuite.testAggregatorPerformanceBudget"
         )
     )
 

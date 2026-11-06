@@ -199,6 +199,7 @@ dependencies {
 
     implementation(libs.okhttp)
     implementation(libs.androidx.webkit)
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
