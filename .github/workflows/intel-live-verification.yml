@@ -49,8 +49,10 @@ jobs:
             probe.log
           if-no-files-found: error
 
-      - name: Commit refreshed evidence (manual runs only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Commit refreshed evidence
+        # The Actions log/artifact endpoints are not reachable from every consumer of this
+        # repository, so the measurement is committed to the branch it ran on. `[skip ci]`
+        # stops the commit from retriggering the probe.
         continue-on-error: true
         run: |
           git config user.name "Intel verification"
