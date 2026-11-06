@@ -201,13 +201,11 @@ CloudPlatformTestSuite > uploadEngineReportsProgressAsBytesAreCommitted PASSED
 
 CloudPlatformTestSuite > cloudApiBuildsTheDocumentedPathsAndParsesRealResponses PASSED
 
-ConnectorPlatformTestSuite > testTextUrlFeedsRejectNonUrlsAndDeduplicate FAILED
-    com.adshield.pro.domain.connectors.FeedParseException at ConnectorPlatformTestSuite.kt:232
+ConnectorPlatformTestSuite > testTextUrlFeedsRejectNonUrlsAndDeduplicate PASSED
 
 ConnectorPlatformTestSuite > testEveryImplementedFeedIsHttpsAndHasMetadata PASSED
 
-ConnectorPlatformTestSuite > testSuccessfulSyncParsesAndCaps FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:327
+ConnectorPlatformTestSuite > testSuccessfulSyncParsesAndCaps PASSED
 
 ConnectorPlatformTestSuite > testEmergencyFeedParsers PASSED
 
@@ -231,18 +229,15 @@ ConnectorPlatformTestSuite > testParserRejectsEmptyAndUnknown PASSED
 
 ConnectorPlatformTestSuite > testCatalogueIdsAndEndpointsAreUnique PASSED
 
-ConnectorPlatformTestSuite > testOfflineTimeoutAndInvalidBody FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:372
+ConnectorPlatformTestSuite > testOfflineTimeoutAndInvalidBody PASSED
 
 ConnectorPlatformTestSuite > testOnlyDefaultEnabledFeedsAreScheduled PASSED
 
-ConnectorPlatformTestSuite > testDisabledAndNotConfiguredOverrideOldSuccess FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:467
+ConnectorPlatformTestSuite > testDisabledAndNotConfiguredOverrideOldSuccess PASSED
 
 ConnectorPlatformTestSuite > testDiagnosticFeedsValidateResponseAndProduceNoThreats PASSED
 
-ConnectorPlatformTestSuite > testCredentialRequiringConnectorsAreNotEnabledAndNotImplemented FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:86
+ConnectorPlatformTestSuite > testCredentialRequiringConnectorsAreNotEnabledAndNotImplemented PASSED
 
 ConnectorPlatformTestSuite > testDisabledAndKeyRequiredAreSkipped FAILED
     java.lang.AssertionError at ConnectorPlatformTestSuite.kt:412
@@ -251,15 +246,13 @@ ConnectorPlatformTestSuite > testCooldownSkipsNetworkEntirely PASSED
 
 ConnectorPlatformTestSuite > testValueNormalisationAndKindDetection PASSED
 
-ConnectorPlatformTestSuite > testRateLimitProviderErrorAndAuthFailures FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:354
+ConnectorPlatformTestSuite > testRateLimitProviderErrorAndAuthFailures PASSED
 
 ConnectorPlatformTestSuite > testDomainBlocklistsAndIpsum PASSED
 
 ConnectorPlatformTestSuite > testBackoffIsExponentialAndBounded PASSED
 
-ConnectorPlatformTestSuite > testNotModifiedIsSuccessWithoutIndicators FAILED
-    java.lang.AssertionError at ConnectorPlatformTestSuite.kt:342
+ConnectorPlatformTestSuite > testNotModifiedIsSuccessWithoutIndicators PASSED
 
 ConnectorPlatformTestSuite > testEveryModuleHasRealConnectorsAndHonestGaps PASSED
 
@@ -517,7 +510,7 @@ SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
 
 SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
 
-232 tests completed, 8 failed
+232 tests completed, 1 failed
 
 > Task :app:testDebugUnitTest FAILED
 
