@@ -322,7 +322,7 @@ private fun IndicatorCheckCard(
                     onValueChange = onInputChange,
                     modifier = Modifier.weight(1f),
                     singleLine = true,
-                    label = { Text("domain, URL, IP or SHA-256", fontSize = 9.sp) }
+                    label = { Text("domain, URL, IP, CVE or SHA-256", fontSize = 9.sp) }
                 )
                 Spacer(Modifier.width(6.dp))
                 OutlinedButton(onClick = onCheck, enabled = !checking) {
@@ -345,10 +345,64 @@ private fun IndicatorCheckCard(
                     Text("• $reason", color = Color(0xFF94A3B8), fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
-                    "Offline check against indicators cached on this device. Not a malware verdict.",
+                    "Local check against indicators cached on this device. Not a malware verdict.",
                     color = Color(0xFF5B7089),
                     fontSize = 7.sp
                 )
+                if (result.providers.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    val found = result.providers.count { it.error == null && it.found }
+                    Text(
+                        "LIVE PROVIDER ANSWERS · $found/${result.providers.size} FOUND",
+                        color = Color(0xFF7C93AF),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                    result.providers.take(8).forEach { finding: LookupFinding ->
+                        val state = when {
+                            finding.error != null -> "ERROR"
+                            finding.fromCache && finding.found -> "CACHED · MATCH"
+                            finding.fromCache -> "CACHED"
+                            finding.found -> "FOUND"
+                            else -> "NO MATCH"
+                        }
+                        val stateColor = when {
+                            finding.error != null -> WarningAmber
+                            finding.found -> AlertRed
+                            finding.fromCache -> CyberCyan
+                            else -> EmeraldPrimary
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                finding.provider,
+                                color = Color(0xFF94A3B8),
+                                fontSize = 8.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(state, color = stateColor, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            finding.error ?: finding.headline.ifBlank { "No detail returned" },
+                            color = Color(0xFF64748B),
+                            fontSize = 7.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    result.lookupNotes.take(3).forEach { note ->
+                        Text("• $note", color = Color(0xFF5B7089), fontSize = 7.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (result.offline) {
+                        Text(
+                            "Some providers were unreachable. Cached answers are labelled CACHED.",
+                            color = WarningAmber,
+                            fontSize = 7.sp
+                        )
+                    }
+                }
             }
         }
     }

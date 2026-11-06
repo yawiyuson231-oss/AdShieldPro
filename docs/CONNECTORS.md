@@ -10,9 +10,10 @@ yourself. The machine-generated, per-connector table lives in
 
 * A **connector** is one concrete way of getting real intelligence: either an HTTPS endpoint whose
   response the app parses locally, or an Android API the app calls on the device.
-* The registry currently contains **110 connectors, 103 of which are implemented**. 7 are declared
-  but not executable: 4 need provider credentials that are never bundled, 3 have no public machine
-  interface. Nothing is counted twice; the generator rejects duplicate endpoints.
+* The registry currently contains **178 connectors, 157 of which are implemented**. 21 are declared
+  but not executable: 13 need provider credentials that are never bundled, 6 have no public machine
+  interface, 2 are documented API shapes without a working free endpoint. Nothing is counted twice;
+  the generator rejects duplicate endpoints.
 * The brief asked for up to 350 integrations (~50 per module). **That number is not reached and it
   is not faked.** Padding with duplicate URLs, renamed endpoints, HTML scraping or invented APIs
   would make the product dishonest and fragile. The gap is reported per module in
@@ -36,11 +37,15 @@ yourself. The machine-generated, per-connector table lives in
 
 ```
 engine/connectors/
-  ConnectorCatalogue.kt   registry: 110 entries, each with the full metadata set
+  ConnectorCatalogue.kt   first-wave registry, each entry with the full metadata set
+  ConnectorExpansion.kt   second-wave registry (feeds, lookups, native probes), same rules
   ConnectorParsers.kt     pure parsers (JSON/CSV/text/RSS) -> ThreatIndicator list
   ConnectorHttp.kt        OkHttp transport: HTTPS only, size cap, timeouts, ETag/Last-Modified
   ConnectorSyncEngine.kt  one sync cycle: skip/cooldown/HTTP/parse -> SyncOutcome
-  NativeConnectorProbes.kt  ~80 on-device probes, each returning real observations
+  NativeConnectorProbes.kt  on-device probes, each returning real observations
+  NativeProbeExpansion.kt   second-wave probes (roles, admins, DRM, QR self-test, …)
+  IntelLookupEngine.kt      one on-demand lookup: validate -> request -> parse -> finding
+  LookupParsers.kt          pure parsers for lookup responses (RDAP, OSV, hashlookup, DoH, …)
   IndicatorRisk.kt        deterministic scoring + reasons ("why this alert")
 data/repository/ConnectorRepository.kt   state, cache, dedupe, per-module sync, IOC assessment
 data/local/db/ConnectorEntities.kt       Room v5: connector_state, threat_indicators
@@ -186,7 +191,7 @@ Release builds keep `isMinifyEnabled`/R8 configured; parsers avoid reflection an
 
 ## Known gaps (honest list)
 
-* 110/350 of the brief's target; the gap is genuine, not deferred padding.
+* 178/350 of the brief's target; the gap is genuine, not deferred padding.
 * Emergency coverage outside the US/EU feeds depends on GDACS/EMSC aggregation; Philippine official
   sources remain link-outs until they publish machine-readable feeds.
 * GitHub/NVD unauthenticated limits mean a 6 h cadence is the practical ceiling.

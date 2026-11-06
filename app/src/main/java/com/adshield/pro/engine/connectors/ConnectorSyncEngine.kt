@@ -36,7 +36,14 @@ class ConnectorSyncEngine(
             }
         }
 
-        val result = transport.get(spec, runtime.etag, runtime.lastModified)
+        // A spec that declares a body is a POST connector (abuse.ch APIs, OSV, OSS Index). Sending
+        // it as a GET would be a silent lie about what the provider answered.
+        val body = spec.requestBody
+        val result = if (body != null) {
+            transport.post(spec, body, spec.contentType, runtime.etag, runtime.lastModified)
+        } else {
+            transport.get(spec, runtime.etag, runtime.lastModified)
+        }
         return when (result) {
             is TransportResult.Failure -> SyncOutcome.Retryable(
                 httpCode = null,

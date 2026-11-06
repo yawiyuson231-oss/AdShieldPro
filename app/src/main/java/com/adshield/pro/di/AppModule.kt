@@ -6,6 +6,7 @@ import com.adshield.pro.data.local.db.AdShieldDao
 import com.adshield.pro.data.local.db.AdShieldDatabase
 import com.adshield.pro.data.local.db.ConnectorDao
 import com.adshield.pro.data.local.db.IntelligenceEventDao
+import com.adshield.pro.data.local.db.LookupCacheDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,7 +32,8 @@ object AppModule {
                 AdShieldDatabase.MIGRATION_1_2,
                 AdShieldDatabase.MIGRATION_2_3,
                 AdShieldDatabase.MIGRATION_3_4,
-                AdShieldDatabase.MIGRATION_4_5
+                AdShieldDatabase.MIGRATION_4_5,
+                AdShieldDatabase.MIGRATION_5_6
             )
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
@@ -66,4 +68,16 @@ object AppModule {
         transport: com.adshield.pro.engine.connectors.ConnectorTransport
     ): com.adshield.pro.engine.connectors.ConnectorSyncEngine =
         com.adshield.pro.engine.connectors.ConnectorSyncEngine(transport)
+
+    @Provides
+    @Singleton
+    fun provideLookupCacheDao(database: AdShieldDatabase): LookupCacheDao =
+        database.lookupCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideIntelLookupEngine(
+        transport: com.adshield.pro.engine.connectors.ConnectorTransport
+    ): com.adshield.pro.engine.connectors.IntelLookupEngine =
+        com.adshield.pro.engine.connectors.IntelLookupEngine(transport)
 }

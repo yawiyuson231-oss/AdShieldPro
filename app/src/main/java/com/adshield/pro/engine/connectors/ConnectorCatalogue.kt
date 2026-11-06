@@ -39,13 +39,16 @@ object ConnectorCatalogue {
         auth: ConnectorAuth = ConnectorAuth.NONE,
         defaultEnabled: Boolean = false,
         maxBytes: Int = 4_000_000,
-        implemented: Boolean = true
+        implemented: Boolean = true,
+        requestBody: String? = null,
+        contentType: String? = null
     ) = ConnectorSpec(
         id = id,
         name = name,
         module = module,
         provider = provider,
         endpoint = endpoint,
+        method = if (requestBody != null) "POST" else "GET",
         format = format,
         transport = ConnectorTransport.HTTP,
         auth = auth,
@@ -58,7 +61,9 @@ object ConnectorCatalogue {
         implemented = implemented,
         handlerId = handlerId,
         verification = verification,
-        docsUrl = endpoint
+        docsUrl = endpoint,
+        requestBody = requestBody,
+        contentType = contentType
     )
 
     private fun native(
@@ -102,20 +107,20 @@ object ConnectorCatalogue {
             module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (URLhaus)",
             endpoint = "https://urlhaus.abuse.ch/downloads/csv_recent/",
             format = ConnectorFormat.CSV, handlerId = "urlhaus-csv", cacheTtlMs = 6 * HOUR,
-            freeUse = "Public feed, no account for this download.",
-            restrictions = "abuse.ch feeds are for defensive/non-commercial use; the operator may rate-limit or change access.",
-            rateLimit = "No published numeric limit; honour Retry-After and cache for hours.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS, defaultEnabled = true
+            freeUse = "This public download is retired: it answered HTTP 410 Gone on 2026-11-06; abuse.ch now requires a free Auth-Key for its API.",
+            restrictions = "Kept in the catalogue so the health table shows the loss instead of hiding it. No key is bundled; the key-gated API form is listed separately.",
+            rateLimit = "n/a (endpoint retired).",
+            verification = VerificationClass.SOURCE_UNAVAILABLE, implemented = false
         ),
         feed(
             id = "cyber.urlhaus.text", name = "URLhaus recent URL list (plain)",
             module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (URLhaus)",
             endpoint = "https://urlhaus.abuse.ch/downloads/text_recent/",
             format = ConnectorFormat.TEXT, handlerId = "urlhaus-text", cacheTtlMs = 6 * HOUR,
-            freeUse = "Public plain-text list.",
-            restrictions = "Same abuse.ch terms as the CSV feed; a plain list carries no category metadata.",
-            rateLimit = "Cache for hours; conditional requests supported.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS
+            freeUse = "Retired public download (HTTP 410 Gone on 2026-11-06).",
+            restrictions = "Declared, not implemented, so the app never reports a false CONNECTED for a retired endpoint.",
+            rateLimit = "n/a (endpoint retired).",
+            verification = VerificationClass.SOURCE_UNAVAILABLE, implemented = false
         ),
         feed(
             id = "cyber.feodo.c2", name = "Feodo Tracker botnet C2 IPs",
@@ -165,36 +170,30 @@ object ConnectorCatalogue {
             rateLimit = "60 requests per hour per IP unauthenticated."
         ),
         feed(
-            id = "cyber.misp.special-use", name = "MISP warninglist: special-use domains",
-            module = IntelligenceModule.CYBER_DEFENSE, provider = "MISP project",
-            endpoint = "https://raw.githubusercontent.com/MISP/misp-warninglists/main/lists/special-use-domain/list.json",
-            format = ConnectorFormat.JSON, handlerId = "misp-list", cacheTtlMs = 7 * DAY,
-            freeUse = "Open-source warninglists on GitHub.",
-            restrictions = "This list marks reserved/special domains; it is used for suppression, never to accuse a domain.",
-            rateLimit = "Static raw.githubusercontent.com file.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS
-        ),
-        feed(
             id = "cyber.threatfox", name = "ThreatFox IOC feed",
             module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (ThreatFox)",
             endpoint = "https://threatfox-api.abuse.ch/api/v1/",
             format = ConnectorFormat.JSON, handlerId = "none", cacheTtlMs = 6 * HOUR,
-            freeUse = "Free account required by the provider for API access.",
-            restrictions = "Requires an Auth-Key that this build does not ship and does not ask for.",
+            freeUse = "Free account key required; the probe received HTTP 401 anonymously on 2026-11-06.",
+            restrictions = "Requires an Auth-Key that this build does not ship and does not ask for; stays NOT CONFIGURED.",
             rateLimit = "Per-account quota enforced by abuse.ch.",
             verification = VerificationClass.FREE_WITH_RESTRICTIONS,
-            auth = ConnectorAuth.REQUIRED_KEY, implemented = false
+            auth = ConnectorAuth.REQUIRED_KEY, implemented = false,
+            requestBody = "{\"query\":\"get_iocs\",\"days\":1}",
+            contentType = "application/json"
         ),
         feed(
             id = "cyber.malwarebazaar", name = "MalwareBazaar recent samples",
             module = IntelligenceModule.CYBER_DEFENSE, provider = "abuse.ch (MalwareBazaar)",
-            endpoint = "https://bazaar.abuse.ch/export/csv/recent/",
-            format = ConnectorFormat.CSV, handlerId = "none", cacheTtlMs = 6 * HOUR,
-            freeUse = "Export requires an Auth-Key from abuse.ch.",
+            endpoint = "https://mb-api.abuse.ch/api/v1/",
+            format = ConnectorFormat.JSON, handlerId = "none", cacheTtlMs = 6 * HOUR,
+            freeUse = "Free account key required; the public CSV export returned HTTP 410 and the API 401 on 2026-11-06.",
             restrictions = "No key is embedded in the APK; the connector stays NOT CONFIGURED.",
             rateLimit = "Governed by abuse.ch account policy.",
             verification = VerificationClass.FREE_WITH_RESTRICTIONS,
-            auth = ConnectorAuth.REQUIRED_KEY, implemented = false
+            auth = ConnectorAuth.REQUIRED_KEY, implemented = false,
+            requestBody = "query=get_recent&selector=50",
+            contentType = "application/x-www-form-urlencoded"
         ),
         native(
             id = "cyber.android.signing", name = "APK signature verification",
@@ -252,10 +251,10 @@ object ConnectorCatalogue {
             module = IntelligenceModule.FINANCIAL_DEFENSE, provider = "abuse.ch (URLhaus)",
             endpoint = "https://urlhaus.abuse.ch/downloads/csv_online/",
             format = ConnectorFormat.CSV, handlerId = "urlhaus-online-csv", cacheTtlMs = 6 * HOUR,
-            freeUse = "Public download.",
-            restrictions = "Defensive use; URLs are reported by third parties and can include compromised legitimate sites.",
-            rateLimit = "Cache for hours.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS, defaultEnabled = true
+            freeUse = "Retired public download (HTTP 410 Gone on 2026-11-06).",
+            restrictions = "Declared, not implemented. This feed held third-party reports and could include compromised legitimate sites.",
+            rateLimit = "n/a (endpoint retired).",
+            verification = VerificationClass.SOURCE_UNAVAILABLE, implemented = false
         ),
         feed(
             id = "fin.openphish", name = "OpenPhish community feed",
@@ -265,7 +264,7 @@ object ConnectorCatalogue {
             freeUse = "Community feed published by OpenPhish.",
             restrictions = "Community feed is time-limited and the operator restricts redistribution/commercial use; verify current terms before relying on it.",
             rateLimit = "Feed changes frequently; hourly caching is polite.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS
+            verification = VerificationClass.FREE_WITH_RESTRICTIONS, defaultEnabled = true
         ),
         feed(
             id = "fin.phishtank", name = "PhishTank verified phishing URLs",
@@ -631,15 +630,6 @@ object ConnectorCatalogue {
             verification = VerificationClass.FREE_WITH_RESTRICTIONS
         ),
         feed(
-            "emrg.reliefweb", "ReliefWeb disasters", IntelligenceModule.EMERGENCY_INTELLIGENCE,
-            "ReliefWeb (OCHA)", "https://api.reliefweb.int/v1/disasters?appname=omni-shield-x&limit=50&sort[]=date:desc",
-            ConnectorFormat.JSON, "reliefweb-disasters", 6 * HOUR,
-            freeUse = "Public API; appname parameter is required for identification only.",
-            restrictions = "Humanitarian context, not real-time evacuation orders.",
-            rateLimit = "ReliefWeb asks for modest rates; 6 h caching.",
-            verification = VerificationClass.FREE_WITH_RESTRICTIONS
-        ),
-        feed(
             "emrg.emsc", "EMSC/SeismicPortal earthquakes", IntelligenceModule.EMERGENCY_INTELLIGENCE,
             "EMSC", "https://www.seismicportal.eu/fdsnws/event/1/query?format=json&limit=50&orderby=time",
             ConnectorFormat.JSON, "seismicportal", 30 * 60L * 1_000L,
@@ -755,7 +745,8 @@ object ConnectorCatalogue {
     // ------------------------------------------------------------------ assembly
 
     val all: List<ConnectorSpec> by lazy {
-        (cyber() + financial() + privacy() + network() + device() + emergency() + automation())
+        (cyber() + financial() + privacy() + network() + device() + emergency() + automation() +
+            ConnectorExpansion.all)
             .distinctBy { it.id }
     }
 

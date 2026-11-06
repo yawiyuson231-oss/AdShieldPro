@@ -22,6 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOGUE = ROOT / "app/src/main/java/com/adshield/pro/engine/connectors/ConnectorCatalogue.kt"
+EXPANSION = ROOT / "app/src/main/java/com/adshield/pro/engine/connectors/ConnectorExpansion.kt"
 OUT = ROOT / "docs/CONNECTOR_VERIFICATION.md"
 
 MODULES = [
@@ -79,6 +80,139 @@ def enum_field(block: str, name: str, enum: str) -> str | None:
         return match.group(1)
     match = re.search(rf"{enum}\.(\w+)", block)
     return match.group(1) if match else None
+
+
+def split_args(block: str) -> list[str]:
+    """Splits a call's argument list on top-level commas (strings and nesting respected)."""
+    args: list[str] = []
+    depth = 0
+    in_string = False
+    current: list[str] = []
+    i = 0
+    while i < len(block):
+        ch = block[i]
+        if in_string:
+            current.append(ch)
+            if ch == "\\":
+                if i + 1 < len(block):
+                    current.append(block[i + 1])
+                    i += 2
+                    continue
+            elif ch == '"':
+                in_string = False
+        else:
+            if ch == '"':
+                in_string = True
+                current.append(ch)
+            elif ch in "([{":
+                depth += 1
+                current.append(ch)
+            elif ch in ")]}":
+                depth -= 1
+                current.append(ch)
+            elif ch == "," and depth == 0:
+                args.append("".join(current).strip())
+                current = []
+            else:
+                current.append(ch)
+        i += 1
+    tail = "".join(current).strip()
+    if tail:
+        args.append(tail)
+    return args
+
+
+def _literal(value: str | None, default: str = "") -> str:
+    if not value:
+        return default
+    value = value.strip()
+    match = re.fullmatch(r'"((?:[^"\\]|\\.)*)"', value)
+    if match:
+        return match.group(1).replace('\\"', '"')
+    return value
+
+
+EXPANSION_SIGNATURES = {
+    "feed": (
+        ["id", "name", "module", "provider", "endpoint", "format", "handlerId", "cacheTtlMs",
+         "freeUse", "restrictions", "rateLimit", "verification", "auth", "defaultEnabled",
+         "maxBytes", "implemented", "requestBody", "contentType"],
+        "feed",
+    ),
+    "lookup": (
+        ["id", "name", "module", "provider", "endpoint", "field", "handlerId", "cacheTtlMs",
+         "freeUse", "restrictions", "rateLimit", "verification", "auth", "implemented",
+         "requestBody", "contentType"],
+        "lookup",
+    ),
+    "native": (
+        ["id", "name", "module", "provider", "api", "probeId", "freeUse", "restrictions",
+         "auth", "verification", "implemented", "cacheTtlMs"],
+        "native",
+    ),
+}
+
+
+def parse_expansion(source: str) -> list[dict]:
+    entries: list[dict] = []
+    for helper, (params, kind) in EXPANSION_SIGNATURES.items():
+        for block in split_calls(source, helper):
+            # Skip the helper's own parameter list (`id: String, name: String, ...`).
+            if re.search(r"\bid\s*:", block):
+                continue
+            values: dict[str, str] = {}
+            positional: list[str] = []
+            for arg in split_args(block):
+                named = re.match(r"([A-Za-z_]\w*)\s*=\s*(.+)$", arg, re.S)
+                if named and named.group(1) in params:
+                    values[named.group(1)] = named.group(2).strip()
+                else:
+                    positional.append(arg)
+            for index, arg in enumerate(positional):
+                if index < len(params):
+                    values.setdefault(params[index], arg)
+            entry_id = _literal(values.get("id"))
+            if not entry_id:
+                continue
+            module = _literal(values.get("module"), "IntelligenceModule.CYBER_DEFENSE")
+            module = module.split(".")[-1]
+            auth = _literal(values.get("auth"), "ConnectorAuth.NONE").split(".")[-1]
+            default_verification = (
+                "IMPLEMENTED_NOT_FULLY_VERIFIED" if kind == "native" else "IMPLEMENTED_AND_TESTED"
+            )
+            verification = _literal(values.get("verification"), default_verification).split(".")[-1]
+            implemented_expr = values.get("implemented", "true")
+            implemented = "false" not in implemented_expr
+            if auth == "REQUIRED_KEY":
+                implemented = False
+            endpoint = _literal(values.get("api" if kind == "native" else "endpoint"))
+            if kind == "native":
+                transport = "Android API"
+                method = "CALL"
+                handler = _literal(values.get("probeId"))
+            else:
+                transport = "HTTPS lookup (on demand)" if kind == "lookup" else "HTTPS feed"
+                body = values.get("requestBody")
+                method = "POST" if body and body.strip() not in {"null", '""'} else "GET"
+                handler = _literal(values.get("handlerId"))
+            entries.append({
+                "id": entry_id,
+                "name": _literal(values.get("name"), entry_id),
+                "module": module,
+                "provider": _literal(values.get("provider")),
+                "endpoint": endpoint,
+                "handler": handler,
+                "transport": transport,
+                "method": method,
+                "auth": auth,
+                "verification": verification,
+                "implemented": implemented,
+                "defaultEnabled": "true" in values.get("defaultEnabled", ""),
+                "requiresCredentials": auth in {"REQUIRED_KEY", "USER_AUTHORIZATION"},
+                "kind": "native" if kind == "native" else "feed",
+                "queryField": _literal(values.get("field")).split(".")[-1] if kind == "lookup" else "",
+            })
+    return entries
 
 
 def parse_entry(block: str, kind: str) -> dict:
@@ -165,6 +299,8 @@ def load() -> list[dict]:
     native_blocks = [b for b in split_calls(source, "native") if not re.search(r"\bprobeId\s*:", b)]
     entries = [parse_entry(b, "feed") for b in feed_blocks]
     entries += [parse_entry(b, "native") for b in native_blocks]
+    if EXPANSION.is_file():
+        entries += parse_expansion(EXPANSION.read_text())
     seen = set()
     unique = []
     for entry in entries:
@@ -183,7 +319,7 @@ def render(entries: list[dict]) -> str:
     lines.append("")
     lines.append(
         "> Generated by `tools/generate_connector_report.py` from "
-        "`app/src/main/java/com/adshield/pro/engine/connectors/ConnectorCatalogue.kt`. "
+        "`ConnectorCatalogue.kt` and `ConnectorExpansion.kt`. "
         "Do not edit by hand — CI fails when this file is stale."
     )
     lines.append("")

@@ -47,6 +47,12 @@ object IndicatorRisk {
         IndicatorKind.MALWARE_FAMILY -> 34
         IndicatorKind.CVE -> 22
         IndicatorKind.ALERT -> 10
+        // A matching TLS certificate or JA3 fingerprint is only useful when it was observed on
+        // this device's own traffic; the Ethernet/TLS layer does not expose that here, so these
+        // kinds stay informational and are weighted below a direct URL/IP match.
+        IndicatorKind.CERT_SHA1 -> 26
+        IndicatorKind.JA3 -> 24
+        IndicatorKind.IP_CIDR -> 34
     }
 
     /**
@@ -93,6 +99,30 @@ object IndicatorRisk {
 
     /** Canonical form used for lookups so `HTTPS://Example.com/x` and `https://example.com/x` agree. */
     fun normalise(raw: String): String = raw.trim().lowercase(Locale.US).trimEnd('.')
+
+    /** True when [ip] is inside [cidr] (IPv4 only, matching the indicator model). */
+    fun ipInCidr(ip: String, cidr: String): Boolean {
+        val address = ipv4ToLong(ip) ?: return false
+        val parts = cidr.split('/')
+        if (parts.size != 2) return false
+        val base = ipv4ToLong(parts[0]) ?: return false
+        val bits = parts[1].toIntOrNull()?.takeIf { it in 0..32 } ?: return false
+        if (bits == 0) return true
+        val mask = (0xFFFFFFFFL shl (32 - bits)) and 0xFFFFFFFFL
+        return (address and mask) == (base and mask)
+    }
+
+    private fun ipv4ToLong(value: String): Long? {
+        val octets = value.split('.')
+        if (octets.size != 4) return null
+        var result = 0L
+        octets.forEach { part ->
+            val number = part.toIntOrNull() ?: return null
+            if (number !in 0..255) return null
+            result = (result shl 8) or number.toLong()
+        }
+        return result and 0xFFFFFFFFL
+    }
 
     fun kindForValue(raw: String): IndicatorKind? {
         val value = normalise(raw)

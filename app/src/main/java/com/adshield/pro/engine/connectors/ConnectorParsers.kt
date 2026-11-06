@@ -39,6 +39,10 @@ object ConnectorParsers {
     private val hashRegex = Regex("^[a-f0-9]{64}$")
     private val ipv4Regex = Regex("^(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$")
     private val cveRegex = Regex("^CVE-\\d{4}-\\d{4,7}$", RegexOption.IGNORE_CASE)
+    private val CVE_REGEX = Regex("CVE-\\d{4}-\\d{4,7}", RegexOption.IGNORE_CASE)
+    private val CIDR_REGEX = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}/\\d{1,2}$")
+    private val JA3_REGEX = Regex("^[a-f0-9]{32}$")
+    private val SHA1_REGEX = Regex("^[a-f0-9]{40}$")
 
     fun parse(parserId: String, spec: ConnectorSpec, payload: String, fetchedAt: Long): ParsedFeed {
         if (payload.isBlank()) throw FeedParseException("empty response body")
@@ -52,8 +56,17 @@ object ConnectorParsers {
             "nvd-cves" -> parseNvd(spec, payload, fetchedAt, ttl)
             "github-advisories" -> parseGithubAdvisories(spec, payload, fetchedAt, ttl)
             "misp-list" -> parseMispList(spec, payload, fetchedAt, ttl)
-            "stevenblack-hosts", "phishing-domains" -> parseDomainLines(spec, payload, fetchedAt, ttl)
+            "stevenblack-hosts", "phishing-domains", "adblock-domain-list" ->
+                parseDomainLines(spec, payload, fetchedAt, ttl)
+            "json-domain-array" -> parseJsonDomainArray(spec, payload, fetchedAt, ttl)
             "ipsum" -> parseIpsum(spec, payload, fetchedAt, ttl)
+            "ip-list" -> parseIpList(spec, payload, fetchedAt, ttl)
+            "sslbl-ja3" -> parseSslblJa3(spec, payload, fetchedAt, ttl)
+            "sslbl-cert" -> parseSslblCert(spec, payload, fetchedAt, ttl)
+            "exploitdb-csv" -> parseExploitDb(spec, payload, fetchedAt, ttl)
+            "gdacs-api" -> parseGdacsApi(spec, payload, fetchedAt, ttl)
+            "eonet" -> parseEonet(spec, payload, fetchedAt, ttl)
+            "open-meteo-context" -> parseOpenMeteoContext(spec, payload, fetchedAt, ttl)
             "usgs-quakes" -> parseUsgs(spec, payload, fetchedAt, ttl)
             "gdacs-rss" -> parseGdacs(spec, payload, fetchedAt, ttl)
             "nws-alerts" -> parseNws(spec, payload, fetchedAt, ttl)
@@ -232,6 +245,13 @@ object ConnectorParsers {
 
     // ------------------------------------------------------------------ MISP warninglists
 
+    /**
+     * Real MISP warninglist schema: `{"name":..., "type":"hostname|string|cidr|...",
+     * "list":["value", ...]}`. Older copies also expose `values` objects, so both are accepted.
+     *
+     * These lists exist to *suppress* false positives. The repository stores them with confidence
+     * 0 so they can only ever remove risk, never add it.
+     */
     private fun parseMispList(
         spec: ConnectorSpec,
         payload: String,
@@ -239,21 +259,37 @@ object ConnectorParsers {
         ttl: Long
     ): List<ThreatIndicator> {
         val root = jsonObjectOf(payload)
-        val values = root["values"]?.jsonArray ?: throw FeedParseException("MISP list has no values array")
-        val listName = sanitizeShort(root["name"]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }.orEmpty(), 48)
-        return values.mapNotNull { element ->
-            val item = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
-            val raw = item.string("value")?.trim()?.lowercase(Locale.US) ?: return@mapNotNull null
+        val listName = sanitizeShort(root.string("name").orEmpty(), 48)
+        val entries = mutableListOf<String>()
+        root["list"]?.let { element ->
+            runCatching {
+                element.jsonArray.forEach { item ->
+                    runCatching { item.jsonPrimitive.contentOrNull }.getOrNull()
+                        ?.let { entries += it }
+                }
+            }
+        }
+        root["values"]?.let { element ->
+            runCatching {
+                element.jsonArray.forEach { item ->
+                    runCatching { item.jsonObject.string("value") }.getOrNull()?.let { entries += it }
+                }
+            }
+        }
+        if (entries.isEmpty()) throw FeedParseException("MISP warninglist has no list values")
+        return entries.mapNotNull { raw ->
+            val value = raw.trim().trimStart('.').removePrefix("*.").lowercase(Locale.US)
+            if (value.isBlank()) return@mapNotNull null
             val kind = when {
-                ipv4Regex.matches(raw) -> IndicatorKind.IP
-                hashRegex.matches(raw) -> IndicatorKind.HASH_SHA256
-                domainRegex.matches(raw) -> IndicatorKind.DOMAIN
+                ipv4Regex.matches(value) -> IndicatorKind.IP
+                CIDR_REGEX.matches(value) -> IndicatorKind.IP_CIDR
+                hashRegex.matches(value) -> IndicatorKind.HASH_SHA256
+                domainRegex.matches(value) -> IndicatorKind.DOMAIN
                 else -> return@mapNotNull null
             }
-            val description = sanitizeShort(item.string("description").orEmpty(), 48)
             indicator(
-                spec, kind, raw,
-                description.ifBlank { listName.ifBlank { "MISP warninglist" } },
+                spec, kind, value,
+                listName.ifBlank { "MISP warninglist (false-positive suppression)" },
                 60, fetchedAt, ttl
             )
         }
@@ -274,7 +310,12 @@ object ConnectorParsers {
             val candidate = trimmed
                 .removePrefix("0.0.0.0 ")
                 .removePrefix("127.0.0.1 ")
+                .removePrefix(":: ")
+                .removePrefix("||")
+                .removeSuffix("^")
+                .substringBefore('#')
                 .substringBefore(' ')
+                .trimStart('.')
                 .trim()
             if (!domainRegex.matches(candidate)) return@forEach
             if (candidate == "localhost" || candidate.endsWith(".local")) return@forEach
@@ -436,6 +477,216 @@ object ConnectorParsers {
                 minOf(ttl, 24L * 60L * 60L * 1_000L)
             )
         }
+    }
+
+    // ------------------------------------------------------------------ generic IP / CIDR lists
+
+    /**
+     * Plain-text IP / CIDR feeds (IPsum, FireHOL, Emerging Threats, CINS, blocklist.de, Tor).
+     * Comments are stripped. A CIDR entry is stored as IP_CIDR and matched by prefix, because
+     * collapsing a /12 to one address would silently miss almost the whole range.
+     */
+    private fun parseIpList(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val (label, baseConfidence) = ipListPolicy(spec)
+        val out = mutableListOf<ThreatIndicator>()
+        payload.lineSequence().forEach { line ->
+            val withoutComment = line.trim().substringBefore('#').substringBefore(';').trim()
+            if (withoutComment.isNotEmpty()) {
+                withoutComment.split(',', ' ', '\t').forEach tokenLoop@{ tokenRaw ->
+                    val token = tokenRaw.trim()
+                    if (token.isEmpty()) return@tokenLoop
+                    when {
+                        ipv4Regex.matches(token) ->
+                            out += indicator(spec, IndicatorKind.IP, token, label, baseConfidence, fetchedAt, ttl)
+                        CIDR_REGEX.matches(token) ->
+                            out += indicator(spec, IndicatorKind.IP_CIDR, token, label, baseConfidence, fetchedAt, ttl)
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    private fun ipListPolicy(spec: ConnectorSpec): Pair<String, Int> = when {
+        spec.id.contains("tor") -> "Tor exit node (anonymising proxy, not malware)" to 30
+        spec.id.contains("spamhaus") -> "Spamhaus DROP network" to 72
+        spec.id.contains("firehol") -> "FireHOL level-1 blocked network" to 68
+        spec.id.contains("blocklistde") -> "reported brute-flow attacker" to 66
+        spec.id.contains("et.") -> "compromised host (Emerging Threats)" to 74
+        spec.id.contains("cins") -> "low-reputation IP (CINS)" to 68
+        spec.id.contains("ipsum") -> "aggregated blocklist IP (IPsum)" to 60
+        spec.id.contains("sslbl") -> "SSLBL malicious TLS endpoint" to 78
+        else -> "reported malicious IP" to 60
+    }
+
+    // ------------------------------------------------------------------ SSLBL fingerprints
+
+    /** SSLBL JA3 CSV: one 32-hex client fingerprint per row plus a reason column. */
+    private fun parseSslblJa3(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val out = mutableListOf<ThreatIndicator>()
+        csvLines(payload).forEach { row ->
+            val ja3 = row.firstOrNull { JA3_REGEX.matches(it.lowercase(Locale.US)) } ?: return@forEach
+            val reason = sanitizeShort(row.lastOrNull().orEmpty(), 64)
+            out += indicator(
+                spec, IndicatorKind.JA3, ja3.lowercase(Locale.US),
+                reason.ifBlank { "malicious TLS client fingerprint" }, 70, fetchedAt, ttl
+            )
+        }
+        return out
+    }
+
+    /** SSLBL certificate CSV: a 40-hex SHA-1 of a certificate used by malware infrastructure. */
+    private fun parseSslblCert(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val out = mutableListOf<ThreatIndicator>()
+        csvLines(payload).forEach { row ->
+            val sha1 = row.firstOrNull { SHA1_REGEX.matches(it.lowercase(Locale.US)) } ?: return@forEach
+            val reason = sanitizeShort(row.lastOrNull().orEmpty(), 64)
+            out += indicator(
+                spec, IndicatorKind.CERT_SHA1, sha1.lowercase(Locale.US),
+                reason.ifBlank { "malicious TLS certificate" }, 72, fetchedAt, ttl
+            )
+        }
+        return out
+    }
+
+    // ------------------------------------------------------------------ Exploit-DB
+
+    /** Exploit-DB CSV: extracts every CVE an exploit maps to. No executable content is stored. */
+    private fun parseExploitDb(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val out = mutableListOf<ThreatIndicator>()
+        csvLines(payload).forEach { row ->
+            val codes = row.getOrNull(11).orEmpty()
+            val description = sanitizeShort(row.getOrNull(2).orEmpty(), 60)
+            CVE_REGEX.findAll(codes).forEach { match ->
+                out += indicator(
+                    spec, IndicatorKind.CVE, match.value.uppercase(Locale.US),
+                    "public exploit available: $description", 82, fetchedAt, ttl
+                )
+            }
+        }
+        return out
+    }
+
+    // ------------------------------------------------------------------ JSON domain arrays
+
+    private fun parseJsonDomainArray(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val array = runCatching { json.parseToJsonElement(payload).jsonArray }.getOrNull()
+            ?: throw FeedParseException("response is not a JSON array of domains")
+        return array.mapNotNull { element ->
+            val raw = runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
+                ?.trim()?.lowercase(Locale.US)?.removePrefix("*.")?.removePrefix(".")
+                ?: return@mapNotNull null
+            if (!domainRegex.matches(raw)) return@mapNotNull null
+            indicator(spec, IndicatorKind.DOMAIN, raw, "reported scam/phishing domain", 70, fetchedAt, ttl)
+        }
+    }
+
+    // ------------------------------------------------------------------ GDACS JSON API
+
+    private fun parseGdacsApi(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val root = jsonObjectOf(payload)
+        val features = root["features"]?.jsonArray ?: throw FeedParseException("GDACS API has no features")
+        return features.mapNotNull { element ->
+            val properties = runCatching { element.jsonObject["properties"]?.jsonObject }.getOrNull()
+                ?: return@mapNotNull null
+            val id = properties.string("eventid") ?: properties.string("episodeid") ?: return@mapNotNull null
+            val type = properties.string("eventtype").orEmpty()
+            val name = sanitizeShort(properties.string("name").orEmpty(), 60)
+            val alert = properties.string("alertlevel").orEmpty()
+            val country = properties.string("country").orEmpty()
+            val label = listOf(type, alert, name, country).filter { it.isNotBlank() }.joinToString(" · ")
+            indicator(spec, IndicatorKind.ALERT, "gdacs:$type:$id", label, 85, fetchedAt, ttl)
+        }
+    }
+
+    // ------------------------------------------------------------------ NASA EONET
+
+    private fun parseEonet(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val root = jsonObjectOf(payload)
+        val events = root["events"]?.jsonArray ?: throw FeedParseException("EONET response has no events")
+        return events.mapNotNull { element ->
+            val item = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val id = item.string("id") ?: return@mapNotNull null
+            val title = sanitizeShort(item.string("title").orEmpty(), 70)
+            val category = runCatching {
+                item["categories"]?.jsonArray?.firstOrNull()?.jsonObject?.string("title")
+            }.getOrNull().orEmpty()
+            indicator(
+                spec, IndicatorKind.ALERT, "eonet:$id",
+                listOf(category, title).filter { it.isNotBlank() }.joinToString(" · "),
+                70, fetchedAt, ttl
+            )
+        }
+    }
+
+    // ------------------------------------------------------------------ Open-Meteo context
+
+    /**
+     * Weather/flood/air-quality context. This is explicitly *not* an official warning: the parser
+     * labels it as a forecast and the app never turns it into an emergency alert.
+     */
+    private fun parseOpenMeteoContext(
+        spec: ConnectorSpec,
+        payload: String,
+        fetchedAt: Long,
+        ttl: Long
+    ): List<ThreatIndicator> {
+        val root = jsonObjectOf(payload)
+        val current = runCatching { root["current"]?.jsonObject }.getOrNull()
+        val daily = runCatching { root["daily"]?.jsonObject }.getOrNull()
+        val evidence = when {
+            current != null -> current.entries.take(6).joinToString(" · ") { (key, value) ->
+                "$key=${runCatching { value.jsonPrimitive.contentOrNull }.getOrNull() ?: "?"}"
+            }
+            daily != null -> {
+                val discharge = runCatching { daily["river_discharge"]?.jsonArray }.getOrNull()
+                val peak = discharge?.mapNotNull { runCatching { it.jsonPrimitive.doubleOrNull }.getOrNull() }?.maxOrNull()
+                "river discharge forecast peak=${peak ?: "unavailable"} m³/s"
+            }
+            else -> throw FeedParseException("Open-Meteo response has neither current nor daily data")
+        }
+        return listOf(
+            indicator(
+                spec, IndicatorKind.ALERT, "forecast:${spec.id}",
+                "Forecast context (not an official warning): $evidence",
+                25, fetchedAt, ttl
+            )
+        )
     }
 
     // ------------------------------------------------------------------ Diagnostics (no indicators)

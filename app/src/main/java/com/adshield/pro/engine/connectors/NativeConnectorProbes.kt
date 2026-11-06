@@ -62,7 +62,8 @@ class NativeConnectorProbes @Inject constructor(
     @ApplicationContext private val context: Context,
     private val connectorDao: ConnectorDao,
     private val eventDao: IntelligenceEventDao,
-    private val batteryRepository: BatteryIntelligenceRepository
+    private val batteryRepository: BatteryIntelligenceRepository,
+    private val expansion: NativeProbeExpansion
 ) {
 
     suspend fun run(probeId: String): ProbeResult = withContext(Dispatchers.IO) {
@@ -172,6 +173,37 @@ class NativeConnectorProbes @Inject constructor(
                     "Retry limits and recovery state machine",
                     listOf("max backoff" to "${ConnectorSyncEngine.MAX_BACKOFF_MS / 3_600_000}h", "attempts" to "bounded")
                 )
+                // --- second-wave probes (see NativeProbeExpansion) ---
+                "probe.fin-heuristics" -> expansion.finHeuristics()
+                "probe.typosquat" -> expansion.typosquat()
+                "probe.idn" -> expansion.idn()
+                "probe.brand" -> expansion.brand()
+                "probe.redirect" -> expansion.redirect()
+                "probe.qr" -> expansion.qrPayload()
+                "probe.qr-image" -> expansion.qrImage()
+                "probe.installer-provenance" -> expansion.installerProvenance()
+                "probe.app-flags" -> expansion.appFlags()
+                "probe.input-methods" -> expansion.inputMethods()
+                "probe.role-holders" -> expansion.roleHolders()
+                "probe.device-admin" -> expansion.deviceAdmin()
+                "probe.work-profile" -> expansion.workProfile()
+                "probe.vpn-state" -> expansion.vpnState()
+                "probe.private-dns" -> expansion.privateDns()
+                "probe.traffic-stats" -> expansion.trafficStats()
+                "probe.wifi-security" -> expansion.wifiSecurity()
+                "probe.mediadrm" -> expansion.mediaDrm()
+                "probe.gles" -> expansion.gles()
+                "probe.storage-volumes" -> expansion.storageVolumes()
+                "probe.camera-inventory" -> expansion.cameraInventory()
+                "probe.battery-energy" -> expansion.batteryEnergy()
+                "probe.timezone-locale" -> expansion.timezoneLocale()
+                "probe.jobscheduler" -> expansion.jobScheduler()
+                "probe.content-observer" -> expansion.contentObserver()
+                "probe.file-observer" -> expansion.fileObserver()
+                "probe.battery-optimization" -> expansion.batteryOptimization()
+                "probe.notification-channel" -> expansion.notificationChannel()
+                "probe.exact-alarms" -> expansion.exactAlarms()
+                "probe.datastore" -> expansion.dataStore()
                 else -> ProbeResult(false, ConnectorStatus.NOT_IMPLEMENTED, "no such probe: $probeId")
             }
         } catch (security: SecurityException) {

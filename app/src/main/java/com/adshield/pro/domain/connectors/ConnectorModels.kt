@@ -29,6 +29,37 @@ enum class ConnectorAuth {
 
 enum class ConnectorFormat { CSV, TEXT, JSON, RSS, ANDROID_API }
 
+/**
+ * Input a lookup connector accepts. A lookup is not a feed: it runs only when the user (or the
+ * scanner) supplies a value, so it never spends background data on its own.
+ */
+enum class LookupField(val label: String) {
+    HASH_SHA256("SHA-256 hash"),
+    DOMAIN("Domain"),
+    IP("IP address"),
+    CVE("CVE identifier"),
+    URL("URL"),
+    PACKAGE("Package coordinate");
+
+    companion object {
+        /** Best-effort field detection for a typed value; null means "not a supported IOC". */
+        fun detect(raw: String): LookupField? {
+            val value = raw.trim()
+            if (value.isEmpty()) return null
+            val lowered = value.lowercase()
+            return when {
+                Regex("^[a-f0-9]{64}$").matches(lowered) -> HASH_SHA256
+                Regex("^CVE-\\d{4}-\\d{4,7}$", RegexOption.IGNORE_CASE).matches(value) -> CVE
+                lowered.startsWith("http://") || lowered.startsWith("https://") -> URL
+                Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$").matches(lowered) -> IP
+                lowered.contains(':') && lowered.contains('@') -> PACKAGE
+                lowered.contains('.') -> DOMAIN
+                else -> null
+            }
+        }
+    }
+}
+
 /** Presentation status. `CONNECTED` is only ever set after a real, valid, successful operation. */
 enum class ConnectorStatus {
     CONNECTED,
@@ -84,6 +115,7 @@ data class ConnectorSpec(
     val freeUse: String,
     val restrictions: String,
     val rateLimit: String,
+    val cachePolicy: String = "",
     val cacheTtlMs: Long,
     val timeoutMs: Int = 15_000,
     val maxBytes: Int = 4_000_000,
@@ -93,9 +125,20 @@ data class ConnectorSpec(
     val handlerId: String,
     val verification: VerificationClass,
     /** Stable reference for evidence/attribution, e.g. the feed home page. */
-    val docsUrl: String = ""
+    val docsUrl: String = "",
+    /** Non-null when this is an on-demand lookup rather than a scheduled feed. */
+    val queryField: LookupField? = null,
+    /** Request body template for POST feeds/lookups; `{value}` is substituted for lookups. */
+    val requestBody: String? = null,
+    /** Content type for [requestBody]; ignored for GET. */
+    val contentType: String? = null,
+    /** Immediate retry budget for transient transport failures (idempotent requests only). */
+    val maxRetries: Int = 2,
+    /** Seconds a provider's Retry-After may block this connector, capped defensively. */
+    val maxRetryAfterSeconds: Long = 3_600L
 ) {
     val isFeed: Boolean get() = transport == ConnectorTransport.HTTP
+    val isLookup: Boolean get() = isFeed && queryField != null
     val requiresKey: Boolean get() = auth == ConnectorAuth.REQUIRED_KEY
 }
 
@@ -193,7 +236,13 @@ enum class IndicatorKind {
     IP,
     CVE,
     MALWARE_FAMILY,
-    ALERT
+    ALERT,
+    /** SHA-1 of a TLS certificate seen in malware C2 infrastructure (SSLBL). */
+    CERT_SHA1,
+    /** JA3 TLS client fingerprint (SSLBL). */
+    JA3,
+    /** IPv4 network in CIDR form (FireHOL, Spamhaus DROP). Matched by containment. */
+    IP_CIDR
 }
 
 /**
@@ -271,3 +320,56 @@ data class ConnectorModuleSummary(
     val notConfigured: Int,
     val lastSuccessEpochMs: Long?
 )
+
+
+/**
+ * One on-demand intelligence query. `value` is validated and canonicalised before any request is
+ * made; nothing is fetched for a malformed value.
+ */
+data class LookupQuery(
+    val field: LookupField,
+    val value: String
+)
+
+/** One labelled fact returned by a lookup connector, shown verbatim in the evidence sheet. */
+data class LookupEvidence(
+    val label: String,
+    val value: String
+)
+
+/**
+ * A single connector's answer about a query.
+ *
+ * [found] means the provider returned a record for the value. It is deliberately not the same as
+ * "malicious": an OSV record means a vulnerable package version exists, while a CIRCL hit means
+ * the file is publicly known. [riskScore] is produced by local deterministic rules, never by the
+ * provider, and [attribution] always names the source so nothing is presented anonymously.
+ */
+data class LookupFinding(
+    val connectorId: String,
+    val connectorName: String,
+    val provider: String,
+    val module: IntelligenceModule,
+    val query: LookupQuery,
+    val found: Boolean,
+    val riskScore: Int,
+    val headline: String,
+    val evidence: List<LookupEvidence>,
+    val attribution: String,
+    val fetchedAtEpochMs: Long,
+    val fromCache: Boolean = false,
+    val httpCode: Int? = null,
+    val limitation: String? = null,
+    val error: String? = null
+)
+
+/** Result of running every applicable lookup connector for one value. */
+data class LookupReport(
+    val query: LookupQuery,
+    val findings: List<LookupFinding>,
+    val offline: Boolean,
+    val notes: List<String>
+) {
+    val anyFound: Boolean get() = findings.any { it.found }
+    val maxRisk: Int get() = findings.maxOfOrNull { it.riskScore } ?: 0
+}

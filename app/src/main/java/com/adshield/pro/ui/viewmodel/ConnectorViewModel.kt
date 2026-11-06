@@ -141,13 +141,19 @@ class ConnectorViewModel @Inject constructor(
         viewModelScope.launch {
             checking.value = true
             val assessment = repository.assess(value)
+            // Live lookups are attempted only on this explicit user action. Each provider is
+            // independently allowed to fail; failures stay visible instead of being hidden.
+            val report = runCatching { repository.lookup(value) }.getOrNull()
             checking.value = false
             check.value = IndicatorCheckResult(
                 value = value,
                 verdict = assessment.verdict.label,
                 score = assessment.score,
                 reasons = assessment.reasons,
-                checkedAtEpochMs = System.currentTimeMillis()
+                checkedAtEpochMs = System.currentTimeMillis(),
+                providers = report?.findings.orEmpty(),
+                lookupNotes = report?.notes.orEmpty(),
+                offline = report?.offline == true
             )
             message.value = null
         }

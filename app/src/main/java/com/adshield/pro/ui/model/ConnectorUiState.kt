@@ -1,6 +1,7 @@
 package com.adshield.pro.ui.model
 
 import com.adshield.pro.domain.connectors.ConnectorSnapshot
+import com.adshield.pro.domain.connectors.LookupFinding
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 
 /** A user-initiated check of a domain/URL/IP/hash against the cached intelligence index. */
@@ -9,7 +10,11 @@ data class IndicatorCheckResult(
     val verdict: String,
     val score: Int,
     val reasons: List<String>,
-    val checkedAtEpochMs: Long
+    val checkedAtEpochMs: Long,
+    /** Live per-provider answers from key-free lookup connectors; empty until a check runs. */
+    val providers: List<LookupFinding> = emptyList(),
+    val lookupNotes: List<String> = emptyList(),
+    val offline: Boolean = false
 )
 
 data class ConnectorUiState(

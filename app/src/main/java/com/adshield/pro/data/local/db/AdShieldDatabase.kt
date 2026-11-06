@@ -16,9 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DirectDownloadEntity::class,
         IntelligenceEventEntity::class,
         ConnectorStateEntity::class,
-        ThreatIndicatorEntity::class
+        ThreatIndicatorEntity::class,
+        LookupCacheEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AdShieldDatabase : RoomDatabase() {
@@ -27,6 +28,8 @@ abstract class AdShieldDatabase : RoomDatabase() {
     abstract fun intelligenceEventDao(): IntelligenceEventDao
 
     abstract fun connectorDao(): ConnectorDao
+
+    abstract fun lookupCacheDao(): LookupCacheDao
 
     companion object {
         const val DATABASE_NAME = "adshield_pro_v2.db"
@@ -209,6 +212,33 @@ abstract class AdShieldDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS index_intelligence_events_module_timestamp_epoch_ms " +
                         "ON intelligence_events(module, timestamp_epoch_ms)"
                 )
+            }
+        }
+
+        /**
+         * Adds the on-demand lookup cache. Purely additive: every existing table, counter and
+         * preference survives an upgrade.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS lookup_cache (
+                        cacheKey TEXT NOT NULL PRIMARY KEY,
+                        connectorId TEXT NOT NULL,
+                        field TEXT NOT NULL,
+                        query TEXT NOT NULL,
+                        found INTEGER NOT NULL,
+                        riskScore INTEGER NOT NULL,
+                        headline TEXT NOT NULL,
+                        evidenceJson TEXT NOT NULL,
+                        attribution TEXT NOT NULL,
+                        fetchedAtEpochMs INTEGER NOT NULL,
+                        expiresAtEpochMs INTEGER NOT NULL,
+                        httpCode INTEGER
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_lookup_cache_connectorId ON lookup_cache(connectorId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_lookup_cache_expiresAtEpochMs ON lookup_cache(expiresAtEpochMs)")
             }
         }
     }

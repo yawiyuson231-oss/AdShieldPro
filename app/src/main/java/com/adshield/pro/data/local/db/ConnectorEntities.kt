@@ -98,6 +98,9 @@ interface ConnectorDao {
     )
     suspend fun match(kind: String, values: List<String>, nowEpochMs: Long, limit: Int = 12): List<ThreatIndicatorEntity>
 
+    @Query("SELECT * FROM threat_indicators WHERE kind = 'IP_CIDR' AND expiresAtEpochMs > :nowEpochMs")
+    suspend fun activeCidrs(nowEpochMs: Long): List<ThreatIndicatorEntity>
+
     @Query("DELETE FROM threat_indicators WHERE expiresAtEpochMs < :nowEpochMs")
     suspend fun pruneExpired(nowEpochMs: Long): Int
 
@@ -112,4 +115,51 @@ interface ConnectorDao {
 
     @Query("SELECT MAX(lastSuccessEpochMs) FROM connector_state")
     fun observeLastSuccess(): Flow<Long?>
+}
+
+
+/**
+ * Cache for on-demand lookups (hash/domain/IP/CVE/package).
+ *
+ * Keyed by connector + canonical value so a repeated query is served from disk without touching
+ * the provider. [expiresAtEpochMs] is the freshness boundary; an expired entry may still be shown
+ * while offline, but only with an explicit "cached" marker and its real timestamp.
+ */
+@Entity(
+    tableName = "lookup_cache",
+    primaryKeys = ["cacheKey"],
+    indices = [Index("connectorId"), Index("expiresAtEpochMs")]
+)
+data class LookupCacheEntity(
+    val cacheKey: String,
+    val connectorId: String,
+    val field: String,
+    val query: String,
+    val found: Boolean,
+    val riskScore: Int,
+    val headline: String,
+    val evidenceJson: String,
+    val attribution: String,
+    val fetchedAtEpochMs: Long,
+    val expiresAtEpochMs: Long,
+    val httpCode: Int?
+)
+
+@Dao
+interface LookupCacheDao {
+
+    @Query("SELECT * FROM lookup_cache WHERE cacheKey = :key LIMIT 1")
+    suspend fun get(key: String): LookupCacheEntity?
+
+    @Upsert
+    suspend fun upsert(entry: LookupCacheEntity)
+
+    @Query("DELETE FROM lookup_cache WHERE expiresAtEpochMs < :nowEpochMs")
+    suspend fun pruneExpired(nowEpochMs: Long): Int
+
+    @Query("SELECT COUNT(*) FROM lookup_cache")
+    suspend fun count(): Int
+
+    @Query("DELETE FROM lookup_cache")
+    suspend fun clear(): Int
 }

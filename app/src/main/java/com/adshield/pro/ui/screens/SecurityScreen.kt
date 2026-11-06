@@ -73,6 +73,7 @@ import com.adshield.pro.engine.security.ScanProgress
 import com.adshield.pro.engine.security.SecurityLevel
 import com.adshield.pro.engine.security.SecurityPosture
 import com.adshield.pro.engine.security.SecurityScanRecord
+import com.adshield.pro.engine.security.QrImageDecoder
 import com.adshield.pro.engine.security.UrlThreatScanner
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.ElectricBlue
@@ -574,6 +575,24 @@ private fun queryDisplayName(context: android.content.Context, uri: android.net.
 @Composable
 private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolean, onScanUrl: (String) -> Unit) {
     var urlInput by rememberSaveable { mutableStateOf("") }
+    val qrContext = LocalContext.current
+    val qrScope = rememberCoroutineScope()
+    var qrStatus by remember { mutableStateOf<String?>(null) }
+    val qrPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        qrStatus = "Decoding image on this device…"
+        qrScope.launch {
+            val decoded = withContext(Dispatchers.IO) {
+                QrImageDecoder.decodeUri(qrContext.contentResolver, uri)
+            }
+            decoded.onSuccess { code ->
+                qrStatus = "Decoded ${code.format}: ${code.text.take(140)}"
+                onScanUrl(code.text)
+            }.onFailure { error ->
+                qrStatus = error.message ?: "No QR code found in that image"
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -622,6 +641,30 @@ private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolea
                         }
                         Text("Analyze Link")
                     }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { qrPicker.launch("image/*") },
+                        enabled = !isScanning,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Scan a QR code image", style = MaterialTheme.typography.labelLarge)
+                    }
+                    qrStatus?.let { status ->
+                        Text(
+                            status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Text(
+                        "The image is decoded on this device; nothing is uploaded and no link is opened automatically.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }

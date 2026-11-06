@@ -2,6 +2,8 @@ package com.adshield.pro.data.repository
 
 import com.adshield.pro.data.local.db.ConnectorDao
 import com.adshield.pro.data.local.db.ConnectorStateEntity
+import com.adshield.pro.data.local.db.LookupCacheDao
+import com.adshield.pro.data.local.db.LookupCacheEntity
 import com.adshield.pro.data.local.db.ThreatIndicatorEntity
 import com.adshield.pro.domain.connectors.ConnectorModuleSummary
 import com.adshield.pro.domain.connectors.ConnectorRuntime
@@ -9,6 +11,11 @@ import com.adshield.pro.domain.connectors.ConnectorSnapshot
 import com.adshield.pro.domain.connectors.ConnectorSpec
 import com.adshield.pro.domain.connectors.ConnectorStatus
 import com.adshield.pro.domain.connectors.IndicatorKind
+import com.adshield.pro.domain.connectors.LookupEvidence
+import com.adshield.pro.domain.connectors.LookupField
+import com.adshield.pro.domain.connectors.LookupFinding
+import com.adshield.pro.domain.connectors.LookupQuery
+import com.adshield.pro.domain.connectors.LookupReport
 import com.adshield.pro.domain.connectors.SyncOutcome
 import com.adshield.pro.domain.connectors.ThreatIndicator
 import com.adshield.pro.domain.intelligence.IntelligenceModule
@@ -16,6 +23,7 @@ import com.adshield.pro.engine.connectors.ConnectorCatalogue
 import com.adshield.pro.engine.connectors.ConnectorParsers
 import com.adshield.pro.engine.connectors.ConnectorSyncEngine
 import com.adshield.pro.engine.connectors.IndicatorRisk
+import com.adshield.pro.engine.connectors.IntelLookupEngine
 import com.adshield.pro.engine.connectors.NativeConnectorProbes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -42,7 +50,9 @@ import javax.inject.Singleton
 class ConnectorRepository @Inject constructor(
     private val dao: ConnectorDao,
     private val engine: ConnectorSyncEngine,
-    private val probes: NativeConnectorProbes
+    private val probes: NativeConnectorProbes,
+    private val lookupCacheDao: LookupCacheDao,
+    private val lookupEngine: IntelLookupEngine
 ) {
 
     private val syncMutex = Mutex()
@@ -93,6 +103,15 @@ class ConnectorRepository @Inject constructor(
             val previous = dao.stateFor(id)?.toDomain() ?: ConnectorRuntime.initial(spec)
             val now = System.currentTimeMillis()
 
+            if (spec.isLookup) {
+                // Lookups are user-driven: syncing them as feeds would send an empty query and
+                // turn a working provider into a misleading error.
+                dao.upsertState(
+                    previous.copy(lastError = "On-demand lookup — enter a value in the check panel").toEntity()
+                )
+                return@withLock dao.stateFor(id)?.toDomain()
+            }
+
             if (spec.requiresKey) {
                 val blocked = previous.copy(
                     status = ConnectorStatus.NOT_CONFIGURED,
@@ -142,7 +161,7 @@ class ConnectorRepository @Inject constructor(
         val now = System.currentTimeMillis()
         var synced = 0
         ConnectorCatalogue.feeds
-            .filter { it.implemented && it.defaultEnabled && !it.requiresKey }
+            .filter { it.implemented && it.defaultEnabled && !it.requiresKey && !it.isLookup }
             .forEach { spec ->
                 val previous = dao.stateFor(spec.id)?.toDomain() ?: ConnectorRuntime.initial(spec)
                 val due = previous.lastAttemptEpochMs == null ||
@@ -198,8 +217,164 @@ class ConnectorRepository @Inject constructor(
                 candidates += dao.match(IndicatorKind.DOMAIN.name, listOf(host), now).map { it.toDomain() }
             }
         }
+        if (kind == IndicatorKind.IP) {
+            // CIDR feeds (FireHOL, Spamhaus DROP) are stored as networks; containment is checked
+            // locally so a /12 entry actually matches the addresses inside it.
+            candidates += dao.activeCidrs(now)
+                .filter { IndicatorRisk.ipInCidr(value, it.value) }
+                .map { it.toDomain() }
+        }
         val distinct = candidates.distinctBy { it.sourceId to it.value }
         IndicatorRisk.assess(distinct, localRisk)
+    }
+
+    /**
+     * Runs every implemented, key-free lookup connector that accepts this kind of value.
+     *
+     * Behaviour:
+     *  - a fresh cache entry (inside its TTL) is served without a network request;
+     *  - an expired entry is refreshed, and is used as an explicit offline fallback if the
+     *    provider is unreachable;
+     *  - a connector that needs a key or is unimplemented is never contacted and never appears
+     *    as a verified answer.
+     *
+     * The returned report keeps per-provider errors, so a partial answer is visible as partial.
+     */
+    suspend fun lookup(rawValue: String, fieldHint: LookupField? = null): LookupReport = withContext(Dispatchers.IO) {
+        val trimmed = rawValue.trim()
+        val field = fieldHint ?: LookupField.detect(trimmed)
+            ?: return@withContext LookupReport(
+                query = LookupQuery(LookupField.DOMAIN, trimmed),
+                findings = emptyList(),
+                offline = false,
+                notes = listOf("Unsupported value. Use a domain, URL, IPv4 address, CVE, SHA-256 or ecosystem:name@version.")
+            )
+        val query = LookupQuery(field, trimmed)
+        val prepared = lookupEngine.prepare(query)
+        if (prepared is IntelLookupEngine.Prepared.Invalid) {
+            return@withContext LookupReport(
+                query = query,
+                findings = emptyList(),
+                offline = false,
+                notes = listOf(prepared.reason)
+            )
+        }
+        val target = (prepared as IntelLookupEngine.Prepared.Ready).target
+        val specs = ConnectorCatalogue.all
+            .filter { it.isLookup && it.implemented && !it.requiresKey && it.queryField == field }
+        val now = System.currentTimeMillis()
+        val findings = mutableListOf<LookupFinding>()
+        var attempted = 0
+        var offlineCount = 0
+        specs.forEach { spec ->
+            val cacheKey = spec.id + "|" + field.name + "|" + target.canonical
+            val cached = runCatching { lookupCacheDao.get(cacheKey) }.getOrNull()
+            if (cached != null && cached.expiresAtEpochMs > now) {
+                findings += cached.toFinding(query)
+                return@forEach
+            }
+            attempted++
+            val finding = lookupEngine.execute(spec, query, prepared)
+            if (finding.error == null) {
+                runCatching {
+                    lookupCacheDao.upsert(
+                        LookupCacheEntity(
+                            cacheKey = cacheKey,
+                            connectorId = spec.id,
+                            field = field.name,
+                            query = target.canonical,
+                            found = finding.found,
+                            riskScore = finding.riskScore,
+                            headline = finding.headline.take(300),
+                            evidenceJson = encodeEvidence(finding.evidence),
+                            attribution = finding.attribution.take(200),
+                            fetchedAtEpochMs = finding.fetchedAtEpochMs,
+                            expiresAtEpochMs = finding.fetchedAtEpochMs + spec.cacheTtlMs,
+                            httpCode = finding.httpCode
+                        )
+                    )
+                }
+                findings += finding
+            } else {
+                if (finding.error.contains("offline", ignoreCase = true)) offlineCount++
+                findings += if (cached != null) {
+                    cached.toFinding(query).copy(
+                        fromCache = true,
+                        limitation = "Live query failed (${finding.error}); showing the cached answer from " +
+                            formatAge(now - cached.fetchedAtEpochMs) + " ago."
+                    )
+                } else {
+                    finding
+                }
+            }
+        }
+        val notes = mutableListOf<String>()
+        notes += "Lookups run only when you ask; no background requests are made for them."
+        if (specs.isEmpty()) {
+            notes += "No implemented free connector accepts ${field.label}."
+        } else {
+            notes += "${specs.size} connector(s) can answer ${field.label}; $attempted live request(s) this time."
+        }
+        if (offlineCount > 0) {
+            notes += "$offlineCount provider(s) looked unreachable; cached answers are marked as cached."
+        }
+        notes += "Risk numbers are local deterministic weights, not provider verdicts and not a malware verdict."
+        LookupReport(
+            query = query,
+            findings = findings,
+            offline = offlineCount > 0,
+            notes = notes
+        )
+    }
+
+    suspend fun lookupCacheCount(): Int = withContext(Dispatchers.IO) {
+        runCatching { lookupCacheDao.count() }.getOrDefault(0)
+    }
+
+    suspend fun clearLookupCache(): Int = withContext(Dispatchers.IO) {
+        runCatching { lookupCacheDao.clear() }.getOrDefault(0)
+    }
+
+    private fun LookupCacheEntity.toFinding(query: LookupQuery): LookupFinding = LookupFinding(
+        connectorId = connectorId,
+        connectorName = ConnectorCatalogue.find(connectorId)?.name ?: connectorId,
+        provider = ConnectorCatalogue.find(connectorId)?.provider ?: attribution,
+        module = ConnectorCatalogue.find(connectorId)?.module ?: IntelligenceModule.CYBER_DEFENSE,
+        query = query,
+        found = found,
+        riskScore = riskScore,
+        headline = headline,
+        evidence = decodeEvidence(evidenceJson),
+        attribution = attribution,
+        fetchedAtEpochMs = fetchedAtEpochMs,
+        fromCache = true,
+        httpCode = httpCode,
+        limitation = "Cached answer; freshness depends on the provider TTL."
+    )
+
+    private fun encodeEvidence(evidence: List<LookupEvidence>): String = evidence
+        .take(12)
+        .joinToString("\n") { item ->
+            item.label.replace('\n', ' ').replace('\u001f', ' ') + "\u001f" +
+                item.value.replace('\n', ' ').replace('\u001f', ' ')
+        }
+
+    private fun decodeEvidence(raw: String): List<LookupEvidence> = raw
+        .lineSequence()
+        .filter { it.isNotBlank() }
+        .mapNotNull { line ->
+            val parts = line.split('\u001f', limit = 2)
+            if (parts.size != 2) null else LookupEvidence(parts[0], parts[1])
+        }
+        .toList()
+
+    private fun formatAge(ageMs: Long): String {
+        val minutes = (ageMs / 60_000L).coerceAtLeast(0L)
+        return when {
+            minutes < 60 -> "$minutes min"
+            minutes < 1_440 -> "${minutes / 60} h"
+            else -> "${minutes / 1_440} d"
+        }
     }
 
     private suspend fun storeIndicators(spec: ConnectorSpec, indicators: List<ThreatIndicator>, now: Long) {
