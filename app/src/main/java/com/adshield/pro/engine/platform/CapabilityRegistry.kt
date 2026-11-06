@@ -28,6 +28,7 @@ enum class CapabilityArea(val label: String) {
     BATTERY("Battery & power"),
     DEVICE_MAINTENANCE("Device maintenance"),
     SAFE_GPS("Safe GPS & location sharing"),
+    MEDIA_ADS("Video ads & playback safety"),
     CLOUD_STORAGE("Private cloud & Infinity storage"),
     FILE_MANAGEMENT("SAF file management"),
     DOWNLOADS("Direct media downloads"),
@@ -487,6 +488,42 @@ object CapabilityRegistry {
             emptyList(), listOf("No reliable attestation source for a browser or a normal app"),
             listOf("Mock flags and plausibility checks are reported as hints; the app never certifies a location as genuine"),
             "n/a — platform limitation"
+        ),
+        // ------------------------------------------------------- video ads / playback safety
+        cap(
+            "media-playback-guarantee", "Playback hosts exempted above every block list",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.IMPLEMENTED, "engine/media/MediaPlaybackGuard.kt",
+            listOf("service/AdShieldVpnService.kt", "engine/filter/FilterRuleEngine.kt"),
+            listOf("49 protected delivery hosts exempted at priority 79 by the native VPN/DNS engine — no WebView or extension involved (googlevideo, nflxvideo, ttvnw, tiktokcdn, aiv-cdn, fbcdn, googlevideo subdomains …)"),
+            listOf(
+                "The exemption covers a whole host family, so telemetry sharing that host survives too — the deliberate trade for never breaking video",
+                "Generic ad-carrying CDNs (cloudfront, fastly, akamaihd) are NOT exempted, so blocking stays meaningful"
+            ),
+            "MediaPlaybackGuardTestSuite.hostileListCannotBlockAPlaybackHost"
+        ),
+        cap(
+            "media-video-ad-layer", "Curated video-ad network rules (VAST/VPAID, SDKs, SSAI APIs)",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.IMPLEMENTED, "engine/media/MediaPlaybackGuard.kt",
+            emptyList(),
+            listOf("assets/video_ad_network.txt — 71 curated ad-tech host rules plus 7 playback exemptions"),
+            listOf(
+                "Removes third-party video-ad calls; it cannot remove ads stitched into the same stream (YouTube/TikTok/Meta SSAI)",
+                "The file is hand-curated and reviewed, never presented as an upstream feed"
+            ),
+            "MediaPlaybackGuardTestSuite.videoAdHostsAreBlockedWhilePlaybackPlays"
+        ),
+        cap(
+            "media-firstparty-video-ads", "Removing ads stitched into the video stream (YouTube/TikTok/SSAI)",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.UNAVAILABLE, "",
+            emptyList(), listOf("No separate request exists to block — the ad and the video arrive in the same stream"),
+            listOf(
+                "Blocking it would mean blocking the video itself, which breaks playback; the app refuses to do that and says so",
+                "No client-side or DNS technique removes server-side stitched ads without a YouTube-specific client mod"
+            ),
+            "n/a — protocol limitation"
         ),
         cap(
             "battery-charge-control", "Control charging current/voltage/limits", CapabilityArea.BATTERY,

@@ -7,6 +7,7 @@ import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.RuleConflictReport
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
+import com.adshield.pro.engine.media.MediaPlaybackGuard
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -214,6 +215,18 @@ class FilterRuleEngine @Inject constructor() {
             if (snap.builtInAllowSubdomains.contains(suffix)) {
                 return buildResult(domain, false, "@@||$suffix^", null, RuleMatchType.SUBDOMAIN, "System Safety Allowlist", 80, startNs)
             }
+        }
+
+        // 6b. Media playback guarantee (Priority 79).
+        // Video must not break: hosts that deliver playback are exempted above every filter
+        // list (priority 50), so neither a bundled list nor a synced third-party feed can take
+        // someone's video down. The trade-off — a tracker sharing the host family survives — is
+        // documented in MediaPlaybackGuard and docs/MEDIA_PLAYBACK.md.
+        if (MediaPlaybackGuard.isProtectedDeliveryHost(domain)) {
+            return buildResult(
+                domain, false, "@@media-playback", null, RuleMatchType.SUBDOMAIN,
+                "Media Playback Guard", 79, startNs
+            )
         }
 
         val activeCategories = snap.protectionMode.activeCategories

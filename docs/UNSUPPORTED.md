@@ -20,12 +20,29 @@ under **Capabilities**.
 | Not supported | Why |
 |---|---|
 | Universal / guaranteed ad blocking | Ads served from the page's own (first-party) domain cannot be identified by DNS. No technology guarantees this. |
-| Blocking ads inside video streams (server-side stitched) | Same-origin delivery — invisible to DNS. |
+| Blocking ads **stitched into the video stream** (YouTube, TikTok, Facebook, SSAI) | The ad and the video arrive in the same stream — there is no separate request for DNS to resolve. Removing them would mean blocking the video itself, which breaks playback. |
+| Guaranteeing playback on a **user-synced** third-party list | AdShield cannot vet a feed it did not write. The bundled layers are verified against every protected playback host; a synced feed is checked at sync time and reported if it would block one. |
 | Malware detection inside files or pages | This is DNS filtering, not an antivirus and not a file scanner. |
 | Content-based phishing detection | No page content, DOM or certificate inspection is performed. Only hostname evidence. |
 | Full Public Suffix List | A focused subset (`aether/domain.js`) covers common ccTLD layouts. Exotic suffixes may be mis-split when computing registrable domains. |
 | Wildcards matching across label boundaries | `||ads*.example^` matches within labels by design; `*` is not a cross-domain glob. |
 | Cosmetic / element hiding in DNS rules | Not applicable to DNS; such lines are counted and reported as skipped, not silently applied. |
+
+### 2.1 What video-ad blocking actually does
+
+The Android core blocks **third-party video-ad infrastructure** device-wide, at the DNS layer, so
+it applies in every app (Chrome, YouTube, TikTok, podcast players) with no WebView or extension
+involved: VAST/VPAID ad servers, ad exchanges, video-ad SDK APIs, SSAI/stitcher vendor APIs and
+ad-verification beacons.
+
+It does **not** and cannot remove ads that are stitched into the video itself. To keep that
+boundary honest in code as well as in prose:
+
+- **Playback hosts are exempted above every filter list** (`MediaPlaybackGuard`, priority 79 vs.
+  filter lists at 50), so no bundled layer can take video down;
+- every protected delivery host is checked test-time against **every shipped list**;
+- the video-ad list is checked to contain **no playback host and no wildcard** that could swallow one;
+- a deliberate user block still wins, because the user's own decision outranks built-in lists.
 
 ## 3. DNSSEC
 
