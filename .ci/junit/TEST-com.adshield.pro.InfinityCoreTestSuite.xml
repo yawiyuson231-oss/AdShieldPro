@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.InfinityCoreTestSuite" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-06T07:47:31.377Z" hostname="runnervmwuk1x" time="0.09">
+<testsuite name="com.adshield.pro.InfinityCoreTestSuite" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-06T09:43:42.788Z" hostname="runnervmwuk1x" time="0.104">
   <properties/>
-  <testcase name="testWebDavPaths_rejectTraversalAndBuildSafeChildren" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.005"/>
-  <testcase name="testWebDavXml_parsesRealMultistatusEntriesAndQuota" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.071"/>
+  <testcase name="testWebDavPaths_rejectTraversalAndBuildSafeChildren" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.007"/>
+  <testcase name="testWebDavXml_parsesRealMultistatusEntriesAndQuota" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.081"/>
   <testcase name="testAetherReportExplainer_usesOnlyRecordedEvidenceAndCannotAuthorizeDeletion" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.004"/>
   <testcase name="testStorageEndpoints_requireHttpsAndRejectEmbeddedCredentials" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
-  <testcase name="testDirectMediaInput_enforcesHttpsAndSafeFileNames" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
-  <testcase name="testCapacityAggregation_sumsMultipleVerifiedServersWithoutAssumedCapacity" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testDirectMediaInput_enforcesHttpsAndSafeFileNames" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testCapacityAggregation_sumsMultipleVerifiedServersWithoutAssumedCapacity" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
   <testcase name="testPrivateSearch_selectsProviderAndUpgradesCleartextNavigation" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
   <testcase name="testAetherReportExplainer_emptyHistoryDoesNotInventThreats" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.0"/>
   <testcase name="testCapacityAggregation_countsOnlyOnlineProvidersWithMeasuredQuota" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.0"/>
