@@ -891,6 +891,23 @@ class AdShieldRepository @Inject constructor(
                 lastStatusMessage = "Bundled & Active"
             ),
             FilterSourceEntity(
+                id = "bundled_video_ad_network",
+                name = "Video-Ad Network Layer (Offline)",
+                description = "Curated VAST/VPAID ad servers, video-ad SDKs and SSAI vendor APIs. " +
+                    "Scoped so playback hosts stay exempt: video must not break. Ads stitched into the " +
+                    "video stream itself cannot be removed by DNS and are not claimed to be.",
+                url = "asset://$VIDEO_AD_NETWORK_ASSET",
+                licenseName = "AdShield Pro curated (GPLv3-compatible)",
+                category = RuleCategory.ADS.name,
+                isBuiltIn = true,
+                isEnabled = true,
+                isPremiumOnly = false,
+                ruleCount = 71,
+                duplicateCount = 0,
+                lastUpdatedEpochMs = now,
+                lastStatusMessage = "Bundled & Active"
+            ),
+            FilterSourceEntity(
                 id = "bundled_core_threats",
                 name = "AdShield Threat Intelligence (Offline)",
                 description = "191,000+ active malware, phishing and scam domains bundled in the APK (HaGeZi TIF). Powers DNS web protection and the Security Center link scanner.",
@@ -1062,6 +1079,7 @@ class AdShieldRepository @Inject constructor(
         const val CORE_MAX_ADS_ASSET = "core_max_ads.txt"
         const val CORE_LITE_ADS_ASSET = "core_lite_ads.txt"
         const val CORE_THREATS_ASSET = "core_max_threats.txt"
+        const val VIDEO_AD_NETWORK_ASSET = "video_ad_network.txt"
 
         val FIRST_PARTY_MULTIPLEXED_AD_PACKAGES = setOf(
             "com.google.android.youtube",

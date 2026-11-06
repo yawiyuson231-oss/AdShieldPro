@@ -2,6 +2,7 @@ package com.adshield.pro
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Monitor
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -54,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,8 +73,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.model.RuleMatchType
+import com.adshield.pro.ui.viewmodel.SafeGpsViewModel
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.screens.ActivityScreen
@@ -84,6 +91,7 @@ import com.adshield.pro.ui.screens.FileManagerScreen
 import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
+import com.adshield.pro.ui.screens.SafeGpsScreen
 import com.adshield.pro.ui.screens.SecurityScreen
 import com.adshield.pro.ui.screens.SettingsScreen
 import com.adshield.pro.ui.theme.AdShieldProTheme
@@ -100,6 +108,7 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     SECURITY("Security", Icons.Default.Security),
+    SAFE_GPS("Safe GPS", Icons.Default.MyLocation),
     FILES("Files", Icons.Default.Folder),
     CLOUD("Cloud", Icons.Default.Cloud),
     DOWNLOADS("Downloads", Icons.Default.Download),
@@ -250,6 +259,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
+                MainNavDestination.SAFE_GPS -> SafeGpsDestination()
                 MainNavDestination.FILES -> FilesDestination()
                 MainNavDestination.CLOUD -> CloudDestination()
                 MainNavDestination.DOWNLOADS -> DownloadsDestination()
@@ -266,6 +276,107 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
             }
         }
     }
+}
+
+/**
+ * Safe GPS destination.
+ *
+ * Owns the location permission contract and the message intents, so the screen itself stays a
+ * pure renderer of [SafeGpsViewModel] state. The permission is requested only when the user asks
+ * for a fix — never at launch, and never for background access (which this app does not request).
+ */
+@Composable
+private fun SafeGpsDestination() {
+    val context = LocalContext.current
+    val viewModel: SafeGpsViewModel = hiltViewModel()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        val fine = granted[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = granted[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        // A denial here is reported as a plain denial: the platform decides whether it is
+        // permanent, and the checklist re-reads it on resume rather than guessing.
+        viewModel.onPermissionResult(granted = fine || coarse)
+        viewModel.refreshDeviceState()
+    }
+
+    val requestPermission: () -> Unit = {
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    LaunchedEffect(Unit) { viewModel.refreshDeviceState() }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshDeviceState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    SafeGpsScreen(
+        state = state,
+        onLocate = {
+            if (state.permission == com.adshield.pro.engine.location.LocationPermission.GRANTED) {
+                viewModel.startCapture()
+            } else {
+                requestPermission()
+            }
+        },
+        onStop = viewModel::stopCapture,
+        onRequestPermission = requestPermission,
+        onTargetChange = viewModel::setTargetAccuracy,
+        onTimeoutChange = viewModel::setTimeoutSeconds,
+        onGridChange = viewModel::setGridMeters,
+        onSetShareMode = viewModel::setShareMode,
+        onCopyShare = {
+            val plan = state.sharePlan
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+            if (plan != null && !plan.blocked) {
+                clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("My location", plan.text))
+            }
+        },
+        onOpenSms = {
+            val plan = state.sharePlan
+            if (plan != null && !plan.blocked) {
+                val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(plan.smsUri))
+                runCatching { context.startActivity(intent) }
+            }
+        },
+        onOpenMap = {
+            val plan = state.sharePlan
+            if (plan != null && !plan.blocked) {
+                val geo = Intent(
+                    Intent.ACTION_VIEW,
+                    android.net.Uri.parse(com.adshield.pro.engine.location.LocationSafetyAdvisor.geoUri(plan.point))
+                )
+                runCatching { context.startActivity(geo) }.onFailure {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                android.net.Uri.parse(
+                                    com.adshield.pro.engine.location.LocationSafetyAdvisor.openStreetMapUrl(plan.point)
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        onOpenSetting = { fact ->
+            fact.setting?.let { target ->
+                runCatching { context.startActivity(viewModel.settingIntent(target)) }
+            }
+        }
+    )
 }
 
 @Composable

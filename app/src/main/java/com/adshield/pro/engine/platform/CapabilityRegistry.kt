@@ -27,6 +27,8 @@ enum class CapabilityArea(val label: String) {
     AI_INTELLIGENCE("On-device intelligence"),
     BATTERY("Battery & power"),
     DEVICE_MAINTENANCE("Device maintenance"),
+    SAFE_GPS("Safe GPS & location sharing"),
+    MEDIA_ADS("Video ads & playback safety"),
     CLOUD_STORAGE("Private cloud & Infinity storage"),
     FILE_MANAGEMENT("SAF file management"),
     DOWNLOADS("Direct media downloads"),
@@ -62,6 +64,8 @@ object CapabilityRegistry {
     private const val PERM_VPN = "android.permission.BIND_VPN_SERVICE"
     private const val PERM_NOTIF = "android.permission.POST_NOTIFICATIONS"
     private const val PERM_BATTERY_STATS = "android.permission.BATTERY_STATS"
+    private const val PERM_LOCATION_FINE = "android.permission.ACCESS_FINE_LOCATION"
+    private const val PERM_LOCATION_COARSE = "android.permission.ACCESS_COARSE_LOCATION"
 
     /**
      * The 100 capabilities from the product directive, as they actually stand.
@@ -404,6 +408,122 @@ object CapabilityRegistry {
             listOf("CHARGE_COUNTER_FULL / FULL_DESIGN, Android 14+ getCycleCount"),
             listOf("Most devices do not expose design capacity or cycle count to apps; then it is reported as unmeasurable"),
             "BatteryIntelligenceTestSuite.testCapacityHealth_isNullUnlessBothCountersExist"
+        ),
+        // ------------------------------------------------------- Safe GPS
+        cap(
+            "gps-convergent-sampling", "Convergent high-accuracy fix sampling", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/SafeGpsLocator.kt",
+            listOf(PERM_LOCATION_FINE, PERM_LOCATION_COARSE),
+            listOf("LocationManager provider updates (GNSS/network), Location.getAccuracy() per fix"),
+            listOf(
+                "Sample count, target accuracy and deadline are user-set; the device's own reported accuracy is the only improvement measure",
+                "A cold GNSS lock outdoors is required for a tight fix; indoors the reported radius stays coarse"
+            ),
+            "SafeGpsTestSuite.convergingSessionReportsTheMeasuredImprovement"
+        ),
+        cap(
+            "gps-fix-consistency", "Fix consistency and plausibility checks", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/LocationAnalyzer.kt",
+            listOf(PERM_LOCATION_FINE, PERM_LOCATION_COARSE),
+            listOf("Accuracy circles per fix, 1/accuracy² weighted centre, monotonic elapsedRealtimeNanos"),
+            listOf(
+                "Circle overlap and implied speed are heuristics; a well-crafted spoofed fix can pass both",
+                "Not tamper proof: the screen says 'unverified', never 'spoof detected'"
+            ),
+            "SafeGpsTestSuite.disagreeingFixesAreRefusedInsteadOfAveraged"
+        ),
+        cap(
+            "gps-mock-detection", "Platform-reported simulated fix handling", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/SafeGpsLocator.kt",
+            listOf(PERM_LOCATION_FINE, PERM_LOCATION_COARSE),
+            listOf("Location.isMock (API 31+) / isFromMockProvider, Settings.Secure.ALLOW_MOCK_LOCATION"),
+            listOf(
+                "Only reports what Android flags; a mock app that is not registered as a test provider may not be flagged",
+                "A flagged fix is refused for emergency sharing rather than silently sent"
+            ),
+            "SafeGpsTestSuite.mockedFixIsFlaggedAndNeverPresentedAsReal"
+        ),
+        cap(
+            "gps-privacy-rounding", "Privacy rounding before sharing (250 m / 1 km / 5 km)", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/LocationAnalyzer.kt", emptyList(),
+            listOf("The fix itself; no network or third-party service is contacted"),
+            listOf("Rounding trades precision for privacy: the disclosed radius always covers the worst-case displacement"),
+            "SafeGpsTestSuite.roundedShareNeverContainsTheExactLatitude"
+        ),
+        cap(
+            "gps-safe-share-text", "Shareable pin text with disclosed radius and limits", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/LocationSafetyAdvisor.kt",
+            listOf(PERM_LOCATION_FINE, PERM_LOCATION_COARSE),
+            listOf("The analysed fix; output is a text message and an sms:/geo: URI the user sends"),
+            listOf(
+                "The app cannot send the message itself, dial emergency services, or track the phone afterwards",
+                "A map link hands the coordinates to that map provider; plain text does not"
+            ),
+            "SafeGpsTestSuite.emergencyMessageTellsTheReceiverWhatToDo"
+        ),
+        cap(
+            "gps-device-checklist", "Device readiness checklist with unknown states", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.IMPLEMENTED, "engine/location/LocationSafetyAdvisor.kt", emptyList(),
+            listOf("LocationManager.isLocationEnabled, permission state, WIFI_SCAN_ALWAYS_AVAILABLE, DEVELOPMENT_SETTINGS_ENABLED"),
+            listOf("Values Android does not expose (screen lock) are shown as 'cannot read', never assumed healthy"),
+            "SafeGpsTestSuite.checklistReportsUnknownInsteadOfAssumingHealthy"
+        ),
+        cap(
+            "gps-live-tracking", "Live location tracking or shared sessions", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.UNAVAILABLE, "",
+            emptyList(), listOf("Would require a relay server and a persistent session"),
+            listOf("Deliberately not built: a pin is fixed text, so a lost or stolen phone cannot keep broadcasting"),
+            "n/a — by design"
+        ),
+        cap(
+            "gps-background-location", "Background location capture", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.UNAVAILABLE, "",
+            emptyList(), listOf("Would need ACCESS_BACKGROUND_LOCATION and a foreground service"),
+            listOf("Not declared in the manifest; capture runs only while the Safe GPS screen is open"),
+            "n/a — by design"
+        ),
+        cap(
+            "gps-spoof-proof", "Proof of location / anti-spoof guarantee", CapabilityArea.SAFE_GPS,
+            CapabilityStatus.UNAVAILABLE, "",
+            emptyList(), listOf("No reliable attestation source for a browser or a normal app"),
+            listOf("Mock flags and plausibility checks are reported as hints; the app never certifies a location as genuine"),
+            "n/a — platform limitation"
+        ),
+        // ------------------------------------------------------- video ads / playback safety
+        cap(
+            "media-playback-guarantee", "Playback hosts exempted above every block list",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.IMPLEMENTED, "engine/media/MediaPlaybackGuard.kt",
+            listOf("service/AdShieldVpnService.kt", "engine/filter/FilterRuleEngine.kt"),
+            listOf("49 protected delivery hosts exempted at priority 79 by the native VPN/DNS engine — no WebView or extension involved (googlevideo, nflxvideo, ttvnw, tiktokcdn, aiv-cdn, fbcdn, googlevideo subdomains …)"),
+            listOf(
+                "The exemption covers a whole host family, so telemetry sharing that host survives too — the deliberate trade for never breaking video",
+                "Generic ad-carrying CDNs (cloudfront, fastly, akamaihd) are NOT exempted, so blocking stays meaningful"
+            ),
+            "MediaPlaybackGuardTestSuite.hostileListCannotBlockAPlaybackHost"
+        ),
+        cap(
+            "media-video-ad-layer", "Curated video-ad network rules (VAST/VPAID, SDKs, SSAI APIs)",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.IMPLEMENTED, "engine/media/MediaPlaybackGuard.kt",
+            emptyList(),
+            listOf("assets/video_ad_network.txt — 71 curated ad-tech host rules plus 7 playback exemptions"),
+            listOf(
+                "Removes third-party video-ad calls; it cannot remove ads stitched into the same stream (YouTube/TikTok/Meta SSAI)",
+                "The file is hand-curated and reviewed, never presented as an upstream feed"
+            ),
+            "MediaPlaybackGuardTestSuite.videoAdHostsAreBlockedWhilePlaybackPlays"
+        ),
+        cap(
+            "media-firstparty-video-ads", "Removing ads stitched into the video stream (YouTube/TikTok/SSAI)",
+            CapabilityArea.MEDIA_ADS,
+            CapabilityStatus.UNAVAILABLE, "",
+            emptyList(), listOf("No separate request exists to block — the ad and the video arrive in the same stream"),
+            listOf(
+                "Blocking it would mean blocking the video itself, which breaks playback; the app refuses to do that and says so",
+                "No client-side or DNS technique removes server-side stitched ads without a YouTube-specific client mod"
+            ),
+            "n/a — protocol limitation"
         ),
         cap(
             "battery-charge-control", "Control charging current/voltage/limits", CapabilityArea.BATTERY,
