@@ -9,30 +9,10 @@ Daemon will be stopped at the end of the build
 > Task :app:parseDebugLocalResources FROM-CACHE
 > Task :app:generateDebugRFile FROM-CACHE
 > Task :app:kspDebugKotlin
+
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/ConnectorHttp.kt:78:35 None of the following candidates is applicable:
-
-fun toString(): String:
-  Too many arguments for 'fun toString(): String'.
-
-fun Any?.toString(): String:
-  Too many arguments for 'fun Any?.toString(): String'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:28:17 Unresolved reference 'biometric'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:333:32 Unresolved reference 'getEnabledListenerPackages' on receiver of type 'NotificationManager'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:338:36 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:338:39 Cannot infer type for type parameter 'A'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:338:39 Cannot infer type for type parameter 'B'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:369:19 Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:371:20 Unresolved reference 'getOpsForPackage' on receiver of type 'AppOpsManager'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:376:54 Unresolved reference 'sumOf' on receiver of type 'Any'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:376:62 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:385:56 Unresolved reference 'SENSOR_PRIVACY_SERVICE'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:409:22 Unresolved reference 'BiometricManager'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:409:69 Unresolved reference 'BiometricManager'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:410:28 Unresolved reference 'BiometricManager'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:848:32 Unresolved reference 'widthPx' on receiver of type 'DisplayMetrics'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:848:51 Unresolved reference 'heightPx' on receiver of type 'DisplayMetrics'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:1066:45 Unresolved reference 'first'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:432:88 Unresolved reference 'FEATURE_BIOMETRIC_STRONG'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:434:79 Unresolved reference 'FEATURE_BIOMETRIC_ANY'.
 
 > Task :app:compileDebugKotlin FAILED
 
@@ -43,16 +23,10 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: NONE_APPLICABLE
+   > Kotlin compiler: UNRESOLVED_REFERENCE
        Kotlin compiler error
-         None of the following candidates is applicable:
-     
-         fun toString(): String:
-           Too many arguments for 'fun toString(): String'.
-     
-         fun Any?.toString(): String:
-           Too many arguments for 'fun Any?.toString(): String'.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/ConnectorHttp.kt line 78
+         Unresolved reference 'FEATURE_BIOMETRIC_STRONG'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt line 432
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -213,13 +187,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: None of the following candidates is applicable:
-
-fun toString(): String:
-  Too many arguments for 'fun toString(): String'.
-
-fun Any?.toString(): String:
-  Too many arguments for 'fun Any?.toString(): String'.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'FEATURE_BIOMETRIC_STRONG'.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -256,5 +224,5 @@ fun Any?.toString(): String:
 	... 2 more
 
 
-BUILD FAILED in 1m 5s
+BUILD FAILED in 49s
 8 actionable tasks: 2 executed, 6 from cache
