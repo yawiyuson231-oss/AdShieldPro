@@ -32,7 +32,7 @@ object MapOverlayMath {
 
     /** Ground metres per screen pixel at [latitude] and [zoom] (Web Mercator, 256 px tiles). */
     fun pixelsPerMeter(latitude: Double, zoom: Double, tileSize: Int = DEFAULT_TILE_SIZE): Double {
-        val metersPerPixel = Geodesy.metersPerPixel(latitude, zoom, tileSize)
+        val metersPerPixel = MapProjection.metersPerPixel(latitude, zoom, tileSize)
         return if (metersPerPixel <= 0.0) 0.0 else 1.0 / metersPerPixel
     }
 
