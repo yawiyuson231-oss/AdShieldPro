@@ -31,6 +31,38 @@ replaces that release's APK assets instead of failing or creating a duplicate re
 To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
 `ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
 
+### Test APK before publishing
+
+[`.github/workflows/test-apk.yml`](.github/workflows/test-apk.yml) builds and publishes **the same
+signed, R8-minified APK as a GitHub pre-release**, so it can be installed and exercised on a real
+device before the real release goes out:
+
+```bash
+# test whatever the branch already contains
+gh workflow run "Test APK (pre-release)" --ref main
+
+# test an unmerged pull request (builds exactly that commit, no merge needed)
+gh workflow run "Test APK (pre-release)" --ref main -f source_ref=refs/pull/13/head
+
+# a second round on the same version keeps a separate tag
+gh workflow run "Test APK (pre-release)" --ref main -f source_ref=arena/my-branch -f tag=test-v2.10.0-rc2
+```
+
+It runs the unit tests, UI-performance gate, universal-build gate and a signing-continuity check,
+then creates tag `test-v<versionName>` with `AdShieldPro-<versionName>-test.apk` and its SHA-256.
+Design guarantees, enforced by the workflow itself:
+
+- **Signed with the published release key**, never a throwaway one — the test APK installs *over*
+  the current release as an update, and the real release later replaces it in place. If no release
+  keystore is available the job fails instead of producing an un-upgradable APK.
+- **Always a pre-release**, so `/releases/latest` — what the in-app updater and the website download
+  link resolve — keeps pointing at the shipped version. A final step asserts this and fails if the
+  test build ever became *Latest*.
+- **Tags must start with `test-`**, so the build cannot match the `v*` tag trigger of the release
+  pipeline. The keystore is never attached to a test release; only real releases carry it.
+
+Once the test build is verified, publish for real with the **Release APK** workflow above.
+
 
 ## OmniShield X web platform (browser)
 
