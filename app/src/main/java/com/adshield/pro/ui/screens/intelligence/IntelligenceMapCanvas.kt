@@ -284,6 +284,15 @@ fun IntelligenceMapCanvas(
         val positions = effectivePositions
         val coreWorld = MapGeometry.coreWorldPosition
         val coreScreen = camera.worldToScreen(coreWorld)
+        // Temporary event highlight: only real, still-running pulses light up their module.
+        val pulseHighlights = mutableMapOf<IntelligenceModule, Float>()
+        pulses.forEach { pulse ->
+            val progress = MapGeometry.progress(frameNanos, pulse.startNanos, MapGeometry.PULSE_DURATION_NANOS)
+            if (progress < 1f) {
+                val strength = 1f - progress
+                pulseHighlights[pulse.module] = maxOf(pulseHighlights[pulse.module] ?: 0f, strength)
+            }
+        }
         val context = DrawContext(
             camera = camera,
             fitScale = cameraState.fitScale,
@@ -291,7 +300,8 @@ fun IntelligenceMapCanvas(
             textMeasurer = textMeasurer,
             uiState = uiState,
             positions = positions,
-            coreScreen = coreScreen
+            coreScreen = coreScreen,
+            pulseHighlights = pulseHighlights
         )
 
         drawBackground(context)
@@ -311,7 +321,8 @@ private class DrawContext(
     val textMeasurer: TextMeasurer,
     val uiState: IntelligenceMapUiState,
     val positions: Map<IntelligenceModule, NodePosition>,
-    val coreScreen: Offset
+    val coreScreen: Offset,
+    val pulseHighlights: Map<IntelligenceModule, Float>
 )
 
 private fun DrawScope.drawBackground(context: DrawContext) {
@@ -481,6 +492,14 @@ private fun DrawScope.drawModuleNodes(context: DrawContext) {
         val radius = MapGeometry.drawRadius(camera.scale)
         val isSelected = selected == module
 
+        context.pulseHighlights[module]?.takeIf { it > 0f }?.let { strength ->
+            drawCircle(
+                color = accent.copy(alpha = 0.38f * strength),
+                radius = radius * 1.55f,
+                center = center,
+                style = Stroke(width = 2.dp.toPx())
+            )
+        }
         if (state == IntelligenceModuleState.CRITICAL || state == IntelligenceModuleState.WARNING) {
             drawCircle(color = color.copy(alpha = 0.12f), radius = radius * 1.9f, center = center)
         }
