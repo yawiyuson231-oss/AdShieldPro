@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.IntelligenceMapTestSuite" tests="29" skipped="0" failures="2" errors="0" timestamp="2026-11-06T07:47:31.473Z" hostname="runnervmwuk1x" time="0.647">
+  <properties/>
+  <testcase name="testAggregatorEscalatesThermalThresholdAndRecovers" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.012"/>
+  <testcase name="testAggregatorBuildsOnlyFromRealInputs" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testGeometryHitTestSelectsNearestNodeAndCore" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.004"/>
+  <testcase name="testRepositoryRoundTripPersistsSanitizedEvents" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.062"/>
+  <testcase name="testGeometryFitContainsAllNodesInPortraitAndLandscape" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testAutomationFailuresRaiseAlerts" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.011"/>
+  <testcase name="testMitigatedBlocksDoNotRaiseModuleAlerts" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testScanRecordRoutesToCyberFinancialAndPrivacy" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.03">
+    <failure message="java.lang.AssertionError" type="java.lang.AssertionError">java.lang.AssertionError
+	at org.junit.Assert.fail(Assert.java:87)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at org.junit.Assert.assertTrue(Assert.java:53)
+	at com.adshield.pro.IntelligenceMapTestSuite.testScanRecordRoutesToCyberFinancialAndPrivacy(IntelligenceMapTestSuite.kt:210)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.runRequest(JUnitTestExecutor.java:174)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:84)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:47)
+	at org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestDefinitionProcessor.processTestDefinition(AbstractJUnitTestDefinitionProcessor.java:65)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.processTestDefinition(SuiteTestDefinitionProcessor.java:53)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.processTestDefinition(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:178)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+</failure>
+  </testcase>
+  <testcase name="testCameraLerpAndCentredOn" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testGeometryPulseProgressAlphaAndMarkerPlacement" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testFinancialClassifierAttributesPaymentLinksOnly" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.004"/>
+  <testcase name="testNodePositionsClampIntoTheWorld" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testDedupePolicyThrottlesRepeatedObservations" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.014"/>
+  <testcase name="testGeometryPinchZoomKeepsFocalPointStable" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testFactoryNeverEmitsWithoutRealEvidence" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testAggregatorReportsOfflineModuleWithoutInventingData" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testEmergencyLockdownIsReportedAsVerifiedConfiguration" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testEventSanitizerBoundsAndMetricLimits" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.078"/>
+  <testcase name="testRecommendationsCoverEveryModule" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testSanitizerRejectsEventWithoutEvidence" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testSanitizerRejectsModuleTypeMismatchAndFutureTimestamps" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.006">
+    <failure message="java.lang.AssertionError: expected null, but was:&lt;IntelligenceEvent(id=0, module=NETWORK_DEFENSE, type=NETWORK_THREAT_BLOCKED, severity=WARNING, timestampEpochMs=1765440000000, title=Wrong module, description=Never stored, evidence=Real evidence, evidenceRef=null, relatedObjectIds=[], actions=[], metrics=[])&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected null, but was:&lt;IntelligenceEvent(id=0, module=NETWORK_DEFENSE, type=NETWORK_THREAT_BLOCKED, severity=WARNING, timestampEpochMs=1765440000000, title=Wrong module, description=Never stored, evidence=Real evidence, evidenceRef=null, relatedObjectIds=[], actions=[], metrics=[])&gt;
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotNull(Assert.java:756)
+	at org.junit.Assert.assertNull(Assert.java:738)
+	at org.junit.Assert.assertNull(Assert.java:748)
+	at com.adshield.pro.IntelligenceMapTestSuite.testSanitizerRejectsModuleTypeMismatchAndFutureTimestamps(IntelligenceMapTestSuite.kt:143)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.runRequest(JUnitTestExecutor.java:174)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:84)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:47)
+	at org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestDefinitionProcessor.processTestDefinition(AbstractJUnitTestDefinitionProcessor.java:65)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.processTestDefinition(SuiteTestDefinitionProcessor.java:53)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.processTestDefinition(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:178)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+</failure>
+  </testcase>
+  <testcase name="testAggregatorPerformanceBudget" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.406"/>
+  <testcase name="testSanitizerMasksSecretsAndPersonalData" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testRepositoryPrunesByAgeAndCount" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.003"/>
+  <testcase name="testSanitizerCannotDowngradeCatalogueSeverity" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testGeometryTapSlopCancelsSelectionWhileDragging" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.001"/>
+  <testcase name="testFiltersMatchModuleSeverityRangeAndQuery" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.0"/>
+  <testcase name="testNetworkStateFollowsRealTunnelState" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.002"/>
+  <testcase name="testRepositoryDropsCorruptRowsOnRead" classname="com.adshield.pro.IntelligenceMapTestSuite" time="0.003"/>
+  <system-out><![CDATA[IntelligenceAggregator: 600 events, 8 nodes, filters=on → avg=1.610 ms p95=2.230 ms (budget 25 ms avg / 40 ms p95, measured on the CI JVM)
+Event feed filter (800 events, query+range): avg=0.681 ms per pass
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
