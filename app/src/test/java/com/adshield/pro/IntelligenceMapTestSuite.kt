@@ -891,6 +891,9 @@ class IntelligenceMapTestSuite {
 
         override suspend fun count(): Int = state.value.size
 
+        override suspend fun countForModule(module: String): Int =
+            state.value.count { it.module == module }
+
         override suspend fun pruneBefore(cutoffEpochMs: Long): Int {
             val before = state.value.size
             state.value = state.value.filterNot { it.timestampEpochMs < cutoffEpochMs }
