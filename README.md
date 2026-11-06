@@ -1,4 +1,4 @@
-# AdShield Pro 2.9.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.10.1 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 

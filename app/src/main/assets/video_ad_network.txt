@@ -1,0 +1,108 @@
+# AdShield Pro — video-ad network layer (bundled rule fragment, NOT a full upstream feed)
+#
+# PURPOSE
+#   Block the *ad plumbing* that video players use: ad servers, ad exchanges, VAST/VPAID
+#   trackers, video-ad SDKs, SSAI/stitcher vendor APIs and ad verification beacons.
+#
+# WHAT THIS LIST IS
+#   A small, hand-curated list written in ABP syntax. It is NOT an upstream feed and is not
+#   presented as one. `@@||host^` lines are explicit allow rules: they exempt a host so that
+#   blocking something else on the same family cannot take playback down with it.
+#
+# WHAT THIS LIST MUST NEVER CONTAIN
+#   Any host that delivers the video itself — youtube.com, googlevideo.com, netflix.com,
+#   nflxvideo.net, tiktokcdn.com, ttvnw.net, aiv-cdn.net, fbcdn.net, vimeocdn.net and the rest of
+#   MediaPlaybackGuard.PROTECTED_DELIVERY_HOSTS. A JVM test fails the build if one appears here,
+#   and the engine additionally exempts them at a higher priority than any filter list.
+#
+# HONEST LIMIT
+#   Ads stitched into the same stream as the video (YouTube / TikTok / Meta SSAI) are not separate
+#   requests. Nothing in this file can remove them; docs/MEDIA_PLAYBACK.md says so plainly.
+
+# --- Exemptions first: playback must survive even if a third-party feed blocks these ---
+@@||googlevideo.com^
+@@||youtube.com^
+@@||youtube-nocookie.com^
+@@||nflxvideo.net^
+@@||ttvnw.net^
+@@||tiktokcdn.com^
+@@||aiv-delivery.net^
+
+# --- VAST / VPAID / OpenRTB ad-serving infrastructure ---
+||adsystem.com^
+||aaxads.com^
+||adap.tv^
+||adform.net^
+||adingo.jp^
+||adition.com^
+||adnxs.com^
+||adroll.com^
+||adsafeprotected.com^
+||adsrvr.org^
+||adswizz.com^
+||amazon-adsystem.com^
+||bidswitch.net^
+||casalemedia.com^
+||criteo.com^
+||criteo.net^
+||doubleclick.net^
+||freewheel.tv^
+||freewheel.com^
+||googleadservices.com^
+||googlesyndication.com^
+||indexww.com^
+||innovid.com^
+||lijit.com^
+||loopme.me^
+||moatads.com^
+||openx.net^
+||pubmatic.com^
+||rubiconproject.com^
+||sharethrough.com^
+||smartadserver.com^
+||spotxchange.com^
+||spotx.tv^
+||springserve.com^
+||teads.tv^
+||tremorhub.com^
+||undertone.com^
+||unrulymedia.com^
+||videostep.com^
+||vi.ai^
+||yieldmo.com^
+
+# --- Video-ad players / SDK APIs (the ad call, never the video call) ---
+||imasdk.googleapis.com^
+||googletagservices.com^
+||2mdn.net^
+||serving-sys.com^
+||sizmek.com^
+||adcolony.com^
+||applovin.com^
+||chartboost.com^
+||inmobi.com^
+||ironsrc.com^
+||unityads.unity3d.com^
+||vungle.com^
+||fyber.com^
+||supersonicads.com^
+||tapjoy.com^
+||mintegral.com^
+||mopub.com^
+
+# --- SSAI / stitcher vendor APIs (the vendor's ad API, not the stream it returns) ---
+||ssai.google.com^
+||api.ssai.yospace.com^
+||ssai.bcovlive.io^
+||adinsertion.imggolf.com^
+
+# --- Ad verification / attention beacons ---
+||doubleverify.com^
+||iasds01.com^
+||integralads.com^
+||nielsen.com^
+||imrworldwide.com^
+||comscore.com^
+||scorecardresearch.com^
+||quantserve.com^
+||tubemogul.com^
