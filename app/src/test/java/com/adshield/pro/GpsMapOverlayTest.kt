@@ -138,11 +138,26 @@ class GpsMapOverlayTest {
     }
 
     @Test
-    fun testArrowBearingPointsFromTheCentreToTheTarget() {
+    fun testArrowBearingIsScreenRelativeNotGeographic() {
         val north = GeoPoint(manila.latitude + 0.01, manila.longitude)
-        close(0.0, MapOverlayMath.arrowBearingDegrees(manila, north), 0.1, "due north is bearing 0")
         val east = GeoPoint(manila.latitude, manila.longitude + 0.01)
-        close(90.0, MapOverlayMath.arrowBearingDegrees(manila, east), 0.5, "due east is bearing 90")
+        // North-up camera: screen direction equals the compass bearing.
+        close(0.0, MapOverlayMath.arrowBearingDegrees(manila, north, 0.0, 15.0), 0.05, "north is up")
+        close(90.0, MapOverlayMath.arrowBearingDegrees(manila, east, 0.0, 15.0), 0.05, "east is right")
+
+        // Camera facing east: north is now on the left of the screen, i.e. 270° clockwise from up.
+        close(
+            270.0,
+            MapOverlayMath.arrowBearingDegrees(manila, north, 90.0, 15.0),
+            0.05,
+            "a rotated camera must move the arrow, not just the map"
+        )
+    }
+
+    @Test
+    fun testArrowBearingIsUndefinedAtTheCentre() {
+        // The target is exactly under the camera: there is no direction to point at.
+        close(0.0, MapOverlayMath.arrowBearingDegrees(manila, manila, 42.0, 16.0), 1e-9, "centre has no direction")
     }
 
     @Test

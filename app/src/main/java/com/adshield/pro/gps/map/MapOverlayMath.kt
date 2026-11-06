@@ -1,7 +1,6 @@
 package com.adshield.pro.gps.map
 
 import com.adshield.pro.gps.geo.GeoPoint
-import com.adshield.pro.gps.geo.Geodesy
 import com.adshield.pro.gps.geo.MapProjection
 import kotlin.math.cos
 import kotlin.math.sin
@@ -112,9 +111,26 @@ object MapOverlayMath {
         return ScreenPoint(offset.x * scale, offset.y * scale)
     }
 
-    /** Bearing from the camera centre to [point], for the off-screen direction arrow. */
-    fun arrowBearingDegrees(centre: GeoPoint, point: GeoPoint): Double =
-        Geodesy.bearingDegrees(centre, point)
+    /**
+     * Where [point] lies on screen, as degrees clockwise from "up", for the off-screen arrow.
+     *
+     * This is deliberately *not* the geographic bearing: the arrow has to point at the edge of the
+     * viewport, so a camera rotated to bearing 90 puts a point that is geographically north on the
+     * left of the screen (270°). Returns 0 when the point sits exactly at the centre, where there is
+     * no direction to indicate.
+     */
+    fun arrowBearingDegrees(
+        centre: GeoPoint,
+        point: GeoPoint,
+        cameraBearingDegrees: Double,
+        zoom: Double,
+        tileSize: Int = DEFAULT_TILE_SIZE
+    ): Double {
+        val offset = offsetFromCentre(point, centre, cameraBearingDegrees, zoom, tileSize)
+        if (kotlin.math.abs(offset.x) < 1e-12 && kotlin.math.abs(offset.y) < 1e-12) return 0.0
+        val degrees = Math.toDegrees(kotlin.math.atan2(offset.x, -offset.y))
+        return (degrees + 360.0) % 360.0
+    }
 
     private fun Double.pow(exponent: Double): Double = Math.pow(this, exponent)
 }

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.gps.engine.GpsFrame
 import com.adshield.pro.gps.engine.IntegrityVerdict
@@ -309,10 +310,7 @@ fun GpsMapScreen(
                     Box(
                         Modifier
                             .align(Alignment.Center)
-                            .offset(
-                                x = with(density) { offset.x.toDp() },
-                                y = with(density) { offset.y.toDp() }
-                            )
+                            .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
                             .size(circleDp)
                             .clip(RoundedCornerShape(percent = 50))
                             .background(
@@ -332,10 +330,7 @@ fun GpsMapScreen(
                     integrityCompromised = frame.integrity.verdict == IntegrityVerdict.COMPROMISED,
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .offset(
-                            x = with(density) { offset.x.toDp() },
-                            y = with(density) { offset.y.toDp() }
-                        )
+                        .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
                         .size(30.dp)
                 )
                 }
@@ -358,10 +353,7 @@ fun GpsMapScreen(
                 Box(
                     Modifier
                         .align(Alignment.Center)
-                        .offset(
-                            x = with(density) { offset.x.toDp() },
-                            y = with(density) { (offset.y - 14f).toDp() }
-                        )
+                        .offset { IntOffset(offset.x.roundToInt(), (offset.y - 14f).roundToInt()) }
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
@@ -624,37 +616,6 @@ fun GpsMapScreen(
  */
 private fun screenToGeo(x: Float, y: Float, engine: MapLibreEngine): GeoPoint? =
     engine.screenToCoordinate(ScreenPoint(x.toDouble(), y.toDouble()))
-
-@Composable
-private fun HudButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    active: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(GpsBackground.copy(alpha = 0.9f))
-            .padding(horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onClick, modifier = Modifier.size(34.dp)) {
-            Icon(
-                icon,
-                contentDescription = label,
-                tint = if (active) GpsCyan else GpsTextSecondary,
-                modifier = Modifier.size(17.dp)
-            )
-        }
-        Text(
-            label,
-            color = if (active) GpsCyan else GpsTextDim,
-            fontSize = 9.sp,
-            modifier = Modifier.padding(end = 8.dp)
-        )
-    }
-}
 
 @Composable
 private fun HudButton(
