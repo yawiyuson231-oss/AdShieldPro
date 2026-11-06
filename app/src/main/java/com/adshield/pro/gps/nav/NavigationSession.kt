@@ -58,7 +58,21 @@ class NavigationSession @Inject constructor(
 
     private var tracker: RouteTracker? = null
     private var activePlan: RoutePlan? = null
-    private var travelled = ArrayList<GeoPoint>()
+    /**
+     * Driven trail for the HUD overlay.
+     *
+     * Written by the fix collector ([onFrame]) **and** by the reroute coroutine, and copied by the
+     * ViewModel on the main thread. A plain ArrayList raced: `toList()` could walk a list the
+     * collector was concurrently shrinking with `removeAt(0)`, which is where a
+     * ConcurrentModificationException on a long trip came from. Every access is now under [trailLock].
+     */
+    private val travelled = ArrayList<GeoPoint>()
+    private val trailLock = Any()
+
+    /** Trail sampling interval. Promoted from a magic number so the rule is testable. */
+    private object Trail {
+        const val MIN_SPACING_METERS = 8.0
+    }
     private var lastRerouteAtMs = 0L
     private var offlineRouter: OfflineRouter? = null
     private var offlineGraphRegion: String? = null
@@ -71,7 +85,16 @@ class NavigationSession @Inject constructor(
 
     val currentPlan: RoutePlan? get() = activePlan
     val routeGeometry: List<GeoPoint> get() = activePlan?.geometry.orEmpty()
-    fun travelledGeometry(): List<GeoPoint> = travelled.toList()
+
+    /**
+     * Everything the map must fit: the plan *and* the driven trail.
+     *
+     * The ViewModel used to fit only [routeGeometry]. As soon as the driver deviated from the route
+     * the trail left the fitted box and the "fit route" button cropped the path already driven.
+     */
+    fun geometryIncludingTrail(): List<GeoPoint> =
+        activePlan?.geometry.orEmpty() + travelledGeometry()
+    fun travelledGeometry(): List<GeoPoint> = synchronized(trailLock) { travelled.toList() }
 
     /**
      * Requests a route. [provider] is the user's preference; an offline graph is used
@@ -138,7 +161,7 @@ class NavigationSession @Inject constructor(
     private fun activate(plan: RoutePlan) {
         activePlan = plan
         tracker = RouteTracker(plan)
-        travelled.clear()
+        synchronized(trailLock) { travelled.clear() }
         lastRerouteAtMs = 0L
         _state.value = NavigationState(
             phase = NavigationPhase.NAVIGATING,
@@ -161,9 +184,11 @@ class NavigationSession @Inject constructor(
 
         val progress = currentTracker.progressAt(fix)
         _progress.value = progress
-        if (travelled.isEmpty() || com.adshield.pro.gps.geo.Geodesy.distanceMeters(travelled.last(), progress.snappedPosition) > 8.0) {
-            travelled += progress.snappedPosition
-            if (travelled.size > MAX_TRAIL_POINTS) travelled.removeAt(0)
+        synchronized(trailLock) {
+            if (shouldAppendTrailPoint(travelled.lastOrNull(), progress.snappedPosition)) {
+                travelled += progress.snappedPosition
+                if (travelled.size > MAX_TRAIL_POINTS) travelled.removeAt(0)
+            }
         }
         voice.announce(progress)
 
@@ -215,10 +240,12 @@ class NavigationSession @Inject constructor(
                     is RoutingResult.Failure -> tryOffline(from, destination, plan.destinationLabel)
                 }
                 if (newPlan != null) {
-                    val previousTravelled = travelled.toList()
+                    val previousTravelled = synchronized(trailLock) { travelled.toList() }
                     activate(newPlan.copy(destinationLabel = plan.destinationLabel))
-                    travelled.clear()
-                    travelled.addAll(previousTravelled)
+                    synchronized(trailLock) {
+                        travelled.clear()
+                        travelled.addAll(previousTravelled)
+                    }
                     voice.onReroute(newPlan.steps.getOrNull(1)?.instruction)
                 } else {
                     _state.value = _state.value.copy(
@@ -233,7 +260,7 @@ class NavigationSession @Inject constructor(
     fun stop() {
         activePlan = null
         tracker = null
-        travelled.clear()
+        synchronized(trailLock) { travelled.clear() }
         _progress.value = null
         _state.value = NavigationState(phase = NavigationPhase.IDLE)
         voice.stop()
@@ -272,6 +299,17 @@ class NavigationSession @Inject constructor(
 
     companion object {
         const val MAX_TRAIL_POINTS = 4_000
+
+        /**
+         * Whether a new snapped position belongs in the trail.
+         *
+         * The trail is a 4 000-point ring; appending a point every fix would push the start of a
+         * long trip out of the overlay within the hour. Spacing is measured against the newest point
+         * actually kept, and a stationary vehicle therefore adds nothing.
+         */
+        fun shouldAppendTrailPoint(last: GeoPoint?, next: GeoPoint): Boolean =
+            last == null ||
+                com.adshield.pro.gps.geo.Geodesy.distanceMeters(last, next) > Trail.MIN_SPACING_METERS
     }
 }
 

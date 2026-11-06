@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * AdShield Pro — GPS console foreground service.
@@ -77,7 +79,7 @@ class GpsConsoleService : LifecycleService() {
             }
             ACTION_START, null -> startNavigation()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startNavigation() {
@@ -153,8 +155,16 @@ class GpsConsoleService : LifecycleService() {
     }
 
     private fun stopNavigation() {
-        notificationJob?.cancel()
+        // `cancel()` only *requests* cancellation; a collect body already running would still run
+        // its `startForeground` call and re-post the notification microseconds after we removed it,
+        // leaving an ongoing notification with no service behind it. Joining waits for that body to
+        // finish before we remove the notification.
+        val dying = notificationJob
         notificationJob = null
+        dying?.cancel()
+        if (dying != null) {
+            kotlinx.coroutines.runBlocking { runCatching { withTimeoutOrNull(500L) { dying.join() } } }
+        }
         // The engine is shared with the UI: releasing our hold lets it stop only if nobody else is
         // collecting. Calling stop() unconditionally here froze the map when a user tapped "Stop"
         // in the notification while the GPS screen was open.
@@ -169,9 +179,26 @@ class GpsConsoleService : LifecycleService() {
         notificationJob?.cancel()
         notificationJob = null
         engine.release(HOLDER_SERVICE)
-        foregroundStarted = false
         scope.cancel()
+        // If the OS destroys us while navigation was live (low memory, task removed), the ongoing
+        // notification must not outlive the service that owns it.
+        if (foregroundStarted) {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        }
+        foregroundStarted = false
         super.onDestroy()
+    }
+
+    /**
+     * [START_NOT_STICKY] on purpose: everything this service does is *foreground*. A sticky restart
+     * has no intent (so [onStartCommand] falls into `startNavigation`) and cannot legally call
+     * `startForeground` from the background on Android 12+, which throws and kills the process in a
+     * loop. Nothing is lost by not restarting: navigation is driven by the GPS screen, which
+     * restarts it in the foreground.
+     */
+    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+        stopNavigation()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent): IBinder? {

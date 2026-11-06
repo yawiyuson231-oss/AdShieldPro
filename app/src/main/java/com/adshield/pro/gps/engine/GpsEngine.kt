@@ -70,7 +70,17 @@ class GpsEngine(
     private var latestHeading: HeadingSample? = null
     private var latestIntegrity: IntegrityReport = IntegrityReport.NONE
 
-    private val listeners = CopyOnWriteArrayList<(GnssFix) -> Unit>()
+    /**
+     * Receives the fix **and the frame computed for that fix**.
+     *
+     * The frame argument is not a convenience: `frame` is a `StateFlow` that the UI re-collects on
+     * its own dispatcher, and a listener runs synchronously on the engine's collector thread. A
+     * listener that read `engine.frame.value` therefore saw whatever frame happened to be published
+     * — on a 1 Hz stream with a slow consumer, frequently the *previous* fix. The UI used it to
+     * decide whether to record the trip, so a fix Android flagged as mocked could be recorded with
+     * the previous fix's TRUSTED verdict.
+     */
+    private val listeners = CopyOnWriteArrayList<(GnssFix, GpsFrame) -> Unit>()
 
     /**
      * Serialises state mutation.
@@ -83,12 +93,12 @@ class GpsEngine(
      */
     private val stateLock = Any()
 
-    /** Extra consumers (trip recorder, traffic recorder) receive every accepted fix. */
-    fun addFixListener(listener: (GnssFix) -> Unit) {
+    /** Extra consumers (trip recorder, traffic recorder) receive every accepted fix and its frame. */
+    fun addFixListener(listener: (GnssFix, GpsFrame) -> Unit) {
         if (listener !in listeners) listeners += listener
     }
 
-    fun removeFixListener(listener: (GnssFix) -> Unit) {
+    fun removeFixListener(listener: (GnssFix, GpsFrame) -> Unit) {
         listeners -= listener
     }
 
@@ -236,21 +246,23 @@ class GpsEngine(
     }
 
     private fun onFix(fix: GnssFix) {
-        val deliver = synchronized(stateLock) { onFixLocked(fix) }
+        val frameForThisFix = synchronized(stateLock) { onFixLocked(fix) }
         // Dispatched outside the lock on purpose: a listener runs on the caller's thread and may
         // touch the engine again (or hop to the main thread, which may be waiting on this lock).
-        if (deliver) listeners.forEach { listener -> runCatching { listener(fix) } }
+        if (frameForThisFix != null) {
+            listeners.forEach { listener -> runCatching { listener(fix, frameForThisFix) } }
+        }
     }
 
     /**
      * Body of [onFix], always called while holding [stateLock].
      *
-     * @return true when the fix should be handed to the registered listeners.
+     * @return the frame that was published for this fix, or null when the fix was rejected.
      */
-    private fun onFixLocked(fix: GnssFix): Boolean {
+    private fun onFixLocked(fix: GnssFix): GpsFrame? {
         if (!fix.position.isValid) {
             rejectedSamples++
-            return false
+            return null
         }
         // Reject fixes Android itself flags as mocked *for accounting*, but still display them so
         // the user can see the spoofing rather than a frozen map. They never enter the track stats.
@@ -311,7 +323,7 @@ class GpsEngine(
             _diagnostics.value.satelliteNote
         }
 
-        _frame.value = GpsFrame(
+        val published = GpsFrame(
             fix = fix,
             // A compromised position is a distinct, visible state — the earlier version had the
             // same value in both branches, so spoofing looked exactly like a healthy fix.
@@ -330,6 +342,7 @@ class GpsEngine(
             integrity = integrity,
             updatedAtMs = System.currentTimeMillis()
         )
+        _frame.value = published
         _diagnostics.value = GpsDiagnostics(
             gnssStatusAvailable = _satellites.value != null,
             satelliteNote = resolutionNote,
@@ -338,7 +351,7 @@ class GpsEngine(
             mockLocationObserved = integrity.findings.any { it.kind == IntegrityFindingKind.MOCK_LOCATION },
             updatedAtMs = System.currentTimeMillis()
         )
-        return true
+        return published
     }
 
     /** Recomputes the fused heading for the current fix; called when the compass reports. */

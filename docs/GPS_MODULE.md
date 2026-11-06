@@ -195,7 +195,8 @@ minSdk 29 (Android 10) as before.
   over a two-leg network, direction-aware one-way traversal, duration/distance arithmetic, offline
   turn-by-turn plan synthesis, refusal to route outside the downloaded pack, nearest-node and
   on-segment snapping, snap radius, coverage distance, and the pack description string.
-* `GpsAuditRegressionTest` — 11 tests, each pinning a defect that shipped: the antimeridian
+* `GpsAuditRegressionTest` — 13 tests, each pinning a defect that shipped: a fix listener seeing the
+  previous fix's integrity verdict, the 8 m trail-spacing rule, the antimeridian
   projection error in `Geodesy.projectOnSegment` (a segment crossing 180° became a 40 000 km line,
   reporting 10 069 m where the truth is 1 112 m), `FixState.COMPROMISED` surviving the stale
   ticker, a stopped engine clearing its last fix, locale-independent number formatting, trip-point

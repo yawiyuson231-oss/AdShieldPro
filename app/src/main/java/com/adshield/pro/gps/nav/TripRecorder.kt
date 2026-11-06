@@ -102,6 +102,9 @@ class TripRecorder @Inject constructor(
         }
         if (compromised) {
             integrityVerdict = "COMPROMISED"
+            // A compromised position must not start a trip at an invented origin. Recording it as
+            // "the user left from here" is exactly the fabrication this app refuses to do, so the
+            // trip simply begins at the next trustworthy fix.
             return
         }
         val persisted = HistoryGuard.persistedPoint(fix.position, policy)

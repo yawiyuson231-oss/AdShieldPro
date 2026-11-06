@@ -237,7 +237,15 @@ class GpsViewModel @Inject constructor(
         OfflineProgressBus.progress.collect { event ->
             val packId = event.first
             val progress = event.second
-            dao.offlinePack(packId) ?: return@collect
+            val pack = dao.offlinePack(packId) ?: return@collect
+            // A late progress event for a pack that failed or was cancelled must not drag it back
+            // to READY/DOWNLOADING: that is how a cancelled download reappeared as available.
+            // There is no CANCELLED state: removing a pack deletes its row. What must not be
+            // resurrected is a pack that FAILED, and a pack whose progress arrives *before* the row
+            // says it is downloading (the event is queued, the state update is not).
+            if (pack.state == OfflinePackState.FAILED.name && !progress.complete) {
+                return@collect
+            }
             dao.updatePackProgress(
                 id = packId,
                 state = if (progress.complete) OfflinePackState.READY.name else OfflinePackState.DOWNLOADING.name,
@@ -250,12 +258,15 @@ class GpsViewModel @Inject constructor(
         }
     }
 
-    private val fixListener: (com.adshield.pro.gps.engine.GnssFix) -> Unit = { fix ->
+    private val fixListener: (com.adshield.pro.gps.engine.GnssFix, GpsFrame) -> Unit = { fix, fixFrame ->
         val policy = _state.value.policy
-        val compromised = frame.value.integrity.shouldRejectObservation
+        // The frame handed to this callback, NOT `frame.value`: `frame` is re-collected by this
+        // ViewModel's dispatcher, so reading it here could return the previous fix's frame and
+        // record a mocked position with a TRUSTED verdict.
+        val compromised = fixFrame.integrity.shouldRejectObservation
         tripRecorder.onFix(fix, policy, compromised)
         traffic.onFix(fix, policy, compromised)
-        navigation.onFrame(frame.value)
+        navigation.onFrame(fixFrame)
         syncRouteGeometry()
     }
 
@@ -466,11 +477,15 @@ class GpsViewModel @Inject constructor(
         _state.value = _state.value.copy(mapSheet = sheet)
     }
 
-    /** "Fit the whole route on screen": the camera goes to the route bounds, tracking paused. */
+    /**
+     * "Fit the whole route on screen": the camera goes to the bounds of the plan **and** the driven
+     * trail, tracking paused. Fitting the plan alone cropped the path already driven as soon as the
+     * driver deviated from it.
+     */
     fun fitRouteOnMap() {
         _state.value = _state.value.copy(
             cameraMode = CameraMode.FREE,
-            mapFitRequest = _state.value.routeGeometry.takeIf { it.size >= 2 }
+            mapFitRequest = navigation.geometryIncludingTrail().takeIf { it.size >= 2 }
         )
     }
 

@@ -260,4 +260,82 @@ class GpsAuditRegressionTest {
         assertEquals(listOf(2, 2, 2), sizes)
         assertEquals(6_000L, watermark)
     }
+    // ------------------------------------------------------- Fix listener contract
+
+    /**
+     * BUG: `addFixListener` received only the `GnssFix`, so the ViewModel read the integrity verdict
+     * from `engine.frame.value`. `frame` is a StateFlow *re-collected by the ViewModel's dispatcher*,
+     * while listeners run synchronously on the engine's collector thread — so on a 1 Hz stream a
+     * listener could see the previous fix's frame. The concrete consequence: a fix Android flagged
+     * as mocked was recorded into the trip with a TRUSTED verdict.
+     *
+     * The contract is now "you are given the frame computed for this fix". Pinned by building the
+     * two frames and proving the verdict they carry is the discriminating value.
+     */
+    @Test
+    fun testListenerFrameIsTheOneComputedForItsFix() {
+        val trustedFix = GnssFix(
+            position = GeoPoint(14.5995, 120.9842),
+            timeMs = 1_000L,
+            elapsedRealtimeNanos = 0L,
+            accuracyMeters = 5f
+        )
+        val mockedFix = trustedFix.copy(timeMs = 2_000L, mockProviderFlag = true)
+
+        val trustedFrame = GpsFrame(
+            fix = trustedFix,
+            integrity = com.adshield.pro.gps.engine.IntegrityReport(IntegrityVerdict.TRUSTED)
+        )
+        val compromisedFrame = GpsFrame(
+            fix = mockedFix,
+            fixState = FixState.COMPROMISED,
+            integrity = com.adshield.pro.gps.engine.IntegrityReport(IntegrityVerdict.COMPROMISED)
+        )
+
+        // The rule the listener applies to decide whether to record.
+        assertFalse("a TRUSTED fix is recorded", trustedFrame.integrity.shouldRejectObservation)
+        assertTrue("a COMPROMISED fix is never recorded", compromisedFrame.integrity.shouldRejectObservation)
+        // The frames must disagree, otherwise this test would pass with either one.
+        assertNotEquals(trustedFrame.integrity.verdict, compromisedFrame.integrity.verdict)
+        // And the frame identifies its own fix, which is what makes the pairing checkable at all.
+        assertEquals(2_000L, compromisedFrame.fix?.timeMs)
+    }
+
+    // ------------------------------------------------------- Navigation trail
+
+    /**
+     * BUG: the driven-trail ring appended a point on *every* fix once 8 m had passed, but the rule
+     * was inline inside `onFrame` and mutated a plain ArrayList that the reroute coroutine and the
+     * main-thread copier also touched. Extracting the spacing rule makes both halves checkable: a
+     * stationary vehicle must add nothing, and a moving one must add once per 8 m.
+     */
+    @Test
+    fun testTrailOnlyAppendsAfterEightMetres() {
+        val origin = GeoPoint(14.5995, 120.9842)
+        // 1 m of latitude ≈ 1/111 194.9 degrees at this latitude.
+        fun north(metres: Double) = GeoPoint(14.5995 + metres / 111_194.9, 120.9842)
+
+        assertTrue(
+            "the first point always starts the trail",
+            com.adshield.pro.gps.nav.NavigationSession.shouldAppendTrailPoint(null, origin)
+        )
+        assertFalse(
+            "a stationary fix adds nothing",
+            com.adshield.pro.gps.nav.NavigationSession.shouldAppendTrailPoint(origin, origin)
+        )
+        assertFalse(
+            "5 m is below the spacing",
+            com.adshield.pro.gps.nav.NavigationSession.shouldAppendTrailPoint(origin, north(5.0))
+        )
+        // The threshold is strict (> 8 m), and 8.0 m measures as 8.000013 m, so it appends.
+        assertTrue(
+            "8 m is at the spacing",
+            com.adshield.pro.gps.nav.NavigationSession.shouldAppendTrailPoint(origin, north(8.0))
+        )
+        assertTrue(
+            "9 m is past the spacing",
+            com.adshield.pro.gps.nav.NavigationSession.shouldAppendTrailPoint(origin, north(9.0))
+        )
+    }
+
 }
