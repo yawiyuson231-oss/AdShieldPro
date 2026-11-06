@@ -79,7 +79,7 @@ object MapOverlayMath {
         if (dx > halfWorld) dx -= worldSize
         if (dx < -halfWorld) dx += worldSize
 
-        val rotation = Math.toRadians(bearingDegrees)
+        val rotation = Math.toRadians(cameraBearingDegrees)
         // A camera bearing b turns the world so that b points up. A point at screen angle
         // (theta - b) clockwise from up has x = r·sin(theta - b) and y = -r·cos(theta - b); with
         // dx = r·sin(theta) and dy = -r·cos(theta) that expands to the two lines below.

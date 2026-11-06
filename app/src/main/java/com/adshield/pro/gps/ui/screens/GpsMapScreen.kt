@@ -78,6 +78,7 @@ import com.adshield.pro.gps.ui.VehicleMarker
 import com.adshield.pro.gps.ui.accuracyColor
 import com.adshield.pro.gps.ui.integrityColor
 import com.adshield.pro.gps.ui.movementColor
+import kotlin.math.roundToInt
 
 /**
  * GPS MAP — the full-screen interactive map.
