@@ -20,12 +20,29 @@ under **Capabilities**.
 | Not supported | Why |
 |---|---|
 | Universal / guaranteed ad blocking | Ads served from the page's own (first-party) domain cannot be identified by DNS. No technology guarantees this. |
-| Blocking ads inside video streams (server-side stitched) | Same-origin delivery — invisible to DNS. |
+| Blocking ads **stitched into the video stream** (YouTube, TikTok, Facebook, SSAI) | The ad and the video arrive in the same stream — there is no separate request for DNS to resolve. Removing them would mean blocking the video itself, which breaks playback. |
+| Guaranteeing playback on a **user-synced** third-party list | AdShield cannot vet a feed it did not write. The bundled layers are verified against every protected playback host; a synced feed is checked at sync time and reported if it would block one. |
 | Malware detection inside files or pages | This is DNS filtering, not an antivirus and not a file scanner. |
 | Content-based phishing detection | No page content, DOM or certificate inspection is performed. Only hostname evidence. |
 | Full Public Suffix List | A focused subset (`aether/domain.js`) covers common ccTLD layouts. Exotic suffixes may be mis-split when computing registrable domains. |
 | Wildcards matching across label boundaries | `||ads*.example^` matches within labels by design; `*` is not a cross-domain glob. |
 | Cosmetic / element hiding in DNS rules | Not applicable to DNS; such lines are counted and reported as skipped, not silently applied. |
+
+### 2.1 What video-ad blocking actually does
+
+The Android core blocks **third-party video-ad infrastructure** device-wide, at the DNS layer, so
+it applies in every app (Chrome, YouTube, TikTok, podcast players) with no WebView or extension
+involved: VAST/VPAID ad servers, ad exchanges, video-ad SDK APIs, SSAI/stitcher vendor APIs and
+ad-verification beacons.
+
+It does **not** and cannot remove ads that are stitched into the video itself. To keep that
+boundary honest in code as well as in prose:
+
+- **Playback hosts are exempted above every filter list** (`MediaPlaybackGuard`, priority 79 vs.
+  filter lists at 50), so no bundled layer can take video down;
+- every protected delivery host is checked test-time against **every shipped list**;
+- the video-ad list is checked to contain **no playback host and no wildcard** that could swallow one;
+- a deliberate user block still wins, because the user's own decision outranks built-in lists.
 
 ## 3. DNSSEC
 
@@ -60,6 +77,18 @@ remain explicitly unsupported:
 | General IP/TCP/UDP firewalling | The tunnel routes DNS addresses only, so non-DNS sockets are never seen. Per-app and per-network controls are DNS decisions. |
 | YARA rules / native YARA / ClamAV | No rule parser ships in this build. The file scanner uses signature and structural checks only (EICAR, polyglot containers, script droppers, macro documents, zip-slip). |
 | DoH3 / Oblivious DoH | Only DoH (RFC 8484), DoT (RFC 7858) and explicit plaintext port 53 are implemented. |
+
+## 3e. Safe GPS (Android, v2.10)
+
+| Not supported | Why | What exists instead |
+|---|---|---|
+| Live / continuous location sharing | Needs a relay server and a live session; a lost or stolen phone would keep broadcasting. | A converged fix turned into fixed text you send yourself. |
+| Background location (`ACCESS_BACKGROUND_LOCATION`) | Deliberately not declared. Capture runs only while the Safe GPS screen is open. | On-demand capture with a visible Stop button. |
+| Proof of location / anti-spoof guarantee | No reliable attestation source for an ordinary app. | Android's mock flag is surfaced and blocks emergency sharing; implied-speed plausibility is shown as a hint only. |
+| Emergency calls or automatic contact alerts | An app cannot place a 911 call for you or guarantee an alert. | An emergency message to copy or send via SMS, naming 911 and asking a bystander to call. |
+| Map tiles / offline maps | No map SDK is bundled; tiles would add a provider and a licence. | A `geo:` URI or OpenStreetMap link you choose to open, with the provider named. |
+| Reverse geocoding (street address) | Would send coordinates to a third party without being asked. | Coordinates, a spoken reference, and a landmark-based sharing habit. |
+| Screen-lock / SIM-lock state | Android does not expose it to apps. | The checklist shows "cannot read" rather than assuming the device is locked. |
 
 ## 4. Intelligence limits
 

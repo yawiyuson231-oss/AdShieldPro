@@ -1,4 +1,4 @@
-# AdShield Pro 2.9.0 — Android DNS Ad & Tracker Protection
+# AdShield Pro 2.10.0 — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -91,6 +91,27 @@ npm run stage             # assemble _site/ exactly as the Pages workflow does
 
 Capabilities are also listed inside the app on the **Capabilities** page, including the rows
 that read *not implemented* — nothing there is aspirational.
+
+## Safe GPS (v2.10)
+
+A new **Safe GPS** tab turns a phone fix into something you can act on and share without
+over-sharing:
+
+- **Accuracy that is actually measured.** The screen keeps sampling GNSS/network fixes until the
+  device's *own* reported accuracy stops improving, showing the measured gain (e.g. "38.6 m
+  tighter over 4 fixes") instead of trusting one cached reading.
+- **Honest trust signal.** Fixes that contradict each other are refused rather than averaged;
+  Android's mock-location flag is surfaced; an implausible jump between fixes is reported as a
+  hint, never as tamper detection.
+- **Private by construction.** No server, no map SDK, no background location permission. Before
+  anything is copied or sent it can be rounded to a 250 m / 1 km / 5 km grid, with the wording,
+  the disclosed radius and the trade-offs stated on screen.
+- **Two messages.** An everyday pin ("fixed pin, not live tracking") and an emergency pin that
+  tells the receiver to search from those coordinates and names 911. The app cannot call for help
+  itself and says so.
+
+Details, including the limits registered as `UNAVAILABLE` in the capability matrix:
+[`docs/SAFE_GPS.md`](docs/SAFE_GPS.md).
 
 ## OMNISHIELD X INFINITY native upgrade
 
