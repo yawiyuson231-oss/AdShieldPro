@@ -35,7 +35,12 @@ class GpsMapOverlayTest {
         val z18 = MapOverlayMath.pixelsPerMeter(14.6, 18.0)
         close(2.0, z18 / z17, 1e-9, "each zoom level doubles the pixel density")
         // Equator has the largest scale; a higher latitude compresses it by cos(lat).
-        assertTrue(MapOverlayMath.pixelsPerMeter(0.0, 15.0) > MapOverlayMath.pixelsPerMeter(60.0, 15.0))
+        // assertTrue takes the message FIRST; swapping the arguments compiles (it boxes the
+        // boolean into the Object overload) and then fails at runtime on every device.
+        assertTrue(
+            "the equator must have a larger scale than 60° north",
+            MapOverlayMath.pixelsPerMeter(0.0, 15.0) > MapOverlayMath.pixelsPerMeter(60.0, 15.0)
+        )
     }
 
     @Test
