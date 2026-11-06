@@ -33,579 +33,31 @@ Daemon will be stopped at the end of the build
 > Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
 
-> Task :app:compileDebugUnitTestKotlin
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsTrafficSecurityTest.kt:446:33 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/ScanJournalTest.kt:156:23 Redundant creation of Json format. Creating instances for each use can be slow.
-
-> Task :app:processDebugUnitTestJavaRes
-> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
-> Task :app:hiltCollectClassesDebugUnitTest
-> Task :app:hiltAggregateDepsDebugUnitTest FROM-CACHE
-> Task :app:hiltJavaCompileDebugUnitTest NO-SOURCE
-> Task :app:transformDebugUnitTestClassesWithAsm
-
-> Task :app:testDebugUnitTest
-
-AdShieldEngineTestSuite > testCacheKeysAreScopedToTheActiveResolver PASSED
-
-AdShieldEngineTestSuite > testFilterRuleEngine_precedenceModesWildcardsAndConflictDetection PASSED
-
-AdShieldEngineTestSuite > testBrowserContentBlocker_sanitizesTrackingParamsAndEvaluatesRequests PASSED
-
-AdShieldEngineTestSuite > testJunkCleaner_sha256DuplicateDetection PASSED
-
-AdShieldEngineTestSuite > testDatabaseMigrationVersion PASSED
-
-AdShieldEngineTestSuite > testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu PASSED
-
-AdShieldEngineTestSuite > testLargeTcpDnsAnswersAreSegmentedToFitTheTunnelMtu PASSED
-
-AdShieldEngineTestSuite > testUpstreamResponsesMustEchoTheTransactionIdAndBeResponses PASSED
-
-AdShieldEngineTestSuite > testOnlyNoerrorAndNxdomainAnswersAreCacheable PASSED
-
-AdShieldEngineTestSuite > testUpstreamServerListIncludesIpv6FallbackOnlyWhenEnabled PASSED
-
-AdShieldEngineTestSuite > testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkholeResponses PASSED
-
-AdShieldEngineTestSuite > testFilterValidation_rejectsMalformedDomainsHtmlAndBroadWildcards PASSED
-
-AdShieldEngineTestSuite > testRegression_malformedDnsPacketsAndCompressionLoopsRejectedSafely PASSED
-
-AdShieldEngineTestSuite > testUdpPayloadCapacityMatchesIpVersionHeaders PASSED
-
-AdShieldEngineTestSuite > testIpv4AndIpv6_udpAndTcpFramingAndChecksums PASSED
-
-AdShieldEngineTestSuite > testDnsPacketParser_parsesStandardIpv4AAndIpv6AaaaQueries PASSED
-
-AdShieldEngineTestSuite > testThirdPartyDetectionRespectsLabelBoundaries PASSED
-
-AdShieldEngineTestSuite > testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks PASSED
-
-AdShieldEngineTestSuite > testAiSmartBoostPredictor_detectsBottlenecksAndReadinessScoreAccurately PASSED
-
-AetherCoreTest > testHeuristicsAlone_canNeverVerifyOrBlock PASSED
-
-AetherCoreTest > testUserAllowRule_alwaysWins PASSED
-
-AetherCoreTest > testAdsList_isVerifiedButNotThreatIntelligence PASSED
-
-AetherCoreTest > testDomainAnalyzer_flagsRealPhishingPatterns PASSED
-
-AetherCoreTest > testRiskAggregation_listMatchDominates PASSED
-
-AetherCoreTest > testConnectionHealth_isHonestAboutMissingData PASSED
-
-AetherCoreTest > testAppAssessment_neverBlocksAndExplainsSignals PASSED
-
-AetherCoreTest > testThreatListMatch_isVerifiedAndBlocksByDefault PASSED
-
-AetherCoreTest > testManualAutonomy_reportsInsteadOfBlocking PASSED
-
-AetherCoreTest > testUnknownIsAFirstClassAnswer PASSED
-
-AetherCoreTest > testLiveSnapshot_isBuiltOnlyFromRealLogs PASSED
-
-AetherCoreTest > testDomainAnalyzer_doesNotFlagLegitimateDomains PASSED
-
-AetherCoreTest > testSuspectedBlocking_requiresExplicitOptInAndHigherScore PASSED
-
-AetherCoreTest > testHostExtraction_handlesPortsUsersAndTrailingDots PASSED
-
-BatteryIntelligenceTestSuite > testCapacityHealth_isNullUnlessBothCountersExist PASSED
-
-BatteryIntelligenceTestSuite > testSession_metricsDerivedFromStoredValues PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_flagsRealMeasuredCapacityLoss PASSED
-
-BatteryIntelligenceTestSuite > testFeatureGates_areCorrectForEverySupportedApiLevel PASSED
-
-BatteryIntelligenceTestSuite > testWattsFromMilliAmpsAndMillivolts_conversionIsExact PASSED
-
-BatteryIntelligenceTestSuite > testCurrentSign_isNormalisedPerVendorConvention PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_hotBatteryIsCritical_andColdIsWarned PASSED
-
-BatteryIntelligenceTestSuite > testFahrenheitConversion_matchesReferenceScreenshot PASSED
-
-BatteryIntelligenceTestSuite > testHealthScore_dropsWithRealWearSignals PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_lowChargePowerCallsOutCableOrCharger PASSED
-
-BatteryIntelligenceTestSuite > testDrainRate_andRuntimeProjection PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_neverInventsCapacityDegradationWithoutCounters PASSED
-
-BatteryIntelligenceTestSuite > testMinutesToFull_isNullWhenFullOrNotMeasurable PASSED
-
-BatteryIntelligenceTestSuite > testChargeRate_isMeasuredFromRealSamplesOnly PASSED
-
-BatteryIntelligenceTestSuite > testPower_isVoltageTimesMeasuredCurrent_andNeverInvented PASSED
-
-BatteryIntelligenceTestSuite > testNavigationFitsEveryScreenWidth PASSED
-
-BatteryIntelligenceTestSuite > testFormFactors_coverPhonesTabletsAndFoldables PASSED
-
-BatteryIntelligenceTestSuite > testSupportedPlatformRange_matchesTheManifest PASSED
-
-BatteryIntelligenceTestSuite > testPlausibilityRejectsVendorGarbageButAcceptsRealPhones PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_repeatedDropoutsAreFlagged PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_slowChargingIsExplainedWithEvidence PASSED
-
-BatteryIntelligenceTestSuite > testChargeTimeUnits_areNormalisedOrRejected PASSED
-
-BatteryIntelligenceTestSuite > testReadingSources_areLabelledForTheUi PASSED
-
-BatteryIntelligenceTestSuite > testVoltageStability_needsEnoughSamplesAndReportsSpread PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_missingTemperatureIsReportedAsNotExposed PASSED
-
-BatteryIntelligenceTestSuite > testInterruptions_countOnlyRealChargingDropouts PASSED
-
-BatteryIntelligenceTestSuite > testChargeRate_returnsNullWhenEvidenceIsInsufficient PASSED
-
-BatteryIntelligenceTestSuite > testDiagnostics_needsTimeBeforeJudgingChargeSpeed PASSED
-
-BatteryIntelligenceTestSuite > testVoltageUnitNormalisation_handlesBothVendorConventions PASSED
-
-CapabilityRegistryTest > testSummaryCountsMatchTheRegistry PASSED
-
-CapabilityRegistryTest > testNoCapabilityClaimsCloudAiOrChargeControl PASSED
-
-CapabilityRegistryTest > testEveryCapabilityHasUniqueIdAndHonestStatus PASSED
-
-CapabilityRegistryTest > testImplementedCapabilitiesPointAtRealCode PASSED
-
-CapabilityRegistryTest > testUnavailableCapabilitiesClaimNoCode PASSED
-
-CloudPlatformTestSuite > backupCodecRoundTripsAndRefusesATamperedPayload PASSED
-
-CloudPlatformTestSuite > cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage PASSED
-
-CloudPlatformTestSuite > vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne PASSED
-
-CloudPlatformTestSuite > uploadEngineResumesOnlyThePartsTheServerIsStillMissing PASSED
-
-CloudPlatformTestSuite > uploadEngineCancelsCleanlyAndTellsTheServerToCancelTheSession PASSED
-
-CloudPlatformTestSuite > uploadEngineRetriesATransientPartFailureAndThenSucceeds PASSED
-
-CloudPlatformTestSuite > backupCodecSummaryAndSupportChecksReportTheTruth PASSED
-
-CloudPlatformTestSuite > uploadEnginePausesAndResumesWithoutLosingTheBytesAlreadyStored PASSED
-
-CloudPlatformTestSuite > uploadEngineStreamsEveryPartWithItsRealSha1AndCompletes PASSED
-
-CloudPlatformTestSuite > uploadEngineReportsProgressAsBytesAreCommitted PASSED
-
-CloudPlatformTestSuite > cloudApiBuildsTheDocumentedPathsAndParsesRealResponses PASSED
-
-CybersecurityPlatformTestSuite > fileScannerFlagsEncodedPowerShellDropper PASSED
-
-CybersecurityPlatformTestSuite > validatorRejectsWrongQuestionTruncationServfailAndTrailingData PASSED
-
-CybersecurityPlatformTestSuite > diagnosticQueryUsesEdns0AndNormalisesCase PASSED
-
-CybersecurityPlatformTestSuite > dnssecModeReportsUpstreamAdAndStrictModeRejectsUnsignedPositiveAnswers PASSED
-
-CybersecurityPlatformTestSuite > strictDnssecFailsClosedWithServfailInsteadOfAnUnsignedAnswer PASSED
-
-CybersecurityPlatformTestSuite > resolverServesTtlCacheWithoutRequeryingUpstream PASSED
-
-CybersecurityPlatformTestSuite > resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade PASSED
-
-CybersecurityPlatformTestSuite > appNetworkAndEmergencyPoliciesAreDeterministic PASSED
-
-CybersecurityPlatformTestSuite > providerPlanIsExplicitAndNeverCrossFailsPlaintextDns PASSED
-
-CybersecurityPlatformTestSuite > healthCircuitOpensClosesAndUsesOnlyMeasuredLatency PASSED
-
-CybersecurityPlatformTestSuite > resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt PASSED
-
-DashboardPresentationTest > eventTitlesDescribeRealOutcomes PASSED
-
-DashboardPresentationTest > overview_threatsCannotExceedBlocked PASSED
-
-DashboardPresentationTest > motionRequiresConnectedTunnelRealTrafficAndSystemAnimations PASSED
-
-DashboardPresentationTest > overview_prefersDeviceHistoryAndNeverMixesSessionCounters PASSED
-
-DashboardPresentationTest > liveEventsKeepDatabaseIdsForStableLazyKeys PASSED
-
-DashboardPresentationTest > overview_emptyStateIsExplicitAndZeroSafe PASSED
-
-DashboardPresentationTest > severityMappingIsStableAndNeverInventsCriticalForAllowedTraffic PASSED
-
-DashboardPresentationTest > idleLiveSnapshotDoesNotPretendToHaveTraffic PASSED
-
-DashboardPresentationTest > percentLabelRoundsAndClamps PASSED
-
-DashboardPresentationTest > navScrollTargetCentersSelectionAndClampsAtStart PASSED
-
-DashboardPresentationTest > overview_fallsBackToCurrentSessionOnlyWhenHistoryIsEmpty PASSED
-
-DashboardPresentationTest > overview_clampsImpossibleBlockedCounters PASSED
-
-DashboardPresentationTest > overview_recomputesAllowedWhenReportedCounterContradictsTotal PASSED
-
-DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
-
-GpsEngineTest > testRadarZenithSatelliteSitsInTheCentre PASSED
-
-GpsEngineTest > testRadarEmptyReasonIsSpecificAboutTheCause PASSED
-
-GpsEngineTest > testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed PASSED
-
-GpsEngineTest > testEtaFallsBackToSpeedLimitWhenStopped PASSED
-
-GpsEngineTest > testAccuracyBandThresholds PASSED
-
-GpsEngineTest > testGeodesyDistanceBetweenManilaAndQuezonCity PASSED
-
-GpsEngineTest > testGeoBoundsAroundContainsCentreAndNotFarAwayPoint PASSED
-
-GpsEngineTest > testSnrRatioClampsOutOfRangeValues PASSED
-
-GpsEngineTest > testMapProjectionTileCountForSmallRegion PASSED
-
-GpsEngineTest > testIntegrityMonitorFlagsClockGoingBackwards PASSED
-
-GpsEngineTest > testStationaryDetectorClassifiesHighwaySpeed PASSED
-
-GpsEngineTest > testSeverityOrderingIsExplicit PASSED
-
-GpsEngineTest > testSatelliteSnapshotQualityNoteExplainsFewSatellites PASSED
-
-GpsEngineTest > testSegmentProjectionSnapsToNearestPointOnRoad PASSED
-
-GpsEngineTest > testEtaUsesMeasuredSpeedWhenMoving PASSED
-
-GpsEngineTest > testStationaryDetectorClassifiesStoppedVehicle PASSED
-
-GpsEngineTest > testFixWithoutAltitudeKeepsNullInsteadOfZero PASSED
-
-GpsEngineTest > testSkyScoreRisesWithAFullSky PASSED
-
-GpsEngineTest > testIntegrityStatisticsAccumulate PASSED
-
-GpsEngineTest > testSkyScoreIsZeroWithoutSatellites PASSED
-
-GpsEngineTest > testIntegrityMonitorAcceptsNormalDriving PASSED
-
-GpsEngineTest > testRadarEastIsPositiveX PASSED
-
-GpsEngineTest > testIntegrityMonitorFlagsImpossibleJump PASSED
-
-GpsEngineTest > testSpeedIsAbsentWhenProviderDoesNotReportIt PASSED
-
-GpsEngineTest > testMapProjectionRejectsPolarLatitude PASSED
-
-GpsEngineTest > testConstellationCodeIsShortAndStable PASSED
-
-GpsEngineTest > testConfidenceDropsForMockedAndCachedFixes PASSED
-
-GpsEngineTest > testIncidentValidatorRejectsCompromisedLocation PASSED
-
-GpsEngineTest > testGeodesyBearingAndDestinationRoundTrip PASSED
-
-GpsEngineTest > testRadarRingsAreHorizonZenithAndMid PASSED
-
-GpsEngineTest > testSatelliteSnapshotUsedRatioIsZeroWithoutSatellites PASSED
-
-GpsEngineTest > testRadarPlacesNorthernSatelliteAboveCentre PASSED
-
-GpsEngineTest > testEtaWithoutAnySpeedInformationStillTerminates PASSED
-
-GpsEngineTest > testStationaryDetectorInfersMotionWithoutDopplerSpeed PASSED
-
-GpsEngineTest > testIntegrityMonitorFlagsMockProvider PASSED
-
-GpsOfflineGraphTest > testOfflineRouterProducesATurnByTurnPlan FAILED
-    java.lang.AssertionError at GpsOfflineGraphTest.kt:189
-
-GpsOfflineGraphTest > testGraphRoundTripsThroughTheBinaryFormat PASSED
-
-GpsOfflineGraphTest > testEstimatedSizeGrowsWithTheGraph PASSED
-
-GpsOfflineGraphTest > testRoutingOutsideTheDownloadedRegionIsRefusedNotApproximated PASSED
-
-GpsOfflineGraphTest > testShortestPathFindsTheLShapedRoute FAILED
-    java.lang.AssertionError at GpsOfflineGraphTest.kt:48
-
-GpsOfflineGraphTest > testTruncatedFileFailsInsteadOfProducingAPartialGraph PASSED
-
-GpsOfflineGraphTest > testNearestNodeSnapsAnOffRoadCoordinate PASSED
-
-GpsOfflineGraphTest > testCorruptNodeCountIsBounded PASSED
-
-GpsOfflineGraphTest > testCompressedFileRoundTripOnDisk PASSED
-
-GpsOfflineGraphTest > testForeignFileIsRejectedWithAReason PASSED
-
-GpsOfflineGraphTest > testSnapToRoadLandsOnTheSegmentNotOnANode PASSED
-
-GpsOfflineGraphTest > testSnapToRoadReturnsNullBeyondItsSearchRadius PASSED
-
-GpsOfflineGraphTest > testWrongVersionIsRejectedInsteadOfParsedAnyway PASSED
-
-GpsOfflineGraphTest > testDescribeReportsRealRoadKilometresNotEdgeCounts PASSED
-
-GpsOfflineGraphTest > testShortestPathIsDirectionAwareAcrossTheOneWayPair FAILED
-    java.lang.NullPointerException at GpsOfflineGraphTest.kt:167
-
-GpsOfflineGraphTest > testRegionIdIsNotPartOfTheFileSoTheCallerSuppliesIt PASSED
-
-GpsOfflineGraphTest > testDistanceToCoverageIsZeroInsideAndPositiveOutside PASSED
-
-GpsSecureStoreTest > testEmptyPayloadStillRoundTrips PASSED
-
-GpsSecureStoreTest > testWrongKeyIsRejected PASSED
-
-GpsSecureStoreTest > testEncryptedContainerIsNotThePlaintext PASSED
-
-GpsSecureStoreTest > testHeaderOnlyFileIsRejectedAsTruncated PASSED
-
-GpsSecureStoreTest > testRoundTripRestoresTheExactBytes PASSED
-
-GpsSecureStoreTest > testTamperedCiphertextFailsAuthentication PASSED
-
-GpsSecureStoreTest > testHeaderLayoutMatchesTheDocumentedFormat PASSED
-
-GpsSecureStoreTest > testRestoredKeyDecryptsEarlierData PASSED
-
-GpsSecureStoreTest > testTamperedIvFailsAuthentication PASSED
-
-GpsSecureStoreTest > testSameKeyTwiceProducesDifferentContainers PASSED
-
-GpsSecureStoreTest > testPlaintextFileIsNotMistakenForAContainer PASSED
-
-GpsTrafficSecurityTest > testStandstillTrafficIsRed PASSED
-
-GpsTrafficSecurityTest > testDuplicateIncidentIsRejectedAndNearbyOneIsMerged PASSED
-
-GpsTrafficSecurityTest > testDistanceFormattingIsHumanReadable PASSED
-
-GpsTrafficSecurityTest > testIncidentValidatorRejectsControlCharactersAndLongNotes PASSED
-
-GpsTrafficSecurityTest > testTelemetryGateBlocksMockAndPoorAccuracy PASSED
-
-GpsTrafficSecurityTest > testTelemetryGateBlocksEverythingWhenSharingIsOff PASSED
-
-GpsTrafficSecurityTest > testOfflinePolicyLineStatesTheLimits PASSED
-
-GpsTrafficSecurityTest > testAgreementFactorPunishesScatteredSpeeds PASSED
-
-GpsTrafficSecurityTest > testOfflineAutoFitFindsAZoomRangeInsideTheBudget PASSED
-
-GpsTrafficSecurityTest > testOfflinePlanRejectsRegionAboveTheFreeTileBudget PASSED
-
-GpsTrafficSecurityTest > testSegmentWithNoObservationsIsUnknownNotGreen PASSED
-
-GpsTrafficSecurityTest > testAgeAndConfidenceFormattingNeverInventsPrecision PASSED
-
-GpsTrafficSecurityTest > testTokenBucketStopsBurstBeyondCapacity PASSED
-
-GpsTrafficSecurityTest > testObservationsForAnotherSegmentAreIgnored PASSED
-
-GpsTrafficSecurityTest > testDegenerateBoundsAreRejectedWithAReason PASSED
-
-GpsTrafficSecurityTest > testFreeFlowUsesPostedLimitThenEightyFifthPercentile PASSED
-
-GpsTrafficSecurityTest > testPermissionAuditReportsApproximateOnlyAsAFinding PASSED
-
-GpsTrafficSecurityTest > testKillSwitchOverridesEmergencyAllowance PASSED
-
-GpsTrafficSecurityTest > testPrivacyDefaultsAreAllOff PASSED
-
-GpsTrafficSecurityTest > testEmergencyShareContainsRealCoordinatesAndFreeMapLink PASSED
-
-GpsTrafficSecurityTest > testPermissionAuditWithNothingGrantedSaysModuleIsDisabled PASSED
-
-GpsTrafficSecurityTest > testPermissionAuditFlagsMockLocationApp PASSED
-
-GpsTrafficSecurityTest > testSingleNoisySampleStaysUnknownBecauseConfidenceIsTooLow PASSED
-
-GpsTrafficSecurityTest > testHistoryGuardRoundsCoordinatesWhenCoarse PASSED
-
-GpsTrafficSecurityTest > testIncidentKindsHaveBoundedLifetimes PASSED
-
-GpsTrafficSecurityTest > testOfflinePlanAcceptsASmallNeighbourhood PASSED
-
-GpsTrafficSecurityTest > testOfflineEstimateGrowsWithZoomRange PASSED
-
-GpsTrafficSecurityTest > testFreeFlowingTrafficIsGreenWithEnoughSamples PASSED
-
-GpsTrafficSecurityTest > testHistoryGuardExpiresOldTimestamps PASSED
-
-GpsTrafficSecurityTest > testObservationsOutsideTheWindowAreIgnored PASSED
-
-GpsTrafficSecurityTest > testEmergencyShareRefusesWithoutPermission PASSED
-
-GpsTrafficSecurityTest > testOfflineCorridorCoversTheWholeRoute PASSED
-
-GpsTrafficSecurityTest > testConfidenceDecaysWithAge PASSED
-
-InfinityCoreTestSuite > testWebDavPaths_rejectTraversalAndBuildSafeChildren PASSED
-
-InfinityCoreTestSuite > testWebDavXml_parsesRealMultistatusEntriesAndQuota PASSED
-
-InfinityCoreTestSuite > testAetherReportExplainer_usesOnlyRecordedEvidenceAndCannotAuthorizeDeletion PASSED
-
-InfinityCoreTestSuite > testStorageEndpoints_requireHttpsAndRejectEmbeddedCredentials PASSED
-
-InfinityCoreTestSuite > testDirectMediaInput_enforcesHttpsAndSafeFileNames PASSED
-
-InfinityCoreTestSuite > testCapacityAggregation_sumsMultipleVerifiedServersWithoutAssumedCapacity PASSED
-
-InfinityCoreTestSuite > testPrivateSearch_selectsProviderAndUpgradesCleartextNavigation PASSED
-
-InfinityCoreTestSuite > testAetherReportExplainer_emptyHistoryDoesNotInventThreats PASSED
-
-InfinityCoreTestSuite > testCapacityAggregation_countsOnlyOnlineProvidersWithMeasuredQuota PASSED
-
-InfinityCoreTestSuite > testWebDavXml_parsesOnlyHttpsNextcloudShareLinks PASSED
-
-OnionRoutingTestSuite > orbotStatusBroadcastMapsToHonestStates PASSED
-
-OnionRoutingTestSuite > proxyPortsFromOrbotAreUsedAndInvalidOnesFallBackToTheDefaults PASSED
-
-OnionRoutingTestSuite > torIsVerifiedAgainstTorsOwnCheckService PASSED
-
-OnionRoutingTestSuite > socksProxyIsUnresolvedSoOnionNamesNeverReachTheDeviceResolver PASSED
-
-PrivateSearchTest > providerLabelsAndPrivacyNotesArePresentAndHonest PASSED
-
-PrivateSearchTest > searchUrl_encodesUtf8PerByte PASSED
-
-PrivateSearchTest > everyProviderSearchesOverHttps PASSED
-
-PrivateSearchTest > providerLookup_unknownOrMissingFallsBackToPrivacyDefault PASSED
-
-PrivateSearchTest > switchingProviderChangesOnlyTheSearchEndpoint PASSED
-
-PrivateSearchTest > searchUrl_cannotInjectExtraQueryParameters PASSED
-
-PrivateSearchTest > searchUrl_encodesSpacesAsPercent20 PASSED
-
-PrivateSearchTest > addressDetectionMatchesTheDocumentedRule PASSED
-
-PrivateSearchTest > bareHostIsUpgradedToHttps PASSED
-
-PrivateSearchTest > searchUrl_escapesReservedCharacters PASSED
-
-PrivateSearchTest > searchUrl_trimsAndDoesNotDoubleEncode PASSED
-
-PrivateSearchTest > explicitHttpIsNotSilentlyRewritten PASSED
-
-PrivateSearchTest > explicitHttpsIsPreservedExactly PASSED
-
-PrivateSearchTest > plainTermsBecomeProviderSearches PASSED
-
-PrivateSearchTest > providerLookup_isCaseInsensitiveAndTrimmed PASSED
-
-PrivateSearchTest > searchUrl_keepsUnreservedCharactersReadable PASSED
-
-PrivateSearchTest > emptyInputGoesToSelectedProviderHome PASSED
-
-ProtectionStatusTest > missingRulesAreDegradedRatherThanSilentlyHealthy PASSED
-
-ProtectionStatusTest > aWorkingTunnelReportsActiveWithAFullHealthScore PASSED
-
-ProtectionStatusTest > pausedAndOfflineStatesNeverClaimProtection PASSED
-
-ProtectionStatusTest > policiesAndDnssecModeAreReflectedInBadgesAndStages PASSED
-
-ProtectionStatusTest > emergencyLockdownIsAttentionNotAHealthFault PASSED
-
-ProtectionStatusTest > anIdleTunnelIsNeverDescribedAsWorking PASSED
-
-ProtectionStatusTest > anOpenProviderCircuitIsReportedAsDegradedAndCostsHealth PASSED
-
-ScanJournalTest > historyIsBoundedAndNewestFirst PASSED
-
-ScanJournalTest > quarantineStoredNamesCannotEscapeTheDirectory PASSED
-
-ScanJournalTest > scanRecordSurvivesPersistenceRoundTrip PASSED
-
-ScanJournalTest > storedFileNameValidationRejectsForeignFiles PASSED
-
-ScanJournalTest > idsStayUniqueWhenManyScansFinishInTheSameMillisecond PASSED
-
-ScanJournalTest > progressFractionIsClampedAndReportedHonestly PASSED
-
-ScanJournalTest > batchAppendSortsNewestFirstAndRespectsTheCap PASSED
-
-ScanJournalTest > quarantineIndexIsBoundedAndUsageIgnoresNegativeSizes PASSED
-
-ScanJournalTest > summaryCountsEveryLevelAndKind PASSED
-
-ScanJournalTest > emptySummaryHasNoLastScanTimestamp PASSED
-
-ScanJournalTest > quarantineItemSurvivesPersistenceRoundTrip PASSED
-
-ScanJournalTest > reportIncludesRealFindingsAndStatesScannerLimits PASSED
-
-ScanJournalTest > legacyRecordsWithoutNewFieldsStillDecode PASSED
-
-ScanJournalTest > nextIdNeverGoesBackwardsEvenIfClockMovesBack PASSED
-
-ScanJournalTest > nextIdUsesWallClockWhenItIsAhead PASSED
-
-ScanJournalTest > displayNamesAreStrippedOfTraversalAndControlCharacters PASSED
-
-ScanJournalTest > progressIsIndeterminateUntilTheTotalIsKnown PASSED
-
-ScanJournalTest > emptyJournalIsNotEvidenceOfACleanDevice PASSED
-
-SecurityCenterTestSuite > testUrlScanner_flagsTyposquatting PASSED
-
-SecurityCenterTestSuite > testUrlScanner_flagsPhishingPatterns PASSED
-
-SecurityCenterTestSuite > testApkAnalyzer_axmlParser_extractsPackageAndPermissions PASSED
-
-SecurityCenterTestSuite > testApkAnalyzer_flagsSmsInterceptionDropperProfile PASSED
-
-SecurityCenterTestSuite > testFileScanner_cleanFilePasses PASSED
-
-SecurityCenterTestSuite > testBrowserBlocker_blocksThirdPartyAdHostsButNotFirstPartyContent PASSED
-
-SecurityCenterTestSuite > testAppAuditor_flagsAccessibilitySmsTrojanProfile PASSED
-
-SecurityCenterTestSuite > testFileScanner_detectsPolyglotExecutableInImage PASSED
-
-SecurityCenterTestSuite > testUrlScanner_usesKnownThreatLookup PASSED
-
-SecurityCenterTestSuite > testUrlScanner_cleanUrlPasses PASSED
-
-SecurityCenterTestSuite > testFileScanner_detectsEicarTestSignature PASSED
-
-SecurityCenterTestSuite > testFilterEngine_blocksSubdomainsAndHonoursExceptions PASSED
-
-SecurityCenterTestSuite > testUrlScanner_flagsEmbeddedCredentialsAndRawIpLogins PASSED
-
-SecurityCenterTestSuite > testFileScanner_detectsZipSlipArchive PASSED
-
-SecurityCenterTestSuite > testFileScanner_flagsMacroOfficeDocuments PASSED
-
-270 tests completed, 3 failed
-
-> Task :app:testDebugUnitTest FAILED
+> Task :app:compileDebugUnitTestKotlin FAILED
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsMapOverlayTest.kt:46:20 Argument type mismatch: actual type is 'Float', but 'Double' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsMapOverlayTest.kt:49:20 Argument type mismatch: actual type is 'Float', but 'Double' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsMapOverlayTest.kt:116:20 Argument type mismatch: actual type is 'Boolean', but 'String!' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsMapOverlayTest.kt:116:40 Argument type mismatch: actual type is 'String', but 'Boolean' was expected.
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':app:testDebugUnitTest'.
-> There were failing tests. See the report at: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build/reports/tests/testDebugUnitTest/index.html
+Execution failed for task ':app:compileDebugUnitTestKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: ARGUMENT_TYPE_MISMATCH
+       Kotlin compiler error
+         Argument type mismatch: actual type is 'Float', but 'Double' was expected.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/GpsMapOverlayTest.kt line 46
 
 * Try:
+> Run with --info or --debug option to get more log output.
 > Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
 
 * Exception is:
-org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:testDebugUnitTest'.
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:compileDebugUnitTestKotlin' (registered by plugin 'com.android.internal.application').
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:135)
 	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:288)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:133)
@@ -637,17 +89,57 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:tes
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$0(DefaultBuildLifecycleController.java:323)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:324)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$0(StateTransitionController.java:235)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:235)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
-Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There were failing tests. See the report at: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build/reports/tests/testDebugUnitTest/index.html
-	at org.gradle.api.tasks.testing.AbstractTestTask.executeTests(AbstractTestTask.java:616)
-	at org.gradle.api.tasks.testing.Test.executeTests(Test.java:772)
-	at com.android.build.gradle.tasks.factory.AndroidUnitTest.executeTests(AndroidUnitTest.java:204)
-	at org.gradle.internal.reflect.JavaMethod.invoke(JavaMethod.java:125)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.doExecute(StandardTaskAction.java:58)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:51)
-	at org.gradle.api.internal.project.taskfactory.StandardTaskAction.execute(StandardTaskAction.java:29)
-	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:259)
+Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:273)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:132)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$withoutLocksBlocking$0(DefaultWorkerLeaseService.java:412)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocksBlocking(DefaultWorkerLeaseService.java:407)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.blocking(DefaultWorkerLeaseService.java:257)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.blocking(DefaultWorkerLeaseService.java:239)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$1(DefaultAsyncWorkTracker.java:128)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.resources.AbstractResourceLockRegistry.whileDisallowingLockChanges(AbstractResourceLockRegistry.java:51)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.whileDisallowingProjectLockChanges(DefaultWorkerLeaseService.java:262)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:127)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:93)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForAll(DefaultAsyncWorkTracker.java:79)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForCompletion(DefaultAsyncWorkTracker.java:67)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:267)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:30)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:27)
 	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
@@ -748,8 +240,43 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 30 more
+	... 61 more
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Argument type mismatch: actual type is 'Float', but 'Double' was expected.
+	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
+	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
+	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:68)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:103)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$1(DefaultWorkerExecutor.java:169)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:191)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$600(DefaultConditionalExecutionQueue.java:112)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:168)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:137)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:163)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:125)
+	... 2 more
 
 
-BUILD FAILED in 37s
-33 actionable tasks: 7 executed, 2 from cache, 24 up-to-date
+BUILD FAILED in 19s
+29 actionable tasks: 4 executed, 1 from cache, 24 up-to-date
