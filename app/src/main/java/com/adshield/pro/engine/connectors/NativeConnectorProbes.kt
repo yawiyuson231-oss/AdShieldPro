@@ -405,6 +405,9 @@ class NativeConnectorProbes @Inject constructor(
         else -> "mode $mode"
     }
 
+    // Context.SENSOR_PRIVACY_SERVICE is not exposed in every compile SDK, so the documented
+    // service name is used directly; lint cannot verify a literal.
+    @SuppressLint("WrongConstant")
     private fun sensorPrivacy(): ProbeResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             return ProbeResult(false, ConnectorStatus.DEGRADED, "Sensor privacy API requires Android 12+")
