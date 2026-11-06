@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsSecureStoreTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-05T23:07:04.910Z" hostname="runnervmwuk1x" time="0.008">
+<testsuite name="com.adshield.pro.GpsSecureStoreTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:00:24.794Z" hostname="runnervmwuk1x" time="0.003">
   <properties/>
-  <testcase name="testEmptyPayloadStillRoundTrips" classname="com.adshield.pro.GpsSecureStoreTest" time="0.002"/>
+  <testcase name="testEmptyPayloadStillRoundTrips" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
   <testcase name="testWrongKeyIsRejected" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
-  <testcase name="testEncryptedContainerIsNotThePlaintext" classname="com.adshield.pro.GpsSecureStoreTest" time="0.001"/>
+  <testcase name="testEncryptedContainerIsNotThePlaintext" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
   <testcase name="testHeaderOnlyFileIsRejectedAsTruncated" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
   <testcase name="testRoundTripRestoresTheExactBytes" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
-  <testcase name="testTamperedCiphertextFailsAuthentication" classname="com.adshield.pro.GpsSecureStoreTest" time="0.003"/>
+  <testcase name="testTamperedCiphertextFailsAuthentication" classname="com.adshield.pro.GpsSecureStoreTest" time="0.001"/>
   <testcase name="testHeaderLayoutMatchesTheDocumentedFormat" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
-  <testcase name="testRestoredKeyDecryptsEarlierData" classname="com.adshield.pro.GpsSecureStoreTest" time="0.001"/>
+  <testcase name="testRestoredKeyDecryptsEarlierData" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
   <testcase name="testTamperedIvFailsAuthentication" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
-  <testcase name="testSameKeyTwiceProducesDifferentContainers" classname="com.adshield.pro.GpsSecureStoreTest" time="0.001"/>
-  <testcase name="testPlaintextFileIsNotMistakenForAContainer" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
+  <testcase name="testSameKeyTwiceProducesDifferentContainers" classname="com.adshield.pro.GpsSecureStoreTest" time="0.0"/>
+  <testcase name="testPlaintextFileIsNotMistakenForAContainer" classname="com.adshield.pro.GpsSecureStoreTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

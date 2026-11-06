@@ -94,9 +94,9 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 > Task :app:hiltJavaCompileRelease
 > Task :app:processReleaseJavaRes
 > Task :app:generateReleaseLintVitalReportModel
-> Task :app:mergeReleaseJavaResource
 > Task :app:transformReleaseClassesWithAsm
 > Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:mergeReleaseJavaResource
 > Task :app:expandReleaseArtProfileWildcards
 > Task :app:produceReleaseComposeMapping
 > Task :app:reportReleaseComposeMappingErrors
@@ -114,6 +114,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 3m 28s
+BUILD SUCCESSFUL in 3m 30s
 57 actionable tasks: 38 executed, 19 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
