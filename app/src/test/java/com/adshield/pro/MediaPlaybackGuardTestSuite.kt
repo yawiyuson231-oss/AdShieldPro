@@ -281,8 +281,9 @@ class MediaPlaybackGuardTestSuite {
         assertEquals("IMPLEMENTED", layer.status.name)
         assertEquals("stitched-in ads must be declared unavailable, not hand-waved", "UNAVAILABLE", stitched.status.name)
         assertTrue(
-            "the unavailable row must say why: ${stitched.limitations}",
-            stitched.limitations.any { it.contains("same stream") }
+            "the unavailable row must say why (same stream, no separate request): " +
+                "${stitched.dataSources} ${stitched.limitations}",
+            (stitched.dataSources + stitched.limitations).any { it.contains("same stream") }
         )
         assertTrue(
             "the guarantee must name its own cost: ${guarantee.limitations}",
