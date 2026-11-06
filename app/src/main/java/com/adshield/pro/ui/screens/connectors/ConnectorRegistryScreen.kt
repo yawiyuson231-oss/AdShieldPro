@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.domain.connectors.ConnectorSnapshot
 import com.adshield.pro.domain.connectors.ConnectorStatus
+import com.adshield.pro.domain.connectors.LookupFinding
 import com.adshield.pro.domain.connectors.VerificationClass
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.ui.model.ConnectorUiState

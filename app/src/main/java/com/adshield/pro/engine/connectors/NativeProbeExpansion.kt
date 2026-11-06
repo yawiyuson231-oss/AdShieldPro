@@ -290,12 +290,13 @@ class NativeProbeExpansion @Inject constructor(
     suspend fun deviceAdmin(): ProbeResult {
         val manager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "DevicePolicyManager unavailable")
-        val admins = runCatching { manager.activeAdmins }.getOrElse { emptyList() }
+        val admins: List<android.content.ComponentName> =
+            runCatching { manager.activeAdmins }.getOrNull() ?: emptyList()
         return ProbeResult(
             available = true,
             status = ConnectorStatus.CONNECTED,
             summary = "${admins.size} active device administrator(s)",
-            details = admins.take(8).map { it.packageName to (runCatching { it.componentName.className }.getOrNull() ?: "") },
+            details = admins.take(8).map { it.packageName to it.className },
             restriction = "An active administrator can hold management powers granted by the user, not by this app."
         )
     }
@@ -337,10 +338,10 @@ class NativeProbeExpansion @Inject constructor(
     suspend fun privateDns(): ProbeResult {
         val resolver = context.contentResolver
         val mode = runCatching {
-            Settings.Global.getString(resolver, Settings.Global.PRIVATE_DNS_MODE)
+            Settings.Global.getString(resolver, "private_dns_mode")
         }.getOrNull()
         val specifier = runCatching {
-            Settings.Global.getString(resolver, Settings.Global.PRIVATE_DNS_SPECIFIER)
+            Settings.Global.getString(resolver, "private_dns_specifier")
         }.getOrNull()
         val available = !mode.isNullOrBlank()
         return ProbeResult(
@@ -410,8 +411,8 @@ class NativeProbeExpansion @Inject constructor(
         var drm: MediaDrm? = null
         return try {
             drm = MediaDrm(uuid)
-            val level = runCatching { drm.getPropertyString(MediaDrm.PROPERTY_SECURITY_LEVEL) }.getOrNull()
-            val version = runCatching { drm.getPropertyString(MediaDrm.PROPERTY_VERSION) }.getOrNull()
+            val level = runCatching { drm.getPropertyString("securityLevel") }.getOrNull()
+            val version = runCatching { drm.getPropertyString("version") }.getOrNull()
             ProbeResult(
                 available = !level.isNullOrBlank(),
                 status = if (!level.isNullOrBlank()) ConnectorStatus.CONNECTED else ConnectorStatus.DEGRADED,
@@ -582,8 +583,11 @@ class NativeProbeExpansion @Inject constructor(
         runCatching { dir.mkdirs() }
         var observer: FileObserver? = null
         return try {
-            observer = FileObserver(dir, FileObserver.CREATE)
-            observer.startWatching()
+            val watcher = object : FileObserver(dir, FileObserver.CREATE) {
+                override fun onEvent(event: Int, path: String?) = Unit
+            }
+            observer = watcher
+            watcher.startWatching()
             ProbeResult(
                 available = true,
                 status = ConnectorStatus.CONNECTED,
