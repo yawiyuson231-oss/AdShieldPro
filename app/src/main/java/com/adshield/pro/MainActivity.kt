@@ -94,6 +94,9 @@ import com.adshield.pro.ui.theme.AdShieldProTheme
 import com.adshield.pro.ui.theme.ElectricBlue
 import com.adshield.pro.ui.theme.SkyBlueGlow
 import com.adshield.pro.ui.viewmodel.AdShieldViewModel
+import com.adshield.pro.ui.viewmodel.ConnectorViewModel
+import com.adshield.pro.ui.model.ConnectorUiState
+import com.adshield.pro.ui.screens.connectors.ConnectorRegistryScreen
 import com.adshield.pro.ui.viewmodel.CloudStorageViewModel
 import com.adshield.pro.ui.viewmodel.DownloaderViewModel
 import com.adshield.pro.ui.viewmodel.FileManagerViewModel
@@ -140,11 +143,16 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
+    var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
+    val connectorViewModel: ConnectorViewModel = hiltViewModel()
+    val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uiFeedback by viewModel.uiFeedbackMessage.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = showAboutScreen) { showAboutScreen = false }
+    BackHandler(enabled = showAboutScreen || connectorsOpen) {
+        if (connectorsOpen) connectorsOpen = false else showAboutScreen = false
+    }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -234,7 +242,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen) {
+            if (!showAboutScreen && !connectorsOpen) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -257,8 +265,13 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
                 MainNavDestination.INTELLIGENCE -> IntelligenceDestination(
                     adShieldViewModel = viewModel,
+                    connectorState = connectorState,
                     onToggleProtection = handleToggleVpn,
-                    onNavigate = { currentTab = it }
+                    onNavigate = { currentTab = it },
+                    onOpenConnectors = { module ->
+                        connectorViewModel.setModuleFilter(module)
+                        connectorsOpen = true
+                    }
                 )
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.FILES -> FilesDestination()
@@ -274,6 +287,22 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     onCloseAbout = { showAboutScreen = false }
                 )
                 MainNavDestination.STATUS -> StatusDestination(viewModel)
+            }
+
+            if (connectorsOpen) {
+                ConnectorRegistryScreen(
+                    state = connectorState,
+                    onBack = { connectorsOpen = false },
+                    onSetModuleFilter = connectorViewModel::setModuleFilter,
+                    onSetQuery = connectorViewModel::setQuery,
+                    onSync = connectorViewModel::sync,
+                    onSyncModule = connectorViewModel::syncModule,
+                    onToggleEnabled = connectorViewModel::toggleEnabled,
+                    onCheckValue = connectorViewModel::checkValue,
+                    onClearCheck = connectorViewModel::clearCheck,
+                    onDismissMessage = connectorViewModel::clearMessage,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -437,8 +466,10 @@ private fun navDestinationForModule(module: IntelligenceModule): MainNavDestinat
 @Composable
 private fun IntelligenceDestination(
     adShieldViewModel: AdShieldViewModel,
+    connectorState: ConnectorUiState,
     onToggleProtection: (Boolean) -> Unit,
     onNavigate: (MainNavDestination) -> Unit,
+    onOpenConnectors: (IntelligenceModule?) -> Unit,
     mapViewModel: IntelligenceMapViewModel = hiltViewModel()
 ) {
     val mapState by mapViewModel.uiState.collectAsStateWithLifecycle()
@@ -475,7 +506,9 @@ private fun IntelligenceDestination(
                 IntelligenceAction.SCHEDULE_SCAN -> onNavigate(MainNavDestination.SECURITY)
             }
         },
-        onOpenModule = { module -> onNavigate(navDestinationForModule(module)) }
+        onOpenModule = { module -> onNavigate(navDestinationForModule(module)) },
+        connectorSummaryFor = { module -> connectorState.summaryFor(module) },
+        onOpenConnectors = onOpenConnectors
     )
 }
 

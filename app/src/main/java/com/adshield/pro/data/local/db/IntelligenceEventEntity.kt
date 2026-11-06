@@ -61,6 +61,9 @@ interface IntelligenceEventDao {
     @Query("SELECT COUNT(*) FROM intelligence_events")
     suspend fun count(): Int
 
+    @Query("SELECT COUNT(*) FROM intelligence_events WHERE module = :module")
+    suspend fun countForModule(module: String): Int
+
     @Query("DELETE FROM intelligence_events WHERE timestamp_epoch_ms < :cutoffEpochMs")
     suspend fun pruneBefore(cutoffEpochMs: Long): Int
 

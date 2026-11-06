@@ -122,6 +122,8 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 | [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
 | [`docs/DNS_SECURITY_ARCHITECTURE.md`](docs/DNS_SECURITY_ARCHITECTURE.md) | Upstream failover, response validation, DNSSEC reporting and DNS-only app/network policy |
 | [`docs/INTELLIGENCE_MAP.md`](docs/INTELLIGENCE_MAP.md) | Live Intelligence Map: event pipeline, module data sources, gestures, honesty rules, performance budget and acceptance evidence |
+| [`docs/CONNECTORS.md`](docs/CONNECTORS.md) | Connector platform: architecture, free-provider terms, Android limitations, privacy guarantees and verification steps |
+| [`docs/CONNECTOR_VERIFICATION.md`](docs/CONNECTOR_VERIFICATION.md) | Generated per-connector verification table (110 entries, 103 implemented, honest gap to 350) |
 
 ## App screenshots
 

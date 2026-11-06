@@ -14,15 +14,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SecurityScanEntity::class,
         StorageProviderEntity::class,
         DirectDownloadEntity::class,
-        IntelligenceEventEntity::class
+        IntelligenceEventEntity::class,
+        ConnectorStateEntity::class,
+        ThreatIndicatorEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AdShieldDatabase : RoomDatabase() {
     abstract fun adShieldDao(): AdShieldDao
 
     abstract fun intelligenceEventDao(): IntelligenceEventDao
+
+    abstract fun connectorDao(): ConnectorDao
 
     companion object {
         const val DATABASE_NAME = "adshield_pro_v2.db"
@@ -119,6 +123,58 @@ abstract class AdShieldDatabase : RoomDatabase() {
          * Adds the bounded intelligence-event store that feeds the OMNISHIELD X live map.
          * Index names match Room's generated naming so the identity hash validates after migration.
          */
+        /**
+         * Adds the connector platform: persisted connector state and the bounded indicator cache.
+         * Purely additive — DNS logs, rules, filter sources, stats, scans and intelligence events
+         * are untouched, so upgrades keep every existing setting and counter.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS connector_state (
+                        connectorId TEXT NOT NULL PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        enabled INTEGER NOT NULL,
+                        lastAttemptEpochMs INTEGER,
+                        lastSuccessEpochMs INTEGER,
+                        lastError TEXT,
+                        httpCode INTEGER,
+                        indicatorCount INTEGER NOT NULL,
+                        etag TEXT,
+                        lastModified TEXT,
+                        nextAllowedEpochMs INTEGER,
+                        consecutiveFailures INTEGER NOT NULL,
+                        lastSummary TEXT,
+                        latencyMs INTEGER
+                    )"""
+                )
+                db.execSQL(
+                    """CREATE TABLE IF NOT EXISTS threat_indicators (
+                        rowId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        kind TEXT NOT NULL,
+                        value TEXT NOT NULL,
+                        sourceId TEXT NOT NULL,
+                        module TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        confidence INTEGER NOT NULL,
+                        firstSeenEpochMs INTEGER NOT NULL,
+                        expiresAtEpochMs INTEGER NOT NULL,
+                        attribution TEXT NOT NULL
+                    )"""
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_threat_indicators_kind ON threat_indicators(kind)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_threat_indicators_value ON threat_indicators(value)")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_threat_indicators_sourceId_kind_value " +
+                        "ON threat_indicators(sourceId, kind, value)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_threat_indicators_expiresAtEpochMs " +
+                        "ON threat_indicators(expiresAtEpochMs)"
+                )
+            }
+        }
+
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

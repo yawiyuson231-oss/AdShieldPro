@@ -75,6 +75,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceEvent
 import com.adshield.pro.domain.intelligence.IntelligenceFilters
 import com.adshield.pro.domain.intelligence.IntelligenceMetric
 import com.adshield.pro.domain.intelligence.IntelligenceModule
+import com.adshield.pro.ui.model.ConnectorModuleSummaryUi
 import com.adshield.pro.domain.intelligence.IntelligenceModuleState
 import com.adshield.pro.domain.intelligence.IntelligenceSeverity
 import com.adshield.pro.domain.intelligence.IntelligenceTimeRange
@@ -348,6 +349,7 @@ fun IntelligenceCommandPanel(
     onSelectModule: (IntelligenceModule) -> Unit,
     onOpenModule: (IntelligenceModule) -> Unit,
     onOpenTimeline: () -> Unit,
+    onOpenConnectors: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val system = state.system
@@ -481,6 +483,9 @@ fun IntelligenceCommandPanel(
                             Text("Open selected module", fontSize = 10.sp, color = CyberCyan)
                         }
                     }
+                    TextButton(onClick = onOpenConnectors, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                        Text("Feeds & connectors →", fontSize = 9.sp, color = SkyBlueGlow)
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "Every value above is read from this device. Empty modules say so instead of inventing activity.",
@@ -604,7 +609,9 @@ fun NodeDetailSheet(
     onOpenModule: (IntelligenceModule) -> Unit,
     onRequestAction: (IntelligenceAction, IntelligenceModule) -> Unit,
     onSelectEvent: (IntelligenceEvent) -> Unit,
-    onCenterOnModule: (IntelligenceModule) -> Unit
+    onCenterOnModule: (IntelligenceModule) -> Unit,
+    connectorSummary: ConnectorModuleSummaryUi? = null,
+    onOpenConnectors: () -> Unit = {}
 ) {
     val snapshot = state.system.snapshotFor(module) ?: return
     val history = state.historyFor(module)
@@ -729,6 +736,40 @@ fun NodeDetailSheet(
                             color = Color(0xFFCBD5E1),
                             fontSize = 10.sp
                         )
+                    }
+                }
+            }
+
+            item(key = "detail-connectors", contentType = "connectors") {
+                connectorSummary?.let { summary ->
+                    GlassPanel(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                "MODULE CONNECTORS",
+                                color = Color(0xFF7C93AF),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                "${summary.implemented}/${summary.total} implemented · ${summary.connected} connected now",
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                summary.lastSuccessEpochMs?.let { "Last successful sync ${formatRelative(it)}" }
+                                    ?: "No successful sync recorded yet",
+                                color = Color(0xFF7C93AF),
+                                fontSize = 8.sp
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            TextButton(
+                                onClick = onOpenConnectors,
+                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
+                            ) {
+                                Text("Open connector registry →", fontSize = 9.sp, color = SkyBlueGlow)
+                            }
+                        }
                     }
                 }
             }

@@ -8,6 +8,8 @@ import com.adshield.pro.engine.intelligence.IntelligenceMonitor
 import com.adshield.pro.update.GitHubUpdateWorker
 import com.adshield.pro.worker.FilterUpdateWorker
 import com.adshield.pro.worker.IntelligenceRetentionWorker
+import com.adshield.pro.worker.ConnectorRetentionWorker
+import com.adshield.pro.worker.ConnectorSyncWorker
 import com.adshield.pro.worker.SmartOptimizationWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +40,8 @@ class AdShieldApplication : Application(), Configuration.Provider {
         // to run in the foreground VPN service regardless of whether the map is open.
         intelligenceMonitor.start()
         IntelligenceRetentionWorker.schedule(this)
+        ConnectorSyncWorker.schedule(this)
+        ConnectorRetentionWorker.schedule(this)
         GitHubUpdateWorker.schedule(this)
         appScope.launch {
             val settings = preferencesRepository.getSettingsSnapshot()

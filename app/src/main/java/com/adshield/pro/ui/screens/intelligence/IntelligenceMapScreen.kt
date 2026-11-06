@@ -20,6 +20,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.intelligence.IntelligenceSeverity
 import com.adshield.pro.domain.intelligence.IntelligenceTimeRange
 import com.adshield.pro.domain.intelligence.NodePosition
+import com.adshield.pro.ui.model.ConnectorModuleSummaryUi
 import com.adshield.pro.ui.model.IntelligenceMapUiState
 import com.adshield.pro.ui.model.MapCameraTarget
 
@@ -50,7 +51,9 @@ fun IntelligenceMapScreen(
     onClearHistory: () -> Unit,
     onAction: (IntelligenceAction, IntelligenceModule) -> Unit,
     onOpenModule: (IntelligenceModule) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    connectorSummaryFor: (IntelligenceModule) -> ConnectorModuleSummaryUi? = { null },
+    onOpenConnectors: (IntelligenceModule?) -> Unit = {}
 ) {
     val cameraState = remember { IntelligenceCameraState() }
     var commandExpanded by remember { mutableStateOf(true) }
@@ -182,6 +185,7 @@ fun IntelligenceMapScreen(
             },
             onOpenModule = onOpenModule,
             onOpenTimeline = { timelineOpen = true },
+            onOpenConnectors = { onOpenConnectors(null) },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
@@ -207,7 +211,9 @@ fun IntelligenceMapScreen(
                 timelineOpen = false
                 onSelectEvent(event)
             },
-            onCenterOnModule = { onCenterOnModule(it) }
+            onCenterOnModule = { onCenterOnModule(it) },
+            connectorSummary = connectorSummaryFor(module),
+            onOpenConnectors = { onOpenConnectors(module) }
         )
     }
 
