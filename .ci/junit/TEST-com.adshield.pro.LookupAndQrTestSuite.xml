@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.LookupAndQrTestSuite" tests="9" skipped="0" failures="1" errors="0" timestamp="2026-11-06T12:14:05.720Z" hostname="runnervmwuk1x" time="0.124">
+<testsuite name="com.adshield.pro.LookupAndQrTestSuite" tests="9" skipped="0" failures="1" errors="0" timestamp="2026-11-06T12:26:14.142Z" hostname="runnervmwuk1x" time="0.095">
   <properties/>
   <testcase name="cidr containment matches real networks" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.0"/>
   <testcase name="retired sources are not implemented" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.001"/>
-  <testcase name="blank image yields no payload instead of a guess" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.013"/>
-  <testcase name="qr encoder and decoder agree on a payload" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.091"/>
-  <testcase name="no native handler is dead code" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.011"/>
+  <testcase name="blank image yields no payload instead of a guess" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.011"/>
+  <testcase name="qr encoder and decoder agree on a payload" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.065"/>
+  <testcase name="no native handler is dead code" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.006"/>
   <testcase name="lookup connectors never require a key to be counted as implemented" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.0"/>
-  <testcase name="lookup connectors are https templated and cacheable" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.001">
-    <failure message="java.lang.AssertionError: cyber.osv.query endpoint has no {value} template" type="java.lang.AssertionError">java.lang.AssertionError: cyber.osv.query endpoint has no {value} template
+  <testcase name="lookup connectors are https templated and cacheable" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.005">
+    <failure message="java.lang.AssertionError: cyber.osv.query has no value template in endpoint or body" type="java.lang.AssertionError">java.lang.AssertionError: cyber.osv.query has no value template in endpoint or body
 	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.assertTrue(Assert.java:42)
-	at com.adshield.pro.LookupAndQrTestSuite.lookup connectors are https templated and cacheable(LookupAndQrTestSuite.kt:87)
+	at com.adshield.pro.LookupAndQrTestSuite.lookup connectors are https templated and cacheable(LookupAndQrTestSuite.kt:90)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
@@ -57,7 +57,7 @@
 </failure>
   </testcase>
   <testcase name="oversized images are refused before decoding" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.0"/>
-  <testcase name="every implemented native probe has a dispatch branch" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.007"/>
+  <testcase name="every implemented native probe has a dispatch branch" classname="com.adshield.pro.LookupAndQrTestSuite" time="0.005"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
