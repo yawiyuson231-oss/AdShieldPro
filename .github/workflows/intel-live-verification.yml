@@ -5,6 +5,13 @@ name: Intel live source verification
 # evidence behind every "verified reachable" claim in the connector catalogue.
 on:
   workflow_dispatch:
+  # A branch push re-measures the endpoint set whenever the probe or the catalogue changes.
+  # (workflow_dispatch itself is only offered once this file exists on the default branch.)
+  push:
+    paths:
+      - 'tools/probe_intel_endpoints.py'
+      - '.github/workflows/intel-live-verification.yml'
+      - 'app/src/main/java/com/adshield/pro/engine/connectors/ConnectorCatalogue.kt'
   schedule:
     # Weekly drift check: providers move, and the catalogue has to follow.
     - cron: '17 3 * * 1'
