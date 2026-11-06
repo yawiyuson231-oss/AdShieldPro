@@ -1,41 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsEngineTest" tests="35" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:00:24.721Z" hostname="runnervmwuk1x" time="0.04">
+<testsuite name="com.adshield.pro.GpsEngineTest" tests="35" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:09:35.201Z" hostname="runnervmwuk1x" time="0.043">
   <properties/>
-  <testcase name="testRadarZenithSatelliteSitsInTheCentre" classname="com.adshield.pro.GpsEngineTest" time="0.003"/>
-  <testcase name="testRadarEmptyReasonIsSpecificAboutTheCause" classname="com.adshield.pro.GpsEngineTest" time="0.004"/>
-  <testcase name="testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.005"/>
-  <testcase name="testEtaFallsBackToSpeedLimitWhenStopped" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testAccuracyBandThresholds" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testRadarZenithSatelliteSitsInTheCentre" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testRadarEmptyReasonIsSpecificAboutTheCause" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testIntegrityMonitorFlagsStationaryDeviceReportingMotorwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.006"/>
+  <testcase name="testEtaFallsBackToSpeedLimitWhenStopped" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testAccuracyBandThresholds" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testGeodesyDistanceBetweenManilaAndQuezonCity" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testGeoBoundsAroundContainsCentreAndNotFarAwayPoint" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testSnrRatioClampsOutOfRangeValues" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testMapProjectionTileCountForSmallRegion" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testIntegrityMonitorFlagsClockGoingBackwards" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testStationaryDetectorClassifiesHighwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testSeverityOrderingIsExplicit" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testSatelliteSnapshotQualityNoteExplainsFewSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testGeoBoundsAroundContainsCentreAndNotFarAwayPoint" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testSnrRatioClampsOutOfRangeValues" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testMapProjectionTileCountForSmallRegion" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testIntegrityMonitorFlagsClockGoingBackwards" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testStationaryDetectorClassifiesHighwaySpeed" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testSeverityOrderingIsExplicit" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testSatelliteSnapshotQualityNoteExplainsFewSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testSegmentProjectionSnapsToNearestPointOnRoad" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testEtaUsesMeasuredSpeedWhenMoving" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testEtaUsesMeasuredSpeedWhenMoving" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testStationaryDetectorClassifiesStoppedVehicle" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testFixWithoutAltitudeKeepsNullInsteadOfZero" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testSkyScoreRisesWithAFullSky" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
-  <testcase name="testIntegrityStatisticsAccumulate" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testIntegrityStatisticsAccumulate" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testSkyScoreIsZeroWithoutSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testIntegrityMonitorAcceptsNormalDriving" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testRadarEastIsPositiveX" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testIntegrityMonitorFlagsImpossibleJump" classname="com.adshield.pro.GpsEngineTest" time="0.006"/>
+  <testcase name="testIntegrityMonitorFlagsImpossibleJump" classname="com.adshield.pro.GpsEngineTest" time="0.007"/>
   <testcase name="testSpeedIsAbsentWhenProviderDoesNotReportIt" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testMapProjectionRejectsPolarLatitude" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testConstellationCodeIsShortAndStable" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testConfidenceDropsForMockedAndCachedFixes" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
+  <testcase name="testConfidenceDropsForMockedAndCachedFixes" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testIncidentValidatorRejectsCompromisedLocation" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <testcase name="testGeodesyBearingAndDestinationRoundTrip" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testRadarRingsAreHorizonZenithAndMid" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
+  <testcase name="testRadarRingsAreHorizonZenithAndMid" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testSatelliteSnapshotUsedRatioIsZeroWithoutSatellites" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testRadarPlacesNorthernSatelliteAboveCentre" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testEtaWithoutAnySpeedInformationStillTerminates" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
   <testcase name="testStationaryDetectorInfersMotionWithoutDopplerSpeed" classname="com.adshield.pro.GpsEngineTest" time="0.0"/>
-  <testcase name="testIntegrityMonitorFlagsMockProvider" classname="com.adshield.pro.GpsEngineTest" time="0.002"/>
+  <testcase name="testIntegrityMonitorFlagsMockProvider" classname="com.adshield.pro.GpsEngineTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -325,7 +325,7 @@ GpsEngineTest > testIntegrityMonitorFlagsMockProvider PASSED
 GpsMapOverlayTest > testPointEastOfCentreIsToTheRightOnScreen PASSED
 
 GpsMapOverlayTest > testPixelsPerMeterMatchesWebMercatorGroundResolution FAILED
-    java.lang.AssertionError at GpsMapOverlayTest.kt:38
+    java.lang.AssertionError at GpsMapOverlayTest.kt:40
 
 GpsMapOverlayTest > testCameraBearingRotatesTheWholeScene PASSED
 
@@ -779,5 +779,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 29s
+BUILD FAILED in 38s
 33 actionable tasks: 7 executed, 2 from cache, 24 up-to-date

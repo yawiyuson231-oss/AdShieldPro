@@ -1,38 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsTrafficSecurityTest" tests="33" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:00:24.799Z" hostname="runnervmwuk1x" time="0.031">
+<testsuite name="com.adshield.pro.GpsTrafficSecurityTest" tests="33" skipped="0" failures="0" errors="0" timestamp="2026-11-06T04:09:35.350Z" hostname="runnervmwuk1x" time="0.059">
   <properties/>
-  <testcase name="testStandstillTrafficIsRed" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.002"/>
-  <testcase name="testDuplicateIncidentIsRejectedAndNearbyOneIsMerged" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testStandstillTrafficIsRed" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.005"/>
+  <testcase name="testDuplicateIncidentIsRejectedAndNearbyOneIsMerged" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.004"/>
   <testcase name="testDistanceFormattingIsHumanReadable" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testIncidentValidatorRejectsControlCharactersAndLongNotes" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
-  <testcase name="testTelemetryGateBlocksMockAndPoorAccuracy" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testTelemetryGateBlocksEverythingWhenSharingIsOff" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testOfflinePolicyLineStatesTheLimits" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testTelemetryGateBlocksMockAndPoorAccuracy" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testTelemetryGateBlocksEverythingWhenSharingIsOff" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testOfflinePolicyLineStatesTheLimits" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testAgreementFactorPunishesScatteredSpeeds" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testOfflineAutoFitFindsAZoomRangeInsideTheBudget" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
+  <testcase name="testOfflineAutoFitFindsAZoomRangeInsideTheBudget" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testOfflinePlanRejectsRegionAboveTheFreeTileBudget" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testSegmentWithNoObservationsIsUnknownNotGreen" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testAgeAndConfidenceFormattingNeverInventsPrecision" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testTokenBucketStopsBurstBeyondCapacity" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
-  <testcase name="testObservationsForAnotherSegmentAreIgnored" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
+  <testcase name="testAgeAndConfidenceFormattingNeverInventsPrecision" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testTokenBucketStopsBurstBeyondCapacity" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
+  <testcase name="testObservationsForAnotherSegmentAreIgnored" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testDegenerateBoundsAreRejectedWithAReason" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testFreeFlowUsesPostedLimitThenEightyFifthPercentile" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testPermissionAuditReportsApproximateOnlyAsAFinding" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testKillSwitchOverridesEmergencyAllowance" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
-  <testcase name="testPrivacyDefaultsAreAllOff" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testEmergencyShareContainsRealCoordinatesAndFreeMapLink" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.014"/>
-  <testcase name="testPermissionAuditWithNothingGrantedSaysModuleIsDisabled" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testPermissionAuditFlagsMockLocationApp" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
+  <testcase name="testKillSwitchOverridesEmergencyAllowance" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
+  <testcase name="testPrivacyDefaultsAreAllOff" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testEmergencyShareContainsRealCoordinatesAndFreeMapLink" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.019"/>
+  <testcase name="testPermissionAuditWithNothingGrantedSaysModuleIsDisabled" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testPermissionAuditFlagsMockLocationApp" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testSingleNoisySampleStaysUnknownBecauseConfidenceIsTooLow" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testHistoryGuardRoundsCoordinatesWhenCoarse" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testIncidentKindsHaveBoundedLifetimes" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testOfflinePlanAcceptsASmallNeighbourhood" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testOfflineEstimateGrowsWithZoomRange" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testOfflinePlanAcceptsASmallNeighbourhood" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testOfflineEstimateGrowsWithZoomRange" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testFreeFlowingTrafficIsGreenWithEnoughSamples" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testHistoryGuardExpiresOldTimestamps" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
   <testcase name="testObservationsOutsideTheWindowAreIgnored" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testEmergencyShareRefusesWithoutPermission" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.0"/>
-  <testcase name="testOfflineCorridorCoversTheWholeRoute" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.003"/>
+  <testcase name="testEmergencyShareRefusesWithoutPermission" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
+  <testcase name="testOfflineCorridorCoversTheWholeRoute" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <testcase name="testConfidenceDecaysWithAge" classname="com.adshield.pro.GpsTrafficSecurityTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

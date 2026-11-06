@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GpsMapOverlayTest" tests="14" skipped="0" failures="1" errors="0" timestamp="2026-11-06T04:00:24.767Z" hostname="runnervmwuk1x" time="0.016">
+<testsuite name="com.adshield.pro.GpsMapOverlayTest" tests="14" skipped="0" failures="1" errors="0" timestamp="2026-11-06T04:09:35.249Z" hostname="runnervmwuk1x" time="0.026">
   <properties/>
-  <testcase name="testPointEastOfCentreIsToTheRightOnScreen" classname="com.adshield.pro.GpsMapOverlayTest" time="0.006"/>
-  <testcase name="testPixelsPerMeterMatchesWebMercatorGroundResolution" classname="com.adshield.pro.GpsMapOverlayTest" time="0.009">
-    <failure message="java.lang.AssertionError" type="java.lang.AssertionError">java.lang.AssertionError
-	at org.junit.Assert.fail(Assert.java:87)
+  <testcase name="testPointEastOfCentreIsToTheRightOnScreen" classname="com.adshield.pro.GpsMapOverlayTest" time="0.002"/>
+  <testcase name="testPixelsPerMeterMatchesWebMercatorGroundResolution" classname="com.adshield.pro.GpsMapOverlayTest" time="0.015">
+    <failure message="java.lang.AssertionError: the equator must have a larger scale than 60° north" type="java.lang.AssertionError">java.lang.AssertionError: the equator must have a larger scale than 60° north
+	at org.junit.Assert.fail(Assert.java:89)
 	at org.junit.Assert.assertTrue(Assert.java:42)
-	at org.junit.Assert.assertTrue(Assert.java:53)
-	at com.adshield.pro.GpsMapOverlayTest.testPixelsPerMeterMatchesWebMercatorGroundResolution(GpsMapOverlayTest.kt:38)
+	at com.adshield.pro.GpsMapOverlayTest.testPixelsPerMeterMatchesWebMercatorGroundResolution(GpsMapOverlayTest.kt:40)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
@@ -52,7 +51,7 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="testCameraBearingRotatesTheWholeScene" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
+  <testcase name="testCameraBearingRotatesTheWholeScene" classname="com.adshield.pro.GpsMapOverlayTest" time="0.001"/>
   <testcase name="testOffscreenTargetIsClampedToTheEdge" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
   <testcase name="testAccuracyCircleGrowsWithZoomAndWithReportedError" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
   <testcase name="testAntimeridianIsCrossedTheShortWay" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
@@ -63,7 +62,7 @@
   <testcase name="testVisibleTargetIsNotMoved" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
   <testcase name="testArrowBearingIsUndefinedAtTheCentre" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
   <testcase name="testClampKeepsTheDirectionOfTheTarget" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
-  <testcase name="testPointNorthOfCentreIsAboveTheCentreOnScreen" classname="com.adshield.pro.GpsMapOverlayTest" time="0.0"/>
+  <testcase name="testPointNorthOfCentreIsAboveTheCentreOnScreen" classname="com.adshield.pro.GpsMapOverlayTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
