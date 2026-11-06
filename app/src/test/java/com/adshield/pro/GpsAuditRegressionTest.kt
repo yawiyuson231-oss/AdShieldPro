@@ -46,9 +46,13 @@ class GpsAuditRegressionTest {
         // 0.09 of the 0.2 degree span: the projection must sit inside the segment, not clamp to a.
         close(0.45, projection.fraction, 1e-6, "fraction along a segment that crosses the line")
         close(179.99, projection.closest.longitude, 1e-6, "closest point is the one directly south")
-        // A point beyond the far end must still clamp to that end, not wrap to the near one.
-        val beyond = GeoPoint(0.0, -179.99)
+        // The short way from 179.9 to -179.9 runs *east* through 180, so -179.8 is past the far end
+        // and must clamp there (raw fraction 1.5), not wrap back towards the start.
+        val beyond = GeoPoint(0.0, -179.8)
         close(1.0, Geodesy.projectOnSegment(beyond, a, b).fraction, 1e-9, "clamps at the far end")
+        // And a point behind the start clamps to 0.0 rather than being pulled to the far end.
+        val before = GeoPoint(0.0, 179.79) // 0.11 degrees west of the start
+        close(0.0, Geodesy.projectOnSegment(before, a, b).fraction, 1e-9, "clamps at the start")
     }
 
     /**
