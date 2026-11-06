@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="640" viewBox="0 0 900 640" role="img" aria-label="OMNISHIELD X live intelligence map topology: a central core node connected to seven module nodes">
+  <title>OMNISHIELD X — module topology (static documentation diagram)</title>
+  <desc>Static documentation illustration of the seven module nodes around the OMNISHIELD X core. The app renders the real map with Jetpack Compose Canvas; this image is not used by the app.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0A2038"/>
+      <stop offset="100%" stop-color="#01060E"/>
+    </radialGradient>
+    <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="900" height="640" fill="url(#bg)"/>
+  <g stroke="#14304D" stroke-opacity="0.55" stroke-width="1">
+    <path d="M0 80H900M0 160H900M0 240H900M0 320H900M0 400H900M0 480H900M0 560H900"/>
+    <path d="M80 0V640M160 0V640M240 0V640M320 0V640M400 0V640M480 0V640M560 0V640M640 0V640M720 0V640M800 0V640"/>
+  </g>
+
+  <circle cx="450" cy="320" r="230" fill="url(#coreGlow)"/>
+
+  <g stroke="#22D3EE" stroke-opacity="0.4" stroke-width="1.4">
+    <line x1="450" y1="320" x2="450" y2="120"/>
+    <line x1="450" y1="320" x2="590" y2="172"/>
+    <line x1="450" y1="320" x2="672" y2="300"/>
+    <line x1="450" y1="320" x2="620" y2="484"/>
+    <line x1="450" y1="320" x2="450" y2="540"/>
+    <line x1="450" y1="320" x2="280" y2="484"/>
+    <line x1="450" y1="320" x2="228" y2="300"/>
+  </g>
+
+  <g font-family="Inter, Segoe UI, Roboto, sans-serif" text-anchor="middle">
+    <!-- Core -->
+    <circle cx="450" cy="320" r="66" fill="#04121F" stroke="#22D3EE" stroke-width="2.5" filter="url(#soft)"/>
+    <circle cx="450" cy="320" r="52" fill="none" stroke="#22D3EE" stroke-opacity="0.45"/>
+    <text x="450" y="314" fill="#F8FAFC" font-size="15" font-weight="700" letter-spacing="1">OMNISHIELD X</text>
+    <text x="450" y="336" fill="#22D3EE" font-size="11" font-weight="600">LIVE INTELLIGENCE</text>
+
+    <!-- Module nodes -->
+    <g>
+      <circle cx="450" cy="120" r="42" fill="#05101D" stroke="#2E7DFF" stroke-width="2"/>
+      <text x="450" y="118" fill="#F1F5F9" font-size="11" font-weight="700">CYBER</text>
+      <text x="450" y="132" fill="#2E7DFF" font-size="9">Cyber Defense</text>
+    </g>
+    <g>
+      <circle cx="590" cy="172" r="42" fill="#05101D" stroke="#38BDF8" stroke-width="2"/>
+      <text x="590" y="170" fill="#F1F5F9" font-size="11" font-weight="700">FIN</text>
+      <text x="590" y="184" fill="#38BDF8" font-size="9">Financial Defense</text>
+    </g>
+    <g>
+      <circle cx="672" cy="300" r="42" fill="#05101D" stroke="#8B5CF6" stroke-width="2"/>
+      <text x="672" y="298" fill="#F1F5F9" font-size="11" font-weight="700">PRIV</text>
+      <text x="672" y="312" fill="#8B5CF6" font-size="9">Privacy Defense</text>
+    </g>
+    <g>
+      <circle cx="620" cy="484" r="42" fill="#05101D" stroke="#22D3EE" stroke-width="2"/>
+      <text x="620" y="482" fill="#F1F5F9" font-size="11" font-weight="700">NET</text>
+      <text x="620" y="496" fill="#22D3EE" font-size="9">Network Defense</text>
+    </g>
+    <g>
+      <circle cx="450" cy="540" r="42" fill="#05101D" stroke="#10B981" stroke-width="2"/>
+      <text x="450" y="538" fill="#F1F5F9" font-size="11" font-weight="700">DEV</text>
+      <text x="450" y="552" fill="#10B981" font-size="9">Device Intelligence</text>
+    </g>
+    <g>
+      <circle cx="280" cy="484" r="42" fill="#05101D" stroke="#F59E0B" stroke-width="2"/>
+      <text x="280" y="482" fill="#F1F5F9" font-size="11" font-weight="700">EMRG</text>
+      <text x="280" y="496" fill="#F59E0B" font-size="9">Emergency Intelligence</text>
+    </g>
+    <g>
+      <circle cx="228" cy="300" r="42" fill="#05101D" stroke="#5AA2FF" stroke-width="2"/>
+      <text x="228" y="298" fill="#F1F5F9" font-size="11" font-weight="700">AUTO</text>
+      <text x="228" y="312" fill="#5AA2FF" font-size="9">Automation Core</text>
+    </g>
+
+    <text x="450" y="615" fill="#64748B" font-size="10">Static documentation diagram — the app draws this topology at runtime with Jetpack Compose Canvas.</text>
+  </g>
+</svg>

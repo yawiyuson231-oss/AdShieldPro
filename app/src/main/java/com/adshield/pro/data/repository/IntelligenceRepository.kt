@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -49,9 +47,7 @@ class IntelligenceRepository @Inject constructor(
     private val dao: IntelligenceEventDao
 ) {
     private val json = Json { ignoreUnknownKeys = true }
-    private val stringListSerializer = ListSerializer(String.serializer())
-    private val metricListSerializer = ListSerializer(IntelligenceMetric.serializer())
-    private val insertCounter = AtomicInteger(0)
+    private     private     private val insertCounter = AtomicInteger(0)
 
     val events: Flow<List<IntelligenceEvent>> = dao.observeRecent(IntelligenceLimits.LOADED_EVENTS)
         .map { rows -> rows.mapNotNull(::toDomain) }
@@ -70,7 +66,7 @@ class IntelligenceRepository @Inject constructor(
      */
     suspend fun record(draft: IntelligenceEvent, nowEpochMs: Long = System.currentTimeMillis()): IntelligenceEvent? {
         val sanitized = IntelligenceEventSanitizer.sanitize(draft, nowEpochMs).event ?: return null
-        val id = dao.insert(sanitized.toEntity(json, stringListSerializer, metricListSerializer))
+        val id = dao.insert(sanitized.toEntity(json))
         if (insertCounter.incrementAndGet() % IntelligenceLimits.PRUNE_EVERY_INSERTS == 0) {
             prune(nowEpochMs)
         }
@@ -93,10 +89,10 @@ class IntelligenceRepository @Inject constructor(
         val module = IntelligenceModule.fromIdOrNull(row.module) ?: type.module
         val severity = IntelligenceSeverity.fromNameOrNull(row.severity) ?: type.defaultSeverity
         val related = runCatching {
-            json.decodeFromString(stringListSerializer, row.relatedIdsJson)
+            json.decodeFromString<List<String>>(row.relatedIdsJson)
         }.getOrDefault(emptyList())
         val metrics = runCatching {
-            json.decodeFromString(metricListSerializer, row.metricsJson)
+            json.decodeFromString<List<IntelligenceMetric>>(row.metricsJson)
         }.getOrDefault(emptyList())
         val actions = row.actionsCsv.split(',')
             .mapNotNull { IntelligenceAction.fromNameOrNull(it.trim()) }
@@ -117,11 +113,7 @@ class IntelligenceRepository @Inject constructor(
         )
     }
 
-    private fun IntelligenceEvent.toEntity(
-        json: Json,
-        stringListSerializer: ListSerializer<String>,
-        metricListSerializer: ListSerializer<IntelligenceMetric>
-    ): IntelligenceEventEntity = IntelligenceEventEntity(
+    private fun IntelligenceEvent.toEntity(json: Json): IntelligenceEventEntity = IntelligenceEventEntity(
         id = this.id,
         module = module.id,
         typeCode = type.code,
@@ -131,8 +123,8 @@ class IntelligenceRepository @Inject constructor(
         description = description,
         evidence = evidence,
         evidenceRef = evidenceRef,
-        relatedIdsJson = json.encodeToString(stringListSerializer, relatedObjectIds),
-        metricsJson = json.encodeToString(metricListSerializer, metrics),
+        relatedIdsJson = json.encodeToString<List<String>>(relatedObjectIds),
+        metricsJson = json.encodeToString<List<IntelligenceMetric>>(metrics),
         actionsCsv = actions.joinToString(",") { it.name }
     )
 }

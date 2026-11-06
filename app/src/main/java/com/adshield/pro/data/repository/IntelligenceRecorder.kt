@@ -35,11 +35,13 @@ object IntelligenceDedupePolicy {
         IntelligenceEventType.NETWORK_THREAT_BLOCKED -> 10 * MINUTE
         IntelligenceEventType.DEVICE_THERMAL_WARNING,
         IntelligenceEventType.DEVICE_THERMAL_RECOVERED,
-        IntelligenceEventType.DEVICE_TELEMETRY_UNAVAILABLE -> 30 * MINUTE
+        IntelligenceEventType.DEVICE_TELEMETRY_UNAVAILABLE,
+        IntelligenceEventType.DEVICE_HEALTH_ALERT -> 30 * MINUTE
         IntelligenceEventType.NETWORK_PROTECTION_STARTED,
         IntelligenceEventType.NETWORK_PROTECTION_STOPPED,
         IntelligenceEventType.NETWORK_FILTERING_PAUSED,
-        IntelligenceEventType.NETWORK_RESOLVER_ERROR -> 15_000L
+        IntelligenceEventType.NETWORK_RESOLVER_ERROR,
+        IntelligenceEventType.NETWORK_RULES_MISSING -> 15_000L
         IntelligenceEventType.AUTOMATION_JOB_OK,
         IntelligenceEventType.AUTOMATION_JOB_FAILED -> 60_000L
         IntelligenceEventType.EMERGENCY_LOCKDOWN_ON,

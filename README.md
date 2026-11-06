@@ -121,6 +121,7 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 | [`docs/INFINITY_VERIFICATION.md`](docs/INFINITY_VERIFICATION.md) | Feature-by-feature implementation/test status, evidence, external requirements and remaining issues |
 | [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
 | [`docs/DNS_SECURITY_ARCHITECTURE.md`](docs/DNS_SECURITY_ARCHITECTURE.md) | Upstream failover, response validation, DNSSEC reporting and DNS-only app/network policy |
+| [`docs/INTELLIGENCE_MAP.md`](docs/INTELLIGENCE_MAP.md) | Live Intelligence Map: event pipeline, module data sources, gestures, honesty rules, performance budget and acceptance evidence |
 
 ## App screenshots
 
@@ -138,6 +139,30 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 ## How it Works
 
 ![Animated preview of AdShield Pro](docs/images/adshield-demo.gif)
+
+## What's new in 2.9.0 — Live Intelligence Map
+
+- **Live Intelligence Map (Intel tab)** — an interactive Compose Canvas map of the seven modules
+  around the OMNISHIELD X core. Drag to pan, pinch or double-tap to zoom, tap a node for its real
+  details, long-press for contextual actions, drag nodes in layout-edit mode, reset or centre the
+  camera with animated transitions. It is a live canvas, not an image, and there is no idle
+  animation loop.
+- **Unified event pipeline** — DNS malware/phishing blocks, scan-journal verdicts, battery
+  temperature/health thresholds, VPN transitions, settings changes and WorkManager results are
+  validated, redacted, de-duplicated and stored in a bounded Room table (800 rows / 14 days,
+  schema v4 with an additive migration). Pulses, highlights and the timeline are driven by those
+  stored events only.
+- **No invented activity** — factories return `null` when a real observation cannot supply
+  evidence, the sanitizer can raise but never lower severity, unsupported sensors report `OFFLINE`,
+  and an idle device shows an explicit "no event recorded" sentence instead of demo data.
+- **Command panel & timeline** — collapsible panel with overall health, seven live module states,
+  measured counters (queries, blocks, DNS, privacy/financial/device findings, automation runs),
+  active incidents; timeline with search, module, severity and time-range filters, plus a
+  confirmation-gated history clear.
+- **Honest pause** — pausing freezes the visualisation only; DNS protection and scheduled jobs keep
+  running, and the header reports how many events arrived while paused.
+- **Docs** — see [`docs/INTELLIGENCE_MAP.md`](docs/INTELLIGENCE_MAP.md) for architecture, module
+  mapping, event catalogue, integration steps and the acceptance-criteria evidence table.
 
 ## What's new in 2.7.0
 

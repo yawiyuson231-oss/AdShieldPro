@@ -108,7 +108,23 @@ Those cannot be exercised by JVM unit tests.
    in Security → History with source "Scheduled".
 10. Switch the private search provider in Ad Blocker → Browser → shield controls, search from the
     address bar, and confirm the chosen provider is used after an app restart.
-11. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
+11. Open **Intel**. Drag the map, pinch-zoom, double-tap, tap each of the seven nodes and the core,
+    long-press a node, reset the camera and centre on a module. Confirm a pan never opens a panel
+    and that rotating the device re-fits the map without losing selection.
+12. Tap **Pause** on the map: the header must show the frozen aggregate and a count of events
+    arriving while paused; DNS counters on Home must keep increasing. Resume and confirm the map
+    catches up.
+13. Trigger a real malware DNS block (threat feed test domain) or run a scan that produces a
+    finding; confirm a new event appears in the timeline, the matching node raises its state and a
+    pulse travels to the core.
+14. Use the timeline filters (module, severity, 15 min, search) and confirm both the list and the
+    map markers change accordingly; clear history and confirm the confirmation dialog and the
+    explicit empty state afterwards.
+15. In layout-edit mode drag a node, leave the screen, return and confirm the position persisted.
+    Then use **Reset camera** and confirm the layout is unchanged.
+16. Upgrade-install over the previous version and confirm existing DNS stats, custom rules,
+    filter sources, scan history and settings are intact (additive schema v4 migration).
+17. Scroll Home and Live quickly with detailed logging enabled; confirm the feed stays smooth,
    the scroll-to-top button appears after scrolling, and the shield stops animating when the
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
