@@ -13,6 +13,8 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapLibreMap.OnCameraIdleListener
+import org.maplibre.android.maps.MapLibreMap.OnMapClickListener
 import org.maplibre.android.maps.Style
 import org.maplibre.android.offline.OfflineManager
 import org.maplibre.android.offline.OfflineRegion
@@ -79,7 +81,14 @@ class MapLibreEngine(
     var onCameraIdle: ((lat: Double, lon: Double, zoom: Double, bearing: Double, tilt: Double) -> Unit)? = null
     var onMapClick: ((GeoPoint) -> Unit)? = null
 
+    /** Kept so detach can unregister exactly the listeners this engine added. */
+    private var cameraIdleListener: OnCameraIdleListener? = null
+    private var mapClickListener: OnMapClickListener? = null
+
     fun attach(mapLibreMap: MapLibreMap) {
+        // Detach any previous map first: attaching twice would leave the old listeners registered on
+        // a map we no longer track, and they would keep calling back into a dead composition.
+        detach()
         map = mapLibreMap
         mapLibreMap.uiSettings.apply {
             isAttributionEnabled = true // Required by OSM/OpenFreeMap attribution terms.
@@ -94,26 +103,49 @@ class MapLibreEngine(
         }
         mapLibreMap.setMinZoomPreference(2.0)
         mapLibreMap.setMaxZoomPreference(19.5)
-        mapLibreMap.addOnCameraIdleListener {
-            mapLibreMap.cameraPosition?.let { position ->
-                position.target?.let { target ->
-                    onCameraIdle?.invoke(
-                        target.latitude,
-                        target.longitude,
-                        position.zoom,
-                        position.bearing,
-                        position.tilt
-                    )
+        // Written as an explicit object rather than a lambda so the exact instance can be removed
+        // again in detach(); a SAM-converted lambda is a fresh object each time and cannot be
+        // unregistered.
+        val onIdle = object : OnCameraIdleListener {
+            override fun onCameraIdle() {
+                mapLibreMap.cameraPosition?.let { position ->
+                    position.target?.let { target ->
+                        onCameraIdle?.invoke(
+                            target.latitude,
+                            target.longitude,
+                            position.zoom,
+                            position.bearing,
+                            position.tilt
+                        )
+                    }
                 }
             }
         }
-        mapLibreMap.addOnMapClickListener { latLng ->
-            onMapClick?.invoke(GeoPoint(latLng.latitude, latLng.longitude))
-            true
+        val onClick = object : OnMapClickListener {
+            override fun onMapClick(latLng: LatLng): Boolean {
+                onMapClick?.invoke(GeoPoint(latLng.latitude, latLng.longitude))
+                return true
+            }
         }
+        cameraIdleListener = onIdle
+        mapClickListener = onClick
+        mapLibreMap.addOnCameraIdleListener(onIdle)
+        mapLibreMap.addOnMapClickListener(onClick)
     }
 
+    /**
+     * Detaches from the map and forgets the style.
+     *
+     * The listeners are removed, not merely dropped: MapLibre keeps them on the map object, and the
+     * map outlives this composition during a configuration change, so a stale listener kept
+     * dispatching camera updates into the previous screen.
+     */
     fun detach() {
+        val current = map
+        cameraIdleListener?.let { current?.removeOnCameraIdleListener(it) }
+        mapClickListener?.let { current?.removeOnMapClickListener(it) }
+        cameraIdleListener = null
+        mapClickListener = null
         map = null
         style = null
     }

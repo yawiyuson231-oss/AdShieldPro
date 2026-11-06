@@ -87,9 +87,9 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 
 ### GPS, navigation and traffic module
 
-Five suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (18),
-`GpsMapOverlayTest` (14) and `GpsSecureStoreTest` (11) — cover the whole device-independent core of
-the GPS module, 111 tests in total. Everything below runs on the JVM with no emulator, no network and no playback of recorded
+Six suites — `GpsEngineTest` (35), `GpsTrafficSecurityTest` (33), `GpsOfflineGraphTest` (18),
+`GpsMapOverlayTest` (14), `GpsSecureStoreTest` (11) and `GpsAuditRegressionTest` (11) — cover the
+whole device-independent core of the GPS module, 122 tests in total (296 for the app). Everything below runs on the JVM with no emulator, no network and no playback of recorded
 traces — these are pure function/state-machine tests, not simulated driving:
 
 | Area | Covered behaviour |
@@ -105,6 +105,7 @@ traces — these are pure function/state-machine tests, not simulated driving:
 | `ADG1` offline graph | Raw, gzipped and on-disk round-trips, foreign magic / wrong version / truncated / absurd-node-count headers rejected with a reason, A* over a two-leg network, direction-aware one-way traversal, offline plan synthesis (depart, manoeuvres, arrival), refusal to route outside the pack, nearest-node and on-segment snapping, snap radius, coverage distance, honest pack description |
 | `ADSE1` encrypted container | Exact-byte round-trip, plaintext never visible in the ciphertext, fresh IV per write, documented header layout, wrong key rejected, bit-flipped ciphertext **and** IV failing GCM authentication, plaintext/truncated files refused, empty payload, decryption with a key reloaded from storage |
 | Routing | ETA from the measured speed, ETA falling back to the posted speed limit when stopped, ETA that still terminates with no speed information at all, road snapping to the nearest point on a segment, and distance formatting |
+| Bug-sweep regressions | Segment projection across the antimeridian (the flat projection needed a wrapped longitude delta; it was off by 9x and snapped to the wrong end of the segment), a compromised position staying a distinct `FixState` instead of being relabelled healthy by the 2 s stale ticker, a stopped engine publishing an empty frame instead of keeping the last speed on screen, locale-independent distance and coordinate formatting under a comma-decimal locale, re-stamping collected trip points with the real trip id, and the append-only track archive watermark that stops a long trip losing its first half |
 | Traffic | A segment with no observations reads UNKNOWN rather than green, a single noisy sample stays UNKNOWN on confidence grounds, free-flowing samples turn green, standstill turns red, samples outside the rolling window or belonging to another segment are ignored, confidence decays with age, and agreement drops when speeds scatter |
 | Security | `IncidentValidator` payload rejection (compromised location, control characters, over-long notes), token-bucket rate limiting, incident lifetimes, telemetry gate (sharing off, mock position, poor accuracy), privacy defaults all off, emergency-share permission and real-coordinate/free-map-link content, coarse-coordinate rounding and timestamp expiry in trip history, permission-audit findings, and the kill switch overriding the emergency allowance |
 

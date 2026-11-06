@@ -108,8 +108,14 @@ class VoiceGuidance(private val context: Context) {
 
     fun speak(text: String, flush: Boolean = false) {
         if (state != State.READY) return
-        val utterance = "adshield-nav-${System.currentTimeMillis()}"
-        tts?.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, utterance)
+        val engine = tts ?: return
+        if (text.isBlank()) return
+        // Unique per call: reusing a fixed id makes UtteranceProgressListener report the wrong one.
+        val utterance = "adshield-nav-${System.nanoTime()}"
+        val queued = engine.speak(text, if (flush) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, utterance)
+        if (queued != TextToSpeech.SUCCESS) {
+            lastError = "The speech engine refused the announcement"
+        }
     }
 
     /**
@@ -171,11 +177,23 @@ class VoiceGuidance(private val context: Context) {
         tts?.stop()
     }
 
+    /**
+     * Releases the engine and returns the instance to UNINITIALISED.
+     *
+     * Safe to call when nothing was ever initialised, and safe to call twice. `TextToSpeech` holds a
+     * bound service and a native synthesiser, so not calling this leaks both for the life of the
+     * process — which matters here because the guidance object is an app-scoped singleton.
+     */
     fun shutdown() {
         runCatching { tts?.stop() }
         runCatching { tts?.shutdown() }
         tts = null
         state = State.UNINITIALISED
+        lastAnnouncedStep = -1
+        lastAnnouncedBand = -1
+        lastAnnounceAtMs = 0L
+        lastRerouteAtMs = 0L
+        lastError = null
     }
 
     private fun repeatGuardMs(sameStep: Boolean): Long = if (sameStep) 45_000L else 15_000L

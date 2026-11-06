@@ -195,6 +195,11 @@ minSdk 29 (Android 10) as before.
   over a two-leg network, direction-aware one-way traversal, duration/distance arithmetic, offline
   turn-by-turn plan synthesis, refusal to route outside the downloaded pack, nearest-node and
   on-segment snapping, snap radius, coverage distance, and the pack description string.
+* `GpsAuditRegressionTest` — 11 tests, each pinning a defect that shipped: the antimeridian
+  projection error in `Geodesy.projectOnSegment` (a segment crossing 180° became a 40 000 km line,
+  reporting 10 069 m where the truth is 1 112 m), `FixState.COMPROMISED` surviving the stale
+  ticker, a stopped engine clearing its last fix, locale-independent number formatting, trip-point
+  re-stamping and the append-only track archive watermark.
 * `GpsSecureStoreTest` — 11 tests on the `ADSE1` container: exact-byte round-trip, plaintext never
   present in the ciphertext, a fresh IV per write, documented header layout, wrong key rejected,
   bit-flipped ciphertext and IV failing GCM authentication, plaintext and truncated files refused,

@@ -1,10 +1,13 @@
 package com.adshield.pro.gps.map
 
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -49,11 +52,14 @@ fun AdShieldMap(
     val currentOnMapClick by rememberUpdatedState(onMapClick)
     val currentOnReady by rememberUpdatedState(onReady)
 
-    val mapView = remember {
+    // A MapView is bound to one GL surface and cannot be revived after onDestroy, so the instance is
+    // keyed on something that changes if the host is genuinely rebuilt.
+    val mapView = remember(lifecycleOwner) {
         // MapLibre must be initialised before a MapView is constructed. It is idempotent.
         MapLibre.getInstance(context)
         MapView(context)
     }
+    val attached = remember(mapView) { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -66,10 +72,19 @@ fun AdShieldMap(
                 else -> Unit
             }
         }
+        // MapLibre releases its large bitmap/GL caches from onLowMemory(); nothing in the lifecycle
+        // delivers that, so it is forwarded from the application callback instead.
+        val lowMemory = object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+            override fun onLowMemory() = mapView.onLowMemory()
+            override fun onTrimMemory(level: Int) = Unit
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
+        context.applicationContext.registerComponentCallbacks(lowMemory)
         mapView.onCreate(null)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            runCatching { context.applicationContext.unregisterComponentCallbacks(lowMemory) }
             engine.detach()
             mapView.onStop()
             mapView.onDestroy()
@@ -86,10 +101,17 @@ fun AdShieldMap(
             mapView
         },
         update = { view ->
-            view.getMapAsync { map ->
-                engine.attach(map)
-                engine.loadStyle(styleUrl)
-                currentOnReady()
+            // `update` runs on *every* recomposition. Calling getMapAsync each time re-registered the
+            // camera/click listeners on the same map and re-ran `onReady`, so the caller saw a
+            // "map ready" event several times a second and any one-shot work behind it repeated.
+            // Attach once; style and overlays are handled by the effects below.
+            if (!attached.value) {
+                attached.value = true
+                view.getMapAsync { map ->
+                    engine.attach(map)
+                    engine.loadStyle(styleUrl)
+                    currentOnReady()
+                }
             }
         }
     )

@@ -72,9 +72,20 @@ class GpsEngine(
 
     private val listeners = CopyOnWriteArrayList<(GnssFix) -> Unit>()
 
+    /**
+     * Serialises state mutation.
+     *
+     * Three coroutines write engine state — the fix collector, the heading collector and the stale
+     * ticker — plus [resetTrip]/[release]/[stop] from the UI thread. Trip counters were plain
+     * fields, so a fix and a stale tick could interleave and produce a frame with, for example, the
+     * previous fix's integrity report but the new fix's distance. Every mutation and every frame
+     * publication now runs on this single thread.
+     */
+    private val stateLock = Any()
+
     /** Extra consumers (trip recorder, traffic recorder) receive every accepted fix. */
     fun addFixListener(listener: (GnssFix) -> Unit) {
-        listeners += listener
+        if (listener !in listeners) listeners += listener
     }
 
     fun removeFixListener(listener: (GnssFix) -> Unit) {
@@ -84,10 +95,21 @@ class GpsEngine(
     val isRunning: Boolean get() = locationSource.isListening
 
     /**
-     * Starts collecting. Safe to call repeatedly; an existing collection is kept.
-     * Stops automatically when [stop] is called (the UI calls it in onStop/onCleared).
+     * Holders that asked for fixes: the GPS screen and/or the navigation foreground service.
+     *
+     * The engine is an app singleton, and both the UI and the service legitimately want the same
+     * stream. Counting holders is what stops one of them from shutting the receiver down while the
+     * other is still using it — the bug being a "Stop" tap in the notification freezing the open map.
      */
-    fun start(intervalMs: Long = 1_000L) {
+    private val holders = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    /**
+     * Starts collecting on behalf of [holder]. Safe to call repeatedly; the existing collection is
+     * kept and the holder is simply remembered.
+     */
+    @JvmOverloads
+    fun start(intervalMs: Long = 1_000L, holder: String = DEFAULT_HOLDER) {
+        holders += holder
         if (locationJob != null) return
         if (!locationSource.hasFinePermission() && !locationSource.hasCoarsePermission()) {
             publishState(FixState.NO_PERMISSION)
@@ -109,69 +131,126 @@ class GpsEngine(
         }
         satelliteJob = scope.launch {
             locationSource.satelliteStatus().collect { snapshot ->
-                _satellites.value = snapshot
-                _diagnostics.value = _diagnostics.value.copy(
-                    gnssStatusAvailable = true,
-                    updatedAtMs = System.currentTimeMillis()
-                )
+                synchronized(stateLock) {
+                    _satellites.value = snapshot
+                    _diagnostics.value = _diagnostics.value.copy(
+                        gnssStatusAvailable = true,
+                        updatedAtMs = System.currentTimeMillis()
+                    )
+                }
             }
         }
         headingJob = scope.launch {
             headingSensor.headings().collect { sample ->
                 latestHeading = sample
-                refreshFrame(extra = "heading")
+                refreshFrame()
             }
         }
         staleJob = scope.launch {
             // Independent of fix delivery: makes "stale" appear even if the provider goes silent.
             while (true) {
                 delay(2_000)
-                val current = _frame.value
-                val fix = current.fix ?: continue
-                val age = System.currentTimeMillis() - fix.timeMs
-                if (age > STALE_AFTER_MS && current.fixState != FixState.STALE) {
-                    _frame.value = current.copy(
-                        fixState = FixState.STALE,
-                        lastFixAgeMs = age
-                    )
-                } else if (current.fixState == FixState.STALE && age <= STALE_AFTER_MS) {
-                    _frame.value = current.copy(fixState = FixState.FIX_ACQUIRED, lastFixAgeMs = age)
-                } else {
-                    _frame.value = current.copy(lastFixAgeMs = age)
+                synchronized(stateLock) {
+                    val current = _frame.value
+                    val fix = current.fix ?: return@synchronized
+                    val age = System.currentTimeMillis() - fix.timeMs
+                    // FIX_ACQUIRED / COMPROMISED are re-derived from the last real fix instead of
+                    // being hard-coded back to FIX_ACQUIRED: a compromised position used to be
+                    // relabelled as healthy here two seconds after it arrived.
+                    val settled = when {
+                        age > STALE_AFTER_MS -> FixState.STALE
+                        current.integrity.verdict == IntegrityVerdict.COMPROMISED -> FixState.COMPROMISED
+                        else -> FixState.FIX_ACQUIRED
+                    }
+                    if (current.fixState != settled || current.lastFixAgeMs != age) {
+                        _frame.value = current.copy(fixState = settled, lastFixAgeMs = age)
+                    }
                 }
             }
         }
     }
 
+    /**
+     * Drops [holder]'s request. Collection keeps running while any other holder still wants fixes,
+     * and shuts down completely only when the last one leaves.
+     */
+    @JvmOverloads
+    fun release(holder: String = DEFAULT_HOLDER) {
+        holders -= holder
+        if (holders.isEmpty()) stop()
+    }
+
+    /**
+     * Stops collection unconditionally, whichever holders remain. Used when location must be
+     * abandoned immediately (permission revoked, ViewModel destroyed, process going away).
+     */
     fun stop() {
-        locationJob?.cancel(); locationJob = null
-        satelliteJob?.cancel(); satelliteJob = null
-        headingJob?.cancel(); headingJob = null
-        staleJob?.cancel(); staleJob = null
-        _diagnostics.value = _diagnostics.value.copy(updatedAtMs = System.currentTimeMillis())
+        synchronized(stateLock) {
+            holders.clear()
+            locationJob?.cancel(); locationJob = null
+            satelliteJob?.cancel(); satelliteJob = null
+            headingJob?.cancel(); headingJob = null
+            staleJob?.cancel(); staleJob = null
+            // Drop the fix and say so. Leaving the last frame in place made a stopped engine look
+            // like a live one: the speed and accuracy stayed on screen indefinitely.
+            _frame.value = GpsFrame.EMPTY.copy(
+                fixState = FixState.SEARCHING,
+                satellites = _satellites.value,
+                updatedAtMs = System.currentTimeMillis()
+            )
+            _diagnostics.value = _diagnostics.value.copy(
+                lastFixAtMs = 0L,
+                updatedAtMs = System.currentTimeMillis()
+            )
+        }
     }
 
     fun resetTrip() {
-        trackDistanceMeters = 0.0
-        acceptedSamples = 0
-        rejectedSamples = 0
-        maxSpeedKmh = 0.0
-        speedSum = 0.0
-        movingSeconds = 0L
-        lastAccepted = null
-        stationaryDetector.reset()
-        integrityMonitor.reset()
-        _frame.value = _frame.value.copy(trackStats = TrackStats())
+        synchronized(stateLock) {
+            trackDistanceMeters = 0.0
+            acceptedSamples = 0
+            rejectedSamples = 0
+            maxSpeedKmh = 0.0
+            speedSum = 0.0
+            movingSeconds = 0L
+            lastAccepted = null
+            stationaryDetector.reset()
+            integrityMonitor.reset()
+            // The last verdict and heading belong to the trip that just ended. Keeping them made a
+            // fresh trip start under the previous trip's COMPROMISED badge.
+            latestIntegrity = IntegrityReport.NONE
+            latestHeading = null
+            _frame.value = _frame.value.copy(
+                trackStats = TrackStats(),
+                integrity = IntegrityReport.NONE,
+                heading = null,
+                fixState = _frame.value.fix?.let { FixState.FIX_ACQUIRED } ?: _frame.value.fixState
+            )
+        }
     }
 
     private fun publishState(state: FixState) {
-        _frame.value = _frame.value.copy(fixState = state, updatedAtMs = System.currentTimeMillis())
+        synchronized(stateLock) {
+            _frame.value = _frame.value.copy(fixState = state, updatedAtMs = System.currentTimeMillis())
+        }
     }
 
     private fun onFix(fix: GnssFix) {
+        val deliver = synchronized(stateLock) { onFixLocked(fix) }
+        // Dispatched outside the lock on purpose: a listener runs on the caller's thread and may
+        // touch the engine again (or hop to the main thread, which may be waiting on this lock).
+        if (deliver) listeners.forEach { listener -> runCatching { listener(fix) } }
+    }
+
+    /**
+     * Body of [onFix], always called while holding [stateLock].
+     *
+     * @return true when the fix should be handed to the registered listeners.
+     */
+    private fun onFixLocked(fix: GnssFix): Boolean {
         if (!fix.position.isValid) {
             rejectedSamples++
-            return
+            return false
         }
         // Reject fixes Android itself flags as mocked *for accounting*, but still display them so
         // the user can see the spoofing rather than a frozen map. They never enter the track stats.
@@ -234,7 +313,13 @@ class GpsEngine(
 
         _frame.value = GpsFrame(
             fix = fix,
-            fixState = if (integrity.verdict == IntegrityVerdict.COMPROMISED) FixState.FIX_ACQUIRED else FixState.FIX_ACQUIRED,
+            // A compromised position is a distinct, visible state — the earlier version had the
+            // same value in both branches, so spoofing looked exactly like a healthy fix.
+            fixState = if (integrity.verdict == IntegrityVerdict.COMPROMISED) {
+                FixState.COMPROMISED
+            } else {
+                FixState.FIX_ACQUIRED
+            },
             heading = fusedHeading,
             navigationBearingDegrees = bearing,
             movement = movement,
@@ -253,23 +338,27 @@ class GpsEngine(
             mockLocationObserved = integrity.findings.any { it.kind == IntegrityFindingKind.MOCK_LOCATION },
             updatedAtMs = System.currentTimeMillis()
         )
-        listeners.forEach { listener -> runCatching { listener(fix) } }
+        return true
     }
 
-    private fun refreshFrame(extra: String) {
-        val current = _frame.value
-        val fix = current.fix ?: return
-        val fused = headingFusion.update(latestHeading, fix)
-        val bearing = when {
-            fix.speedMps != null && fix.speedMps >= 3.0f && fix.bearingDegrees != null -> fix.bearingDegrees.toDouble()
-            fused != null -> fused.degrees
-            else -> null
+    /** Recomputes the fused heading for the current fix; called when the compass reports. */
+    private fun refreshFrame() {
+        synchronized(stateLock) {
+            val current = _frame.value
+            val fix = current.fix ?: return@synchronized
+            val fused = headingFusion.update(latestHeading, fix)
+            val bearing = when {
+                fix.speedMps != null && fix.speedMps >= 3.0f && fix.bearingDegrees != null ->
+                    fix.bearingDegrees.toDouble()
+                fused != null -> fused.degrees
+                else -> null
+            }
+            _frame.value = current.copy(
+                heading = fused,
+                navigationBearingDegrees = bearing,
+                updatedAtMs = System.currentTimeMillis()
+            )
         }
-        _frame.value = current.copy(
-            heading = fused,
-            navigationBearingDegrees = bearing,
-            updatedAtMs = System.currentTimeMillis()
-        )
     }
 
     /** Human-readable device capability line for the GPS screen header. */
@@ -288,6 +377,9 @@ class GpsEngine(
 
     companion object {
         const val STALE_AFTER_MS = 12_000L
+
+        /** Holder id for the GPS screen / ViewModel. */
+        const val DEFAULT_HOLDER = "ui"
 
         /** Reads Android's own "allow mock locations" developer switch without modifying it. */
         fun isMockLocationAllowed(context: Context): Boolean = try {

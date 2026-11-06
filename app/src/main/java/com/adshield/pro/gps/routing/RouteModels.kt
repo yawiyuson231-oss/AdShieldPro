@@ -4,6 +4,7 @@ import com.adshield.pro.gps.geo.GeoBounds
 import com.adshield.pro.gps.geo.GeoPoint
 import com.adshield.pro.gps.geo.Geodesy
 import kotlin.math.abs
+import java.util.Locale
 
 /**
  * AdShield Pro — navigation routing models.
@@ -398,7 +399,7 @@ object NavigationPhrases {
         meters < 1000 -> "${(meters / 50).toInt().coerceAtLeast(1) * 50} metres"
         else -> {
             val km = meters / 1000.0
-            if (km < 10) String.format("%.1f kilometres", km) else "${km.toInt()} kilometres"
+            if (km < 10) String.format(Locale.US, "%.1f kilometres", km) else "${km.toInt()} kilometres"
         }
     }
 

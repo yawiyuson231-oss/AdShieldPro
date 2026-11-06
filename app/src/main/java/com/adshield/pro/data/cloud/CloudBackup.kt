@@ -26,6 +26,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Locale
 
 /**
  * The exact configuration that is uploaded when a user backs up AdShield Pro.
@@ -120,12 +121,12 @@ object CloudBackupCodec {
 
     fun sha256(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
-        return digest.joinToString("") { String.format("%02x", it.toInt() and 0xFF) }
+        return digest.joinToString("") { String.format(Locale.ROOT, "%02x", it.toInt() and 0xFF) }
     }
 
     fun sha1(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-1").digest(bytes)
-        return digest.joinToString("") { String.format("%02x", it.toInt() and 0xFF) }
+        return digest.joinToString("") { String.format(Locale.ROOT, "%02x", it.toInt() and 0xFF) }
     }
 
     /** A backup only verifies when the stored bytes still hash to the value recorded at upload. */

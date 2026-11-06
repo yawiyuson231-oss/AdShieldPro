@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import com.adshield.pro.gps.engine.FixState
 import com.adshield.pro.gps.engine.GpsFrame
 import com.adshield.pro.gps.engine.IntegrityVerdict
 import com.adshield.pro.gps.engine.MovementState
@@ -79,6 +80,7 @@ import com.adshield.pro.gps.ui.accuracyColor
 import com.adshield.pro.gps.ui.integrityColor
 import com.adshield.pro.gps.ui.movementColor
 import kotlin.math.roundToInt
+import java.util.Locale
 
 /**
  * GPS MAP — the full-screen interactive map.
@@ -391,7 +393,7 @@ fun GpsMapScreen(
                     Row {
                         TelemetryReadout(
                             label = "Speed",
-                            value = frame.speedKmh?.let { String.format("%.0f", it) } ?: "—",
+                            value = frame.speedKmh?.let { String.format(Locale.US, "%.0f", it) } ?: "—",
                             unit = "km/h",
                             accent = GpsCyan,
                             modifier = Modifier.weight(1f)
@@ -418,7 +420,7 @@ fun GpsMapScreen(
                         fontSize = 9.sp
                     )
                     Text(
-                        "Zoom " + String.format("%.1f", cameraZoom) + " · " + state.cameraMode.label,
+                        "Zoom " + String.format(Locale.US, "%.1f", cameraZoom) + " · " + state.cameraMode.label,
                         color = GpsTextDim,
                         fontSize = 9.sp
                     )
@@ -550,10 +552,13 @@ fun GpsMapScreen(
                 GpsPanel(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            when (frame.fixState.label) {
-                                "Permission denied" -> "LOCATION PERMISSION REQUIRED"
-                                "Location services off" -> "SYSTEM LOCATION IS OFF"
-                                "No GNSS hardware" -> "NO GNSS RECEIVER REPORTED"
+                            // Compare the enum, not its display label: matching on the label meant a
+                            // wording change silently fell through to "ACQUIRING GNSS FIX".
+                            when (frame.fixState) {
+                                FixState.NO_PERMISSION -> "LOCATION PERMISSION REQUIRED"
+                                FixState.DISABLED -> "SYSTEM LOCATION IS OFF"
+                                FixState.UNSUPPORTED -> "NO GNSS RECEIVER REPORTED"
+                                FixState.COMPROMISED -> "POSITION FAILED INTEGRITY CHECK"
                                 else -> "ACQUIRING GNSS FIX"
                             },
                             color = GpsAmber,
@@ -563,14 +568,17 @@ fun GpsMapScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            when (frame.fixState.label) {
-                                "Permission denied" ->
+                            when (frame.fixState) {
+                                FixState.NO_PERMISSION ->
                                     "Grant precise location in Android settings to see your position. " +
                                         "Offline maps and routing graphs keep working without it."
-                                "Location services off" ->
+                                FixState.DISABLED ->
                                     "Turn system location back on; the map stays usable for planning."
-                                "No GNSS hardware" ->
+                                FixState.UNSUPPORTED ->
                                     "This device does not expose a GPS provider. Network positioning may still work."
+                                FixState.COMPROMISED ->
+                                    "Android reports this position as simulated. It is shown so you can see it, " +
+                                        "but it is never recorded and never contributes traffic data."
                                 else ->
                                     "Waiting for real readings from the receiver. Nothing is simulated — " +
                                         "if no satellite is visible the map stays without a position."

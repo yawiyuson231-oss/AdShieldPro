@@ -142,6 +142,14 @@ enum class FixState(val label: String) {
     NO_PERMISSION("Permission denied"),
     SEARCHING("Searching for satellites"),
     FIX_ACQUIRED("Fix acquired"),
+
+    /**
+     * A fix whose integrity check failed (mock provider or another spoofing signal).
+     *
+     * The position is still shown — hiding it would leave the user with a frozen map and no
+     * explanation — but it is never counted towards track statistics and never recorded.
+     */
+    COMPROMISED("Position failed integrity check"),
     STALE("Fix is stale"),
     DISABLED("Location services off"),
     UNSUPPORTED("No GNSS hardware")

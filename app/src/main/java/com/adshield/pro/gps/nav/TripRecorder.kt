@@ -62,6 +62,15 @@ class TripRecorder @Inject constructor(
     private var pointCount = 0
     private var integrityVerdict = "TRUSTED"
     private val track = ArrayList<TripPointEntity>()
+
+    /**
+     * Time of the newest point already written to the encrypted track archive.
+     *
+     * [flushTrackToDisk] used to rewrite the whole file from memory after trimming, so `finish()`
+     * read back only the newest half of the trip. The archive is now append-only and this watermark
+     * says where to continue.
+     */
+    private var trackArchivedUpToMs = 0L
     private var lastPolicy: LocationPrivacyPolicy? = null
 
     val activeTripId: Long? get() = tripId
@@ -108,6 +117,7 @@ class TripRecorder @Inject constructor(
             maxSpeedKmh = 0.0
             distanceMeters = 0.0
             pointCount = 0
+            trackArchivedUpToMs = 0L
             integrityVerdict = "TRUSTED"
             track.clear()
             track += persisted.toPointEntity(0L, fix)
@@ -133,6 +143,11 @@ class TripRecorder @Inject constructor(
                     )
                 )
                 tripId = id
+                // Points collected before the row existed were stamped with trip_id = 0. Re-stamp
+                // them, otherwise `finish()` inserts rows whose trip_id points at nothing and the
+                // history detail view comes up empty.
+                val restamped = restampTripId(track, id)
+                for (index in restamped.indices) track[index] = restamped[index]
             }
             return
         }
@@ -172,7 +187,10 @@ class TripRecorder @Inject constructor(
         val id = tripId ?: return
         val end = endFix?.position?.let { HistoryGuard.persistedPoint(it, policy) } ?: lastPoint
         val endedAt = endFix?.timeMs ?: System.currentTimeMillis()
-        val trackFile = writeTrack(id)
+        // Every flush trimmed memory down to the newest half, so whatever is still in `track` has
+        // not been archived yet. Appending it is what makes the file the complete trip shape.
+        trackFileArchiveTail(id)
+        val trackFile = if (trackArchivedUpToMs > 0L) "trip_$id.json.enc" else null
         val pointsSnapshot = track.toList()
         val distance = distanceMeters
         val maxSpeed = maxSpeedKmh
@@ -207,6 +225,7 @@ class TripRecorder @Inject constructor(
 
         tripId = null
         track.clear()
+        trackArchivedUpToMs = 0L
         pointCount = 0
         startPoint = null
         lastPoint = null
@@ -218,43 +237,66 @@ class TripRecorder @Inject constructor(
         lastTimestampMs = 0L
     }
 
+    /**
+     * Archives the un-written tail of [track] and trims memory.
+     *
+     * The trim only ever drops points up to [trackArchivedUpToMs], which is what the file already
+     * contains. The old version rewrote the file from the whole in-memory list and *then* trimmed,
+     * but `finish()` re-read the already-trimmed content, so a trip longer than
+     * [MAX_IN_MEMORY_POINTS] lost its first half on disk.
+     */
     private fun flushTrackToDisk() {
         val id = tripId ?: return
-        writeTrack(id)
-        // Keep the newest points in memory so the tail of the trip is not lost.
+        trackFileArchiveTail(id)
         if (track.size > MAX_IN_MEMORY_POINTS) {
-            val excess = track.size - MAX_IN_MEMORY_POINTS / 2
-            repeat(excess) { track.removeAt(0) }
+            // Drop only points that are already archived, oldest first.
+            while (track.size > MAX_IN_MEMORY_POINTS && track.first().timestampMs <= trackArchivedUpToMs) {
+                track.removeAt(0)
+            }
         }
     }
 
-    private fun writeTrack(id: Long): String? {
-        if (track.isEmpty()) return null
-        if (lastPolicy?.recordTripHistory != true) return null
-        val payload = buildJsonObject {
-            put("trip_id", id)
-            put("started_at_ms", startedAtMs)
-            put("points", kotlinx.serialization.json.JsonArray(
-                track.map { point ->
-                    buildJsonObject {
-                        put("t", point.timestampMs)
-                        put("lat", point.latitude)
-                        put("lon", point.longitude)
-                        put("spd", point.speedKmh ?: 0.0)
-                        put("acc", point.accuracyMeters.toDouble())
-                        put("brg", point.bearingDegrees ?: 0.0)
-                    }
-                }
-            ))
-        }.toString().toByteArray(Charsets.UTF_8)
-
+    /**
+     * Appends every point newer than [trackArchivedUpToMs] to the encrypted track file.
+     *
+     * The payload is newline-delimited JSON: one self-contained record per point. Appending a record
+     * is inside a single GCM operation, so no point is ever written half-way.
+     */
+    private fun trackFileArchiveTail(id: Long): Boolean {
+        if (lastPolicy?.recordTripHistory != true) return false
+        val pending = unarchivedPoints(track, trackArchivedUpToMs)
+        if (pending.isEmpty()) return false
         val name = "trip_$id.json.enc"
-        return if (secureStore.write(name, payload)) {
-            name
+        val file = File(secureStoreDirectory(), name)
+        // An existing file that cannot be decrypted (Keystore reset, corruption) must not be
+        // silently replaced by only the newest points: that would look like a complete trip.
+        if (file.isFile && secureStore.read(name) == null) {
+            lastStorageError = secureStore.lastError ?: "Existing encrypted track could not be read"
+            return false
+        }
+        val payload = pending.joinToString(separator = "\n", postfix = "\n") { point ->
+            buildJsonObject {
+                put("t", point.timestampMs)
+                put("lat", point.latitude)
+                put("lon", point.longitude)
+                put("spd", point.speedKmh ?: 0.0)
+                put("acc", point.accuracyMeters.toDouble())
+                put("brg", point.bearingDegrees ?: 0.0)
+            }.toString()
+        }.toByteArray(Charsets.UTF_8)
+
+        val existing = if (file.isFile) secureStore.read(name).orEmpty() else ByteArray(0)
+        val merged = ByteArray(existing.size + payload.size).also {
+            existing.copyInto(it, 0)
+            payload.copyInto(it, existing.size)
+        }
+        return if (secureStore.write(name, merged)) {
+            trackArchivedUpToMs = pending.maxOf { it.timestampMs }
+            true
         } else {
             // Fail loudly in the UI rather than pretending the track was stored.
             lastStorageError = secureStore.lastError ?: "Encrypted storage unavailable"
-            null
+            false
         }
     }
 
@@ -321,5 +363,24 @@ class TripRecorder @Inject constructor(
     companion object {
         /** Keep memory bounded on long trips; the encrypted file is appended in chunks. */
         const val MAX_IN_MEMORY_POINTS = 3_000
+
+        /**
+         * Points collected before the Room row existed carry the placeholder `trip_id = 0`.
+         *
+         * `finish()` writes these rows to the database, so leaving the placeholder makes them
+         * orphans: the history detail view queries by real id and shows an empty trip.
+         */
+        fun restampTripId(points: List<TripPointEntity>, tripId: Long): List<TripPointEntity> =
+            if (tripId <= 0L) points else points.map { it.copy(tripId = tripId) }
+
+        /**
+         * The part of [points] not yet written to the encrypted archive.
+         *
+         * The archive watermark is the timestamp of the newest archived point, so this is exactly
+         * what has to be appended next. Keeping it pure is what makes the "long trip loses its
+         * first half" bug testable without an Android Keystore.
+         */
+        fun unarchivedPoints(points: List<TripPointEntity>, archivedUpToMs: Long): List<TripPointEntity> =
+            points.filter { it.timestampMs > archivedUpToMs }
     }
 }

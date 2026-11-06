@@ -13,6 +13,7 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
+import java.util.Locale
 
 /**
  * AdShield Pro — GPS module, pure-geodesy layer.
@@ -51,6 +52,9 @@ object Geodesy {
         val lat1 = Math.toRadians(a.latitude)
         val lat2 = Math.toRadians(b.latitude)
         val dLat = lat2 - lat1
+        // No normalisation needed: sin/cos are 2-pi periodic, so a 359.8° step gives exactly the
+        // same result as the equivalent -0.2° one. (Verified, not assumed — see
+        // GpsAuditRegressionTest.testDistanceAcrossAntimeridianUsesTheShortWayRound.)
         val dLon = Math.toRadians(b.longitude - a.longitude)
         val h = sin(dLat / 2.0).pow(2) + cos(lat1) * cos(lat2) * sin(dLon / 2.0).pow(2)
         return 2.0 * EARTH_RADIUS_M * asin(min(1.0, sqrt(h)))
@@ -121,9 +125,13 @@ object Geodesy {
 
         val ax = 0.0
         val ay = 0.0
-        val bx = (b.longitude - a.longitude) * mPerDegLon
+        // Longitude differences are wrapped so a segment that crosses the antimeridian is treated as
+        // the short way round rather than the long way across the whole planet.
+        val dLonB = normalizeLongitude(b.longitude - a.longitude)
+        val dLonP = normalizeLongitude(point.longitude - a.longitude)
+        val bx = dLonB * mPerDegLon
         val by = (b.latitude - a.latitude) * mPerDegLat
-        val px = (point.longitude - a.longitude) * mPerDegLon
+        val px = dLonP * mPerDegLon
         val py = (point.latitude - a.latitude) * mPerDegLat
 
         val dx = bx - ax
@@ -138,7 +146,7 @@ object Geodesy {
         } else {
             GeoPoint(
                 latitude = a.latitude + (b.latitude - a.latitude) * fraction,
-                longitude = a.longitude + (b.longitude - a.longitude) * fraction
+                longitude = normalizeLongitude(a.longitude + dLonB * fraction)
             )
         }
         val dxp = px - dx * fraction
@@ -185,8 +193,8 @@ object Geodesy {
     /** Human-readable distance used by the navigation banner. */
     fun formatDistance(meters: Double): String = when {
         !meters.isFinite() || meters < 0 -> "—"
-        meters < 950 -> "${meters.coerceAtLeast(0.0).let { if (it < 10) String.format("%.1f", it) else it.toInt().toString() }} m"
-        else -> String.format("%.1f km", meters / 1000.0)
+        meters < 950 -> "${meters.coerceAtLeast(0.0).let { if (it < 10) String.format(Locale.US, "%.1f", it) else it.toInt().toString() }} m"
+        else -> String.format(Locale.US, "%.1f km", meters / 1000.0)
     }
 
     /** Human-readable duration: 45 s, 12 min, 1 h 08 min. */
@@ -203,7 +211,7 @@ object Geodesy {
 
     /** "Lat 15.123456, Lon 120.654321" — used by the telemetry and security screens. */
     fun formatCoordinates(latitude: Double, longitude: Double, decimals: Int = 6): String =
-        String.format("Lat %." + decimals + "f, Lon %." + decimals + "f", latitude, longitude)
+        String.format(Locale.US, "Lat %." + decimals + "f, Lon %." + decimals + "f", latitude, longitude)
 
     /** Absolute angular difference between two bearings, 0..180. */
     fun bearingDifference(a: Double, b: Double): Double = abs(bearingDelta(a, b))

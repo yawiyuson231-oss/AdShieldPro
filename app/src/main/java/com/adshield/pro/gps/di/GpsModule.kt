@@ -84,7 +84,7 @@ object GpsModule {
         integrityMonitor = GpsIntegrityMonitor(),
         stationaryDetector = StationaryDetector(),
         headingFusion = HeadingFusion()
-    ).also { GpsEngineHolder.install(it) }
+    )
 
     @Provides
     @Singleton
@@ -97,19 +97,4 @@ abstract class GpsBindingsModule {
     @Binds
     @Singleton
     abstract fun bindVoiceGuidance(impl: TtsVoiceGuidance): VoiceGuidanceApi
-}
-
-/**
- * Static handle to the singleton [GpsEngine] for the foreground service, which is created by the
- * platform rather than through injection. Set once by [GpsEngine]'s provider.
- */
-object GpsEngineHolder {
-    @Volatile
-    private var engine: GpsEngine? = null
-
-    fun install(engine: GpsEngine) {
-        this.engine = engine
-    }
-
-    fun get(): GpsEngine? = engine
 }

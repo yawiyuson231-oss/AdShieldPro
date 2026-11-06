@@ -81,10 +81,22 @@ class TrafficRepository @Inject constructor(
         val message: String = "No traffic data available"
     )
 
+    @Volatile private var initialised = false
+
+    /**
+     * One-time setup, idempotent.
+     *
+     * This used to unconditionally replace `recorder` from a coroutine. If it landed after the
+     * first `onFix` (or after `updateSegments`), it silently threw away whatever segment window was
+     * being accumulated, so the first observation after app start was usually lost. It now only
+     * creates the recorder if there is none, and refuses to run twice.
+     */
     fun initialise() {
+        if (initialised) return
+        initialised = true
         scope.launch {
             reporterToken = preferences.reporterToken()
-            recorder = SpeedObservationRecorder(reporterToken = reporterToken)
+            if (recorder == null) recorder = SpeedObservationRecorder(reporterToken = reporterToken)
             refreshFromDatabase()
         }
     }
@@ -103,6 +115,12 @@ class TrafficRepository @Inject constructor(
      */
     fun onFix(fix: GnssFix, policy: LocationPrivacyPolicy, compromised: Boolean) {
         val activeRecorder = recorder ?: return
+        if (compromised && policy.contributeTraffic) {
+            // Say it in the gate log: otherwise a user whose position is flagged sees "no traffic
+            // ever recorded" with no explanation anywhere in the UI.
+            _gateLog.value = (listOf("${clock()} Not recorded: position failed the integrity check") +
+                _gateLog.value).take(40)
+        }
         val match = matcher.matchDetailed(fix.position)
         val segment = match.segment
 
@@ -147,8 +165,16 @@ class TrafficRepository @Inject constructor(
 
     fun completeTrip(policy: LocationPrivacyPolicy) {
         val activeRecorder = recorder ?: return
-        val completed = activeRecorder.complete() ?: return
-        if (!policy.contributeTraffic) return
+        // The partial segment is always closed so the window does not leak into the next trip; it is
+        // only *stored* when the user opted in.
+        val completed = activeRecorder.complete()
+        recorder = SpeedObservationRecorder(reporterToken = reporterToken)
+        if (completed == null) return
+        if (!policy.contributeTraffic) {
+            _gateLog.value = (listOf("${clock()} Trip closed: sharing is off, sample discarded") +
+                _gateLog.value).take(40)
+            return
+        }
         scope.launch {
             dao.insertObservation(
                 TrafficObservationEntity(

@@ -14,11 +14,11 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import com.adshield.pro.MainActivity
 import com.adshield.pro.R
-import com.adshield.pro.gps.engine.GnssLocationSource
 import com.adshield.pro.gps.engine.GpsEngine
 import com.adshield.pro.gps.routing.RouteProgress
 import com.adshield.pro.gps.geo.Geodesy
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,11 +48,20 @@ import kotlinx.coroutines.launch
 class GpsConsoleService : LifecycleService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var engine: GpsEngine? = null
+
+    /**
+     * The app-scoped engine, injected rather than created here.
+     *
+     * The GPS screen already runs this engine while it is visible. Constructing a second one in the
+     * service meant two independent LocationManager request loops (double battery, two 1 Hz
+     * streams) and two writers on the same integrity/trip state. The engine is reference-counted
+     * internally, so starting it from the service is safe while the UI also holds it.
+     */
+    @Inject lateinit var engine: GpsEngine
+
     private var notificationJob: Job? = null
     private var lastInstruction: String = "Navigation active"
-
-    private val locationSource: GnssLocationSource by lazy { GnssLocationSource(this) }
+    private var foregroundStarted = false
 
     override fun onCreate() {
         super.onCreate()
@@ -72,7 +81,7 @@ class GpsConsoleService : LifecycleService() {
     }
 
     private fun startNavigation() {
-        if (engine != null) return
+        if (foregroundStarted) return
         val started = try {
             ServiceCompat.startForeground(
                 this,
@@ -97,14 +106,13 @@ class GpsConsoleService : LifecycleService() {
             false
         }
         if (!started) return
+        foregroundStarted = true
 
-        val newEngine = GpsEngine(this, scope, locationSource)
-        engine = newEngine
-        newEngine.start(intervalMs = 1_000L)
+        engine.start(intervalMs = 1_000L, holder = HOLDER_SERVICE)
         _state.value = ServiceState(running = true, error = null)
 
         notificationJob = scope.launch {
-            newEngine.frame.collect { frame ->
+            engine.frame.collect { frame ->
                 val fix = frame.fix
                 val speed = fix?.speedKmh?.let { "${it.toInt()} km/h" } ?: "no fix yet"
                 val accuracy = fix?.accuracyMeters?.let { "±${it.toInt()} m" } ?: "—"
@@ -147,8 +155,11 @@ class GpsConsoleService : LifecycleService() {
     private fun stopNavigation() {
         notificationJob?.cancel()
         notificationJob = null
-        engine?.stop()
-        engine = null
+        // The engine is shared with the UI: releasing our hold lets it stop only if nobody else is
+        // collecting. Calling stop() unconditionally here froze the map when a user tapped "Stop"
+        // in the notification while the GPS screen was open.
+        engine.release(HOLDER_SERVICE)
+        foregroundStarted = false
         _state.value = ServiceState(running = false, error = null)
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -156,8 +167,9 @@ class GpsConsoleService : LifecycleService() {
 
     override fun onDestroy() {
         notificationJob?.cancel()
-        engine?.stop()
-        engine = null
+        notificationJob = null
+        engine.release(HOLDER_SERVICE)
+        foregroundStarted = false
         scope.cancel()
         super.onDestroy()
     }
@@ -227,6 +239,9 @@ class GpsConsoleService : LifecycleService() {
         private const val NOTIFICATION_ID = 4210
         private const val REQUEST_OPEN = 4211
         private const val REQUEST_STOP = 4212
+
+        /** Holder id for this service, distinct from the UI holder. */
+        private const val HOLDER_SERVICE = "navigation-service"
 
         private val _state = MutableStateFlow(ServiceState())
         val state: StateFlow<ServiceState> = _state.asStateFlow()

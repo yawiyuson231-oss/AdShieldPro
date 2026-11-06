@@ -283,7 +283,7 @@ class GpsViewModel @Inject constructor(
         if (observing) return
         observing = true
         refreshPermissionAudit()
-        engine.start(intervalMs = 1_000L)
+        engine.start(intervalMs = 1_000L, holder = GpsEngine.DEFAULT_HOLDER)
         if (!_state.value.policy.recordTripHistory) tripRecorder.finish(_state.value.policy)
         _events.value = listOf(
             GpsEvent("GPS engine started", System.currentTimeMillis(), GpsEventLevel.INFO)
@@ -293,7 +293,9 @@ class GpsViewModel @Inject constructor(
     fun onScreenHidden() {
         if (!observing) return
         observing = false
-        engine.stop()
+        // The navigation foreground service may still be holding the engine; only the last holder
+        // to leave actually stops the receiver.
+        engine.release(GpsEngine.DEFAULT_HOLDER)
         tripRecorder.finish(_state.value.policy)
         traffic.completeTrip(_state.value.policy)
     }
@@ -798,9 +800,16 @@ class GpsViewModel @Inject constructor(
         RadarGeometry.project(satellites.value?.satellites.orEmpty())
 
     override fun onCleared() {
+        // Every listener registered in onScreenVisible is released here. Anything left behind keeps
+        // a reference to a destroyed ViewModel (and to the activity that owned it) alive.
         engine.removeFixListener(fixListener)
-        engine.stop()
+        // Release rather than stop: closing the screen while navigation runs in the foreground
+        // service must not kill the receiver the notification depends on.
+        engine.release(GpsEngine.DEFAULT_HOLDER)
         navigation.stop()
+        // Stop the current announcement, but do NOT shut the engine down. This ViewModel is recreated
+        // on every configuration change (rotation); shutting down here left the next instance with a
+        // dead TextToSpeech object and no navigation voice until the process restarted.
         voice.stop()
         super.onCleared()
     }
