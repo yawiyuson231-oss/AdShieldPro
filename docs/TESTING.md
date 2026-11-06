@@ -129,3 +129,22 @@ Those cannot be exercised by JVM unit tests.
    the scroll-to-top button appears after scrolling, and the shield stops animating when the
    tunnel is paused or traffic is idle. Enable reduced motion / remove animations in developer
    options and confirm the shield renders statically.
+18. Open **Intel → Feeds & connectors**, pick a module and confirm the header counts match the
+    registry (110 listed / 103 implemented at the time of writing). Open a feed, press **SYNC NOW**
+    and confirm the status, HTTP code, latency and indicator count are populated from the real
+    response — a connector that has never succeeded must not read CONNECTED.
+19. Put the device in airplane mode (or block the host) and sync again: the connector must show
+    OFFLINE/ERROR with a readable reason and a retry delay, and the rest of the app must keep
+    working from cache. Reconnect and confirm the next sync recovers.
+20. Run a native probe (e.g. installed-app inventory, connectivity, battery, sensor privacy) and
+    confirm every value is a real reading; deny a permission (usage access, location) and confirm
+    the connector reports a restriction instead of inventing data.
+21. Use **Check against cached intelligence** with a domain from a synced feed, then a random
+    domain: the verdict, score and reasons must differ, and the disclaimer ("a match does not
+    prove compromise") must be visible.
+22. Set `connector-sync` to run sooner (or change the device clock), wait for a background cycle
+    and confirm freshness updates in the registry and the Automation node records the job result.
+    Then force-stop the app and confirm the stored state — including failures — survives restart.
+23. Upgrade-install over the previous version and confirm DNS stats, rules, scan history and the
+    intelligence event log survive the additive schema v5 migration (connector_state and
+    threat_indicators are new tables).
