@@ -429,12 +429,11 @@ class NativeConnectorProbes @Inject constructor(
 
     private fun biometricProbe(): ProbeResult {
         val packageManager = context.packageManager
-        val strong = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BIOMETRIC_STRONG)
-        val any = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BIOMETRIC_ANY)
-        } else {
-            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_FINGERPRINT)
-        }
+        // Feature strings are stable public values; the SDK constants are not present in every
+        // compile SDK, so they are spelled out here.
+        val strong = packageManager.hasSystemFeature("android.hardware.biometrics.strong")
+        val any = packageManager.hasSystemFeature("android.hardware.biometrics.any") ||
+            packageManager.hasSystemFeature("android.hardware.fingerprint")
         val keyguard = (context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager)
             ?.isDeviceSecure == true
         return ProbeResult(
