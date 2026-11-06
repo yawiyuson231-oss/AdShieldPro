@@ -439,3 +439,65 @@ test('no page uses innerHTML or trusts file content as markup', () => {
   assert.equal(/insertAdjacentHTML/.test(appSource), false, 'app.js must not use insertAdjacentHTML');
   assert.equal(/\.innerHTML\s*=/.test(domSource), false, 'ui/dom.js must not assign innerHTML');
 });
+
+test('Aura is a separate surface with an introduction, a real answer and a safe download link', async () => {
+  app.navigate('aura');
+  const section = $('#page-aura');
+  assert.ok(section, 'the Aura section must exist');
+  assert.equal(section.getAttribute('aria-label'), 'Aura AI Assistant');
+  assert.match(section.textContent, /Aura answers — and shows you why/, 'the introduction must be present');
+  assert.match(text('#aura-limits'), /does not browse|browse/i, 'the introduction must state its limits');
+
+  // The download card names the exact artifact and links out safely.
+  const download = $('#aura-download');
+  assert.match(download.textContent, /aura-1\.0\.582\.apk/);
+  assert.match(download.textContent, /SHA-256 not published/i, 'missing integrity data must be stated');
+  const link = download.querySelector('a.btn-download');
+  assert.ok(link, 'the download card must render a download link');
+  assert.equal(link.href, 'https://www.mediafire.com/file/vqu39py830k1gkl/aura-1.0.582.apk/file');
+  assert.equal(link.getAttribute('target'), '_blank');
+  assert.equal(link.getAttribute('rel'), 'noopener noreferrer');
+
+  // Asking a question answers from the local corpus, with citation and confidence.
+  $('#aura-input').value = 'Where do I download the APK?';
+  $('#aura-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  const log = text('#aura-log');
+  assert.match(log, /Where do I download the APK\?/, 'the question must be echoed');
+  assert.match(log, /aura-1\.0\.582\.apk/, 'the answer must quote the release manifest');
+  assert.match(log, /knowledge entry “download”/, 'the answer must cite its source');
+  assert.match(log, /confidence/, 'the answer must publish its confidence');
+  assert.match(text('#aura-turns'), /1 question/);
+
+  // Clearing erases the conversation — nothing is persisted. Suggested-prompt
+  // chips remain, so the assertion is on the answer, not on the question text.
+  click('#aura-reset');
+  const cleared = text('#aura-log');
+  assert.doesNotMatch(cleared, /knowledge entry “download”/, 'the answer must be gone after clearing');
+  assert.match(cleared, /Session cleared/, 'clearing must state what happened');
+  assert.match(text('#aura-turns'), /no questions yet/);
+});
+
+test('Aura declines off-topic questions in the real UI instead of improvising', async () => {
+  app.navigate('aura');
+  $('#aura-input').value = 'what is the capital of France';
+  $('#aura-form').dispatchEvent(new win.Event('submit', { bubbles: true, cancelable: true }));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const log = text('#aura-log');
+  assert.match(log, /outside the answers I carry/);
+  assert.match(log, /no confident match/);
+  assert.doesNotMatch(log, /Paris/);
+  click('#aura-reset');
+});
+
+test('one-click launcher opens Aura from any page and hides on its own page', () => {
+  app.navigate('dashboard');
+  const fab = $('#aura-fab');
+  assert.ok(fab, 'the launcher must exist');
+  assert.equal(fab.hidden, false);
+  click('#aura-fab');
+  assert.equal($('#page-aura').hidden, false);
+  assert.equal($('#aura-fab').hidden, true, 'the launcher must not cover its own page');
+  app.navigate('dashboard');
+});

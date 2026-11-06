@@ -11,6 +11,10 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
   to click it once; the deploy workflow reports it if it is still off).
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+- **Aura AI Assistant (Android build):** [`aura-1.0.582.apk` on MediaFire](https://www.mediafire.com/file/vqu39py830k1gkl/aura-1.0.582.apk/file) —
+  introduced on the website at [`#aura`](https://yawiyuson231-oss.github.io/AdShieldPro/#aura) and usable in the browser at
+  [`app/#aura`](https://yawiyuson231-oss.github.io/AdShieldPro/app/#aura). The download card states what is *not* known
+  about the file (no published SHA-256) instead of inventing it.
 
 ### Publishing a release
 
@@ -73,9 +77,9 @@ over HTTP and it works offline after the first visit.
 
 ```bash
 npm install               # jsdom, used only by the integration tests
-npm test                  # 166 unit + 19 integration tests
+npm test                  # 181 unit + 22 integration tests
 npm run lint              # house lint rules for the shipped runtime code
-npm run verify            # 86 static architecture, claim, artifact and packaging gates
+npm run verify            # 103 static architecture, claim, artifact and packaging gates
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 npm run stage             # assemble _site/ exactly as the Pages workflow does
@@ -86,8 +90,15 @@ npm run stage             # assemble _site/ exactly as the Pages workflow does
 | [`docs/WEB_PLATFORM.md`](docs/WEB_PLATFORM.md) | Features, quick start, integration instructions |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map: DNS plumbing, AETHER, Firewall AI, recovery, power governor, extension builder |
 | [`docs/AETHER.md`](docs/AETHER.md) | Signal weights, evidence floors, calibration methodology and measured metrics |
+| [`docs/AURA.md`](docs/AURA.md) | Aura AI Assistant: why retrieval instead of a model, module map, release policy, how to add an answer |
 | [`docs/UNSUPPORTED.md`](docs/UNSUPPORTED.md) | What this platform deliberately does **not** do, and why |
 | [`docs/WEB_TESTING.md`](docs/WEB_TESTING.md) | What the browser suite actually verifies |
+
+**Aura AI Assistant** is a first-class surface of the web app (`app/#aura`): a deterministic,
+offline retrieval assistant over a curated knowledge base that answers questions about the
+platform and the Android build, citing the entry and the measured confidence behind every reply.
+It makes no network request, keeps no storage and declines questions it cannot answer — the
+architecture and its enforced properties are documented in [`docs/AURA.md`](docs/AURA.md).
 
 Capabilities are also listed inside the app on the **Capabilities** page, including the rows
 that read *not implemented* — nothing there is aspirational.
