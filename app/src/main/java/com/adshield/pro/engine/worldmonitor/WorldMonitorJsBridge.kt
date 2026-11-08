@@ -1,6 +1,7 @@
 package com.adshield.pro.engine.worldmonitor
 
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import com.adshield.pro.domain.worldmonitor.GlobeProjection
 import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
 import com.adshield.pro.domain.worldmonitor.WorldViewport
@@ -37,6 +38,10 @@ class WorldMonitorJsBridge(
         fun onBuildingSelected(id: String, name: String, heightMeters: Double, heightEstimated: Boolean, lat: Double, lon: Double)
         fun onLocationSelected(lat: Double, lon: Double, terrainElevationMeters: Int, countryHint: String)
         fun onSatellitePassesComputed(entityId: String, passes: List<SatellitePassPrediction>)
+    }
+
+    fun attachTo(webView: WebView) {
+        webView.addJavascriptInterface(this, BRIDGE_NAME)
     }
 
     @JavascriptInterface

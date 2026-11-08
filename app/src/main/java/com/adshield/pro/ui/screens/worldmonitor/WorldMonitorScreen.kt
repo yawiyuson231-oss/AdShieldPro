@@ -239,8 +239,8 @@ private fun WorldMonitorGlobeWebView(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val tileAndAssetServer = remember(context) { WorldMonitorAssetAndTileServer(context) }
-    val jsBridge = remember(viewModel) { WorldMonitorJsBridge(viewModel) }
+    val tileAndAssetServer: WorldMonitorAssetAndTileServer = remember(context) { WorldMonitorAssetAndTileServer(context) }
+    val jsBridge: WorldMonitorJsBridge = remember(viewModel) { WorldMonitorJsBridge(viewModel) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     LaunchedEffect(webViewRef) {
@@ -295,7 +295,7 @@ private fun WorldMonitorGlobeWebView(
                     javaScriptCanOpenWindowsAutomatically = false
                     cacheMode = WebSettings.LOAD_DEFAULT
                 }
-                addJavascriptInterface(jsBridge, WorldMonitorJsBridge.BRIDGE_NAME)
+                jsBridge.attachTo(this)
                 webChromeClient = WebChromeClient()
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(
