@@ -212,14 +212,23 @@ dependencies {
 
 // The World Monitor is bundled, never a remote page. One shared implementation keeps the web
 // and native surfaces on the same tested parsers, filtering, map, watchlists and export code.
-val worldMonitorAssets = layout.buildDirectory.dir("generated/worldMonitorAssets")
-val prepareWorldMonitorAssets by tasks.registering(Sync::class) {
-    from(rootProject.layout.projectDirectory) {
-        include("world/**", "ui/dom.js", "ui/icons.js", "ui/theme.css", "ui/world.css")
-        include("security/storage.js", "security/sha256.js")
-        include("assets/world-land.svg", "assets/country-boundaries.json", "assets/country-data-license.txt")
-    }
-    into(worldMonitorAssets.map { it.dir("world-monitor") })
+// AGP 9 requires generated assets to use the variant Sources API, not sourceSets.srcDir(Provider).
+abstract class WorldMonitorAssetSync : Sync() {
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+    override fun getDestinationDir(): File = outputDirectory.get().asFile
+    override fun setDestinationDir(destination: File) { outputDirectory.set(destination) }
 }
-android.sourceSets.getByName("main").assets.srcDir(worldMonitorAssets)
-tasks.named("preBuild").configure { dependsOn(prepareWorldMonitorAssets) }
+androidComponents.onVariants { variant ->
+    val prepareWorldMonitorAssets = tasks.register<WorldMonitorAssetSync>(
+        "prepareWorldMonitorAssets${variant.name.replaceFirstChar { it.uppercaseChar() }}"
+    ) {
+        from(rootProject.layout.projectDirectory) {
+            include("world/**", "ui/dom.js", "ui/icons.js", "ui/theme.css", "ui/world.css")
+            include("security/storage.js", "security/sha256.js")
+            include("assets/world-land.svg", "assets/country-boundaries.json", "assets/country-data-license.txt")
+            into("world-monitor")
+        }
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareWorldMonitorAssets, WorldMonitorAssetSync::outputDirectory)
+}

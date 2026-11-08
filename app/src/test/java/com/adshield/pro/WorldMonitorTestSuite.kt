@@ -64,6 +64,15 @@ class WorldMonitorTestSuite {
     }
 
     @Test
+    fun testSnapshotReaderEnforcesByteLimitWhileStreaming() {
+        assertEquals("Hi 世界", WorldMonitorPolicy.readBoundedUtf8("Hi 世界".byteInputStream(), 9))
+        var rejected = false
+        try { WorldMonitorPolicy.readBoundedUtf8("界".repeat(100).byteInputStream(), 10) }
+        catch (_: IllegalArgumentException) { rejected = true }
+        assertTrue("A multibyte snapshot cannot bypass the byte bound", rejected)
+    }
+
+    @Test
     fun testScheduledSourcesAreDeduplicatedAndAllowlisted() {
         val data = Json.parseToJsonElement("""{"sources":["usgs","usgs","kev","unknown","https://evil.example",null]}""").jsonObject
         assertEquals(setOf("usgs", "kev"), WorldMonitorPolicy.scheduledSources(data, setOf("usgs", "kev", "eonet")))
@@ -112,7 +121,7 @@ class WorldMonitorTestSuite {
         assertTrue(build.contains("prepareWorldMonitorAssets"))
         assertTrue(build.contains("world/**"))
         assertTrue(build.contains("assets/country-boundaries.json"))
-        assertTrue(build.contains("assets.srcDir(worldMonitorAssets)"))
+        assertTrue(build.contains("addGeneratedSourceDirectory(prepareWorldMonitorAssets, WorldMonitorAssetSync::outputDirectory)"))
         val shell = source("app/src/main/java/com/adshield/pro/MainActivity.kt")
         assertTrue(shell.contains("WORLD(\"World\""))
         assertTrue(shell.contains("MainNavDestination.WORLD -> WorldMonitorScreen()"))

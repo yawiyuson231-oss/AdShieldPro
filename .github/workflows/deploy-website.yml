@@ -15,7 +15,6 @@ on:
   push:
     branches:
       - main
-      - 'arena/**'
     paths:
       - 'docs/**'
       - 'index.html'
@@ -28,6 +27,8 @@ on:
       - 'dns/**'
       - 'aether/**'
       - 'security/**'
+      - 'world/**'
+      - 'scripts/stage-site.mjs'
       - 'omnishield-x-extension.zip'
       - '.github/workflows/deploy-website.yml'
 
@@ -42,6 +43,8 @@ permissions:
 
 jobs:
   deploy:
+    # Production Pages only accepts the protected default branch. Branches use local preview + CI.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

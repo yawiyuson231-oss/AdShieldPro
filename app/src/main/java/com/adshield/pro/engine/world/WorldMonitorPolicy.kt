@@ -7,6 +7,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import java.net.URI
+import java.io.InputStream
+import java.io.ByteArrayOutputStream
 
 /** Pure host policy, shared by native export and background scheduling; covered by JVM tests. */
 object WorldMonitorPolicy {
@@ -47,6 +49,22 @@ object WorldMonitorPolicy {
         require(mime in exportTypes && content.toByteArray(Charsets.UTF_8).size <= MAX_EXPORT_BYTES)
         ExportRequest(filename, content, mime)
     }.getOrNull()
+
+    /** Read at most the configured bytes plus one small chunk; never allocate an unbounded snapshot. */
+    fun readBoundedUtf8(input: InputStream, maxBytes: Int): String {
+        require(maxBytes in 1..MAX_SNAPSHOT_BYTES)
+        val buffer = ByteArray(8_192)
+        val output = ByteArrayOutputStream(minOf(maxBytes, 16_384))
+        var total = 0
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            require(total <= maxBytes) { "Response exceeds its safety limit" }
+            output.write(buffer, 0, read)
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
 
     fun scheduledSources(value: JsonObject, allowed: Set<String>): Set<String> =
         (value["sources"] as? JsonArray).orEmpty()

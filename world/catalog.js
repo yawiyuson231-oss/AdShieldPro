@@ -37,11 +37,11 @@ export const SOURCES = Object.freeze([
     terms: 'NASA EONET open data. Locations can be approximate; not a warning service.'
   },
   {
-    id: 'gdacs', name: 'GDACS Disaster Alerts', short: 'GDACS', category: 'disaster', enabled: true,
-    url: 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP',
+    id: 'gdacs', name: 'GDACS Earthquake Impacts', short: 'GDACS', category: 'disaster', enabled: true,
+    url: 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP?eventtype=EQ',
     homepage: 'https://www.gdacs.org/', ttlMs: 15 * minute,
-    coverage: 'Worldwide · disaster alerts published by GDACS',
-    terms: 'Attribute GDACS (UN / European Commission). Alert colour is the provider rating.'
+    coverage: 'Worldwide · GDACS earthquake impact alerts · other hazards via EONET',
+    terms: 'Attribute GDACS (UN / European Commission). Alert colour is the provider rating. Browser requests may be blocked by upstream bot protection.'
   },
   {
     id: 'nws', name: 'US Weather Alerts', short: 'NWS', category: 'weather', enabled: false,

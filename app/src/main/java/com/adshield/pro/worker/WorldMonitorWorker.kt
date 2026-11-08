@@ -57,8 +57,7 @@ class WorldMonitorWorker(appContext: Context, params: WorkerParameters) : Corout
             val wanted = prefs.getStringSet(SOURCES, emptySet()).orEmpty().toSet()
             val old = runCatching {
                 cacheFile(applicationContext).openRead().use { input ->
-                    val text = input.readBytes().toString(Charsets.UTF_8)
-                    require(text.length <= WorldMonitorPolicy.MAX_SNAPSHOT_BYTES)
+                    val text = WorldMonitorPolicy.readBoundedUtf8(input, WorldMonitorPolicy.MAX_SNAPSHOT_BYTES)
                     (Json.parseToJsonElement(text).jsonObject["sources"] as? JsonArray).orEmpty()
                         .mapNotNull { element -> (element as? JsonObject)?.let { it.string("id")?.let { id -> id to it } } }.toMap()
                 }
@@ -189,9 +188,11 @@ class WorldMonitorWorker(appContext: Context, params: WorkerParameters) : Corout
 
         /** Only this exact path is exposed by the WebView asset loader, never an arbitrary file. */
         fun openSnapshot(context: Context): InputStream? = runCatching {
-            val file = cacheFile(context)
-            require(file.baseFile.length() <= WorldMonitorPolicy.MAX_SNAPSHOT_BYTES)
-            file.openRead()
+            val input = cacheFile(context).openRead()
+            try {
+                require(input.channel.size() <= WorldMonitorPolicy.MAX_SNAPSHOT_BYTES)
+                input
+            } catch (error: Exception) { input.close(); throw error }
         }.getOrNull()
     }
 }

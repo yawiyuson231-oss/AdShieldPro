@@ -26,13 +26,13 @@ const worker = async () => {
       row.valid = true; row.records = parsed.events.length; row.rejected = parsed.rejected; row.truncated = parsed.truncated;
     } catch (error) { row.error = error.message; }
     row.durationMs = Math.round(performance.now() - started); results.push(row);
-    if (process.env.GITHUB_ACTIONS) console.log(`::notice title=World source ${row.id}::HTTP ${row.httpStatus ?? 'unavailable'}; valid=${row.valid}; records=${row.records ?? 'none'}; browserCors=${row.browserOriginAllowed}; ${row.error || 'Response schema validated'}`);
     console.log(`${row.valid ? 'VALID' : 'UNAVAILABLE'} ${row.id}: ${row.valid ? `${row.records} records; CORS ${row.browserOriginAllowed ? 'allowed' : 'not advertised'}` : row.error}`);
   }
 };
 await Promise.all([worker(), worker(), worker()]);
 results.sort((a, b) => SOURCES.findIndex((s) => s.id === a.id) - SOURCES.findIndex((s) => s.id === b.id));
 const report = { version: 1, startedAt, finishedAt: new Date().toISOString(), origin, note: 'Point-in-time unauthenticated checks. Provider availability is not guaranteed; CORS headers are measured for this origin, not assumed. This report is not fed into the UI as live data.', results };
+if (process.env.GITHUB_ACTIONS) console.log(`::notice title=World source audit::${results.map((r) => `${r.id}: HTTP=${r.httpStatus}; valid=${r.valid}; records=${r.records}; CORS=${r.browserOriginAllowed}; ${r.error || 'schema valid'}`).join(' | ')}`);
 const outIndex = process.argv.indexOf('--out');
 if (outIndex >= 0) {
   if (!process.argv[outIndex + 1]) throw new Error('--out needs a path');
