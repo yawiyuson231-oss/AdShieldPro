@@ -734,14 +734,27 @@
           }
         }
       } else if (current) {
+        const riseAz = Number(current.aosAzimuthDeg.toFixed(0));
+        const setAz = Number(current.losAzimuthDeg.toFixed(0));
+        const maxEl = Number(current.maxElevationDeg.toFixed(1));
+        const durSec = Math.max(30, Math.round((current.losEpochMs - current.aosEpochMs) / 1000));
         passes.push({
+          name: (entry.entity && entry.entity.title) || entityId,
+          observerLat: observerLatDeg,
+          observerLon: observerLonDeg,
+          riseEpochMs: current.aosEpochMs,
+          culminationEpochMs: current.maxElevationEpochMs,
+          setEpochMs: current.losEpochMs,
+          maxElevationDeg: maxEl,
+          riseAzimuthDeg: riseAz,
+          setAzimuthDeg: setAz,
+          durationSeconds: durSec,
           aosEpochMs: current.aosEpochMs,
           losEpochMs: current.losEpochMs,
           maxElevationEpochMs: current.maxElevationEpochMs,
-          maxElevationDeg: Number(current.maxElevationDeg.toFixed(1)),
-          aosAzimuthDeg: Number(current.aosAzimuthDeg.toFixed(0)),
-          losAzimuthDeg: Number(current.losAzimuthDeg.toFixed(0)),
-          durationSec: Math.max(30, Math.round((current.losEpochMs - current.aosEpochMs) / 1000))
+          aosAzimuthDeg: riseAz,
+          losAzimuthDeg: setAz,
+          durationSec: durSec
         });
         current = null;
         if (passes.length >= 8) break;
@@ -2087,6 +2100,8 @@
           postToAndroid('onLocationSelected', {
             lat: Number(geo.lat.toFixed(5)),
             lon: Number(geo.lon.toFixed(5)),
+            elevationMeters: 0,
+            countryName: '',
             terrainElevationMeters: 0,
             countryHint: ''
           });
@@ -2253,6 +2268,7 @@
     }
     if (!wasReady) {
       postToAndroid('onGlobeReady', {
+        webgl: true,
         webglSupported: true,
         cesiumVersion: (typeof Cesium !== 'undefined' && Cesium.VERSION ? Cesium.VERSION : '1.147.0') + '-3DCanvas',
         timestampMs: Date.now()
@@ -2478,6 +2494,8 @@
           postToAndroid('onLocationSelected', {
             lat: Number(lat.toFixed(5)),
             lon: Number(lon.toFixed(5)),
+            elevationMeters: Math.round(elev),
+            countryName: '',
             terrainElevationMeters: Math.round(elev),
             countryHint: ''
           });
@@ -2516,6 +2534,7 @@
       }
 
       postToAndroid('onGlobeReady', {
+        webgl: true,
         webglSupported: true,
         cesiumVersion: Cesium.VERSION || '1.147.0',
         timestampMs: Date.now()
@@ -2541,6 +2560,22 @@
     } catch (err) {
       await activateFallback3DCanvasGlobe(err && err.message ? err.message : String(err));
     }
+  }
+
+  function decodeBase64Utf8(b64) {
+    const bin = window.atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) {
+      bytes[i] = bin.charCodeAt(i);
+    }
+    if (typeof TextDecoder !== 'undefined') {
+      return new TextDecoder('utf-8').decode(bytes);
+    }
+    let esc = '';
+    for (let i = 0; i < bytes.length; i++) {
+      esc += '%' + ('00' + bytes[i].toString(16)).slice(-2);
+    }
+    return decodeURIComponent(esc);
   }
 
   window.WorldMonitorHost = {
@@ -2575,6 +2610,19 @@
       if (state.viewer) {
         try { state.viewer.destroy(); } catch (_) { /* ignore */ }
         state.viewer = null;
+      }
+    }
+  };
+
+  window.WorldMonitorApp = {
+    receiveBase64: function (b64) {
+      try {
+        if (!b64 || typeof b64 !== 'string') return false;
+        const jsonStr = decodeBase64Utf8(b64);
+        return window.WorldMonitorHost.dispatch(jsonStr);
+      } catch (err) {
+        console.error('WorldMonitorApp.receiveBase64 error:', err);
+        return false;
       }
     }
   };

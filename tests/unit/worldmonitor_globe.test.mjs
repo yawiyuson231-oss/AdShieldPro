@@ -131,38 +131,53 @@ test("World Monitor 2035 3D globe runtime self-heals to 3D spherical canvas engi
     assert.equal(w.WorldMonitorHost.isReady(), true);
     assert.equal(w.WorldMonitorHost.getEngineMode(), "canvas3d");
     assert.equal(readyPayloads.length, 1);
+    assert.equal(readyPayloads[0].webgl, true);
     assert.equal(readyPayloads[0].webglSupported, true);
-
     assert.equal(
-        w.WorldMonitorHost.dispatch({
-            type: "UPDATE_ENTITIES",
-            entities: [{
-                id: "celestrak:25544",
-                category: "SPACE",
-                severity: "INFO",
-                title: "ISS (ZARYA)",
-                latitude: 0,
-                longitude: 0,
-                tleLine1: "1 25544U 98067A   26312.50000000  .00016717  00000+0  10270-3 0  9993",
-                tleLine2: "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.50103472421535"
-            }]
-        }),
-        true
+        w.CESIUM_BASE_URL,
+        "https://appassets.androidplatform.net/assets/worldmonitor/vendor/cesium/"
     );
+
+    // Verify exact Base64 bridge path used by WorldMonitorJsBridge.buildJsDispatchExpression
+    const updateCmdJson = JSON.stringify({
+        type: "UPDATE_ENTITIES",
+        entities: [{
+            id: "celestrak:25544",
+            category: "SPACE",
+            severity: "INFO",
+            title: "ISS (ZARYA) — 軌道",
+            latitude: 0,
+            longitude: 0,
+            tleLine1: "1 25544U 98067A   26312.50000000  .00016717  00000+0  10270-3 0  9993",
+            tleLine2: "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.50103472421535"
+        }]
+    });
+    const b64 = Buffer.from(updateCmdJson, "utf8").toString("base64");
+    assert.equal(w.WorldMonitorApp.receiveBase64(b64), true);
+
     assert.equal(w.WorldMonitorHost.dispatch({ type: "CAMERA_ACTION", action: "TILT_3D" }), true);
     assert.equal(w.WorldMonitorHost.dispatch({ type: "CAMERA_ACTION", action: "HOME" }), true);
-    assert.equal(
-        w.WorldMonitorHost.dispatch({
+
+    const passCmdB64 = Buffer.from(
+        JSON.stringify({
             type: "COMPUTE_SATELLITE_PASSES",
             entityId: "celestrak:25544",
             lat: 14.5995,
             lon: 120.9842,
-            hoursAhead: 24
+            hoursAhead: 36
         }),
-        true
-    );
+        "utf8"
+    ).toString("base64");
+    assert.equal(w.WorldMonitorApp.receiveBase64(passCmdB64), true);
     assert.equal(passPayloads.length, 1);
     assert.equal(passPayloads[0].entityId, "celestrak:25544");
+    if (passPayloads[0].passes.length > 0) {
+        const firstPass = passPayloads[0].passes[0];
+        assert.equal(typeof firstPass.riseEpochMs, "number");
+        assert.equal(typeof firstPass.culminationEpochMs, "number");
+        assert.equal(typeof firstPass.setEpochMs, "number");
+        assert.equal(typeof firstPass.durationSeconds, "number");
+    }
 
     w.WorldMonitorHost.destroy();
     dom.window.close();

@@ -216,6 +216,26 @@ private fun LayersAndMapPanel(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item(key = "renderer_engine") {
+            Text("3D Renderer Engine", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item(key = "native_gpu") {
+                    FilterChip(
+                        selected = uiState.useNative3dEngine,
+                        onClick = { viewModel.setUseNative3dEngine(true) },
+                        label = { Text("Native 3D GPU (Instant)", fontSize = 11.sp) }
+                    )
+                }
+                item(key = "cesium_webgl") {
+                    FilterChip(
+                        selected = !uiState.useNative3dEngine,
+                        onClick = { viewModel.setUseNative3dEngine(false) },
+                        label = { Text("CesiumJS WebGL Street Tiles", fontSize = 11.sp) }
+                    )
+                }
+            }
+        }
+
         item(key = "basemaps") {
             Text("Basemap Imagery", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

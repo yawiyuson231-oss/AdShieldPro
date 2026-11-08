@@ -29,6 +29,7 @@ import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
 import com.adshield.pro.engine.worldmonitor.CzmlAndGeoJsonBuilder
 import com.adshield.pro.engine.worldmonitor.DigitalTwinEngine
 import com.adshield.pro.engine.worldmonitor.EventCorrelationEngine
+import com.adshield.pro.engine.worldmonitor.OrbitalAndGlobeMath
 import com.adshield.pro.engine.worldmonitor.SimulationLabEngine
 import com.adshield.pro.engine.worldmonitor.WorldMonitorAiAnalyst
 import com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge
@@ -83,10 +84,23 @@ data class ClickedLocationInfo(
     val population: Long?
 )
 
+sealed interface NativeGlobeCommand {
+    data class FlyTo(
+        val lat: Double,
+        val lon: Double,
+        val altitudeMeters: Double,
+        val pitchDeg: Double
+    ) : NativeGlobeCommand
+
+    data class CameraAction(val action: String) : NativeGlobeCommand
+    data class SelectSatellite(val entityId: String) : NativeGlobeCommand
+}
+
 data class WorldMonitorUiState(
-    val globeReady: Boolean = false,
+    val useNative3dEngine: Boolean = true,
+    val globeReady: Boolean = true,
     val globeError: String? = null,
-    val cesiumVersion: String = "1.147.0",
+    val cesiumVersion: String = "Native-3D-GPU-2.0",
     val reloadNonce: Int = 0,
     val fullscreenMode: Boolean = false,
     val deckExpanded: Boolean = false,
@@ -139,6 +153,7 @@ data class WorldMonitorUiState(
     val providerStates: List<WorldProviderRuntimeState> = emptyList(),
     val watchRegions: List<WatchtowerRegion> = emptyList(),
     val watchAlerts: List<WatchtowerAlert> = emptyList(),
+    val buildings3d: List<OsmBuilding3D> = emptyList(),
     val hasOpenSkyKey: Boolean = false,
     val hasFirmsKey: Boolean = false,
     val hasAisStreamKey: Boolean = false
@@ -162,6 +177,9 @@ class WorldMonitorViewModel @Inject constructor(
 
     private val _jsCommands = MutableSharedFlow<String>(extraBufferCapacity = 256)
     val jsCommands: SharedFlow<String> = _jsCommands.asSharedFlow()
+
+    private val _nativeGlobeCommands = MutableSharedFlow<NativeGlobeCommand>(extraBufferCapacity = 64)
+    val nativeGlobeCommands: SharedFlow<NativeGlobeCommand> = _nativeGlobeCommands.asSharedFlow()
 
     private var timelinePlayJob: Job? = null
 
@@ -193,6 +211,7 @@ class WorldMonitorViewModel @Inject constructor(
         }
         viewModelScope.launch {
             repository.buildings3D.collectLatest { buildings ->
+                _uiState.update { it.copy(buildings3d = buildings) }
                 if (buildings.isNotEmpty()) pushBuildingsToGlobe(buildings)
             }
         }
@@ -322,12 +341,20 @@ class WorldMonitorViewModel @Inject constructor(
     }
 
     fun reloadGlobe() {
+        val native = _uiState.value.useNative3dEngine
+        if (native) {
+            _nativeGlobeCommands.tryEmit(NativeGlobeCommand.CameraAction("HOME_GLOBE"))
+        }
         _uiState.update {
             it.copy(
-                globeReady = false,
+                globeReady = native,
                 globeError = null,
                 reloadNonce = it.reloadNonce + 1,
-                statusBanner = "Reinitializing 3D Digital Earth engine…"
+                statusBanner = if (native) {
+                    "Native 3D GPU Digital Earth reset to Indo-Pacific view."
+                } else {
+                    "Reinitializing Cesium WebGL 3D Digital Earth engine…"
+                }
             )
         }
     }
@@ -391,6 +418,17 @@ class WorldMonitorViewModel @Inject constructor(
     }
 
     // ── Globe & Layer Controls ───────────────────────────────────────────────
+
+    fun setUseNative3dEngine(useNative: Boolean) {
+        _uiState.update {
+            it.copy(
+                useNative3dEngine = useNative,
+                globeReady = useNative,
+                globeError = null,
+                cesiumVersion = if (useNative) "Native-3D-GPU-2.0" else "1.147.0"
+            )
+        }
+    }
 
     fun setBasemap(basemap: GlobeBasemap) {
         _uiState.update { it.copy(basemap = basemap) }
@@ -539,19 +577,23 @@ class WorldMonitorViewModel @Inject constructor(
             if (_uiState.value.projection != GlobeProjection.GLOBE_3D) {
                 setProjection(GlobeProjection.GLOBE_3D)
             }
+            _nativeGlobeCommands.tryEmit(NativeGlobeCommand.CameraAction("TILT_3D"))
             sendCommand(buildJsonObject {
                 put("type", "CAMERA_ACTION")
                 put("action", "TILT_3D")
             }.toString())
             return
         }
+        val normalized = if (action == "HOME") "HOME_GLOBE" else action
+        _nativeGlobeCommands.tryEmit(NativeGlobeCommand.CameraAction(normalized))
         sendCommand(buildJsonObject {
             put("type", "CAMERA_ACTION")
-            put("action", if (action == "HOME") "HOME_GLOBE" else action)
+            put("action", normalized)
         }.toString())
     }
 
     fun flyTo(lat: Double, lon: Double, altitudeMeters: Double = 350_000.0, pitchDeg: Double = -58.0) {
+        _nativeGlobeCommands.tryEmit(NativeGlobeCommand.FlyTo(lat, lon, altitudeMeters, pitchDeg))
         sendCommand(buildJsonObject {
             put("type", "FLY_TO")
             put("lat", lat)
@@ -570,6 +612,7 @@ class WorldMonitorViewModel @Inject constructor(
         }
         flyTo(entity.latitude, entity.longitude, targetAlt, -55.0)
         if (entity.category == WorldIntelCategory.SPACE && !entity.tleLine1.isNullOrBlank()) {
+            _nativeGlobeCommands.tryEmit(NativeGlobeCommand.SelectSatellite(entity.id))
             sendCommand(buildJsonObject {
                 put("type", "SELECT_SATELLITE_ORBIT")
                 put("entityId", entity.id)
@@ -580,6 +623,18 @@ class WorldMonitorViewModel @Inject constructor(
 
     fun computePassesForSelectedSatellite(entity: WorldEntity) {
         val vp = _uiState.value.viewport
+        viewModelScope.launch(Dispatchers.Default) {
+            val tle = OrbitalAndGlobeMath.parseTle(entity.id, entity.title, entity.tleLine1, entity.tleLine2)
+            if (tle != null) {
+                val nativePasses = OrbitalAndGlobeMath.predictPasses(
+                    tle = tle,
+                    observerLatDeg = vp.centerLat,
+                    observerLonDeg = vp.centerLon,
+                    hoursAhead = 24
+                )
+                _uiState.update { it.copy(satellitePasses = nativePasses) }
+            }
+        }
         sendCommand(buildJsonObject {
             put("type", "COMPUTE_SATELLITE_PASSES")
             put("entityId", entity.id)

@@ -3,6 +3,7 @@ package com.adshield.pro
 import com.adshield.pro.data.worldmonitor.WorldEntityRecord
 import com.adshield.pro.domain.worldmonitor.FreshnessClass
 import com.adshield.pro.domain.worldmonitor.GeoAccuracy
+import com.adshield.pro.domain.worldmonitor.GlobeProjection
 import com.adshield.pro.domain.worldmonitor.ProviderAuthRequirement
 import com.adshield.pro.domain.worldmonitor.ProviderSyncStatus
 import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
@@ -19,6 +20,7 @@ import com.adshield.pro.engine.worldmonitor.CzmlAndGeoJsonBuilder
 import com.adshield.pro.engine.worldmonitor.DigitalTwinEngine
 import com.adshield.pro.engine.worldmonitor.EventCorrelationEngine
 import com.adshield.pro.engine.worldmonitor.GeoSpatialIndex
+import com.adshield.pro.engine.worldmonitor.OrbitalAndGlobeMath
 import com.adshield.pro.engine.worldmonitor.SimulationLabEngine
 import com.adshield.pro.engine.worldmonitor.WatchtowerManager
 import com.adshield.pro.engine.worldmonitor.WorldMonitorAiAnalyst
@@ -31,6 +33,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import kotlin.math.abs
 
 /**
  * Comprehensive JVM Verification Suite for OMNISHIELD X INFINITY — WORLD MONITOR 2035.
@@ -441,5 +445,87 @@ class WorldMonitorTestSuite {
         assertEquals(FreshnessClass.NEAR_REAL_TIME, record.toDomain(fixedNowMs + 10 * 60_000L).freshness)
         assertEquals(FreshnessClass.DELAYED, record.toDomain(fixedNowMs + 90 * 60_000L).freshness)
         assertEquals(FreshnessClass.HISTORICAL, record.toDomain(fixedNowMs + 26 * 3_600_000L).freshness)
+    }
+
+    @Test
+    fun testNativeGlobe3DProjectionAndInverseRayCast() {
+        val cx = 540f
+        val cy = 960f
+        val rPx = 420f
+        val camLat = 14.5995
+        val camLon = 120.9842
+        val pitch = -45.0
+        val heading = 22.5
+
+        val testPoints = listOf(
+            14.5995 to 120.9842,
+            35.6762 to 139.6503,
+            -12.0 to 95.4,
+            48.2 to 105.7
+        )
+        for ((lat, lon) in testPoints) {
+            val sp = OrbitalAndGlobeMath.projectToScreen(
+                latDeg = lat,
+                lonDeg = lon,
+                altitudeMeters = 0.0,
+                camLatDeg = camLat,
+                camLonDeg = camLon,
+                pitchDeg = pitch,
+                headingDeg = heading,
+                projection = GlobeProjection.GLOBE_3D,
+                cx = cx,
+                cy = cy,
+                radiusPx = rPx
+            )
+            assertTrue("Expected visible point ($lat, $lon)", sp.visible)
+            val inv = OrbitalAndGlobeMath.unprojectFromScreen(
+                px = sp.x,
+                py = sp.y,
+                camLatDeg = camLat,
+                camLonDeg = camLon,
+                pitchDeg = pitch,
+                headingDeg = heading,
+                projection = GlobeProjection.GLOBE_3D,
+                cx = cx,
+                cy = cy,
+                radiusPx = rPx
+            )
+            assertNotNull(inv)
+            assertTrue("Lat mismatch: ${inv!!.first} vs $lat", abs(inv.first - lat) < 0.05)
+            assertTrue("Lon mismatch: ${inv.second} vs $lon", abs(inv.second - lon) < 0.05)
+        }
+
+        // Far-antipodal point (New York when centered on Manila) must be occluded on 3D globe
+        val nyc = OrbitalAndGlobeMath.projectToScreen(
+            40.7128, -74.0060, 0.0, camLat, camLon, -88.0, 0.0, GlobeProjection.GLOBE_3D, cx, cy, rPx
+        )
+        assertFalse(nyc.visible)
+    }
+
+    @Test
+    fun testPureKotlinTlePropagationAndTopoJsonDecoding() {
+        val l1 = "1 25544U 98067A   26312.50000000  .00016717  00000+0  10270-3 0  9993"
+        val l2 = "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.50103472421535"
+        val parsed = OrbitalAndGlobeMath.parseTle("celestrak:25544", "ISS (ZARYA)", l1, l2)
+        assertNotNull(parsed)
+
+        val sv = OrbitalAndGlobeMath.propagateTle(parsed!!, fixedNowMs)
+        assertTrue(sv.latitude in -52.5..52.5)
+        assertTrue(sv.longitude in -180.0..180.0)
+        assertTrue("Expected LEO altitude ~415km, got ${sv.altitudeMeters}", sv.altitudeMeters in 350_000.0..500_000.0)
+
+        val track = OrbitalAndGlobeMath.buildOrbitTrack(parsed, fixedNowMs, stepMinutes = 2)
+        assertTrue(track.size >= 48)
+
+        val passes = OrbitalAndGlobeMath.predictPasses(parsed, 14.5995, 120.9842, fixedNowMs, hoursAhead = 36)
+        assertTrue("Expected at least 1 ISS pass over Manila within 36h", passes.isNotEmpty())
+        assertTrue(passes.first().maxElevationDeg >= 10.0)
+
+        val topoFile = File("src/main/assets/worldmonitor/vendor/countries-110m.json")
+            .takeIf { it.exists() }
+            ?: File("app/src/main/assets/worldmonitor/vendor/countries-110m.json")
+        assertTrue("countries-110m.json must exist", topoFile.exists())
+        val arcs = OrbitalAndGlobeMath.decodeTopoJsonArcs(topoFile.readText(Charsets.UTF_8))
+        assertEquals(595, arcs.size)
     }
 }

@@ -121,11 +121,19 @@ fun WorldMonitorScreen(
             .fillMaxSize()
             .background(DeepNavyBackground)
     ) {
-        WorldMonitorGlobeWebView(
-            viewModel = viewModel,
-            reloadNonce = uiState.reloadNonce,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (uiState.useNative3dEngine) {
+            NativeWorldGlobe3D(
+                uiState = uiState,
+                viewModel = viewModel,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            WorldMonitorGlobeWebView(
+                viewModel = viewModel,
+                reloadNonce = uiState.reloadNonce,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         if (uiState.fullscreenMode) {
             Row(
@@ -302,7 +310,7 @@ private fun WorldMonitorGlobeWebView(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 setBackgroundColor(android.graphics.Color.parseColor("#020813"))
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                setLayerType(View.LAYER_TYPE_NONE, null)
                 isFocusable = true
                 isFocusableInTouchMode = true
                 isVerticalScrollBarEnabled = false
