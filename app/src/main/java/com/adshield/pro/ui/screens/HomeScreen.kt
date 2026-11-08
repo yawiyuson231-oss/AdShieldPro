@@ -127,7 +127,8 @@ fun HomeScreen(
     onOpenOptimizerTab: () -> Unit,
     onOpenLiveTab: () -> Unit,
     onOpenStatisticsTab: () -> Unit,
-    onOpenStatusTab: () -> Unit
+    onOpenStatusTab: () -> Unit,
+    onOpenWorldMonitor: () -> Unit = {}
 ) {
     val listState = rememberLazyListState()
     val screenWidth = LocalConfiguration.current.screenWidthDp
@@ -398,6 +399,19 @@ fun HomeScreen(
                         Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("View capability report")
+                    }
+                }
+            }
+
+            item(key = "world-monitor-2035") {
+                CyberPanel(
+                    title = "World Monitor 2035",
+                    subtitle = "Interactive 3D Digital Earth & Live Global Intelligence (Aviation · Maritime · Space · Hazards · Weather · Cyber · News · Infra)"
+                ) {
+                    OutlinedButton(onClick = onOpenWorldMonitor, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(18.dp), tint = CyberCyan)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Launch 3D World Monitor 2035", color = CyberCyan, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

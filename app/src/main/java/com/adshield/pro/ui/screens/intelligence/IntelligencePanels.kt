@@ -350,6 +350,7 @@ fun IntelligenceCommandPanel(
     onOpenModule: (IntelligenceModule) -> Unit,
     onOpenTimeline: () -> Unit,
     onOpenConnectors: () -> Unit = {},
+    onOpenWorldMonitor: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val system = state.system
@@ -483,8 +484,13 @@ fun IntelligenceCommandPanel(
                             Text("Open selected module", fontSize = 10.sp, color = CyberCyan)
                         }
                     }
-                    TextButton(onClick = onOpenConnectors, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
-                        Text("Feeds & connectors →", fontSize = 9.sp, color = SkyBlueGlow)
+                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        TextButton(onClick = onOpenConnectors, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                            Text("Feeds & connectors →", fontSize = 9.sp, color = SkyBlueGlow)
+                        }
+                        TextButton(onClick = onOpenWorldMonitor, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                            Text("3D World Monitor 2035 →", fontSize = 9.sp, color = CyberCyan, fontWeight = FontWeight.Bold)
+                        }
                     }
                     Spacer(Modifier.height(4.dp))
                     Text(
