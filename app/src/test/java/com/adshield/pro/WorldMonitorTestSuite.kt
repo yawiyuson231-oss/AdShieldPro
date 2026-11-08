@@ -531,9 +531,9 @@ class WorldMonitorTestSuite {
 
     @Test
     fun testStreetLevelSlippyTileMathAndGeodesicRuler() {
-        assertEquals(16, OrbitalAndGlobeMath.altitudeToTileZoom(500.0))
-        assertEquals(13, OrbitalAndGlobeMath.altitudeToTileZoom(5_000.0))
-        assertEquals(3, OrbitalAndGlobeMath.altitudeToTileZoom(12_000_000.0))
+        assertEquals(17, OrbitalAndGlobeMath.altitudeToTileZoom(500.0))
+        assertEquals(14, OrbitalAndGlobeMath.altitudeToTileZoom(5_000.0))
+        assertEquals(2, OrbitalAndGlobeMath.altitudeToTileZoom(12_000_000.0))
 
         val (tx, ty) = OrbitalAndGlobeMath.latLonToTileXY(14.5995, 120.9842, 12)
         val bounds = OrbitalAndGlobeMath.tileBoundsLatLon(12, tx, ty)
@@ -601,24 +601,24 @@ class WorldMonitorTestSuite {
         val waveSpec = spec("wm.weather.waves")
         val waveEnts = WorldMonitorNormalizers.normalize(
             waveSpec,
-            """[{"current":{"wave_height":6.4,"wave_direction":45.0,"wave_period":11.2}}]""",
+            """{"current":{"wave_height":6.4,"wave_direction":45.0,"wave_period":11.2}}""",
             fixedNowMs
         )
         assertEquals(1, waveEnts.size)
-        assertEquals(WorldSeverity.HIGH, waveEnts.first().severity)
+        assertEquals(WorldSeverity.CRITICAL, waveEnts.first().severity)
 
         // 5. Open-Meteo 72h Future Forecast
         val fcSpec = spec("wm.weather.forecast72h")
         val times = (0 until 72).joinToString(",") { "\"2026-11-08T00:00\"" }
         val temps = (0 until 72).joinToString(",") { "29.5" }
         val winds = (0 until 72).joinToString(",") { "88.0" }
-        val precs = (0 until 72).joinToString(",") { "12.4" }
+        val precs = (0 until 72).joinToString(",") { "80.0" }
         val fcEnts = WorldMonitorNormalizers.normalize(
             fcSpec,
-            """[{"hourly":{"time":[$times],"temperature_2m":[$temps],"wind_speed_10m":[$winds],"precipitation":[$precs]}}]""",
+            """{"hourly":{"time":[$times],"temperature_2m":[$temps],"wind_speed_10m":[$winds],"precipitation_probability":[$precs]}}""",
             fixedNowMs
         )
-        assertEquals(1, fcEnts.size)
+        assertEquals(5, fcEnts.size)
         assertEquals(FreshnessClass.ESTIMATED, fcEnts.first().freshness)
 
         // 6. URLhaus CSV

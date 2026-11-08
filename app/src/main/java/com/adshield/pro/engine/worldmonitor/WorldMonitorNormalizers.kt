@@ -1621,7 +1621,7 @@ object WorldMonitorNormalizers {
 
         return arr.take(50).mapNotNull { el ->
             val obj = el as? JsonObject ?: return@mapNotNull null
-            val vName = obj.str("vName") ?: obj.str("volcano_name") ?: return@mapNotNull null
+            val vName = obj.str("vName") ?: obj.str("vname") ?: obj.str("volcano_name") ?: return@mapNotNull null
             val lat = obj.dbl("latitude") ?: obj.dbl("lat") ?: return@mapNotNull null
             val lon = obj.dbl("longitude") ?: obj.dbl("lon") ?: obj.dbl("long") ?: return@mapNotNull null
             if (!GeoSpatialIndex.isValidCoordinate(lat, lon)) return@mapNotNull null
@@ -1715,7 +1715,12 @@ object WorldMonitorNormalizers {
         qLat: Double,
         qLon: Double
     ): List<WorldEntity> {
-        val obj = json.parseToJsonElement(raw).jsonObject
+        val elem = json.parseToJsonElement(raw)
+        val obj = when (elem) {
+            is JsonObject -> elem
+            is JsonArray -> elem.firstOrNull() as? JsonObject ?: return emptyList()
+            else -> return emptyList()
+        }
         val lat = obj.dbl("latitude") ?: qLat
         val lon = obj.dbl("longitude") ?: qLon
         val cur = obj["current"] as? JsonObject ?: return emptyList()
@@ -1770,7 +1775,12 @@ object WorldMonitorNormalizers {
         qLat: Double,
         qLon: Double
     ): List<WorldEntity> {
-        val obj = json.parseToJsonElement(raw).jsonObject
+        val elem = json.parseToJsonElement(raw)
+        val obj = when (elem) {
+            is JsonObject -> elem
+            is JsonArray -> elem.firstOrNull() as? JsonObject ?: return emptyList()
+            else -> return emptyList()
+        }
         val lat = obj.dbl("latitude") ?: qLat
         val lon = obj.dbl("longitude") ?: qLon
         val hourly = obj["hourly"] as? JsonObject ?: return emptyList()
