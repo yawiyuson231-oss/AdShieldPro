@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.OfflineBolt
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
@@ -190,12 +191,37 @@ fun HomeScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                    IconButton(onClick = onOpenWorldMonitor) {
+                        Icon(
+                            Icons.Default.Public,
+                            contentDescription = "Open 3D World Monitor 2035",
+                            tint = CyberCyan
+                        )
+                    }
                     IconButton(onClick = onCheckForUpdates, enabled = !isCheckingForUpdates) {
                         Icon(
                             Icons.Default.SystemUpdateAlt,
                             contentDescription = if (isCheckingForUpdates) "Checking for updates" else "Check for updates",
                             tint = SkyBlueGlow
                         )
+                    }
+                }
+            }
+
+            item(key = "world-monitor-top-banner") {
+                CyberPanel(
+                    title = "World Monitor 2035",
+                    subtitle = "3D Digital Earth · Live Aviation, Maritime, Satellites, Hazards, Weather, Cyber & Infra",
+                    trailing = { StatusPill("3D GLOBE", CyberCyan) }
+                ) {
+                    Button(
+                        onClick = onOpenWorldMonitor,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+                    ) {
+                        Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Open 3D World Monitor 2035", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -399,19 +425,6 @@ fun HomeScreen(
                         Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("View capability report")
-                    }
-                }
-            }
-
-            item(key = "world-monitor-2035") {
-                CyberPanel(
-                    title = "World Monitor 2035",
-                    subtitle = "Interactive 3D Digital Earth & Live Global Intelligence (Aviation · Maritime · Space · Hazards · Weather · Cyber · News · Infra)"
-                ) {
-                    OutlinedButton(onClick = onOpenWorldMonitor, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(18.dp), tint = CyberCyan)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Launch 3D World Monitor 2035", color = CyberCyan, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

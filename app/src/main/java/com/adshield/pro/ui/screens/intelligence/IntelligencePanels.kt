@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Search
@@ -198,6 +199,7 @@ fun IntelligenceTopBar(
     onToggleLayoutEditing: () -> Unit,
     onResetLayout: () -> Unit,
     onOpenCommandPanel: () -> Unit,
+    onOpenWorldMonitor: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val system = state.system
@@ -223,6 +225,15 @@ fun IntelligenceTopBar(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+                OutlinedButton(
+                    onClick = onOpenWorldMonitor,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.height(30.dp).padding(end = 6.dp)
+                ) {
+                    Icon(Icons.Default.Public, contentDescription = null, tint = CyberCyan, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("3D Earth", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(
                     modifier = Modifier

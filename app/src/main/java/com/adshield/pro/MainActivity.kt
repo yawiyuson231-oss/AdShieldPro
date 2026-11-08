@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Monitor
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -107,6 +108,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
+    WORLD_MONITOR("World", Icons.Default.Public),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     INTELLIGENCE("Intel", Icons.Default.Hub),
@@ -160,9 +162,10 @@ fun AdShieldMainApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val uiFeedback by viewModel.uiFeedbackMessage.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = showAboutScreen || connectorsOpen || worldMonitorOpen) {
+    BackHandler(enabled = showAboutScreen || connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR) {
         when {
             worldMonitorOpen -> worldMonitorOpen = false
+            currentTab == MainNavDestination.WORLD_MONITOR -> currentTab = MainNavDestination.HOME
             connectorsOpen -> connectorsOpen = false
             else -> showAboutScreen = false
         }
@@ -256,7 +259,7 @@ fun AdShieldMainApp(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen && !connectorsOpen && !worldMonitorOpen) {
+            if (!showAboutScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -274,7 +277,10 @@ fun AdShieldMainApp(
                     onOpenLive = { currentTab = MainNavDestination.LIVE },
                     onOpenStatistics = { currentTab = MainNavDestination.STATISTICS },
                     onOpenStatus = { currentTab = MainNavDestination.STATUS },
-                    onOpenWorldMonitor = { worldMonitorOpen = true }
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
+                )
+                MainNavDestination.WORLD_MONITOR -> WorldMonitorDestination(
+                    onBack = { currentTab = MainNavDestination.HOME }
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(viewModel)
@@ -287,7 +293,7 @@ fun AdShieldMainApp(
                         connectorViewModel.setModuleFilter(module)
                         connectorsOpen = true
                     },
-                    onOpenWorldMonitor = { worldMonitorOpen = true }
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
                 )
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.FILES -> FilesDestination()

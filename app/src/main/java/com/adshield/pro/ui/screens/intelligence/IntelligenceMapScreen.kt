@@ -173,6 +173,7 @@ fun IntelligenceMapScreen(
             onToggleLayoutEditing = { onSetEditingLayout(!uiState.isEditingLayout) },
             onResetLayout = onResetLayout,
             onOpenCommandPanel = { commandExpanded = !commandExpanded },
+            onOpenWorldMonitor = onOpenWorldMonitor,
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
