@@ -169,9 +169,18 @@ class WorldMonitorRepository @Inject constructor(
         outcome
     }
 
-    suspend fun syncBuildingsAndStreetInfra(viewport: WorldViewport): WorldMonitorSyncEngine.ProviderFetchOutcome {
-        return syncSingleProvider("wm.infra.overpass", viewport = viewport, force = true)
-    }
+    suspend fun syncBuildingsAndStreetInfra(viewport: WorldViewport): WorldMonitorSyncEngine.ProviderFetchOutcome =
+        withContext(Dispatchers.IO) {
+            coroutineScope {
+                val overpassDef = async { syncSingleProvider("wm.infra.overpass", viewport = viewport, force = true) }
+                val wikiDef = async { syncSingleProvider("wm.infra.wikipedia.geo", viewport = viewport, force = true) }
+                val airDef = async { syncSingleProvider("wm.aviation.airplaneslive", viewport = viewport, force = true) }
+                val ov = overpassDef.await()
+                val wk = wikiDef.await()
+                airDef.await()
+                ov.copy(entities = ov.entities + wk.entities)
+            }
+        }
 
     private suspend fun persistOutcome(
         spec: WorldProviderSpec,
@@ -270,8 +279,20 @@ class WorldMonitorRepository @Inject constructor(
         if (clean.isEmpty()) credentialStore.remove(slot) else credentialStore.put(slot, clean)
     }
 
-    suspend fun addWatchRegion(region: WatchtowerRegion) = withContext(Dispatchers.IO) {
+    suspend fun addWatchRegion(region: WatchtowerRegion): Int = withContext(Dispatchers.IO) {
         dao.upsertWatchRegion(WatchtowerRegionRecord.fromDomain(region))
+        val now = System.currentTimeMillis()
+        val cached = dao.getAllEntitiesSnapshot(2500).map { it.toDomain(now) }
+        if (cached.isNotEmpty()) {
+            WatchtowerManager.evaluateAndPersist(appContext, dao, cached, notifyUser = false).size
+        } else 0
+    }
+
+    suspend fun evaluateWatchtowerNow(): Int = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val cached = dao.getAllEntitiesSnapshot(2500).map { it.toDomain(now) }
+        if (cached.isEmpty()) 0
+        else WatchtowerManager.evaluateAndPersist(appContext, dao, cached, notifyUser = false).size
     }
 
     suspend fun deleteWatchRegion(id: String) = withContext(Dispatchers.IO) {

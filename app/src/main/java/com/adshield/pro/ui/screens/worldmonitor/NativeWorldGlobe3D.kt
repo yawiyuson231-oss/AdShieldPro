@@ -19,9 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -248,6 +250,9 @@ fun NativeWorldGlobe3D(
     var selectedSatId by remember { mutableStateOf<String?>(null) }
     var orbitClockMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var lastViewportSyncMs by remember { mutableLongStateOf(0L) }
+    var tileRedrawTick by remember { mutableIntStateOf(0) }
+    val mainHandler = remember { android.os.Handler(android.os.Looper.getMainLooper()) }
+    val latestMeasureMode by rememberUpdatedState(uiState.measureModeEnabled)
 
     val mesh = remember { SphereMeshBuffers(rows = 36, cols = 72) }
     val pickTargets = remember { ArrayList<PickableMarker>(512) }
@@ -360,7 +365,7 @@ fun NativeWorldGlobe3D(
                         fromHeading = camHeading,
                         toLat = cmd.lat.coerceIn(-89.0, 89.0),
                         toLon = OrbitalAndGlobeMath.normalizeLon(cmd.lon),
-                        toAlt = cmd.altitudeMeters.coerceIn(22_000.0, 30_000_000.0),
+                        toAlt = cmd.altitudeMeters.coerceIn(350.0, 30_000_000.0),
                         toPitch = cmd.pitchDeg.coerceIn(-90.0, -28.0),
                         toHeading = camHeading
                     )
@@ -371,14 +376,14 @@ fun NativeWorldGlobe3D(
                     when (cmd.action) {
                         "ZOOM_IN" -> {
                             activeFlight = CameraFlight(
-                                now, 320L, camLat, camLon, camAlt, camPitch, camHeading,
-                                camLat, camLon, (camAlt * 0.56).coerceAtLeast(22_000.0), camPitch, camHeading
+                                now, 300L, camLat, camLon, camAlt, camPitch, camHeading,
+                                camLat, camLon, (camAlt * 0.50).coerceAtLeast(350.0), camPitch, camHeading
                             )
                         }
                         "ZOOM_OUT" -> {
                             activeFlight = CameraFlight(
-                                now, 320L, camLat, camLon, camAlt, camPitch, camHeading,
-                                camLat, camLon, (camAlt * 1.68).coerceAtMost(30_000_000.0), camPitch, camHeading
+                                now, 300L, camLat, camLon, camAlt, camPitch, camHeading,
+                                camLat, camLon, (camAlt * 1.85).coerceAtMost(30_000_000.0), camPitch, camHeading
                             )
                         }
                         "TILT_3D" -> {
@@ -410,9 +415,10 @@ fun NativeWorldGlobe3D(
         }
     }
 
-    // Smooth 60/120-Hz animation loop ONLY while a flight or touch inertia is active (zero idle CPU!)
-    LaunchedEffect(activeFlight != null, abs(velLat) > 0.004 || abs(velLon) > 0.004) {
-        while (isActive && (activeFlight != null || abs(velLat) > 0.004 || abs(velLon) > 0.004)) {
+    // Smooth 60/120-Hz animation loop ONLY while flight, touch inertia, or 360° Auto-Orbit is active
+    val hasInertia = abs(velLat) > 1e-6 || abs(velLon) > 1e-6
+    LaunchedEffect(activeFlight != null, hasInertia, uiState.autoOrbitEnabled) {
+        while (isActive && (activeFlight != null || abs(velLat) > 1e-6 || abs(velLon) > 1e-6 || uiState.autoOrbitEnabled)) {
             withFrameNanos { }
             val now = System.currentTimeMillis()
             val flight = activeFlight
@@ -427,13 +433,19 @@ fun NativeWorldGlobe3D(
                 camHeading = (flight.fromHeading + (flight.toHeading - flight.fromHeading) * ease + 360.0) % 360.0
                 if (t >= 1.0) activeFlight = null
             } else {
-                camLat = (camLat + velLat).coerceIn(-88.5, 88.5)
-                camLon = OrbitalAndGlobeMath.normalizeLon(camLon + velLon)
-                velLat *= 0.91
-                velLon *= 0.91
-                if (abs(velLat) <= 0.004 && abs(velLon) <= 0.004) {
-                    velLat = 0.0
-                    velLon = 0.0
+                if (abs(velLat) > 1e-6 || abs(velLon) > 1e-6) {
+                    camLat = (camLat + velLat).coerceIn(-88.5, 88.5)
+                    camLon = OrbitalAndGlobeMath.normalizeLon(camLon + velLon)
+                    velLat *= 0.90
+                    velLon *= 0.90
+                    if (abs(velLat) <= 1e-6 && abs(velLon) <= 1e-6) {
+                        velLat = 0.0
+                        velLon = 0.0
+                    }
+                }
+                if (uiState.autoOrbitEnabled) {
+                    camPitch += (-46.0 - camPitch) * 0.05
+                    camHeading = (camHeading + 0.34) % 360.0
                 }
             }
             if (now - lastViewportSyncMs > 280L) {
@@ -473,23 +485,24 @@ fun NativeWorldGlobe3D(
                             movedSignificantly = true
                         }
                         if (ch.positionChanged() && (abs(dx) > 0.1f || abs(dy) > 0.1f)) {
-                            val rPx = OrbitalAndGlobeMath.globeRadiusPx(
+                            val rPxDouble = OrbitalAndGlobeMath.globeRadiusPxDouble(
                                 size.width.toFloat(),
                                 size.height.toFloat(),
                                 camAlt
-                            ).coerceAtLeast(80f)
-                            val degPerPx = (78.0 / rPx).coerceIn(0.004, 0.55)
+                            ).coerceAtLeast(80.0)
+                            // Exact 1-radian / R_px sensitivity locks streets 1:1 under your fingertip at ALL zoom levels!
+                            val degPerPx = (57.2957795 / rPxDouble).coerceIn(1e-6, 0.65)
                             val hRad = camHeading * PI / 180.0
                             val dLonLocal = -dx * degPerPx
                             val dLatLocal = dy * degPerPx
                             val rotDLon = dLonLocal * cos(hRad) + dLatLocal * sin(hRad)
                             val rotDLat = -dLonLocal * sin(hRad) + dLatLocal * cos(hRad)
-                            val cosLatScale = cos(camLat * PI / 180.0).coerceAtLeast(0.22)
+                            val cosLatScale = cos(camLat * PI / 180.0).coerceAtLeast(0.18)
 
                             camLon = OrbitalAndGlobeMath.normalizeLon(camLon + rotDLon / cosLatScale)
                             camLat = (camLat + rotDLat).coerceIn(-88.5, 88.5)
-                            velLon = (rotDLon / cosLatScale) * 0.42
-                            velLat = rotDLat * 0.42
+                            velLon = (rotDLon / cosLatScale) * 0.38
+                            velLat = rotDLat * 0.38
                             ch.consume()
 
                             val now = System.currentTimeMillis()
@@ -515,8 +528,8 @@ fun NativeWorldGlobe3D(
                             p0.position.y - p1.position.y
                         )
                         if (prevDist > 16f && curDist > 16f) {
-                            val zoomRatio = (prevDist / curDist).toDouble().coerceIn(0.75, 1.35)
-                            camAlt = (camAlt * zoomRatio).coerceIn(22_000.0, 30_000_000.0)
+                            val zoomRatio = (prevDist / curDist).toDouble().coerceIn(0.72, 1.38)
+                            camAlt = (camAlt * zoomRatio).coerceIn(350.0, 30_000_000.0)
                         }
 
                         // Two-finger vertical drag tilts 3D horizon pitch; twist rotates compass heading
@@ -569,52 +582,61 @@ fun NativeWorldGlobe3D(
                         val targetLon = geo?.second ?: camLon
                         activeFlight = CameraFlight(
                             now, 480L, camLat, camLon, camAlt, camPitch, camHeading,
-                            targetLat, targetLon, (camAlt * 0.48).coerceAtLeast(25_000.0), camPitch, camHeading
+                            targetLat, targetLon, (camAlt * 0.42).coerceAtLeast(350.0), camPitch, camHeading
                         )
                     } else {
                         lastTapTimeMs = now
                         lastTapX = startX
                         lastTapY = startY
 
-                        // Hit-test rendered markers (topmost first)
-                        var hitMarker: PickableMarker? = null
-                        var bestDist = Float.MAX_VALUE
-                        for (idx in pickTargets.size - 1 downTo 0) {
-                            val m = pickTargets[idx]
-                            val d = hypot(m.x - startX, m.y - startY)
-                            if (d <= m.hitRadiusPx && d < bestDist) {
-                                bestDist = d
-                                hitMarker = m
-                            }
-                        }
-
-                        if (hitMarker != null) {
-                            val ent = hitMarker.entity
-                            if (ent != null) {
-                                viewModel.onEntitySelected(ent.id)
-                                if (ent.category == WorldIntelCategory.SPACE) {
-                                    selectedSatId = ent.id
-                                }
-                            } else {
-                                // Cluster pin tapped -> zoom smoothly into cluster centroid
-                                activeFlight = CameraFlight(
-                                    now, 520L, camLat, camLon, camAlt, camPitch, camHeading,
-                                    hitMarker.clusterZoomLat,
-                                    hitMarker.clusterZoomLon,
-                                    (camAlt * 0.36).coerceAtLeast(35_000.0),
-                                    camPitch,
-                                    camHeading
-                                )
-                            }
-                        } else {
+                        if (latestMeasureMode) {
                             val geo = OrbitalAndGlobeMath.unprojectFromScreen(
                                 startX, startY, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
                             )
                             if (geo != null) {
-                                val uNorm = ((geo.second + 180.0) / 360.0).toFloat()
-                                val vNorm = ((90.0 - geo.first) / 180.0).toFloat()
-                                val estElevM = (NativeGlobeAssetCache.sampleRelief(uNorm, vNorm) * 1_650f).roundToInt()
-                                viewModel.onLocationSelected(geo.first, geo.second, estElevM, "")
+                                viewModel.recordMeasurePoint(geo.first, geo.second)
+                            }
+                        } else {
+                            // Hit-test rendered markers (topmost first)
+                            var hitMarker: PickableMarker? = null
+                            var bestDist = Float.MAX_VALUE
+                            for (idx in pickTargets.size - 1 downTo 0) {
+                                val m = pickTargets[idx]
+                                val d = hypot(m.x - startX, m.y - startY)
+                                if (d <= m.hitRadiusPx && d < bestDist) {
+                                    bestDist = d
+                                    hitMarker = m
+                                }
+                            }
+
+                            if (hitMarker != null) {
+                                val ent = hitMarker.entity
+                                if (ent != null) {
+                                    viewModel.onEntitySelected(ent.id)
+                                    if (ent.category == WorldIntelCategory.SPACE) {
+                                        selectedSatId = ent.id
+                                    }
+                                } else {
+                                    // Cluster or City Gazetteer pin tapped -> fly smoothly down into city/cluster
+                                    activeFlight = CameraFlight(
+                                        now, 620L, camLat, camLon, camAlt, camPitch, camHeading,
+                                        hitMarker.clusterZoomLat,
+                                        hitMarker.clusterZoomLon,
+                                        (camAlt * 0.28).coerceIn(3_200.0, 220_000.0),
+                                        -52.0,
+                                        camHeading
+                                    )
+                                }
+                            } else {
+                                val geo = OrbitalAndGlobeMath.unprojectFromScreen(
+                                    startX, startY, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                                )
+                                if (geo != null) {
+                                    val uNorm = ((geo.second + 180.0) / 360.0).toFloat()
+                                    val vNorm = ((90.0 - geo.first) / 180.0).toFloat()
+                                    val estElevM = (NativeGlobeAssetCache.sampleRelief(uNorm, vNorm) * 1_650f).roundToInt()
+                                    viewModel.onLocationSelected(geo.first, geo.second, estElevM, "")
+                                }
                             }
                         }
                     }
@@ -630,6 +652,11 @@ fun NativeWorldGlobe3D(
         val h = size.height
         if (w <= 4f || h <= 4f) return@Canvas
 
+        // Observe async slippy-tile arrivals so city/street tiles sharpen immediately on download
+        val redrawGeneration = tileRedrawTick
+        if (redrawGeneration < 0) return@Canvas
+
+        val effectiveEpochMs = orbitClockMs + uiState.futureOffsetHours * 3_600_000L
         val cx = w * 0.5f
         val cy = h * 0.47f
         val rPx = OrbitalAndGlobeMath.globeRadiusPx(w, h, camAlt)
@@ -654,7 +681,7 @@ fun NativeWorldGlobe3D(
 
             // Precompute selected satellite 3D orbital track (back-side occluded behind sphere!)
             val activeOrbitTrack = selectedSatId?.let { id ->
-                parsedSatellites[id]?.let { tle -> OrbitalAndGlobeMath.buildOrbitTrack(tle, orbitClockMs, 2) }
+                parsedSatellites[id]?.let { tle -> OrbitalAndGlobeMath.buildOrbitTrack(tle, effectiveEpochMs, 2) }
             }.orEmpty()
 
             if (is3D && activeOrbitTrack.size >= 2 && uiState.layerStates[WorldIntelCategory.SPACE]?.visible != false) {
@@ -716,7 +743,7 @@ fun NativeWorldGlobe3D(
             }
 
             val earthBmp = NativeGlobeAssetCache.earthBitmap
-            val (sunLat, sunLon) = OrbitalAndGlobeMath.computeSubSolarPoint(orbitClockMs)
+            val (sunLat, sunLon) = OrbitalAndGlobeMath.computeSubSolarPoint(effectiveEpochMs)
             val sunPhi = sunLat * PI / 180.0
             val sunLam = sunLon * PI / 180.0
             val sunX = cos(sunPhi) * cos(sunLam)
@@ -836,6 +863,28 @@ fun NativeWorldGlobe3D(
                         paints.spherePaint
                     )
                 }
+
+                // Multi-zoom slippy city/street/satellite/hybrid-label tile streaming (z = 4..16)!
+                NativeGlobeTileStreamer.renderHighResTilesOnSphere(
+                    context = context,
+                    nc = nc,
+                    basemap = uiState.basemap,
+                    labelsEnabled = uiState.labelsEnabled,
+                    camLat = camLat,
+                    camLon = camLon,
+                    camAltMeters = camAlt,
+                    camPitch = camPitch,
+                    camHeading = camHeading,
+                    projection = uiState.projection,
+                    cx = cx,
+                    cy = cy,
+                    rPx = rPx,
+                    viewportW = w,
+                    colorFilter = paints.spherePaint.colorFilter,
+                    onTileLoaded = {
+                        mainHandler.post { tileRedrawTick++ }
+                    }
+                )
             }
 
             // Historical Before/After Split Comparison tint
@@ -1052,31 +1101,106 @@ fun NativeWorldGlobe3D(
                 }
             }
 
-            // 3D Extruded OSM City Buildings (when loaded via "3D City")
+            // Entity Historical Motion Trails
+            if (uiState.trailsEnabled && uiState.entityTrails.isNotEmpty()) {
+                for (trail in uiState.entityTrails) {
+                    if (trail.points.size < 2) continue
+                    paints.borderPaint.color = categoryColorInt(trail.category, WorldSeverity.INFO, 155)
+                    paints.borderPaint.strokeWidth = 2.2f
+                    paints.reusablePath.reset()
+                    var down = false
+                    for (tp in trail.points) {
+                        val sp = OrbitalAndGlobeMath.projectToScreen(
+                            tp.lat, tp.lon, tp.altM, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                        )
+                        if (sp.visible) {
+                            if (!down) { paints.reusablePath.moveTo(sp.x, sp.y); down = true }
+                            else paints.reusablePath.lineTo(sp.x, sp.y)
+                        } else down = false
+                    }
+                    nc.drawPath(paints.reusablePath, paints.borderPaint)
+                }
+            }
+
+            // 3D Extruded OSM City Buildings (ground walls + elevated roof prism!)
             if (uiState.buildings3d.isNotEmpty()) {
-                paints.strokePaint.color = 0xB838BDF8.toInt()
+                paints.strokePaint.color = 0xCC38BDF8.toInt()
                 paints.strokePaint.strokeWidth = 1.6f
-                paints.fillPaint.color = 0xAA1E3A5F.toInt()
+                paints.fillPaint.color = 0xBB1E3A5F.toInt()
                 for (bldg in uiState.buildings3d.take(260)) {
                     if (bldg.footprint.size < 3) continue
-                    val roofAlt = (bldg.heightMeters * 18.0).coerceIn(40.0, 9_500.0)
+                    val roofAlt = (bldg.heightMeters * 14.0).coerceIn(24.0, 4_500.0)
                     paints.reusablePath.reset()
                     var ok = true
                     bldg.footprint.forEachIndexed { idx, pt ->
                         if (pt.size >= 2) {
-                            val sp = OrbitalAndGlobeMath.projectToScreen(
+                            val baseSp = OrbitalAndGlobeMath.projectToScreen(
+                                pt[1], pt[0], 0.0, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                            )
+                            val roofSp = OrbitalAndGlobeMath.projectToScreen(
                                 pt[1], pt[0], roofAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
                             )
-                            if (!sp.visible) ok = false
-                            else if (idx == 0) paints.reusablePath.moveTo(sp.x, sp.y)
-                            else paints.reusablePath.lineTo(sp.x, sp.y)
+                            if (!roofSp.visible) {
+                                ok = false
+                            } else {
+                                if (baseSp.visible) {
+                                    paints.strokePaint.color = 0x6622D3EE
+                                    nc.drawLine(baseSp.x, baseSp.y, roofSp.x, roofSp.y, paints.strokePaint)
+                                }
+                                if (idx == 0) paints.reusablePath.moveTo(roofSp.x, roofSp.y)
+                                else paints.reusablePath.lineTo(roofSp.x, roofSp.y)
+                            }
                         }
                     }
                     if (ok) {
+                        paints.strokePaint.color = 0xCC38BDF8.toInt()
                         paints.reusablePath.close()
                         nc.drawPath(paints.reusablePath, paints.fillPaint)
                         nc.drawPath(paints.reusablePath, paints.strokePaint)
                     }
+                }
+            }
+
+            // Interactive 2-Point Geodesic Distance & Flight-Time Ruler Arc
+            val mStart = uiState.measureStart
+            if (mStart != null) {
+                val spA = OrbitalAndGlobeMath.projectToScreen(
+                    mStart.first, mStart.second, 500.0, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                )
+                val mEnd = uiState.measureEnd
+                if (mEnd != null) {
+                    paints.dashedPaint.color = 0xFFFBBF24.toInt()
+                    paints.dashedPaint.strokeWidth = 3.4f
+                    paints.reusablePath.reset()
+                    var down = false
+                    for (step in 0..24) {
+                        val f = step / 24.0
+                        val iLat = mStart.first + (mEnd.first - mStart.first) * f
+                        val dL = OrbitalAndGlobeMath.normalizeLon(mEnd.second - mStart.second)
+                        val iLon = OrbitalAndGlobeMath.normalizeLon(mStart.second + dL * f)
+                        val lift = sin(f * PI) * 160_000.0
+                        val p = OrbitalAndGlobeMath.projectToScreen(
+                            iLat, iLon, lift, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                        )
+                        if (p.visible) {
+                            if (!down) { paints.reusablePath.moveTo(p.x, p.y); down = true }
+                            else paints.reusablePath.lineTo(p.x, p.y)
+                        } else down = false
+                    }
+                    nc.drawPath(paints.reusablePath, paints.dashedPaint)
+                    val spB = OrbitalAndGlobeMath.projectToScreen(
+                        mEnd.first, mEnd.second, 500.0, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                    )
+                    if (spB.visible) {
+                        paints.fillPaint.color = 0xFFFBBF24.toInt()
+                        nc.drawCircle(spB.x, spB.y, 10f, paints.fillPaint)
+                        nc.drawText("B", spB.x + 13f, spB.y + 6f, paints.labelPaint)
+                    }
+                }
+                if (spA.visible) {
+                    paints.fillPaint.color = 0xFF10B981.toInt()
+                    nc.drawCircle(spA.x, spA.y, 10f, paints.fillPaint)
+                    nc.drawText("A", spA.x + 13f, spA.y + 6f, paints.labelPaint)
                 }
             }
 
@@ -1149,12 +1273,43 @@ fun NativeWorldGlobe3D(
                     )
                 }
 
-                // Live TLE satellite override position
+                // Live / Future Horizon TLE satellite & moving trajectory projection
                 val satTle = if (entity.category == WorldIntelCategory.SPACE) parsedSatellites[entity.id] else null
-                val satVec = satTle?.let { OrbitalAndGlobeMath.propagateTle(it, orbitClockMs) }
-                val eLat = satVec?.latitude ?: entity.latitude
-                val eLon = satVec?.longitude ?: entity.longitude
+                val satVec = satTle?.let { OrbitalAndGlobeMath.propagateTle(it, effectiveEpochMs) }
+
+                var eLat = satVec?.latitude ?: entity.latitude
+                var eLon = satVec?.longitude ?: entity.longitude
                 val eAlt = satVec?.altitudeMeters ?: (entity.altitudeMeters ?: 0.0)
+
+                // Dead-reckon moving aircraft & ships when Future Horizon (+1H..+72H) is active!
+                if (uiState.futureOffsetHours > 0 &&
+                    (entity.category == WorldIntelCategory.AVIATION || entity.category == WorldIntelCategory.MARITIME) &&
+                    (entity.speedValue ?: 0.0) > 5.0 &&
+                    entity.headingDeg != null
+                ) {
+                    val liveSp = OrbitalAndGlobeMath.projectToScreen(
+                        eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                    )
+                    val speedKmh = (entity.speedValue ?: 0.0) * 1.852
+                    val hrs = if (entity.category == WorldIntelCategory.AVIATION) {
+                        min(6, uiState.futureOffsetHours).toDouble()
+                    } else {
+                        uiState.futureOffsetHours.toDouble()
+                    }
+                    val projected = OrbitalAndGlobeMath.projectAlongBearing(
+                        eLat, eLon, entity.headingDeg, speedKmh * hrs
+                    )
+                    eLat = projected.first
+                    eLon = projected.second
+                    val futSp = OrbitalAndGlobeMath.projectToScreen(
+                        eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                    )
+                    if (liveSp.visible && futSp.visible) {
+                        paints.dashedPaint.color = 0xAA22D3EE.toInt()
+                        paints.dashedPaint.strokeWidth = 2.0f
+                        nc.drawLine(liveSp.x, liveSp.y, futSp.x, futSp.y, paints.dashedPaint)
+                    }
+                }
 
                 val sp = OrbitalAndGlobeMath.projectToScreen(
                     eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
@@ -1257,6 +1412,43 @@ fun NativeWorldGlobe3D(
                     }
                 }
             }
+
+            // 9. Interactive Global & Regional City / Chokepoint 3D Pins (tap any city pin to dive in!)
+            if (uiState.labelsEnabled && camAlt > 35_000.0) {
+                val curZoom = OrbitalAndGlobeMath.altitudeToTileZoom(camAlt)
+                for (place in NativeGlobeTileStreamer.MAJOR_PLACES) {
+                    if (curZoom < place.minZoom) continue
+                    val sp = OrbitalAndGlobeMath.projectToScreen(
+                        place.lat, place.lon, 0.0, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                    )
+                    if (!sp.visible || sp.x < 16f || sp.x > w - 16f || sp.y < 16f || sp.y > h - 16f) continue
+
+                    if (place.isStrategicHub) {
+                        paints.fillPaint.color = 0xEE0C4A6E.toInt()
+                        nc.drawCircle(sp.x, sp.y, 6.5f, paints.fillPaint)
+                        paints.strokePaint.color = 0xFF38BDF8.toInt()
+                        paints.strokePaint.strokeWidth = 2.0f
+                        nc.drawCircle(sp.x, sp.y, 6.5f, paints.strokePaint)
+                    } else {
+                        paints.fillPaint.color = 0xFFF8FAFC.toInt()
+                        nc.drawCircle(sp.x, sp.y, 5.2f, paints.fillPaint)
+                        paints.strokePaint.color = 0xFF0F172A.toInt()
+                        paints.strokePaint.strokeWidth = 1.8f
+                        nc.drawCircle(sp.x, sp.y, 5.2f, paints.strokePaint)
+                    }
+                    nc.drawText(place.name, sp.x + 9f, sp.y + 5f, paints.labelPaint)
+                    pickTargets.add(
+                        PickableMarker(
+                            x = sp.x,
+                            y = sp.y,
+                            hitRadiusPx = 26f,
+                            entity = null,
+                            clusterZoomLat = place.lat,
+                            clusterZoomLon = place.lon
+                        )
+                    )
+                }
+            }
         }
     }
 }
@@ -1270,7 +1462,7 @@ private fun pushViewportToViewModel(
     headingDeg: Double,
     projection: GlobeProjection
 ) {
-    val span = ((altMeters / 13_800_000.0) * 52.0).coerceIn(1.5, 80.0)
+    val span = ((altMeters / 13_800_000.0) * 52.0).coerceIn(0.003, 80.0)
     val uNorm = ((lon + 180.0) / 360.0).toFloat()
     val vNorm = ((90.0 - lat) / 180.0).toFloat()
     val groundElev = (NativeGlobeAssetCache.sampleRelief(uNorm, vNorm) * 1_650f).roundToInt()

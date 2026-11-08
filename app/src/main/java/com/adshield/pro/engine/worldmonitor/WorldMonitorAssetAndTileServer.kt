@@ -169,6 +169,7 @@ class WorldMonitorAssetAndTileServer(
             "arcgisonline.com",
             "openstreetmap.org",
             "basemaps.cartocdn.com",
+            "tile.opentopomap.org",
             "earthdata.nasa.gov",
             "rainviewer.com",
             "s3.amazonaws.com"

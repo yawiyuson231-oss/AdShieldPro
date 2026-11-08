@@ -66,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -85,8 +86,10 @@ import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldSeverity
+import com.adshield.pro.engine.worldmonitor.OrbitalAndGlobeMath
 import com.adshield.pro.engine.worldmonitor.WorldMonitorAssetAndTileServer
 import com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge
+import kotlin.math.roundToInt
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.DeepNavyBackground
@@ -107,6 +110,29 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+
+private data class QuickTeleportCity(
+    val id: String,
+    val label: String,
+    val lat: Double,
+    val lon: Double,
+    val altMeters: Double
+)
+
+private val QUICK_TELEPORT_PLACES = listOf(
+    QuickTeleportCity("mnl", "🇵🇭 Manila", 14.5995, 120.9842, 3_600.0),
+    QuickTeleportCity("ceb", "🇵🇭 Cebu", 10.3157, 123.8854, 4_200.0),
+    QuickTeleportCity("dvo", "🇵🇭 Davao", 7.1907, 125.4553, 4_800.0),
+    QuickTeleportCity("sic", "🇵🇭 Siclong", 15.4850, 120.9660, 2_800.0),
+    QuickTeleportCity("tyo", "🇯🇵 Tokyo", 35.6762, 139.6503, 4_200.0),
+    QuickTeleportCity("sin", "🇸🇬 Singapore", 1.3521, 103.8198, 4_200.0),
+    QuickTeleportCity("dxb", "🇦🇪 Dubai", 25.2048, 55.2708, 4_500.0),
+    QuickTeleportCity("lon", "🇬🇧 London", 51.5072, -0.1276, 4_200.0),
+    QuickTeleportCity("nyc", "🇺🇸 NYC", 40.7128, -74.0060, 3_800.0),
+    QuickTeleportCity("sfo", "🇺🇸 SF", 37.7749, -122.4194, 4_200.0),
+    QuickTeleportCity("hmz", "⚓ Hormuz", 26.5667, 56.2500, 180_000.0),
+    QuickTeleportCity("suz", "⚓ Suez", 30.5852, 32.2654, 95_000.0)
+)
 
 @Composable
 fun WorldMonitorScreen(
@@ -135,13 +161,40 @@ fun WorldMonitorScreen(
             )
         }
 
+        // Futuristic Center Holographic Targeting Visor HUD (non-blocking crosshair + live telemetry)
+        if (uiState.hudVisorEnabled) {
+            HolographicCenterVisorHud(
+                uiState = uiState,
+                onArmWatchHere = {
+                    val label = "Visor Sector %.2f, %.2f".format(
+                        Locale.US,
+                        uiState.viewport.centerLat,
+                        uiState.viewport.centerLon
+                    )
+                    viewModel.createWatchRegionAtCoordinates(
+                        name = label,
+                        lat = uiState.viewport.centerLat,
+                        lon = uiState.viewport.centerLon,
+                        radiusKm = 250.0
+                    )
+                    viewModel.selectTab(WorldMonitorDeckTab.WATCHTOWER)
+                },
+                onScan3dCity = viewModel::load3dBuildingsAtViewport,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
         if (uiState.fullscreenMode) {
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(12.dp)
-                    .background(NavySurface.copy(alpha = 0.88f), RoundedCornerShape(20.dp))
-                    .border(1.dp, NavyBorder, RoundedCornerShape(20.dp))
+                    .background(NavySurface.copy(alpha = 0.90f), RoundedCornerShape(20.dp))
+                    .border(
+                        1.dp,
+                        Brush.horizontalGradient(listOf(CyberCyan, ElectricBlue)),
+                        RoundedCornerShape(20.dp)
+                    )
                     .padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -149,10 +202,10 @@ fun WorldMonitorScreen(
                     Text("Exit", color = TextPrimaryDark, fontSize = 12.sp)
                 }
                 TextButton(onClick = viewModel::toggleFullscreen) {
-                    Text("Show HUD", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Show HUD", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Text(
-                    text = "%.3f°, %.3f°".format(Locale.US, uiState.viewport.centerLat, uiState.viewport.centerLon),
+                    text = "%.4f°, %.4f°".format(Locale.US, uiState.viewport.centerLat, uiState.viewport.centerLon),
                     color = TextSecondaryDark,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
@@ -170,6 +223,9 @@ fun WorldMonitorScreen(
                 onSearchChange = viewModel::updateSearchQuery,
                 onSearchSubmit = viewModel::submitGeographicSearch,
                 onSelectSearchResult = viewModel::selectSearchResult,
+                onTeleportCity = { city ->
+                    viewModel.flyTo(city.lat, city.lon, city.altMeters, pitchDeg = -54.0)
+                },
                 onToggleCategory = { cat ->
                     val cur = uiState.layerStates[cat]?.visible ?: true
                     viewModel.updateLayerState(cat, visible = !cur)
@@ -178,35 +234,74 @@ fun WorldMonitorScreen(
             )
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            GlobeRoundAction("+") { viewModel.cameraAction("ZOOM_IN") }
-            GlobeRoundAction("−") { viewModel.cameraAction("ZOOM_OUT") }
-            GlobeRoundAction("3D") { viewModel.cameraAction("TILT_3D") }
-            GlobeRoundAction("N") { viewModel.cameraAction("RESET_NORTH") }
-            GlobeRoundAction("🌐") { viewModel.cameraAction("HOME") }
+        // Interactive 2-Point Geodesic Distance & Transit-Time Ruler Banner
+        if (uiState.measureModeEnabled) {
+            GeodesicRulerHudBanner(
+                start = uiState.measureStart,
+                end = uiState.measureEnd,
+                onClear = viewModel::clearMeasurePoints,
+                onClose = viewModel::toggleMeasureMode,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        bottom = if (uiState.deckExpanded && !uiState.fullscreenMode) 316.dp else 72.dp,
+                        start = 12.dp,
+                        end = 62.dp
+                    )
+            )
         }
 
+        // 2035 Neon Tactical Floating Control Pod
+        NeonTacticalButtonPod(
+            autoOrbitActive = uiState.autoOrbitEnabled,
+            visorActive = uiState.hudVisorEnabled,
+            rulerActive = uiState.measureModeEnabled,
+            onZoomIn = { viewModel.cameraAction("ZOOM_IN") },
+            onZoomOut = { viewModel.cameraAction("ZOOM_OUT") },
+            onTilt3D = { viewModel.cameraAction("TILT_3D") },
+            onToggleOrbit = viewModel::toggleAutoOrbit,
+            onToggleVisor = viewModel::toggleHudVisor,
+            onToggleRuler = viewModel::toggleMeasureMode,
+            onLoad3dCity = viewModel::load3dBuildingsAtViewport,
+            onHome = { viewModel.cameraAction("HOME") },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp)
+        )
+
         val clicked = uiState.clickedLocation
-        if (clicked != null && uiState.selectedEntity == null) {
+        if (clicked != null && uiState.selectedEntity == null && !uiState.measureModeEnabled) {
             ClickedLocationCard(
                 info = clicked,
                 onDismiss = viewModel::dismissClickedLocation,
+                onStreetDive = {
+                    viewModel.flyTo(clicked.latitude, clicked.longitude, 1_100.0, pitchDeg = -52.0)
+                    viewModel.dismissClickedLocation()
+                },
+                onLoad3dCity = {
+                    viewModel.flyTo(clicked.latitude, clicked.longitude, 3_600.0, pitchDeg = -48.0)
+                    viewModel.load3dBuildingsAtViewport()
+                    viewModel.dismissClickedLocation()
+                },
                 onOpenTwin = {
                     viewModel.dismissClickedLocation()
                     viewModel.selectTab(WorldMonitorDeckTab.TWIN)
                 },
                 onCreateWatch = {
+                    val regionTitle = clicked.placeName?.substringBefore(",")?.take(36)
+                        ?: "Sector %.2f, %.2f".format(Locale.US, clicked.latitude, clicked.longitude)
+                    viewModel.createWatchRegionAtCoordinates(
+                        name = regionTitle,
+                        lat = clicked.latitude,
+                        lon = clicked.longitude,
+                        radiusKm = 250.0
+                    )
                     viewModel.dismissClickedLocation()
                     viewModel.selectTab(WorldMonitorDeckTab.WATCHTOWER)
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = if (uiState.deckExpanded && !uiState.fullscreenMode) 310.dp else 64.dp, start = 12.dp, end = 56.dp)
+                    .padding(bottom = if (uiState.deckExpanded && !uiState.fullscreenMode) 310.dp else 64.dp, start = 12.dp, end = 60.dp)
             )
         }
 
@@ -410,20 +505,35 @@ private fun WorldMonitorTopHud(
     onSearchChange: (String) -> Unit,
     onSearchSubmit: () -> Unit,
     onSelectSearchResult: (GeocodeSearchResult) -> Unit,
+    onTeleportCity: (QuickTeleportCity) -> Unit,
     onToggleCategory: (WorldIntelCategory) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val camAltM = uiState.viewport.cameraAltitudeMeters
+    val zoomTile = OrbitalAndGlobeMath.altitudeToTileZoom(camAltM.toDouble())
+    val altLabel = if (camAltM < 10_000L) {
+        "%,d m".format(Locale.US, camAltM)
+    } else {
+        "%,d km".format(Locale.US, camAltM / 1000L)
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         Surface(
-            color = NavySurface.copy(alpha = 0.90f),
-            shape = RoundedCornerShape(14.dp),
+            color = NavySurface.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, NavyBorder, RoundedCornerShape(14.dp))
+                .border(
+                    1.2.dp,
+                    Brush.horizontalGradient(
+                        listOf(CyberCyan.copy(alpha = 0.72f), ElectricBlue.copy(alpha = 0.55f), EmeraldPrimary.copy(alpha = 0.55f))
+                    ),
+                    RoundedCornerShape(16.dp)
+                )
         ) {
             Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
                 Row(
@@ -434,17 +544,22 @@ private fun WorldMonitorTopHud(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimaryDark)
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
                             Text(
                                 text = "WORLD MONITOR 2035",
                                 color = TextPrimaryDark,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                                 fontSize = 13.sp,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(Modifier.width(6.dp))
-                            if (uiState.simulation.active) {
+                            BadgePill("Z$zoomTile", SkyBlueGlow)
+                            if (uiState.futureOffsetHours > 0) {
+                                BadgePill("FUTURE +${uiState.futureOffsetHours}H", WarningAmber)
+                            } else if (uiState.simulation.active) {
                                 BadgePill("SIMULATION", WarningAmber)
                             } else {
                                 BadgePill(
@@ -454,11 +569,11 @@ private fun WorldMonitorTopHud(
                             }
                         }
                         Text(
-                            text = "%.3f°, %.3f° · Alt %,d km · Elev %d m · %,d items".format(
+                            text = "%.4f°, %.4f° · Alt %s · Elev %d m · %,d nodes".format(
                                 Locale.US,
                                 uiState.viewport.centerLat,
                                 uiState.viewport.centerLon,
-                                (uiState.viewport.cameraAltitudeMeters / 1000L),
+                                altLabel,
                                 uiState.viewport.groundElevationMeters,
                                 uiState.filteredEntities.size
                             ),
@@ -470,18 +585,28 @@ private fun WorldMonitorTopHud(
                         )
                     }
 
-                    TextButton(
-                        onClick = onLoadBuildings,
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    Surface(
+                        color = CyberCyan.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .border(1.dp, CyberCyan.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                            .clickable(onClick = onLoadBuildings)
+                            .padding(horizontal = 7.dp, vertical = 4.dp)
                     ) {
-                        Text("3D City", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text("3D City", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    TextButton(
-                        onClick = onToggleFullscreen,
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    Spacer(Modifier.width(4.dp))
+
+                    Surface(
+                        color = ElectricBlue.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .border(1.dp, ElectricBlue.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                            .clickable(onClick = onToggleFullscreen)
+                            .padding(horizontal = 7.dp, vertical = 4.dp)
                     ) {
-                        Text("Full", color = SkyBlueGlow, fontSize = 11.sp)
+                        Text("HUD", color = SkyBlueGlow, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                     }
 
                     IconButton(onClick = onSync, modifier = Modifier.size(34.dp)) {
@@ -508,7 +633,7 @@ private fun WorldMonitorTopHud(
                         onValueChange = onSearchChange,
                         placeholder = {
                             Text(
-                                "Search country, city, airport (MNL/JFK), port, or lat,lon…",
+                                "Jump to ANY city, street, town, airport (MNL/JFK), or lat,lon…",
                                 fontSize = 11.sp,
                                 color = TextSecondaryDark
                             )
@@ -534,11 +659,38 @@ private fun WorldMonitorTopHud(
                     Spacer(Modifier.width(6.dp))
                     Button(
                         onClick = onSearchSubmit,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.height(40.dp)
                     ) {
-                        Text("Go", fontSize = 12.sp)
+                        Text("Fly", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                // 1-Tap Quick-Teleport Global & Philippine City / Chokepoint Bar
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    items(items = QUICK_TELEPORT_PLACES, key = { it.id }) { place ->
+                        Surface(
+                            color = NavySurfaceVariant.copy(alpha = 0.88f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .border(1.dp, NavyBorder, RoundedCornerShape(10.dp))
+                                .clickable { onTeleportCity(place) }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = place.label,
+                                color = TextPrimaryDark,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
 
@@ -546,9 +698,10 @@ private fun WorldMonitorTopHud(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 150.dp)
+                            .heightIn(max = 165.dp)
                             .padding(top = 4.dp)
                             .background(NavySurfaceVariant, RoundedCornerShape(8.dp))
+                            .border(1.dp, CyberCyan.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                     ) {
                         items(items = uiState.searchResults, key = { "${it.displayName}:${it.latitude}:${it.longitude}" }) { res ->
                             Row(
@@ -564,7 +717,7 @@ private fun WorldMonitorTopHud(
                                     Text("${res.category} · ${res.attribution}", color = TextSecondaryDark, fontSize = 10.sp)
                                 }
                                 Text(
-                                    "%.2f, %.2f".format(Locale.US, res.latitude, res.longitude),
+                                    "%.3f, %.3f".format(Locale.US, res.latitude, res.longitude),
                                     color = CyberCyan,
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace
@@ -601,6 +754,7 @@ private fun WorldMonitorTopHud(
                         text = msg,
                         color = CyberCyan,
                         fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 3.dp)
@@ -612,8 +766,8 @@ private fun WorldMonitorTopHud(
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(top = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             items(items = WorldIntelCategory.entries, key = { it.name }) { cat ->
                 val enabled = uiState.layerStates[cat]?.visible != false
@@ -624,14 +778,14 @@ private fun WorldMonitorTopHud(
                     label = {
                         Text(
                             text = "${cat.shortCode} ($count)",
-                            fontSize = 11.sp,
-                            fontWeight = if (enabled) FontWeight.SemiBold else FontWeight.Normal
+                            fontSize = 10.sp,
+                            fontWeight = if (enabled) FontWeight.Bold else FontWeight.Normal
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ElectricBlue.copy(alpha = 0.28f),
-                        selectedLabelColor = TextPrimaryDark,
-                        containerColor = NavySurface.copy(alpha = 0.85f),
+                        selectedContainerColor = CyberCyan.copy(alpha = 0.22f),
+                        selectedLabelColor = CyberCyan,
+                        containerColor = NavySurface.copy(alpha = 0.88f),
                         labelColor = TextSecondaryDark
                     )
                 )
@@ -719,16 +873,18 @@ private fun WorldMonitorBottomDeck(
 private fun ClickedLocationCard(
     info: ClickedLocationInfo,
     onDismiss: () -> Unit,
+    onStreetDive: () -> Unit,
+    onLoad3dCity: () -> Unit,
     onOpenTwin: () -> Unit,
     onCreateWatch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
-        color = NavySurface.copy(alpha = 0.95f),
+        color = NavySurface.copy(alpha = 0.96f),
         shape = RoundedCornerShape(14.dp),
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+            .border(1.2.dp, CyberCyan.copy(alpha = 0.65f), RoundedCornerShape(14.dp))
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -736,18 +892,18 @@ private fun ClickedLocationCard(
                     Text(
                         text = info.placeName ?: "Earth Coordinate Inspection",
                         color = TextPrimaryDark,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Lat %.4f° · Lon %.4f° · Elevation %,d m MSL%s".format(
+                        text = "Lat %.4f° · Lon %.4f° · Elev %,d m MSL%s".format(
                             Locale.US,
                             info.latitude,
                             info.longitude,
                             info.elevationMeters,
-                            info.population?.let { " · Country Pop %,d".format(Locale.US, it) }.orEmpty()
+                            info.population?.let { " · Pop %,d".format(Locale.US, it) }.orEmpty()
                         ),
                         color = CyberCyan,
                         fontSize = 11.sp,
@@ -760,23 +916,232 @@ private fun ClickedLocationCard(
             }
             Row(
                 modifier = Modifier.padding(top = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedButton(
-                    onClick = onOpenTwin,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(30.dp)
+                    onClick = onStreetDive,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
-                    Text("Regional Digital Twin", fontSize = 11.sp, color = CyberCyan)
+                    Text("Street Zoom", fontSize = 10.sp, color = SkyBlueGlow, fontWeight = FontWeight.SemiBold)
+                }
+                OutlinedButton(
+                    onClick = onLoad3dCity,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("3D City", fontSize = 10.sp, color = CyberCyan, fontWeight = FontWeight.SemiBold)
                 }
                 OutlinedButton(
                     onClick = onCreateWatch,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(30.dp)
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
-                    Text("Watch Geofence", fontSize = 11.sp, color = EmeraldPrimary)
+                    Text("Arm Watch", fontSize = 10.sp, color = EmeraldPrimary, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = onOpenTwin,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("Twin", fontSize = 10.sp, color = TextPrimaryDark)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HolographicCenterVisorHud(
+    uiState: WorldMonitorUiState,
+    onArmWatchHere: () -> Unit,
+    onScan3dCity: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val lat = uiState.viewport.centerLat
+    val lon = uiState.viewport.centerLon
+    val z = OrbitalAndGlobeMath.altitudeToTileZoom(uiState.viewport.cameraAltitudeMeters.toDouble())
+    val solarOffsetHours = (lon / 15.0).roundToInt()
+    val effectiveEpoch = System.currentTimeMillis() + uiState.futureOffsetHours * 3_600_000L
+    val localEpoch = effectiveEpoch + solarOffsetHours * 3_600_000L
+    val hh = ((localEpoch / 3_600_000L) % 24L + 24L) % 24L
+    val mm = ((localEpoch / 60_000L) % 60L + 60L) % 60L
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Futuristic non-obstructive reticle ring
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .border(1.2.dp, CyberCyan.copy(alpha = 0.68f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(EmeraldPrimary, CircleShape)
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Surface(
+            color = NavySurface.copy(alpha = 0.84f),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.border(1.dp, CyberCyan.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = "Z$z · %.4f°, %.4f° · Solar %02d:%02d".format(Locale.US, lat, lon, hh, mm),
+                    color = CyberCyan,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "+Watch",
+                    color = EmeraldPrimary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable(onClick = onArmWatchHere)
+                )
+                Text(
+                    text = "3D",
+                    color = SkyBlueGlow,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable(onClick = onScan3dCity)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeodesicRulerHudBanner(
+    start: Pair<Double, Double>?,
+    end: Pair<Double, Double>?,
+    onClear: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = NavySurface.copy(alpha = 0.95f),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .border(1.2.dp, WarningAmber.copy(alpha = 0.78f), RoundedCornerShape(14.dp))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "GEODESIC RULER & TRANSIT CALCULATOR",
+                    color = WarningAmber,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                val summary = when {
+                    start == null -> "Tap Point A anywhere on Earth…"
+                    end == null -> "Point A locked (%.3f°, %.3f°) — tap Point B!".format(Locale.US, start.first, start.second)
+                    else -> {
+                        val distKm = OrbitalAndGlobeMath.geodesicDistanceKm(start.first, start.second, end.first, end.second)
+                        val distNm = distKm * 0.539957
+                        val brg = OrbitalAndGlobeMath.initialBearingDeg(start.first, start.second, end.first, end.second)
+                        val jetHrs = distKm / 880.0
+                        val shipDays = (distKm / 37.0) / 24.0
+                        "%,.1f km (%,.1f nm) · Brg %.0f° · Jet %.1fh · Ship %.1fd".format(
+                            Locale.US, distKm, distNm, brg, jetHrs, shipDays
+                        )
+                    }
+                }
+                Text(
+                    text = summary,
+                    color = TextPrimaryDark,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            TextButton(onClick = onClear, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text("Reset", color = CyberCyan, fontSize = 11.sp)
+            }
+            TextButton(onClick = onClose, contentPadding = PaddingValues(horizontal = 6.dp)) {
+                Text("Done", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NeonTacticalButtonPod(
+    autoOrbitActive: Boolean,
+    visorActive: Boolean,
+    rulerActive: Boolean,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    onTilt3D: () -> Unit,
+    onToggleOrbit: () -> Unit,
+    onToggleVisor: () -> Unit,
+    onToggleRuler: () -> Unit,
+    onLoad3dCity: () -> Unit,
+    onHome: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = NavySurface.copy(alpha = 0.84f),
+        shape = RoundedCornerShape(22.dp),
+        modifier = modifier
+            .border(
+                1.2.dp,
+                Brush.verticalGradient(listOf(CyberCyan.copy(alpha = 0.70f), ElectricBlue.copy(alpha = 0.50f))),
+                RoundedCornerShape(22.dp)
+            )
+            .padding(vertical = 6.dp, horizontal = 5.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            GlobePodButton("+", active = false, accent = CyberCyan, onClick = onZoomIn)
+            GlobePodButton("−", active = false, accent = CyberCyan, onClick = onZoomOut)
+            GlobePodButton("3D", active = false, accent = SkyBlueGlow, onClick = onTilt3D)
+            GlobePodButton("↻", active = autoOrbitActive, accent = EmeraldPrimary, onClick = onToggleOrbit)
+            GlobePodButton("🎯", active = visorActive, accent = CyberCyan, onClick = onToggleVisor)
+            GlobePodButton("📏", active = rulerActive, accent = WarningAmber, onClick = onToggleRuler)
+            GlobePodButton("🏙️", active = false, accent = SkyBlueGlow, onClick = onLoad3dCity)
+            GlobePodButton("🌐", active = false, accent = EmeraldPrimary, onClick = onHome)
+        }
+    }
+}
+
+@Composable
+private fun GlobePodButton(
+    label: String,
+    active: Boolean,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        color = if (active) accent.copy(alpha = 0.28f) else NavySurfaceVariant.copy(alpha = 0.90f),
+        shape = CircleShape,
+        modifier = Modifier
+            .size(34.dp)
+            .border(1.dp, if (active) accent else NavyBorder, CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                color = if (active) accent else TextPrimaryDark,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -942,22 +1307,6 @@ private fun SelectedEntityDossierCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun GlobeRoundAction(label: String, onClick: () -> Unit) {
-    Surface(
-        color = NavySurface.copy(alpha = 0.88f),
-        shape = CircleShape,
-        modifier = Modifier
-            .size(36.dp)
-            .border(1.dp, NavyBorder, CircleShape)
-            .clickable(onClick = onClick)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(label, color = TextPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

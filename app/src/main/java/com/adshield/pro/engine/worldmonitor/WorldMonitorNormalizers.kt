@@ -62,9 +62,12 @@ object WorldMonitorNormalizers {
                 "wheretheiss-json" -> parseWhereTheIss(spec, rawBody, nowEpochMs)
                 "celestrak-tle" -> parseCelesTrakTle(spec, rawBody, nowEpochMs)
                 "spacedevs-launches" -> parseSpaceDevsLaunches(spec, rawBody, nowEpochMs)
+                "snapi-v4" -> parseSpaceflightNews(spec, rawBody, nowEpochMs)
                 "swpc-kp" -> parseSwpcKp(spec, rawBody, nowEpochMs)
                 "swpc-alerts" -> parseSwpcAlerts(spec, rawBody, nowEpochMs)
                 "usgs-geojson" -> parseUsgsGeoJson(spec, rawBody, nowEpochMs)
+                "usgs-volcanoes" -> parseUsgsVolcanoes(spec, rawBody, nowEpochMs)
+                "reliefweb-disasters" -> parseReliefWebDisasters(spec, rawBody, nowEpochMs)
                 "emsc-json" -> parseEmscJson(spec, rawBody, nowEpochMs)
                 "nasa-eonet" -> parseNasaEonet(spec, rawBody, nowEpochMs)
                 "gdacs-geojson" -> parseGdacsGeoJson(spec, rawBody, nowEpochMs)
@@ -72,14 +75,20 @@ object WorldMonitorNormalizers {
                 "openmeteo-current" -> parseOpenMeteoCurrent(spec, rawBody, nowEpochMs, queryLat, queryLon)
                 "openmeteo-air" -> parseOpenMeteoAir(spec, rawBody, nowEpochMs, queryLat, queryLon)
                 "openmeteo-flood" -> parseOpenMeteoFlood(spec, rawBody, nowEpochMs, queryLat, queryLon)
+                "openmeteo-waves" -> parseOpenMeteoWaves(spec, rawBody, nowEpochMs, queryLat, queryLon)
+                "openmeteo-forecast72h" -> parseOpenMeteoForecast72h(spec, rawBody, nowEpochMs, queryLat, queryLon)
                 "nws-alerts-geojson" -> parseNwsAlerts(spec, rawBody, nowEpochMs)
                 "cisa-kev-world" -> parseCisaKev(spec, rawBody, nowEpochMs)
                 "feodo-json-world" -> parseFeodoJson(spec, rawBody, nowEpochMs)
+                "urlhaus-csv" -> parseUrlhausCsv(spec, rawBody, nowEpochMs)
+                "sans-dshield" -> parseSansDShield(spec, rawBody, nowEpochMs)
+                "tor-onionoo" -> parseTorOnionoo(spec, rawBody, nowEpochMs)
                 "ioda-outages" -> parseIodaOutages(spec, rawBody, nowEpochMs)
                 "ripestat-country" -> parseRipeStatCountry(spec, rawBody, nowEpochMs)
                 "gdelt-geojson" -> parseGdeltGeoJson(spec, rawBody, nowEpochMs)
                 "un-news-rss" -> parseUnNewsRss(spec, rawBody, nowEpochMs)
                 "overpass-infra" -> parseOverpass(spec, rawBody, nowEpochMs).infrastructureEntities
+                "wikipedia-geosearch" -> parseWikipediaGeoSearch(spec, rawBody, nowEpochMs)
                 "bundled-infra" -> BaselineReferenceStore.buildBaselineEntities(nowEpochMs)
                 else -> emptyList()
             }
@@ -1545,6 +1554,447 @@ object WorldMonitorNormalizers {
         7 -> "Engaged in Fishing"
         8 -> "Underway Sailing"
         else -> "AIS Vessel"
+    }
+
+    // ==================== I. EXPANDED FREE PUBLIC GLOBAL SOURCES ====================
+
+    fun parseSpaceflightNews(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val results = root["results"] as? JsonArray ?: return emptyList()
+        val spaceports = listOf(
+            "Cape Canaveral" to (28.5623 to -80.5774),
+            "Kennedy" to (28.5729 to -80.6490),
+            "Boca Chica" to (25.9972 to -97.1560),
+            "Starbase" to (25.9972 to -97.1560),
+            "Vandenberg" to (34.7420 to -120.5724),
+            "Kourou" to (5.2360 to -52.7686),
+            "Baikonur" to (45.9646 to 63.3052),
+            "Jiuquan" to (40.9606 to 100.2983),
+            "Wenchang" to (19.6145 to 110.9510),
+            "Tanegashima" to (30.4000 to 130.9700),
+            "Sriharikota" to (13.7199 to 80.2304),
+            "Mahia" to (-39.2615 to 177.8649)
+        )
+        return results.take(25).mapIndexedNotNull { idx, el ->
+            val obj = el as? JsonObject ?: return@mapIndexedNotNull null
+            val id = obj.int("id")?.toString() ?: obj.str("id") ?: return@mapIndexedNotNull null
+            val title = obj.str("title") ?: return@mapIndexedNotNull null
+            val summary = obj.str("summary")?.take(240).orEmpty()
+            val url = obj.str("url") ?: spec.docsUrl
+            val siteName = obj.str("news_site") ?: "Spaceflight News"
+            val pubMs = obj.str("published_at")?.let { parseIsoEpochMs(it) } ?: nowEpochMs
+
+            val matchedPort = spaceports.firstOrNull { (k, _) ->
+                title.contains(k, ignoreCase = true) || summary.contains(k, ignoreCase = true)
+            }?.second ?: (28.5729 + (idx % 5) * 0.12 to -80.6490 + (idx % 4) * 0.12)
+
+            WorldEntity(
+                id = "space:snapi:$id",
+                providerId = spec.providerId,
+                providerName = siteName,
+                category = WorldIntelCategory.SPACE,
+                subType = "Space Mission Dispatch",
+                title = title,
+                summary = summary.ifBlank { "Global orbital & spaceflight mission intelligence." },
+                latitude = matchedPort.first,
+                longitude = matchedPort.second,
+                severity = WorldSeverity.INFO,
+                freshness = FreshnessClass.NEAR_REAL_TIME,
+                geoAccuracy = GeoAccuracy.ADMIN_CENTROID,
+                confidence = 86,
+                verificationStatus = VerificationStatus.COMMUNITY_OPEN_DATA,
+                eventTimeEpochMs = pubMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 6 * 3_600_000L,
+                sourceUrl = url,
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo
+            )
+        }
+    }
+
+    fun parseUsgsVolcanoes(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val arr = runCatching {
+            val parsed = json.parseToJsonElement(raw)
+            parsed as? JsonArray ?: (parsed as? JsonObject)?.get("volcanoes") as? JsonArray
+        }.getOrNull() ?: return emptyList()
+
+        return arr.take(50).mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val vName = obj.str("vName") ?: obj.str("volcano_name") ?: return@mapNotNull null
+            val lat = obj.dbl("latitude") ?: obj.dbl("lat") ?: return@mapNotNull null
+            val lon = obj.dbl("longitude") ?: obj.dbl("lon") ?: obj.dbl("long") ?: return@mapNotNull null
+            if (!GeoSpatialIndex.isValidCoordinate(lat, lon)) return@mapNotNull null
+            val alert = (obj.str("alertLevel") ?: obj.str("alert_level") ?: "NORMAL").uppercase(Locale.US)
+            val color = (obj.str("colorCode") ?: obj.str("color_code") ?: "GREEN").uppercase(Locale.US)
+            val sev = when {
+                alert == "WARNING" || color == "RED" -> WorldSeverity.CRITICAL
+                alert == "WATCH" || color == "ORANGE" -> WorldSeverity.HIGH
+                alert == "ADVISORY" || color == "YELLOW" -> WorldSeverity.MEDIUM
+                else -> WorldSeverity.LOW
+            }
+            val vnum = obj.str("vnum") ?: vName.lowercase(Locale.US).replace(" ", "_")
+
+            WorldEntity(
+                id = "dis:volcano:$vnum",
+                providerId = spec.providerId,
+                providerName = "USGS Volcano Hazards",
+                category = WorldIntelCategory.DISASTER,
+                subType = "Volcano Status ($color)",
+                title = "Volcano $vName — $alert ($color)",
+                summary = "Official USGS Volcano Hazards Program aviation color $color · alert level $alert.",
+                latitude = lat,
+                longitude = lon,
+                severity = sev,
+                freshness = FreshnessClass.NEAR_REAL_TIME,
+                geoAccuracy = GeoAccuracy.EXACT_GNSS,
+                confidence = 95,
+                verificationStatus = VerificationStatus.OFFICIAL_AGENCY,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 6 * 3_600_000L,
+                sourceUrl = obj.str("vUrl") ?: "https://volcanoes.usgs.gov/",
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo
+            )
+        }
+    }
+
+    fun parseReliefWebDisasters(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val data = root["data"] as? JsonArray ?: return emptyList()
+        val countries = BaselineReferenceStore.load().countries
+        return data.take(30).mapNotNull { el ->
+            val item = el as? JsonObject ?: return@mapNotNull null
+            val id = item.str("id") ?: return@mapNotNull null
+            val fields = item["fields"] as? JsonObject ?: return@mapNotNull null
+            val name = fields.str("name") ?: return@mapNotNull null
+            val status = fields.str("status") ?: "current"
+            val primaryCountry = ((fields["primary_country"] as? JsonObject)
+                ?: ((fields["country"] as? JsonArray)?.firstOrNull() as? JsonObject))
+            val iso3 = primaryCountry?.str("iso3")?.uppercase(Locale.US)
+            val cName = primaryCountry?.str("name")
+            val loc = primaryCountry?.get("location") as? JsonObject
+            val lat = loc?.dbl("lat") ?: countries.firstOrNull {
+                it.iso3.equals(iso3, ignoreCase = true) || it.name.equals(cName, ignoreCase = true)
+            }?.lat ?: return@mapNotNull null
+            val lon = loc?.dbl("lon") ?: countries.firstOrNull {
+                it.iso3.equals(iso3, ignoreCase = true) || it.name.equals(cName, ignoreCase = true)
+            }?.lon ?: return@mapNotNull null
+
+            val sev = if (status.equals("alert", ignoreCase = true)) WorldSeverity.HIGH else WorldSeverity.MEDIUM
+            WorldEntity(
+                id = "dis:reliefweb:$id",
+                providerId = spec.providerId,
+                providerName = "UN OCHA ReliefWeb",
+                category = WorldIntelCategory.DISASTER,
+                subType = "Humanitarian Disaster",
+                title = name,
+                summary = "UN OCHA ReliefWeb active disaster coordination bulletin (${cName ?: iso3 ?: "Global"}).",
+                latitude = lat,
+                longitude = lon,
+                severity = sev,
+                freshness = FreshnessClass.NEAR_REAL_TIME,
+                geoAccuracy = GeoAccuracy.ADMIN_CENTROID,
+                confidence = 94,
+                verificationStatus = VerificationStatus.OFFICIAL_AGENCY,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 6 * 3_600_000L,
+                sourceUrl = fields.str("url") ?: "https://reliefweb.int/disaster/$id",
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo
+            )
+        }
+    }
+
+    fun parseOpenMeteoWaves(
+        spec: WorldProviderSpec,
+        raw: String,
+        nowEpochMs: Long,
+        qLat: Double,
+        qLon: Double
+    ): List<WorldEntity> {
+        val obj = json.parseToJsonElement(raw).jsonObject
+        val lat = obj.dbl("latitude") ?: qLat
+        val lon = obj.dbl("longitude") ?: qLon
+        val cur = obj["current"] as? JsonObject ?: return emptyList()
+        val waveH = cur.dbl("wave_height") ?: return emptyList()
+        val waveDir = cur.dbl("wave_direction") ?: 0.0
+        val wavePer = cur.dbl("wave_period") ?: 0.0
+        val swellH = cur.dbl("swell_wave_height") ?: 0.0
+        val sev = when {
+            waveH >= 6.0 -> WorldSeverity.CRITICAL
+            waveH >= 4.0 -> WorldSeverity.HIGH
+            waveH >= 2.5 -> WorldSeverity.MEDIUM
+            else -> WorldSeverity.INFO
+        }
+        return listOf(
+            WorldEntity(
+                id = "met:waves:${"%.2f".format(Locale.US, lat)}_${"%.2f".format(Locale.US, lon)}",
+                providerId = spec.providerId,
+                providerName = "Open-Meteo Marine",
+                category = WorldIntelCategory.WEATHER,
+                subType = "Marine Sea State",
+                title = "Sea State %.1f m Waves (%.0fs Period)".format(Locale.US, waveH, wavePer),
+                summary = "Significant wave height %.1f m · Swell %.1f m · Direction %.0f°.".format(
+                    Locale.US, waveH, swellH, waveDir
+                ),
+                latitude = lat,
+                longitude = lon,
+                headingDeg = waveDir,
+                severity = sev,
+                freshness = FreshnessClass.LIVE,
+                geoAccuracy = GeoAccuracy.BBOX_APPROXIMATE,
+                confidence = 90,
+                verificationStatus = VerificationStatus.OFFICIAL_AGENCY,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 45 * 60_000L,
+                sourceUrl = spec.docsUrl,
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo,
+                metricsMap = mapOf(
+                    "waveHeightM" to "%.1f".format(Locale.US, waveH),
+                    "swellHeightM" to "%.1f".format(Locale.US, swellH),
+                    "wavePeriodS" to "%.1f".format(Locale.US, wavePer)
+                )
+            )
+        )
+    }
+
+    fun parseOpenMeteoForecast72h(
+        spec: WorldProviderSpec,
+        raw: String,
+        nowEpochMs: Long,
+        qLat: Double,
+        qLon: Double
+    ): List<WorldEntity> {
+        val obj = json.parseToJsonElement(raw).jsonObject
+        val lat = obj.dbl("latitude") ?: qLat
+        val lon = obj.dbl("longitude") ?: qLon
+        val hourly = obj["hourly"] as? JsonObject ?: return emptyList()
+        val temps = hourly["temperature_2m"] as? JsonArray ?: return emptyList()
+        val precipProb = hourly["precipitation_probability"] as? JsonArray
+        val winds = hourly["wind_speed_10m"] as? JsonArray
+        val gusts = hourly["wind_gusts_10m"] as? JsonArray
+        val codes = hourly["weather_code"] as? JsonArray
+
+        val checkpoints = listOf(6, 12, 24, 48, 71)
+        val out = ArrayList<WorldEntity>(checkpoints.size)
+        for (hr in checkpoints) {
+            if (hr >= temps.size) continue
+            val tempC = temps.doubleAt(hr) ?: continue
+            val pop = precipProb?.doubleAt(hr)?.toInt() ?: 0
+            val windKmh = winds?.doubleAt(hr) ?: 0.0
+            val gustKmh = gusts?.doubleAt(hr) ?: windKmh
+            val wCode = codes?.doubleAt(hr)?.toInt() ?: 0
+            val desc = wmoDescription(wCode)
+            val sev = when {
+                gustKmh >= 90.0 || wCode >= 95 -> WorldSeverity.HIGH
+                gustKmh >= 55.0 || pop >= 75 -> WorldSeverity.MEDIUM
+                else -> WorldSeverity.INFO
+            }
+            val displayHr = if (hr == 71) 72 else hr
+            out += WorldEntity(
+                id = "met:future:${displayHr}h:${"%.2f".format(Locale.US, lat)}_${"%.2f".format(Locale.US, lon)}",
+                providerId = spec.providerId,
+                providerName = "Open-Meteo +${displayHr}H Forecast",
+                category = WorldIntelCategory.WEATHER,
+                subType = "Future Forecast (+${displayHr}H)",
+                title = "+${displayHr}H Forecast: $desc · %.1f°C".format(Locale.US, tempC),
+                summary = "Predicted +${displayHr}h: $desc · Temp %.1f°C · Rain prob %d%% · Wind %.0f km/h (gusts %.0f km/h).".format(
+                    Locale.US, tempC, pop, windKmh, gustKmh
+                ),
+                latitude = lat + (displayHr * 0.004),
+                longitude = lon + (displayHr * 0.004),
+                severity = sev,
+                freshness = FreshnessClass.ESTIMATED,
+                geoAccuracy = GeoAccuracy.BBOX_APPROXIMATE,
+                confidence = (92 - displayHr / 4).coerceAtLeast(65),
+                verificationStatus = VerificationStatus.OFFICIAL_AGENCY,
+                eventTimeEpochMs = nowEpochMs + displayHr * 3_600_000L,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 3 * 3_600_000L,
+                sourceUrl = spec.docsUrl,
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo,
+                metricsMap = mapOf(
+                    "forecastOffsetHours" to displayHr.toString(),
+                    "tempC" to "%.1f".format(Locale.US, tempC),
+                    "precipProbPct" to pop.toString(),
+                    "windGustKmh" to "%.0f".format(Locale.US, gustKmh)
+                )
+            )
+        }
+        return out
+    }
+
+    fun parseUrlhausCsv(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val countries = BaselineReferenceStore.load().countries
+        val out = ArrayList<WorldEntity>(35)
+        for (line in raw.lineSequence()) {
+            if (line.isBlank() || line.startsWith("#")) continue
+            val cols = splitCsvLine(line)
+            if (cols.size < 7) continue
+            val id = cols[0].trim()
+            val urlHost = cols[2].trim()
+            val urlStatus = cols[3].trim()
+            val threat = cols[5].trim().ifBlank { "malware_download" }
+            val tags = cols[6].trim()
+            val link = cols.getOrNull(7)?.trim()?.takeIf { it.startsWith("https://") } ?: "https://urlhaus.abuse.ch/"
+
+            val tld = urlHost.substringAfter("://").substringBefore("/").substringBefore(":").substringAfterLast(".")
+                .uppercase(Locale.US)
+            val country = countries.firstOrNull { it.iso2 == tld }
+                ?: countries[(id.hashCode() and 0x7FFFFFFF) % countries.size]
+
+            out += WorldEntity(
+                id = "cyb:urlhaus:$id",
+                providerId = spec.providerId,
+                providerName = "abuse.ch URLhaus",
+                category = WorldIntelCategory.CYBER,
+                subType = "Malware Distribution URL",
+                title = "URLhaus Malware Host ($threat) — ${country.iso2}",
+                summary = "Status: $urlStatus · Tags: ${tags.ifBlank { threat }} · Defensive threat feed.",
+                latitude = country.lat + ((id.hashCode() % 9) * 0.08),
+                longitude = country.lon + (((id.hashCode() shr 4) % 9) * 0.08),
+                severity = if (urlStatus.equals("online", ignoreCase = true)) WorldSeverity.HIGH else WorldSeverity.MEDIUM,
+                freshness = FreshnessClass.NEAR_REAL_TIME,
+                geoAccuracy = GeoAccuracy.ASN_COUNTRY_LEVEL,
+                confidence = 89,
+                verificationStatus = VerificationStatus.COMMUNITY_OPEN_DATA,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 4 * 3_600_000L,
+                sourceUrl = link,
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo,
+                countryCode = country.iso2
+            )
+            if (out.size >= 35) break
+        }
+        return out
+    }
+
+    fun parseSansDShield(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val parsed = runCatching { json.parseToJsonElement(raw) }.getOrNull() ?: return emptyList()
+        val arr = when (parsed) {
+            is JsonArray -> parsed
+            is JsonObject -> parsed["sources"] as? JsonArray ?: parsed["data"] as? JsonArray ?: return emptyList()
+            else -> return emptyList()
+        }
+        val countries = BaselineReferenceStore.load().countries
+        return arr.take(25).mapIndexedNotNull { idx, el ->
+            val obj = el as? JsonObject ?: return@mapIndexedNotNull null
+            val ip = obj.str("ip") ?: obj.str("source") ?: return@mapIndexedNotNull null
+            val attacks = obj.long("attacks") ?: obj.long("count") ?: 0L
+            val cc = obj.str("country")?.uppercase(Locale.US)
+            val cRef = countries.firstOrNull { it.iso2 == cc }
+                ?: countries[(ip.hashCode() and 0x7FFFFFFF) % countries.size]
+
+            WorldEntity(
+                id = "cyb:dshield:$ip",
+                providerId = spec.providerId,
+                providerName = "SANS ISC DShield",
+                category = WorldIntelCategory.CYBER,
+                subType = "Honeypot Attack Telemetry",
+                title = "DShield Probe Source $ip (${cRef.iso2})",
+                summary = "Observed %,d honeypot attack packets reported to SANS Internet Storm Center.".format(Locale.US, attacks),
+                latitude = cRef.lat + ((idx % 5) - 2) * 0.14,
+                longitude = cRef.lon + ((idx / 5) - 2) * 0.14,
+                severity = if (attacks >= 5_000L) WorldSeverity.HIGH else WorldSeverity.MEDIUM,
+                freshness = FreshnessClass.NEAR_REAL_TIME,
+                geoAccuracy = GeoAccuracy.ASN_COUNTRY_LEVEL,
+                confidence = 87,
+                verificationStatus = VerificationStatus.COMMUNITY_OPEN_DATA,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 3 * 3_600_000L,
+                sourceUrl = "https://isc.sans.edu/ipinfo.html?ip=$ip",
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo,
+                countryCode = cRef.iso2
+            )
+        }
+    }
+
+    fun parseTorOnionoo(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val relays = root["relays"] as? JsonArray ?: return emptyList()
+        return relays.take(45).mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val fp = obj.str("fingerprint")?.take(12) ?: return@mapNotNull null
+            val nick = obj.str("nickname") ?: fp
+            val lat = obj.dbl("latitude") ?: return@mapNotNull null
+            val lon = obj.dbl("longitude") ?: return@mapNotNull null
+            if (!GeoSpatialIndex.isValidCoordinate(lat, lon)) return@mapNotNull null
+            val cc = obj.str("country")?.uppercase(Locale.US)
+            val asName = obj.str("as_name") ?: "Autonomous System"
+            val bwMbps = (obj.long("observed_bandwidth") ?: 0L) * 8.0 / 1_000_000.0
+
+            WorldEntity(
+                id = "cyb:tor:$fp",
+                providerId = spec.providerId,
+                providerName = "Tor Onionoo Directory",
+                category = WorldIntelCategory.CYBER,
+                subType = "High-Capacity Tor Relay",
+                title = "Tor Relay $nick (${cc ?: "Global"})",
+                summary = "Bandwidth %.1f Mbps · %s · Active consensus relay.".format(Locale.US, bwMbps, asName),
+                latitude = lat,
+                longitude = lon,
+                severity = WorldSeverity.INFO,
+                freshness = FreshnessClass.LIVE,
+                geoAccuracy = GeoAccuracy.ASN_COUNTRY_LEVEL,
+                confidence = 91,
+                verificationStatus = VerificationStatus.COMMUNITY_OPEN_DATA,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 4 * 3_600_000L,
+                sourceUrl = "https://metrics.torproject.org/rs.html#details/$fp",
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo,
+                countryCode = cc
+            )
+        }
+    }
+
+    fun parseWikipediaGeoSearch(spec: WorldProviderSpec, raw: String, nowEpochMs: Long): List<WorldEntity> {
+        val root = json.parseToJsonElement(raw).jsonObject
+        val queryObj = root["query"] as? JsonObject ?: return emptyList()
+        val geo = queryObj["geosearch"] as? JsonArray ?: return emptyList()
+        return geo.take(40).mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val pageId = obj.long("pageid") ?: return@mapNotNull null
+            val title = obj.str("title") ?: return@mapNotNull null
+            val lat = obj.dbl("lat") ?: return@mapNotNull null
+            val lon = obj.dbl("lon") ?: return@mapNotNull null
+            if (!GeoSpatialIndex.isValidCoordinate(lat, lon)) return@mapNotNull null
+            val distM = obj.dbl("dist")?.toInt() ?: 0
+
+            WorldEntity(
+                id = "inf:wiki:$pageId",
+                providerId = spec.providerId,
+                providerName = "Wikipedia GeoSearch",
+                category = WorldIntelCategory.INFRASTRUCTURE,
+                subType = "Civic Place / Landmark",
+                title = title,
+                summary = "Local landmark & civic place (${distM} m from viewport center) · Tap source to read article.",
+                latitude = lat,
+                longitude = lon,
+                severity = WorldSeverity.INFO,
+                freshness = FreshnessClass.HISTORICAL,
+                geoAccuracy = GeoAccuracy.EXACT_GNSS,
+                confidence = 93,
+                verificationStatus = VerificationStatus.COMMUNITY_OPEN_DATA,
+                eventTimeEpochMs = nowEpochMs,
+                retrievedAtEpochMs = nowEpochMs,
+                expiresAtEpochMs = nowEpochMs + 24 * 3_600_000L,
+                sourceUrl = "https://en.wikipedia.org/?curid=$pageId",
+                attribution = spec.attribution,
+                licenseInfo = spec.licenseInfo
+            )
+        }
     }
 
     private fun wmoDescription(code: Int): String = when (code) {

@@ -186,9 +186,11 @@ enum class GlobeProjection(val label: String) {
 
 @Serializable
 enum class GlobeBasemap(val label: String, val attribution: String) {
-    SATELLITE_ESRI("Satellite (Esri World Imagery)", "Esri, Maxar, Earthstar Geographics, USDA, USGS"),
+    SATELLITE_ESRI("Satellite + Hybrid Cities (Esri)", "Esri, Maxar, Earthstar Geographics, USDA, USGS"),
+    OPENSTREETMAP("OpenStreetMap Streets & Places", "© OpenStreetMap contributors (ODbL)"),
+    CARTO_DARK_MATTER("Dark Tactical City Streets", "© OpenStreetMap contributors · © CARTO"),
+    OPEN_TOPO_MAP("Topographic Terrain & Contours", "© OpenStreetMap contributors · OpenTopoMap (CC-BY-SA)"),
     NASA_GIBS_TRUECOLOR("NASA GIBS VIIRS True Color", "NASA EOSDIS Global Imagery Browse Services"),
-    OPENSTREETMAP("OpenStreetMap Streets & Cities", "© OpenStreetMap contributors (ODbL)"),
     OFFLINE_NATURAL_EARTH("Offline Natural Earth II", "Natural Earth II (Public Domain, bundled in APK)")
 }
 

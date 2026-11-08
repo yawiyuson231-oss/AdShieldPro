@@ -319,6 +319,18 @@
           maximumLevel: 19,
           credit: '© OpenStreetMap contributors (ODbL)'
         });
+      case 'CARTO_DARK_MATTER':
+        return new Cesium.UrlTemplateImageryProvider({
+          url: 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+          maximumLevel: 19,
+          credit: '© CARTO · © OpenStreetMap contributors'
+        });
+      case 'OPEN_TOPO_MAP':
+        return new Cesium.UrlTemplateImageryProvider({
+          url: 'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+          maximumLevel: 17,
+          credit: '© OpenTopoMap (CC-BY-SA) · © OpenStreetMap'
+        });
       case 'DARK_TACTICAL':
         return new Cesium.UrlTemplateImageryProvider({
           url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',

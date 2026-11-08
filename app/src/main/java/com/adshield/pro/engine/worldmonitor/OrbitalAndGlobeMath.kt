@@ -78,11 +78,90 @@ object OrbitalAndGlobeMath {
         return lon - 180.0
     }
 
-    fun globeRadiusPx(viewportWidth: Float, viewportHeight: Float, cameraAltitudeMeters: Double): Float {
-        val base = min(viewportWidth, viewportHeight) * 0.43f
-        val altClamped = cameraAltitudeMeters.coerceIn(18_000.0, 34_000_000.0)
-        val zoomFactor = (13_800_000.0 / altClamped).pow(0.72).toFloat().coerceIn(0.62f, 28.0f)
-        return base * zoomFactor
+    /**
+     * Continuous 64-bit globe radius from deep space (`34,000 km`) all the way down to
+     * street/building level (`350 m`) with zero clamping cap.
+     */
+    fun globeRadiusPxDouble(viewportWidth: Float, viewportHeight: Float, cameraAltitudeMeters: Double): Double {
+        val base = min(viewportWidth, viewportHeight).toDouble() * 0.43
+        val altClamped = cameraAltitudeMeters.coerceIn(350.0, 34_000_000.0)
+        val zoomFactor = if (altClamped >= 1_500_000.0) {
+            (13_800_000.0 / altClamped).pow(0.76)
+        } else {
+            // Linear inverse-altitude scale below 1,500 km so 1 km altitude = true street scale!
+            val anchor = (13_800_000.0 / 1_500_000.0).pow(0.76)
+            anchor * (1_500_000.0 / altClamped)
+        }
+        return (base * zoomFactor).coerceIn(base * 0.58, base * 38_000.0)
+    }
+
+    fun globeRadiusPx(viewportWidth: Float, viewportHeight: Float, cameraAltitudeMeters: Double): Float =
+        globeRadiusPxDouble(viewportWidth, viewportHeight, cameraAltitudeMeters).toFloat()
+
+    /** Maps camera altitude in meters to Web Mercator slippy tile zoom level `z` (`2..17`). */
+    fun altitudeToTileZoom(cameraAltitudeMeters: Double): Int {
+        val alt = cameraAltitudeMeters.coerceIn(350.0, 34_000_000.0)
+        // At 13,800 km -> z=2; every halving of altitude adds ~1 zoom level up to z=17 at 350 m
+        val z = (2.2 + kotlin.math.ln(13_800_000.0 / alt) / kotlin.math.ln(2.0)).roundToInt()
+        return z.coerceIn(2, 17)
+    }
+
+    /** Converts `(latDeg, lonDeg)` at zoom `z` to slippy tile `(tileX, tileY)`. */
+    fun latLonToTileXY(latDeg: Double, lonDeg: Double, zoom: Int): Pair<Int, Int> {
+        val n = 1 shl zoom.coerceIn(0, 20)
+        val clampedLat = latDeg.coerceIn(-85.05112878, 85.05112878)
+        val latRad = clampedLat * DEG_TO_RAD
+        val x = (((normalizeLon(lonDeg) + 180.0) / 360.0) * n).toInt().coerceIn(0, n - 1)
+        val y = ((1.0 - kotlin.math.ln(kotlin.math.tan(latRad) + 1.0 / cos(latRad)) / PI) * 0.5 * n)
+            .toInt()
+            .coerceIn(0, n - 1)
+        return x to y
+    }
+
+    /** Returns `[westLon, southLat, eastLon, northLat]` bounds of slippy tile `(z, x, y)`. */
+    fun tileBoundsLatLon(zoom: Int, tileX: Int, tileY: Int): DoubleArray {
+        val n = (1 shl zoom.coerceIn(0, 20)).toDouble()
+        val west = (tileX / n) * 360.0 - 180.0
+        val east = ((tileX + 1) / n) * 360.0 - 180.0
+        val northRad = kotlin.math.atan(kotlin.math.sinh(PI * (1.0 - 2.0 * tileY / n)))
+        val southRad = kotlin.math.atan(kotlin.math.sinh(PI * (1.0 - 2.0 * (tileY + 1) / n)))
+        return doubleArrayOf(west, southRad * RAD_TO_DEG, east, northRad * RAD_TO_DEG)
+    }
+
+    /** Geodesic great-circle distance in kilometers between two coordinates. */
+    fun geodesicDistanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = (lat2 - lat1) * DEG_TO_RAD
+        val dLon = normalizeLon(lon2 - lon1) * DEG_TO_RAD
+        val p1 = lat1 * DEG_TO_RAD
+        val p2 = lat2 * DEG_TO_RAD
+        val a = sin(dLat * 0.5).pow(2.0) + cos(p1) * cos(p2) * sin(dLon * 0.5).pow(2.0)
+        return 2.0 * EARTH_RADIUS_KM * asin(sqrt(a.coerceIn(0.0, 1.0)))
+    }
+
+    /** Initial forward compass bearing (`0..360°`) from `(lat1, lon1)` to `(lat2, lon2)`. */
+    fun initialBearingDeg(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val p1 = lat1 * DEG_TO_RAD
+        val p2 = lat2 * DEG_TO_RAD
+        val dLon = normalizeLon(lon2 - lon1) * DEG_TO_RAD
+        val y = sin(dLon) * cos(p2)
+        val x = cos(p1) * sin(p2) - sin(p1) * cos(p2) * cos(dLon)
+        return ((atan2(y, x) * RAD_TO_DEG) + 360.0) % 360.0
+    }
+
+    /** Dead-reckons `(lat, lon)` along `headingDeg` by `distanceKm` on the spherical Earth. */
+    fun projectAlongBearing(latDeg: Double, lonDeg: Double, headingDeg: Double, distanceKm: Double): Pair<Double, Double> {
+        if (abs(distanceKm) < 1e-4) return latDeg to lonDeg
+        val angDist = distanceKm / EARTH_RADIUS_KM
+        val brng = headingDeg * DEG_TO_RAD
+        val lat1 = latDeg * DEG_TO_RAD
+        val lon1 = lonDeg * DEG_TO_RAD
+
+        val sinLat2 = sin(lat1) * cos(angDist) + cos(lat1) * sin(angDist) * cos(brng)
+        val lat2 = asin(sinLat2.coerceIn(-1.0, 1.0))
+        val y = sin(brng) * sin(angDist) * cos(lat1)
+        val x = cos(angDist) - sin(lat1) * sin(lat2)
+        val lon2 = lon1 + atan2(y, x)
+        return (lat2 * RAD_TO_DEG).coerceIn(-89.5, 89.5) to normalizeLon(lon2 * RAD_TO_DEG)
     }
 
     /**
@@ -181,11 +260,14 @@ object OrbitalAndGlobeMath {
 
         // Surface visibility test: ez > 0 on unit sphere, or elevated satellite in front of limb circle
         val unitEz = ez / s
-        val screenX = cx + (radiusPx * ux).toFloat()
-        val screenY = cy - (radiusPx * uy).toFloat()
-        val limbCenterY = cy + (radiusPx * sinT).toFloat()
-        val outsideLimb = hypot((screenX - cx).toDouble(), (screenY - limbCenterY).toDouble()) >= radiusPx * 0.992
-        val visible = (unitEz > 0.015) || (altNorm > 0.01 && (unitEz > -0.22 && outsideLimb))
+        val rawScreenX = cx.toDouble() + radiusPx.toDouble() * ux
+        val rawScreenY = cy.toDouble() - radiusPx.toDouble() * uy
+        val screenX = rawScreenX.coerceIn(-24_000.0, 24_000.0).toFloat()
+        val screenY = rawScreenY.coerceIn(-24_000.0, 24_000.0).toFloat()
+        val limbCenterY = cy.toDouble() + radiusPx.toDouble() * sinT
+        val outsideLimb = hypot(rawScreenX - cx.toDouble(), rawScreenY - limbCenterY) >= radiusPx.toDouble() * 0.992
+        val inRasterBounds = abs(rawScreenX) < 22_000.0 && abs(rawScreenY) < 22_000.0
+        val visible = inRasterBounds && ((unitEz > 0.015) || (altNorm > 0.01 && (unitEz > -0.22 && outsideLimb)))
 
         return ScreenPoint3D(
             x = screenX,

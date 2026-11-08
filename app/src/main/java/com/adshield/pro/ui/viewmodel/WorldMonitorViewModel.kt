@@ -6,6 +6,7 @@ import com.adshield.pro.data.worldmonitor.WorldMonitorRepository
 import com.adshield.pro.domain.worldmonitor.AiAnalystResponse
 import com.adshield.pro.domain.worldmonitor.CorrelatedIncident
 import com.adshield.pro.domain.worldmonitor.DigitalTwinSnapshot
+import com.adshield.pro.domain.worldmonitor.EntityTrail
 import com.adshield.pro.domain.worldmonitor.FreshnessClass
 import com.adshield.pro.domain.worldmonitor.GeocodeSearchResult
 import com.adshield.pro.domain.worldmonitor.GlobeBasemap
@@ -64,9 +65,9 @@ enum class WorldMonitorDeckTab(val label: String) {
     CORRELATE("Correlate"),
     AI_ANALYST("AI Analyst"),
     SIM_LAB("Sim Lab"),
-    TIMELINE("Timeline"),
+    TIMELINE("Time & Future"),
     WATCHTOWER("Watchtower"),
-    SOURCES("Sources")
+    SOURCES("Sources (39)")
 }
 
 data class LayerUiState(
@@ -154,6 +155,13 @@ data class WorldMonitorUiState(
     val watchRegions: List<WatchtowerRegion> = emptyList(),
     val watchAlerts: List<WatchtowerAlert> = emptyList(),
     val buildings3d: List<OsmBuilding3D> = emptyList(),
+    val entityTrails: List<EntityTrail> = emptyList(),
+    val futureOffsetHours: Int = 0,
+    val autoOrbitEnabled: Boolean = false,
+    val hudVisorEnabled: Boolean = true,
+    val measureModeEnabled: Boolean = false,
+    val measureStart: Pair<Double, Double>? = null,
+    val measureEnd: Pair<Double, Double>? = null,
     val hasOpenSkyKey: Boolean = false,
     val hasFirmsKey: Boolean = false,
     val hasAisStreamKey: Boolean = false
@@ -370,13 +378,13 @@ class WorldMonitorViewModel @Inject constructor(
     fun syncAllEnabled(force: Boolean = true) {
         if (_uiState.value.isSyncing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing live global feeds…") }
+            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing 39 global & local intelligence feeds…") }
             val vp = _uiState.value.viewport
             val okCount = repository.syncEnabledProviders(
                 categories = _uiState.value.layerStates.filterValues { it.visible }.keys,
                 viewport = vp,
                 force = force,
-                notifyWatchtower = false
+                notifyWatchtower = force
             )
             refreshTrailsOnGlobe()
             if (_uiState.value.radarOverlayEnabled) {
@@ -385,7 +393,7 @@ class WorldMonitorViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSyncing = false,
-                    statusBanner = "Synced $okCount live feed(s) · Cached ${_uiState.value.allEntities.size} entities"
+                    statusBanner = "Synced $okCount live feed(s) · ${_uiState.value.allEntities.size} entities active"
                 )
             }
         }
@@ -406,15 +414,90 @@ class WorldMonitorViewModel @Inject constructor(
     fun load3dBuildingsAtViewport() {
         viewModelScope.launch {
             val vp = _uiState.value.viewport
-            _uiState.update { it.copy(statusBanner = "Querying OpenStreetMap 3D buildings & local infrastructure…") }
+            if (vp.cameraAltitudeMeters > 18_000L) {
+                flyTo(vp.centerLat, vp.centerLon, altitudeMeters = 4_800.0, pitchDeg = -48.0)
+            }
+            _uiState.update { it.copy(statusBanner = "Scanning 3D city buildings, Wikipedia landmarks & live aircraft…") }
             val outcome = repository.syncBuildingsAndStreetInfra(vp)
             _uiState.update {
                 it.copy(
                     statusBanner = outcome.errorMessage
-                        ?: "Rendered ${outcome.buildings3D.size} 3D building(s) & ${outcome.entities.size} street infra node(s)"
+                        ?: "City Scan: ${outcome.buildings3D.size} 3D building(s) & ${outcome.entities.size} local place(s) loaded"
                 )
             }
         }
+    }
+
+    fun setFutureOffsetHours(hours: Int) {
+        val clamped = hours.coerceIn(0, 72)
+        _uiState.update {
+            it.copy(
+                futureOffsetHours = clamped,
+                statusBanner = if (clamped == 0) {
+                    "Returned to Live Real-Time Telemetry"
+                } else {
+                    "Future Horizon +${clamped}H active — SGP4 orbits, flight/ship vectors & 72h weather projected"
+                }
+            )
+        }
+        if (clamped > 0) {
+            viewModelScope.launch {
+                repository.syncSingleProvider("wm.weather.forecast72h", viewport = _uiState.value.viewport, force = false)
+            }
+        }
+    }
+
+    fun toggleAutoOrbit() {
+        val next = !_uiState.value.autoOrbitEnabled
+        _uiState.update {
+            it.copy(
+                autoOrbitEnabled = next,
+                statusBanner = if (next) "360° 3D Drone Orbit engaged" else "360° Drone Orbit paused"
+            )
+        }
+    }
+
+    fun toggleHudVisor() {
+        _uiState.update { it.copy(hudVisorEnabled = !it.hudVisorEnabled) }
+    }
+
+    fun toggleMeasureMode() {
+        val next = !_uiState.value.measureModeEnabled
+        _uiState.update {
+            it.copy(
+                measureModeEnabled = next,
+                measureStart = if (next) it.measureStart else null,
+                measureEnd = if (next) it.measureEnd else null,
+                statusBanner = if (next) "Geodesic Ruler active: tap any 2 points on Earth to measure distance & flight time" else null
+            )
+        }
+    }
+
+    fun recordMeasurePoint(lat: Double, lon: Double) {
+        _uiState.update { cur ->
+            if (cur.measureStart == null || cur.measureEnd != null) {
+                cur.copy(
+                    measureStart = lat to lon,
+                    measureEnd = null,
+                    statusBanner = "Point A set (%.3f°, %.3f°) — tap Point B on the globe".format(Locale.US, lat, lon)
+                )
+            } else {
+                val a = cur.measureStart
+                val km = OrbitalAndGlobeMath.geodesicDistanceKm(a.first, a.second, lat, lon)
+                val brg = OrbitalAndGlobeMath.initialBearingDeg(a.first, a.second, lat, lon)
+                val jetHrs = km / 880.0
+                cur.copy(
+                    measureEnd = lat to lon,
+                    statusBanner = "Distance: %,.1f km (%,.1f NM) · Bearing %.0f° · Jet %.1fh".format(
+                        Locale.US, km, km * 0.539957, brg, jetHrs
+                    )
+                )
+            }
+        }
+    }
+
+    fun clearMeasurePoints() {
+        _uiState.update { it.copy(measureStart = null, measureEnd = null, measureModeEnabled = false) }
     }
 
     // ── Globe & Layer Controls ───────────────────────────────────────────────
@@ -656,14 +739,16 @@ class WorldMonitorViewModel @Inject constructor(
             val results = repository.searchLocations(q)
             _uiState.update { it.copy(isSearching = false, searchResults = results) }
             results.firstOrNull()?.let { top ->
-                flyTo(top.latitude, top.longitude, (top.boundingBoxKm * 2_200.0).coerceIn(8_000.0, 2_800_000.0), -58.0)
+                val alt = (top.boundingBoxKm * 1_450.0).coerceIn(2_400.0, 2_800_000.0)
+                flyTo(top.latitude, top.longitude, alt, -54.0)
             }
         }
     }
 
     fun selectSearchResult(result: GeocodeSearchResult) {
         _uiState.update { it.copy(searchResults = emptyList(), searchQuery = result.displayName) }
-        flyTo(result.latitude, result.longitude, (result.boundingBoxKm * 2_200.0).coerceIn(8_000.0, 2_800_000.0), -58.0)
+        val alt = (result.boundingBoxKm * 1_450.0).coerceIn(2_400.0, 2_800_000.0)
+        flyTo(result.latitude, result.longitude, alt, -54.0)
     }
 
     // ── Digital Twin, AI Analyst, Simulation Lab, Timeline, Watchtower ───────
@@ -785,8 +870,50 @@ class WorldMonitorViewModel @Inject constructor(
                 enabled = true,
                 createdAtEpochMs = System.currentTimeMillis()
             )
-            repository.addWatchRegion(region)
-            _uiState.update { it.copy(statusBanner = "Watchtower geofence '${region.name}' armed") }
+            val matched = repository.addWatchRegion(region)
+            _uiState.update {
+                it.copy(
+                    statusBanner = "Watchtower '${region.name}' armed · $matched active alert(s) detected in sector"
+                )
+            }
+        }
+    }
+
+    fun createWatchRegionAtCoordinates(
+        name: String,
+        lat: Double,
+        lon: Double,
+        radiusKm: Double = 280.0,
+        minSeverity: WorldSeverity = WorldSeverity.MEDIUM
+    ) {
+        viewModelScope.launch {
+            val region = WatchtowerRegion(
+                id = "watch:${UUID.randomUUID().toString().take(8)}",
+                name = name.trim().ifBlank { "Sector %.2f°, %.2f°".format(Locale.US, lat, lon) },
+                centerLat = lat,
+                centerLon = lon,
+                radiusKm = radiusKm.coerceIn(15.0, 2_500.0),
+                categories = WorldIntelCategory.entries.toSet(),
+                minSeverity = minSeverity,
+                enabled = true,
+                createdAtEpochMs = System.currentTimeMillis()
+            )
+            val matched = repository.addWatchRegion(region)
+            flyTo(lat, lon, (radiusKm * 3_400.0).coerceIn(85_000.0, 2_200_000.0), -52.0)
+            _uiState.update {
+                it.copy(
+                    statusBanner = "Watchtower '${region.name}' armed · $matched active alert(s) inside ${radiusKm.toInt()} km"
+                )
+            }
+        }
+    }
+
+    fun scanWatchtowerAlertsNow() {
+        viewModelScope.launch {
+            val matched = repository.evaluateWatchtowerNow()
+            _uiState.update {
+                it.copy(statusBanner = "Watchtower scan complete · $matched new alert(s) matched active geofences")
+            }
         }
     }
 
@@ -911,13 +1038,15 @@ class WorldMonitorViewModel @Inject constructor(
     }
 
     private suspend fun refreshTrailsOnGlobe() {
-        if (!_uiState.value.globeReady) return
         if (!_uiState.value.trailsEnabled) {
-            sendCommand("""{"type":"UPDATE_TRAILS","trails":[]}""")
+            _uiState.update { it.copy(entityTrails = emptyList()) }
+            if (_uiState.value.globeReady) sendCommand("""{"type":"UPDATE_TRAILS","trails":[]}""")
             return
         }
         val activeCats = _uiState.value.layerStates.filterValues { it.visible }.keys
         val trails = repository.loadRecentTrails(activeCats)
+        _uiState.update { it.copy(entityTrails = trails) }
+        if (!_uiState.value.globeReady) return
         sendCommand(buildJsonObject {
             put("type", "UPDATE_TRAILS")
             put("trails", json.parseToJsonElement(json.encodeToString(trails)))

@@ -165,29 +165,23 @@ class WorldMonitorSyncEngine @Inject constructor(
         nowEpochMs: Long
     ): ProviderFetchOutcome {
         val vp = viewport ?: return ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.IDLE)
-        val latSpan = kotlin.math.abs(vp.north - vp.south)
-        val lonSpan = kotlin.math.abs(vp.east - vp.west)
-        if (latSpan > 0.65 || lonSpan > 0.65 || vp.cameraAltitudeMeters > 35_000L) {
-            return ProviderFetchOutcome(
-                spec.providerId,
-                ProviderSyncStatus.IDLE,
-                errorMessage = "Zoom closer (< 35 km altitude) to stream live OSM 3D buildings & street infrastructure."
-            )
-        }
-        val s = "%.5f".format(Locale.US, vp.south)
-        val w = "%.5f".format(Locale.US, vp.west)
-        val n = "%.5f".format(Locale.US, vp.north)
-        val e = "%.5f".format(Locale.US, vp.east)
+        // Always clamp Overpass query to a fast, polite ±0.032° (~7 km) city sector around crosshair
+        val halfSpan = 0.032
+        val s = "%.5f".format(Locale.US, (vp.centerLat - halfSpan).coerceIn(-85.0, 85.0))
+        val w = "%.5f".format(Locale.US, (vp.centerLon - halfSpan).coerceIn(-180.0, 180.0))
+        val n = "%.5f".format(Locale.US, (vp.centerLat + halfSpan).coerceIn(-85.0, 85.0))
+        val e = "%.5f".format(Locale.US, (vp.centerLon + halfSpan).coerceIn(-180.0, 180.0))
 
         val ql = """
-            [out:json][timeout:12];
+            [out:json][timeout:14];
             (
               way["building"]($s,$w,$n,$e);
+              node["amenity"="hospital"]($s,$w,$n,$e);
               node["railway"="station"]($s,$w,$n,$e);
               node["power"="substation"]($s,$w,$n,$e);
               node["man_made"="mast"]($s,$w,$n,$e);
             );
-            out body geom center 180;
+            out body geom center 220;
         """.trimIndent()
         val formBody = ("data=" + URLEncoder.encode(ql, "UTF-8"))
             .toRequestBody("application/x-www-form-urlencoded".toMediaType())
@@ -378,7 +372,11 @@ class WorldMonitorSyncEngine @Inject constructor(
             runCatching { json.decodeFromString<List<GeocodeSearchResult>>(rec.payloadJson) }.getOrNull()
         }
         val liveMatches = cachedGeocode ?: runCatching {
-            val fetched = queryNominatim(clean)
+            val photon = runCatching { queryPhoton(clean) }.getOrDefault(emptyList())
+            val nom = if (photon.size < 4) runCatching { queryNominatim(clean) }.getOrDefault(emptyList()) else emptyList()
+            val fetched = (photon + nom).distinctBy {
+                "${"%.3f".format(Locale.US, it.latitude)}:${"%.3f".format(Locale.US, it.longitude)}"
+            }
             if (fetched.isNotEmpty()) {
                 dao.putGeocodeCache(
                     WorldGeocodeCacheRecord(
@@ -393,8 +391,8 @@ class WorldMonitorSyncEngine @Inject constructor(
         }.getOrDefault(emptyList())
 
         (offlineMatches + liveMatches)
-            .distinctBy { "${"%.2f".format(Locale.US, it.latitude)}:${"%.2f".format(Locale.US, it.longitude)}" }
-            .take(12)
+            .distinctBy { "${"%.3f".format(Locale.US, it.latitude)}:${"%.3f".format(Locale.US, it.longitude)}" }
+            .take(14)
     }
 
     suspend fun lookupElevationAndPlace(lat: Double, lon: Double): Pair<Int?, String?> = withContext(Dispatchers.IO) {
@@ -415,7 +413,7 @@ class WorldMonitorSyncEngine @Inject constructor(
                 val wait = 1_100L - (System.currentTimeMillis() - lastNominatimCallMs)
                 if (wait > 0) delay(wait)
                 lastNominatimCallMs = System.currentTimeMillis()
-                val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&lat=${"%.4f".format(Locale.US, lat)}&lon=${"%.4f".format(Locale.US, lon)}"
+                val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat=${"%.5f".format(Locale.US, lat)}&lon=${"%.5f".format(Locale.US, lon)}"
                 val req = Request.Builder()
                     .url(url)
                     .header("User-Agent", USER_AGENT)
@@ -456,6 +454,52 @@ class WorldMonitorSyncEngine @Inject constructor(
         }.getOrNull()
     }
 
+    private fun queryPhoton(query: String): List<GeocodeSearchResult> {
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        val url = "https://photon.komoot.io/api/?q=$encoded&limit=8&lang=en"
+        val req = Request.Builder()
+            .url(url)
+            .header("User-Agent", USER_AGENT)
+            .get()
+            .build()
+        httpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return emptyList()
+            val root = json.parseToJsonElement(readBoundedUtf8(resp.body.byteStream(), 131_072)).jsonObject
+            val features = root["features"] as? JsonArray ?: return emptyList()
+            return features.mapNotNull { el ->
+                val fObj = el as? JsonObject ?: return@mapNotNull null
+                val coords = (fObj["geometry"] as? JsonObject)?.get("coordinates") as? JsonArray ?: return@mapNotNull null
+                val lon = coords.getOrNull(0)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+                val lat = coords.getOrNull(1)?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
+                if (!GeoSpatialIndex.isValidCoordinate(lat, lon)) return@mapNotNull null
+                val props = fObj["properties"] as? JsonObject ?: return@mapNotNull null
+                val name = props["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                val city = props["city"]?.jsonPrimitive?.content
+                val state = props["state"]?.jsonPrimitive?.content
+                val country = props["country"]?.jsonPrimitive?.content
+                val cc = props["countrycode"]?.jsonPrimitive?.content?.uppercase(Locale.US)
+                val osmVal = props["osm_value"]?.jsonPrimitive?.content ?: props["type"]?.jsonPrimitive?.content ?: "place"
+                val labelParts = listOfNotNull(name, city?.takeIf { it != name }, state, country)
+                val bboxKm = when (osmVal.lowercase(Locale.US)) {
+                    "country" -> 1_400.0
+                    "state", "province", "region" -> 220.0
+                    "city" -> 18.0
+                    "town", "municipality", "district" -> 6.5
+                    else -> 1.8
+                }
+                GeocodeSearchResult(
+                    displayName = labelParts.joinToString(", "),
+                    latitude = lat,
+                    longitude = lon,
+                    boundingBoxKm = bboxKm,
+                    category = osmVal.replaceFirstChar { it.uppercase() },
+                    countryCode = cc,
+                    attribution = "© OpenStreetMap contributors (Photon)"
+                )
+            }
+        }
+    }
+
     private suspend fun queryNominatim(query: String): List<GeocodeSearchResult> = nominatimMutex.withLock {
         val wait = 1_100L - (System.currentTimeMillis() - lastNominatimCallMs)
         if (wait > 0) delay(wait)
@@ -481,10 +525,12 @@ class WorldMonitorSyncEngine @Inject constructor(
                 val type = obj["type"]?.jsonPrimitive?.content ?: "Place"
                 val addr = obj["address"] as? JsonObject
                 val cc = addr?.get("country_code")?.jsonPrimitive?.content?.uppercase(Locale.US)
-                val bboxKm = when (type) {
-                    "country", "administrative" -> 1_600.0
-                    "city", "state" -> 110.0
-                    else -> 16.0
+                val bboxKm = when (type.lowercase(Locale.US)) {
+                    "country" -> 1_400.0
+                    "state", "administrative" -> 180.0
+                    "city" -> 18.0
+                    "town", "suburb", "village" -> 5.0
+                    else -> 1.8
                 }
                 GeocodeSearchResult(
                     displayName = name,

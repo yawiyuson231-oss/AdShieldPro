@@ -771,54 +771,114 @@ private fun SimulationLabPanel(
     }
 }
 
+private data class WatchGeofencePreset(
+    val id: String,
+    val label: String,
+    val lat: Double,
+    val lon: Double,
+    val radiusKm: Double
+)
+
+private val FUTURE_HORIZON_STEPS = listOf(0, 1, 6, 12, 24, 48, 72)
+
+private val WATCH_SEVERITY_CHOICES = listOf(
+    WorldSeverity.LOW,
+    WorldSeverity.MEDIUM,
+    WorldSeverity.HIGH,
+    WorldSeverity.CRITICAL
+)
+
+private val WATCH_PRESET_REGIONS = listOf(
+    WatchGeofencePreset("ph_wps", "🇵🇭 Manila & West PH Sea", 14.5995, 120.9842, 420.0),
+    WatchGeofencePreset("luzon_tw", "🇯🇵 Luzon–Taiwan Strait", 20.8000, 121.5000, 380.0),
+    WatchGeofencePreset("hormuz", "⚓ Strait of Hormuz", 26.5667, 56.2500, 320.0),
+    WatchGeofencePreset("suez_red", "⚓ Red Sea & Suez", 27.8000, 33.8000, 480.0),
+    WatchGeofencePreset("us_pac", "🇺🇸 US Pacific Seismic", 37.7749, -122.4194, 520.0)
+)
+
 @Composable
 private fun TimelinePanel(
     uiState: WorldMonitorUiState,
     viewModel: WorldMonitorViewModel
 ) {
-    Column(
+    LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        Text("Global Event Window & Temporal Replay", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(items = WorldTimelineWindow.entries, key = { it.name }) { preset ->
-                FilterChip(
-                    selected = uiState.timelineWindow == preset,
-                    onClick = { viewModel.setTimelineWindow(preset) },
-                    label = { Text(preset.label, fontSize = 11.sp) }
+        item(key = "future_horizon") {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(NavySurfaceVariant, RoundedCornerShape(10.dp))
+                    .border(1.dp, CyberCyan.copy(alpha = 0.50f), RoundedCornerShape(10.dp))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    "Predictive Future Horizon (SGP4 Orbits + Dead-Reckoning + 72h Forecast)",
+                    color = WarningAmber,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(items = FUTURE_HORIZON_STEPS, key = { "fut:$it" }) { hrs ->
+                        FilterChip(
+                            selected = uiState.futureOffsetHours == hrs,
+                            onClick = { viewModel.setFutureOffsetHours(hrs) },
+                            label = {
+                                Text(
+                                    if (hrs == 0) "LIVE NOW" else "+${hrs}H",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        item(key = "past_window") {
+            Text("Historical Event Window & Replay", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(items = WorldTimelineWindow.entries, key = { it.name }) { preset ->
+                    FilterChip(
+                        selected = uiState.timelineWindow == preset,
+                        onClick = { viewModel.setTimelineWindow(preset) },
+                        label = { Text(preset.label, fontSize = 11.sp) }
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = viewModel::toggleTimelinePlayback,
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
+                ) {
+                    Text(if (uiState.timelinePlaying) "Pause" else "Play", fontSize = 11.sp)
+                }
+                Slider(
+                    value = uiState.timelineProgress,
+                    onValueChange = viewModel::setTimelineProgress,
+                    valueRange = 0.05f..1.0f,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "${(uiState.timelineProgress * 100).toInt()}%",
+                    color = CyberCyan,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
                 )
             }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = viewModel::toggleTimelinePlayback,
-                colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue)
-            ) {
-                Text(if (uiState.timelinePlaying) "Pause" else "Play", fontSize = 11.sp)
-            }
-            Slider(
-                value = uiState.timelineProgress,
-                onValueChange = viewModel::setTimelineProgress,
-                valueRange = 0.05f..1.0f,
-                modifier = Modifier.weight(1f)
-            )
             Text(
-                "${(uiState.timelineProgress * 100).toInt()}%",
-                color = CyberCyan,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
+                "Showing ${uiState.filteredEntities.size} of ${uiState.allEntities.size} records (${if (uiState.futureOffsetHours > 0) "Future +${uiState.futureOffsetHours}h ESTIMATED" else uiState.timelineWindow.label}).",
+                color = TextSecondaryDark,
+                fontSize = 10.sp
             )
         }
-        Text(
-            "Showing ${uiState.filteredEntities.size} of ${uiState.allEntities.size} cached records up to ${(uiState.timelineProgress * 100).toInt()}% of ${uiState.timelineWindow.label}.",
-            color = TextSecondaryDark,
-            fontSize = 11.sp
-        )
     }
 }
 
@@ -829,12 +889,38 @@ private fun WatchtowerPanel(
 ) {
     var regionName by remember { mutableStateOf("") }
     var radiusKm by remember { mutableFloatStateOf(300f) }
-    var minSev by remember { mutableStateOf(WorldSeverity.HIGH) }
+    var minSev by remember { mutableStateOf(WorldSeverity.MEDIUM) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        item(key = "watch_presets") {
+            Text(
+                "1-Tap Regional Watchtower Presets:",
+                color = CyberCyan,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                items(items = WATCH_PRESET_REGIONS, key = { it.id }) { preset ->
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            viewModel.createWatchRegionAtCoordinates(
+                                name = preset.label,
+                                lat = preset.lat,
+                                lon = preset.lon,
+                                radiusKm = preset.radiusKm,
+                                minSeverity = minSev
+                            )
+                        },
+                        label = { Text(preset.label, fontSize = 10.sp) }
+                    )
+                }
+            }
+        }
+
         item(key = "watch_create") {
             Column(
                 modifier = Modifier
@@ -843,16 +929,28 @@ private fun WatchtowerPanel(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    "Arm Watchtower Geofence at Current Globe Crosshair (%.2f°, %.2f°)".format(
-                        Locale.US,
-                        uiState.viewport.centerLat,
-                        uiState.viewport.centerLon
-                    ),
-                    color = EmeraldPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Arm Geofence at Crosshair (%.3f°, %.3f°)".format(
+                            Locale.US,
+                            uiState.viewport.centerLat,
+                            uiState.viewport.centerLon
+                        ),
+                        color = EmeraldPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    TextButton(
+                        onClick = viewModel::scanWatchtowerAlertsNow,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text("Scan Alerts Now", color = CyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = regionName,
@@ -876,10 +974,10 @@ private fun WatchtowerPanel(
                         Text("Arm", fontSize = 11.sp)
                     }
                 }
-                Text("Radius: ${radiusKm.toInt()} km · Min Severity: ${minSev.label}", color = TextSecondaryDark, fontSize = 10.sp)
-                Slider(value = radiusKm, onValueChange = { radiusKm = it }, valueRange = 25f..1500f)
+                Text("Radius: ${radiusKm.toInt()} km · Min Severity: ≥ ${minSev.label}", color = TextSecondaryDark, fontSize = 10.sp)
+                Slider(value = radiusKm, onValueChange = { radiusKm = it }, valueRange = 15f..1500f)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(items = listOf(WorldSeverity.MEDIUM, WorldSeverity.HIGH, WorldSeverity.CRITICAL), key = { it.name }) { s ->
+                    items(items = WATCH_SEVERITY_CHOICES, key = { it.name }) { s ->
                         FilterChip(
                             selected = minSev == s,
                             onClick = { minSev = s },
@@ -895,6 +993,7 @@ private fun WatchtowerPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(NavySurfaceVariant, RoundedCornerShape(8.dp))
+                    .border(1.dp, EmeraldPrimary.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -902,7 +1001,7 @@ private fun WatchtowerPanel(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(region.name, color = TextPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     Text(
-                        "%.2f°, %.2f° · ${region.radiusKm.toInt()} km · ≥ ${region.minSeverity.label}".format(
+                        "%.3f°, %.3f° · ${region.radiusKm.toInt()} km · ≥ ${region.minSeverity.label}".format(
                             Locale.US,
                             region.centerLat,
                             region.centerLon
@@ -911,8 +1010,8 @@ private fun WatchtowerPanel(
                         fontSize = 10.sp
                     )
                 }
-                TextButton(onClick = { viewModel.flyTo(region.centerLat, region.centerLon, 400_000.0) }) {
-                    Text("Fly", color = SkyBlueGlow, fontSize = 11.sp)
+                TextButton(onClick = { viewModel.flyTo(region.centerLat, region.centerLon, (region.radiusKm * 2_200.0).coerceIn(15_000.0, 900_000.0)) }) {
+                    Text("Fly", color = SkyBlueGlow, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 TextButton(onClick = { viewModel.deleteWatchRegion(region.id) }) {
                     Text("Delete", color = AlertRed, fontSize = 11.sp)
@@ -920,27 +1019,55 @@ private fun WatchtowerPanel(
             }
         }
 
-        if (uiState.watchAlerts.isNotEmpty()) {
-            item(key = "alerts_header") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Triggered Watchtower Alerts (${uiState.watchAlerts.size})", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        item(key = "alerts_header") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Triggered Watchtower Alerts (${uiState.watchAlerts.size})",
+                    color = WarningAmber,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (uiState.watchAlerts.isNotEmpty()) {
                     TextButton(onClick = viewModel::clearWatchAlerts) {
                         Text("Clear History", color = TextSecondaryDark, fontSize = 11.sp)
                     }
                 }
             }
+        }
+
+        if (uiState.watchAlerts.isEmpty()) {
+            item(key = "alerts_empty") {
+                Text(
+                    if (uiState.watchRegions.isEmpty()) {
+                        "No active geofences armed yet. Tap any preset above or click 'Arm' to monitor live events."
+                    } else {
+                        "Geofences active and scanning — 0 matching events inside armed radius/severity right now."
+                    },
+                    color = TextSecondaryDark,
+                    fontSize = 11.sp
+                )
+            }
+        } else {
             items(items = uiState.watchAlerts, key = { "${it.regionId}:${it.entityId}:${it.id}" }) { alert ->
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(NavySurfaceVariant, RoundedCornerShape(8.dp))
+                        .border(1.dp, severityColor(alert.severity).copy(alpha = 0.55f), RoundedCornerShape(8.dp))
+                        .clickable {
+                            viewModel.flyTo(alert.latitude, alert.longitude, 55_000.0, pitchDeg = -52.0)
+                            viewModel.onEntitySelected(alert.entityId)
+                        }
                         .padding(8.dp)
                 ) {
-                    Text("${alert.regionName} · ${alert.title}", color = TextPrimaryDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        BadgePill(alert.severity.label, severityColor(alert.severity))
+                        Text("${alert.regionName} · ${alert.title}", color = TextPrimaryDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
                     Text("${alert.summary} (${alert.providerName})", color = TextSecondaryDark, fontSize = 10.sp)
                 }
             }
