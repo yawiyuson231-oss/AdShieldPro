@@ -562,14 +562,14 @@ class WorldMonitorTestSuite {
     fun testExpandedFreeKeylessProvidersAndNewNormalizers() {
         val providers = WorldMonitorProviderRegistry.providers
         assertTrue("Expected >= 39 providers, got ${providers.size}", providers.size >= 39)
-        providers.filter { it.endpointTemplate.isNotBlank() }.forEach { spec ->
-            assertTrue("Non-HTTPS endpoint in ${spec.providerId}", spec.endpointTemplate.startsWith("https://"))
+        providers.filter { it.endpoint.isNotBlank() }.forEach { s ->
+            assertTrue("Non-HTTPS endpoint in ${s.providerId}", s.endpoint.startsWith("https://"))
         }
         assertTrue(WorldMonitorAssetAndTileServer.isAllowedTileHost("a.tile.opentopomap.org"))
         assertTrue(WorldMonitorAssetAndTileServer.isAllowedTileHost("a.basemaps.cartocdn.com"))
 
         // 1. Spaceflight News API v4
-        val snapiSpec = WorldMonitorProviderRegistry.byId("wm.space.snapi")!!
+        val snapiSpec = spec("wm.space.snapi")
         val snapiEnts = WorldMonitorNormalizers.normalize(
             snapiSpec,
             """{"results":[{"id":901,"title":"Starship Flight Launch from Boca Chica","summary":"Orbital test flight","url":"https://spaceflightnow.com/test","news_site":"Spaceflight Now","published_at":"2026-11-08T10:00:00Z"}]}""",
@@ -579,7 +579,7 @@ class WorldMonitorTestSuite {
         assertEquals(WorldIntelCategory.SPACE, snapiEnts.first().category)
 
         // 2. USGS Volcanoes
-        val volcSpec = WorldMonitorProviderRegistry.byId("wm.disaster.volcanoes")!!
+        val volcSpec = spec("wm.disaster.volcanoes")
         val volcEnts = WorldMonitorNormalizers.normalize(
             volcSpec,
             """[{"vnum":"332010","vname":"Kilauea","latitude":19.421,"longitude":-155.287,"colorCode":"ORANGE","alertLevel":"WATCH","obsAbbr":"HVO"}]""",
@@ -589,7 +589,7 @@ class WorldMonitorTestSuite {
         assertEquals(WorldSeverity.HIGH, volcEnts.first().severity)
 
         // 3. UN ReliefWeb Disasters
-        val rwSpec = WorldMonitorProviderRegistry.byId("wm.disaster.reliefweb")!!
+        val rwSpec = spec("wm.disaster.reliefweb")
         val rwEnts = WorldMonitorNormalizers.normalize(
             rwSpec,
             """{"data":[{"id":"52001","fields":{"name":"Philippines: Super Typhoon Emergency","status":"alert","url":"https://reliefweb.int/disaster/52001","primary_country":{"iso3":"PHL","name":"Philippines"},"type":[{"name":"Tropical Cyclone"}],"date":{"created":"2026-11-08T00:00:00+00:00"}}}]}""",
@@ -598,7 +598,7 @@ class WorldMonitorTestSuite {
         assertEquals(1, rwEnts.size)
 
         // 4. Open-Meteo Marine Waves
-        val waveSpec = WorldMonitorProviderRegistry.byId("wm.weather.waves")!!
+        val waveSpec = spec("wm.weather.waves")
         val waveEnts = WorldMonitorNormalizers.normalize(
             waveSpec,
             """[{"current":{"wave_height":6.4,"wave_direction":45.0,"wave_period":11.2}}]""",
@@ -608,7 +608,7 @@ class WorldMonitorTestSuite {
         assertEquals(WorldSeverity.HIGH, waveEnts.first().severity)
 
         // 5. Open-Meteo 72h Future Forecast
-        val fcSpec = WorldMonitorProviderRegistry.byId("wm.weather.forecast72h")!!
+        val fcSpec = spec("wm.weather.forecast72h")
         val times = (0 until 72).joinToString(",") { "\"2026-11-08T00:00\"" }
         val temps = (0 until 72).joinToString(",") { "29.5" }
         val winds = (0 until 72).joinToString(",") { "88.0" }
@@ -622,7 +622,7 @@ class WorldMonitorTestSuite {
         assertEquals(FreshnessClass.ESTIMATED, fcEnts.first().freshness)
 
         // 6. URLhaus CSV
-        val uhSpec = WorldMonitorProviderRegistry.byId("wm.cyber.urlhaus")!!
+        val uhSpec = spec("wm.cyber.urlhaus")
         val uhEnts = WorldMonitorNormalizers.normalize(
             uhSpec,
             "# comment\n\"310001\",\"2026-11-08 11:00:00\",\"https://bad.ru/loader.bin\",\"online\",\"2026-11-08\",\"malware_download\",\"mozi,elf\",\"https://urlhaus.abuse.ch/url/310001/\",\"reporter\"",
@@ -631,7 +631,7 @@ class WorldMonitorTestSuite {
         assertEquals(1, uhEnts.size)
 
         // 7. SANS ISC DShield
-        val dsSpec = WorldMonitorProviderRegistry.byId("wm.cyber.sans.dshield")!!
+        val dsSpec = spec("wm.cyber.sans.dshield")
         val dsEnts = WorldMonitorNormalizers.normalize(
             dsSpec,
             """[{"ip":"185.220.101.1","count":15400,"attacks":920,"ascountry":"DE","asname":"ExampleNet"}]""",
@@ -640,7 +640,7 @@ class WorldMonitorTestSuite {
         assertEquals(1, dsEnts.size)
 
         // 8. Tor Onionoo Relays
-        val torSpec = WorldMonitorProviderRegistry.byId("wm.cyber.tor.relays")!!
+        val torSpec = spec("wm.cyber.tor.relays")
         val torEnts = WorldMonitorNormalizers.normalize(
             torSpec,
             """{"relays":[{"nickname":"FastExit01","fingerprint":"ABCDEF1234567890","latitude":50.1109,"longitude":8.6821,"country":"de","observed_bandwidth":65000000,"flags":["Exit","Fast","Running"]}]}""",
@@ -649,7 +649,7 @@ class WorldMonitorTestSuite {
         assertEquals(1, torEnts.size)
 
         // 9. Wikipedia GeoSearch Local Landmarks
-        val wikiSpec = WorldMonitorProviderRegistry.byId("wm.infra.wikipedia.geo")!!
+        val wikiSpec = spec("wm.infra.wikipedia.geo")
         val wikiEnts = WorldMonitorNormalizers.normalize(
             wikiSpec,
             """{"query":{"geosearch":[{"pageid":18957,"title":"Rizal Park","lat":14.5832,"lon":120.9794,"dist":180.5}]}}""",
