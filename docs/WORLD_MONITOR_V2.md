@@ -62,7 +62,7 @@ schedule)**. Enabling a checkbox alone does not fetch anything.
 |---|---|---:|---|
 | USGS | Magnitude 2.5+ earthquakes | Yes | 5 min; past 24 hours |
 | NASA EONET | Open natural events | Yes | 30 min; up to 200 upstream records |
-| GDACS | Disaster alerts | Yes | 15 min; provider alert colours |
+| GDACS | Earthquake impact alerts | Yes | 15 min; provider alert colours; upstream browser bot protection can block requests |
 | US NWS | Active weather alerts | No | 10 min; United States only |
 | CISA KEV | Known-exploited CVEs, official GitHub mirror | Yes | 6 hours; latest 800 entries |
 | GitHub Advisories | Latest reviewed advisories | Yes | 1 hour; 50 upstream records |
@@ -158,7 +158,8 @@ WorldMonitorPolicy.kt               pure URL/origin/export/response policy with 
   read it. Browser and Android workspaces are separate; use explicit exports to transfer watches.
 - SW caches only the local shell/assets. API responses are never silently served from the SW.
   Activating a new release deletes only this app's older cache namespaces. A server error cannot
-  overwrite the last good offline navigation shell.
+  overwrite the last good offline navigation shell. An incomplete update cannot activate; embedded-page
+  navigation cannot poison the main shell; even same-origin custom feeds bypass the worker.
 
 ## Data licences
 
@@ -172,15 +173,17 @@ WorldMonitorPolicy.kt               pure URL/origin/export/response policy with 
 
 ## Validation and release boundaries
 
+`npm run test:browser` runs 12 real-Chromium acceptance checks, including phone-width panes, pointer/keyboard map controls, document downloads, file import, persisted watches/theme and actual offline reload.
+
 `npm run ci` exercises the existing app and the new monitor; `npm run stage` verifies the staged
 runtime and every offline asset. New tests are in `tests/unit/world.test.mjs`,
-`tests/integration/world.test.mjs`, `tests/integration/world-embed.test.mjs`, and
+`tests/integration/world.test.mjs`, `tests/integration/world-embed.test.mjs`, `tests/unit/sw.test.mjs`, `tests/browser/world-smoke.mjs`, and
 `WorldMonitorTestSuite.kt`. They use labelled synthetic fixtures only at the fetch boundary; fixture
 files are not bundled into the website/APK. The running UI has no demo-event injection.
 
 The `World Monitor daily source health` workflow probes all 12 public endpoints and parses actual responses. It reports HTTP, record counts, CORS permission and failures in a dated artifact; its daily cron starts only after merge to the default branch. A green audit means the audit ran, not that every provider is reachable. `npm run probe:world` performs the same optional network check.
 
-Android compilation, JVM tests, R8 packaging and lint are run by the Android workflow. A physical
+Android compilation, JVM tests, R8 packaging and lint are run by the Android workflow. `tools/check_world_assets.py` compares every shared runtime asset inside both real APKs byte-for-byte with the tested source and rejects missing/extra files. A physical
 Android device is still required to verify document-picker providers, touch/pinch gestures,
 background scheduling after reboot/doze and upgrade installation. Exact daily timing, zero public
 provider outages, unlimited sources and “every planned feature works” are **not** claims of this build.

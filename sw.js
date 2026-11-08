@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate caches on release.
  */
-const VERSION = 'omnishield-x-v5.1.0-world-v2';
+const VERSION = 'omnishield-x-v5.1.0-world-v2-r1';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RULES_CACHE = `${VERSION}-rules`;
 
@@ -73,15 +73,15 @@ const SHELL_ASSETS = [
 ];
 
 const RULES_ASSETS = ['./assets/core_lite_ads.txt'];
+const SHELL_URL = new URL('./index.html', self.location.href);
+const ENTRY_PATH = new URL('./', self.location.href).pathname;
+const BUNDLED_PATHS = new Set([...SHELL_ASSETS, ...RULES_ASSETS].map((path) => new URL(path, self.location.href).pathname));
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const shell = await caches.open(SHELL_CACHE);
-    // addAll fails atomically; add individually so one missing file cannot
-    // break the whole offline experience.
-    await Promise.all(SHELL_ASSETS.map(async (url) => {
-      try { await shell.add(new Request(url, { cache: 'reload' })); } catch { /* optional asset */ }
-    }));
+    // The code/map shell is atomic: a partial update must not replace a working offline release.
+    await shell.addAll(SHELL_ASSETS.map((url) => new Request(url, { cache: 'reload' })));
     const rules = await caches.open(RULES_CACHE);
     await Promise.all(RULES_ASSETS.map(async (url) => {
       try { await rules.add(new Request(url, { cache: 'reload' })); } catch { /* stays online-only */ }
@@ -106,21 +106,26 @@ self.addEventListener('fetch', (event) => {
 
   // Never touch DNS-over-HTTPS or any cross-origin API: answers must be live.
   if (url.origin !== self.location.origin) return;
+  // User-added same-origin JSON feeds are APIs too. Only reviewed bundled assets belong here.
+  if (!BUNDLED_PATHS.has(url.pathname)) return;
 
-  // Navigation: network-first with offline shell fallback.
+  // Navigations: only the real app entry may update the main offline shell. Opening the
+  // packaged embed or licence must not overwrite index.html with another document.
   if (request.mode === 'navigate') {
+    const isEntry = url.pathname === ENTRY_PATH || url.pathname === SHELL_URL.pathname;
+    const cacheKey = isEntry ? SHELL_URL.href : request;
     event.respondWith((async () => {
       try {
         const fresh = await fetch(request);
         const cache = await caches.open(SHELL_CACHE);
         if (fresh.ok) {
-          cache.put('./index.html', fresh.clone()).catch(() => {});
+          cache.put(cacheKey, fresh.clone()).catch(() => {});
           return fresh;
         }
-        return (await cache.match('./index.html')) || fresh;
+        return (await cache.match(cacheKey, { ignoreSearch: true })) || fresh;
       } catch {
         const cache = await caches.open(SHELL_CACHE);
-        return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
+        return (await cache.match(cacheKey, { ignoreSearch: true })) || (isEntry ? await cache.match('./') : null) || Response.error();
       }
     })());
     return;
@@ -142,7 +147,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else same-origin: cache-first with background refresh.
+  // Other reviewed bundled assets: cache-first with background refresh.
   event.respondWith((async () => {
     const cache = await caches.open(SHELL_CACHE);
     const cached = await cache.match(request, { ignoreSearch: true });

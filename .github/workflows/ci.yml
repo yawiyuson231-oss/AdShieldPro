@@ -27,8 +27,11 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install dev dependencies (jsdom, tests only)
+      - name: Install test-only dependencies (jsdom and Playwright)
         run: npm install --no-audit --no-fund
+
+      - name: Check native and browser provider definitions match
+        run: npm run world:providers
 
       - name: Lint the shipped runtime code
         run: npm run lint
@@ -41,6 +44,12 @@ jobs:
 
       - name: Integration tests (the real UI in jsdom)
         run: npm run test:integration
+
+      - name: Install Chromium for real-browser acceptance
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser layout, real downloads, import and offline reload
+        run: npm run test:browser
 
       - name: Check the extension archive is inside Chrome's static-rule limit
         run: node scripts/build-extension.mjs --check

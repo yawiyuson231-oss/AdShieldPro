@@ -1,11 +1,13 @@
 # Testing
 
-Everything below runs locally with Node 22 and no network access.
+Deterministic suites use Node 22 and fixture-backed data. Dependencies and the optional Chromium binary need a one-time download; live-provider probes are separate network checks.
 
 ```bash
-npm install      # dev dependency: jsdom (integration DOM only)
+npm install      # development only: jsdom + Playwright
 npm test         # unit + integration suites
 npm run verify   # static architecture + honesty gates
+npx playwright install chromium
+npm run test:browser  # real Chromium, fixture-backed providers, real downloads and offline reload
 npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 ```
 
@@ -14,7 +16,8 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Layer | Location | What it proves |
 |---|---|---|
 | Unit | `tests/unit/*.test.mjs` | algorithms are correct in isolation, including negative cases |
-| Integration | `tests/integration/ui.test.mjs` | the real `app.js` boots in a real DOM (jsdom), driven through real clicks |
+| Integration | `tests/integration/*.test.mjs` | the real `app.js` boots in a real DOM (jsdom), driven through real clicks |
+| Real browser | `tests/browser/world-smoke.mjs` | rendered layouts, pointer/keyboard input, downloads, file import, offline reload and persistence |
 | Static gates | `scripts/verify.mjs` | module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest |
 
 ## 2. Coverage map (requirement → test)
@@ -61,8 +64,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- World Monitor v2 baseline: 240 unit tests + 42 integration tests (282 total), passing at the first full upgrade check. Run the commands above for the current count.
-- Static verification: 103 checks passing at the first full upgrade check (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
+- 249 unit tests + 44 integration tests (293 total), passing.
+- 12 real-Chromium acceptance checks passing at 1440px and 390px, including actual downloads and offline reload. Provider responses in these checks are explicitly synthetic fixtures.
+- Static verification: 103 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
 - `npm run lint` — 42 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
@@ -85,9 +89,9 @@ Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 ## 5. What the suite does not cover
 
 - Real network behaviour against live resolvers (tests use a deterministic fetch mock).
-- Real browser rendering/CSS (jsdom has no layout engine; charts degrade gracefully).
-- Service-worker runtime semantics (only its file list is verified statically).
-- Real-world feed drift (upstream content changes daily; the shrink guard is what protects you).
+- Comprehensive browser/device coverage. The Chromium acceptance suite covers the monitor and shell; jsdom itself has no layout engine. Physical Android, Safari and assistive-technology acceptance remain manual.
+- Full browser-specific service-worker compatibility. Handler regression tests and actual Chromium offline reload are covered; other browser engines are not.
+- Guaranteed provider uptime. `probe:world` / the daily source-health workflow is a separate dated check; it never turns fixture success into an availability claim.
 
 ## World Monitor v2 manual checks
 

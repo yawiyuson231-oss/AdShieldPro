@@ -42,7 +42,7 @@ export function setupShell(navigate) {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     const buttons = [...results.querySelectorAll('button')]; const index = buttons.indexOf(document.activeElement);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      e.preventDefault(); buttons[(index + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+      e.preventDefault(); const next = index < 0 ? (e.key === 'ArrowDown' ? 0 : buttons.length - 1) : (index + (e.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length; buttons[next]?.focus();
     } else if (e.key === 'Enter' && document.activeElement === search) { e.preventDefault(); buttons[0]?.click(); }
     else if (e.key === 'Tab') {
       const focusables = [...dialog.querySelectorAll('input, button')]; const first = focusables[0]; const last = focusables[focusables.length - 1];

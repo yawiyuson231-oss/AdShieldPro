@@ -2,7 +2,7 @@
 import { download } from '../ui/dom.js';
 
 export function saveWorldFile(filename, content, mime = 'application/json') {
-  if (!/^omnishield-world-[a-z0-9.-]+$/.test(filename)) throw new Error('Invalid export filename.');
+  if (typeof filename !== 'string' || filename.length > 100 || filename.includes('..') || !/^omnishield-world-[a-z0-9.-]+$/.test(filename)) throw new Error('Invalid export filename.');
   if (!['application/json', 'text/csv', 'text/markdown', 'text/plain'].includes(mime)) throw new Error('Unsupported export type.');
   if (new TextEncoder().encode(content).length > 8_000_000) throw new Error('This export exceeds 8 MB. Narrow the filters and try again.');
   const bridge = globalThis.OmniWorldExport;

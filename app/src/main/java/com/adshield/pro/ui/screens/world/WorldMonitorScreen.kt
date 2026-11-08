@@ -3,6 +3,7 @@ package com.adshield.pro.ui.screens.world
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.content.Context
 import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
@@ -27,13 +28,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.webkit.WebViewAssetLoader
@@ -42,6 +45,7 @@ import androidx.webkit.WebViewFeature
 import com.adshield.pro.engine.world.WorldMonitorPolicy
 import com.adshield.pro.engine.world.WorldMonitorPolicy.string
 import com.adshield.pro.worker.WorldMonitorWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,38 +65,30 @@ import java.io.ByteArrayInputStream
 fun WorldMonitorScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val scope = rememberCoroutineScope()
+    val documents: WorldMonitorDocuments = viewModel()
     var webView by remember { mutableStateOf<WebView?>(null) }
-    var notice by remember { mutableStateOf<String?>(null) }
-    var pendingExport by remember { mutableStateOf<WorldMonitorPolicy.ExportRequest?>(null) }
     var pendingFile by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val request = pendingExport
-        pendingExport = null
+        val request = documents.pendingExport
+        documents.pendingExport = null
         val uri = result.data?.data
         if (result.resultCode == Activity.RESULT_OK && uri != null && request != null) {
-            scope.launch {
-                notice = withContext(Dispatchers.IO) {
-                    runCatching {
-                        val output = context.contentResolver.openOutputStream(uri, "wt")
-                            ?: error("The chosen document could not be opened")
-                        output.use { it.write(request.content.toByteArray(Charsets.UTF_8)) }
-                        "Export saved: ${request.filename}"
-                    }.getOrElse { "Export failed: ${it.message}" }
-                }
-            }
-        } else if (request != null) notice = "Export cancelled. Nothing was written."
+            documents.save(context.applicationContext, uri, request)
+        } else if (request != null) documents.notice = "Export cancelled. Nothing was written."
+        else if (result.resultCode == Activity.RESULT_OK) documents.notice = "Android recreated the app while saving. No data was written; export again."
     }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        pendingFile?.onReceiveValue(uri?.let { arrayOf(it) })
+        val callback = pendingFile
         pendingFile = null
+        callback?.onReceiveValue(uri?.let { arrayOf(it) })
+        if (callback == null && uri != null) documents.notice = "The monitor reloaded while choosing a file. Choose Import watchlist again."
     }
     val openExternal: (String) -> Unit = { url ->
         if (WorldMonitorPolicy.publicHttps(url)) {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
-                .onFailure { notice = "No browser is available to open the source link." }
-        } else notice = "Only public HTTPS source links may be opened."
+                .onFailure { documents.notice = "No browser is available to open the source link." }
+        } else documents.notice = "Only public HTTPS source links may be opened."
     }
 
     DisposableEffect(lifecycleOwner, webView) {
@@ -123,10 +119,10 @@ fun WorldMonitorScreen(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        notice?.let { message ->
+        documents.notice?.let { message ->
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
                 Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                TextButton(onClick = { notice = null }) { Text("Dismiss") }
+                TextButton(onClick = { documents.notice = null }) { Text("Dismiss") }
             }
         }
         AndroidView(
@@ -174,27 +170,27 @@ fun WorldMonitorScreen(modifier: Modifier = Modifier) {
                             pendingFile?.onReceiveValue(null)
                             pendingFile = callback
                             runCatching { fileLauncher.launch(arrayOf("application/json", "text/plain")) }
-                                .onFailure { pendingFile?.onReceiveValue(null); pendingFile = null; notice = "No document picker is available." }
+                                .onFailure { pendingFile?.onReceiveValue(null); pendingFile = null; documents.notice = "No document picker is available." }
                             return true
                         }
                     }
-                    setDownloadListener { _, _, _, _, _ -> notice = "Export requires a recent Android System WebView. Update WebView and retry from World Monitor's Export button." }
+                    setDownloadListener { _, _, _, _, _ -> documents.notice = "Export requires a recent Android System WebView. Update WebView and retry from World Monitor's Export button." }
                     if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
                         WebViewCompat.addWebMessageListener(this, "OmniWorldExport", setOf(WorldMonitorPolicy.ORIGIN)) { _, message, origin, mainFrame, _ ->
                             if (WorldMonitorPolicy.trustedOrigin(origin.toString(), mainFrame)) {
                                 val request = WorldMonitorPolicy.exportRequest(message.data.orEmpty())
                                 when {
-                                    request == null -> notice = "Export rejected: invalid format or larger than 8 MB. Narrow the filters and retry."
-                                    pendingExport != null -> notice = "Finish or cancel the current save dialog first."
+                                    request == null -> documents.notice = "Export rejected: invalid format or larger than 8 MB. Narrow the filters and retry."
+                                    (documents.pendingExport != null || documents.exportInProgress) -> documents.notice = "Finish or cancel the current save dialog first."
                                     else -> {
-                                        pendingExport = request
+                                        documents.pendingExport = request
                                         runCatching {
                                             exportLauncher.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                                                 addCategory(Intent.CATEGORY_OPENABLE)
                                                 type = request.mime
                                                 putExtra(Intent.EXTRA_TITLE, request.filename)
                                             })
-                                        }.onFailure { pendingExport = null; notice = "No document saver is available: ${it.message}" }
+                                        }.onFailure { documents.pendingExport = null; documents.notice = "No document saver is available: ${it.message}" }
                                     }
                                 }
                             }
@@ -211,10 +207,10 @@ fun WorldMonitorScreen(modifier: Modifier = Modifier) {
                                             WorldMonitorWorker.configure(viewContext, enabled, WorldMonitorPolicy.scheduledSources(request, allowed))
                                         }
                                     }
-                                }.onFailure { notice = "World Monitor action failed: ${it.message}" }
+                                }.onFailure { documents.notice = "World Monitor action failed: ${it.message}" }
                             }
                         }
-                    } else notice = "Update Android System WebView to enable secure exports and native daily scheduling. The monitor itself still works while open."
+                    } else documents.notice = "Update Android System WebView to enable secure exports and native daily scheduling. The monitor itself still works while open."
                     loadUrl(WorldMonitorPolicy.ENTRY_URL)
                 }
             }
@@ -226,3 +222,28 @@ private fun blockedResponse(code: Int, reason: String) = WebResourceResponse(
     "text/plain", "UTF-8", code, if (code == 404) "Not Found" else "Forbidden",
     mapOf("Cache-Control" to "no-store"), ByteArrayInputStream(reason.toByteArray(Charsets.UTF_8))
 )
+
+
+/** Retain an in-memory document request across rotation, never an 8 MB string in savedInstanceState. */
+class WorldMonitorDocuments : ViewModel() {
+    var notice by mutableStateOf<String?>(null)
+    var pendingExport by mutableStateOf<WorldMonitorPolicy.ExportRequest?>(null)
+    var exportInProgress by mutableStateOf(false)
+        private set
+
+    fun save(context: Context, uri: Uri, request: WorldMonitorPolicy.ExportRequest) {
+        exportInProgress = true
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = context.contentResolver.openOutputStream(uri, "wt")
+                        ?: error("The chosen document could not be opened")
+                    output.use { it.write(request.content.toByteArray(Charsets.UTF_8)) }
+                }
+                notice = "Export saved: ${request.filename}"
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) { notice = "Export failed: ${error.message}" }
+            finally { exportInProgress = false }
+        }
+    }
+}

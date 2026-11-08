@@ -94,6 +94,8 @@ npm install               # jsdom, used only by the integration tests
 npm test                  # all engine + real-UI integration tests
 npm run lint              # house lint rules for the shipped runtime code
 npm run verify            # architecture, claims, offline assets and packaging gates
+npx playwright install chromium
+npm run test:browser      # real layout, downloads/import, offline reload
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 npm run stage             # assemble _site/ exactly as the Pages workflow does

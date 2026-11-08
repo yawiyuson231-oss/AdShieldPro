@@ -300,3 +300,19 @@ test('country indicators use the actual publication year and preserve old values
   clock += 2 * 86400000; fail = true; const next = await service.profile('PH'); assert.equal(next.population.cached, true); assert.equal(next.population.value, 12345); assert.match(next.population.error, /503/);
   await assert.rejects(service.profile('XX'), /country/);
 });
+
+
+test('source failure reason, last attempt and backoff survive reload beside the last good records', async () => {
+  const storage = new MemoryStorage(); const s = storeWith(providerFetch(), storage); await s.sync('usgs');
+  s.fetchImpl = async () => response({}, 503); await s.sync('usgs', { force: true });
+  const restored = storeWith(providerFetch(), storage); await restored.load();
+  assert.equal(restored.events.length, 2); assert.equal(restored.health().usgs.status, 'offline');
+  assert.match(restored.health().usgs.error, /503/); assert.equal(restored.health().usgs.lastAttempt, NOW);
+  assert.equal(restored.health().usgs.failures, 1); assert.equal(restored.health().usgs.lastSuccess, NOW);
+});
+
+test('restored rate limits remain visibly rate-limited, not just silently delayed', async () => {
+  const storage = new MemoryStorage(); const s = storeWith(async () => response({}, 429), storage); await s.sync('usgs');
+  const restored = storeWith(providerFetch(), storage); await restored.load();
+  assert.equal(restored.health().usgs.status, 'rate-limited'); assert.match(restored.health().usgs.error, /429/);
+});

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { NOW, fixtures, response } from '../fixtures/world.mjs';
 import { saveWorldFile } from '../../world/export.js';
-import { configureDailyHost } from '../../world/native.js';
+import { configureDailyHost, loadBackgroundSnapshot } from '../../world/native.js';
 
 let dom; let win; let app;
 const hostMessages = []; const exports = []; const calls = [];
@@ -43,10 +43,25 @@ test('native daily host receives only known built-in source IDs, never arbitrary
 test('native export channel receives bounded text and rejects unsafe names and MIME types', () => {
   saveWorldFile('omnishield-world-test.csv', 'title\nexample', 'text/csv'); assert.equal(exports.at(-1).content, 'title\nexample'); assert.equal(exports.at(-1).mime, 'text/csv');
   assert.throws(() => saveWorldFile('../escape.txt', 'bad', 'text/plain'));
+  assert.throws(() => saveWorldFile('omnishield-world-..json', 'bad'));
+  assert.throws(() => saveWorldFile('omnishield-world-' + 'a'.repeat(100) + '.json', '{}'));
+  assert.throws(() => saveWorldFile('omnishield-world-test.json', '界'.repeat(2_700_000)), /8 MB/);
   assert.throws(() => saveWorldFile('omnishield-world-test.html', '<script>', 'text/html'));
 });
 test('native source links route through the narrow HTTPS host message, not a remote WebView page', () => {
   app.view.openDetail(app.store.events[0]); const anchor = win.document.querySelector('#world-detail a');
   anchor.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
   assert.equal(hostMessages.at(-1).type, 'open'); assert.match(hostMessages.at(-1).url, /^https:\/\/earthquake\.usgs\.gov/);
+});
+
+
+test('native cache reader rejects a declared oversized response before reading its body', async () => {
+  let read = false;
+  const result = await loadBackgroundSnapshot({ fetchImpl: async () => ({ ok: true, status: 200, headers: new Headers({ 'content-length': '30000001' }), text: async () => { read = true; return '{}'; } }) });
+  assert.equal(result.imported, 0); assert.match(result.error, /safety limit/); assert.equal(read, false);
+});
+test('native cache absence is normal, while an invalid payload is surfaced as a cache error', async () => {
+  assert.deepEqual(await loadBackgroundSnapshot({ fetchImpl: async () => response('', 404) }), { imported: 0 });
+  const result = await loadBackgroundSnapshot({ fetchImpl: async () => response('<html>unexpected</html>') });
+  assert.match(result.error, /invalid JSON/);
 });
