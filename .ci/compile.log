@@ -2,61 +2,887 @@ To honour the JVM settings for this build a single-use Daemon process will be fo
 Daemon will be stopped at the end of the build 
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preDebugBuild UP-TO-DATE
-> Task :app:generateDebugBuildConfig
-> Task :app:generateDebugResources
-> Task :app:packageDebugResources
-> Task :app:processDebugNavigationResources
-> Task :app:parseDebugLocalResources
-> Task :app:generateDebugRFile
+> Task :app:generateDebugBuildConfig FROM-CACHE
+> Task :app:generateDebugResources FROM-CACHE
+> Task :app:packageDebugResources FROM-CACHE
+> Task :app:processDebugNavigationResources FROM-CACHE
+> Task :app:parseDebugLocalResources FROM-CACHE
+> Task :app:generateDebugRFile FROM-CACHE
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:128:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:148:50 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:473:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:591:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:635:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:669:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudApi.kt:118:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:272:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudUploadEngine.kt:490:42 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/SupabaseAuth.kt:72:41 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/SupabaseAuth.kt:89:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/SupabaseAuth.kt:104:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/repository/AdShieldRepository.kt:628:48 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/repository/ConnectorRepository.kt:168:56 Elvis operator (?:) always returns the left operand of non-nullable type 'Long'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/di/AppModule.kt:38:14 'fun fallbackToDestructiveMigrationOnDowngrade(): RoomDatabase.Builder<AdShieldDatabase>' is deprecated. Replace by overloaded version with parameter to indicate if all tables should be dropped or not.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/browser/SearchSuggestionClient.kt:46:54 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/ConnectorHttp.kt:148:56 Condition is always 'false'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:420:45 'fun unsafeCheckOpNoThrow(p0: String, p1: Int, p2: String): Int' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:514:33 'val isInsideSecureHardware: Boolean' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:565:77 'static field INSTALL_NON_MARKET_APPS: String' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeConnectorProbes.kt:747:37 'static field TYPE_WIFI: Int' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:441:32 'fun release(): Unit' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:528:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Long'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:529:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Long'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:284:38 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/intelligence/IntelligenceAggregator.kt:701:59 Unnecessary safe call on a non-null receiver of type 'BatteryTelemetry'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/onion/OnionRoutingManager.kt:108:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/onion/OnionRoutingManager.kt:148:39 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:94:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:164:33 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:211:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/storage/WebDavClient.kt:276:17 'fun create(contentType: MediaType?, content: String): RequestBody' is deprecated. Moved to extension function. Put the 'content' argument first to fix Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BatteryScreen.kt:499:32 'val Icons.Filled.ShowChart: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ShowChart.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:331:25 'var databaseEnabled: Boolean' is deprecated. Deprecated in Java.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:381:54 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/BrowserScreen.kt:382:60 Unnecessary safe call on a non-null receiver of type 'WebResourceRequest'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/CloudStorageScreen.kt:264:25 'val LocalClipboardManager: ProvidableCompositionLocal<ClipboardManager>' is deprecated. Use LocalClipboard instead which supports suspend functions.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:301:80 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:302:35 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:441:47 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:92:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/connectors/ConnectorRegistryScreen.kt:97:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/update/GitHubUpdate.kt:44:48 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/update/GitHubUpdate.kt:146:38 Elvis operator (?:) always returns the left operand of non-nullable type 'ResponseBody'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:5:45 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:7:45 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:8:45 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:10:45 Unresolved reference 'TrailVertex'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:11:45 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:12:45 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:53:83 Unresolved reference 'RainViewerFrame'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:53:101 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:53:101 Argument type mismatch: actual type is 'List<uninferred T (of fun <T> emptyList)>', but 'List<??? (Unresolved qualified name: WorldMonitorNormalizers.RainViewerFrame)>' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:54:66 Unresolved reference 'RainViewerFrame'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:56:54 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:56:76 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:56:76 Argument type mismatch: actual type is 'List<uninferred T (of fun <T> emptyList)>', but 'List<??? (Unresolved qualified name: BuildingFootprint3D)>' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:57:37 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:59:53 Unresolved reference 'observeActiveEntities' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:60:10 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:60:16 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:62:18 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:62:18 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:62:22 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:62:27 Unresolved reference 'toDomain'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:68:13 Return type mismatch: expected 'List<WorldProviderRuntimeState>', actual 'Flow<uninferred R (of fun <T, R> Flow<T>.map)>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:68:42 Unresolved reference 'ALL'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:68:46 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:68:46 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:68:52 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:69:27 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:73:37 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:74:24 Return type mismatch: expected 'List<??? (Unresolved qualified name: WatchRegion)>', actual 'List<WatchtowerRegion>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:76:36 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:77:24 Return type mismatch: expected 'List<??? (Unresolved qualified name: WatchAlertRecord)>', actual 'List<WatchtowerAlert>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:79:55 Unresolved reference 'observeUnacknowledgedAlertCount' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:83:36 Unresolved reference 'cachedItemCount' on receiver of type 'WorldProviderStateRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:86:50 Unresolved reference 'toEntity' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:88:17 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:91:49 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:108:19 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:115:13 Unresolved reference 'pruneOldTrails' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:117:50 Unresolved reference 'ALL'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:117:63 Cannot infer type for value parameter 'spec'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:118:27 Type inference failed. The value of the type parameter 'T' must be mentioned in input types (argument types, receiver type, or expected type). Try to specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:119:22 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:120:22 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:121:32 Unresolved reference 'enabledByDefault'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:121:56 Suspension functions can only be called within coroutine body.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:121:78 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:124:24 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:125:13 Argument type mismatch: actual type is 'Flow<uninferred ??? (Unknown type for type parameter R)>', but 'Collection<Deferred<uninferred T (of fun <T> Collection<Deferred<T>>.awaitAll)>>' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:125:19 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:125:19 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:125:25 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:133:15 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:133:15 Candidate 'suspend fun <T> Collection<Deferred<T>>.awaitAll(): List<T>' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:136:48 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:145:26 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:145:58 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:150:19 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:153:49 Expression 'byId' of type 'Map<String, WorldProviderSpec>' cannot be invoked as a function. Function 'invoke()' is not found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:168:55 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:177:38 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:177:38 Candidate 'fun <T> Collection<T>.isNotEmpty(): Boolean' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:180:33 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:180:33 Candidate 'fun <T> Collection<T>.isNotEmpty(): Boolean' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:184:70 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:185:52 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:187:58 Unresolved reference 'toEntity' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:187:72 Unresolved reference 'cacheTtlMs' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:192:22 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:195:61 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:197:22 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:198:25 Unresolved reference 'WorldEntityTrailPointEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:207:31 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:219:30 Unresolved reference 'queryRecentTrailsForCategory' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:220:30 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:220:54 Cannot infer type for implicit value parameter 'it'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:220:54 Operator call 'component1()' is ambiguous for destructuring of type '??? (Unknown type for value parameter <destruct>)'. Applicable candidates:
+fun <T> Array<out T>.component1(): T
+fun ByteArray.component1(): Byte
+fun ShortArray.component1(): Short
+fun IntArray.component1(): Int
+fun LongArray.component1(): Long
+fun FloatArray.component1(): Float
+fun DoubleArray.component1(): Double
+fun BooleanArray.component1(): Boolean
+fun CharArray.component1(): Char
+fun <T> List<T>.component1(): T
+fun <K, V> Map.Entry<K, V>.component1(): K
+fun UIntArray.component1(): UInt
+fun ULongArray.component1(): ULong
+fun UByteArray.component1(): UByte
+fun UShortArray.component1(): UShort
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:220:54 Operator call 'component2()' is ambiguous for destructuring of type '??? (Unknown type for value parameter <destruct>)'. Applicable candidates:
+fun <T> Array<out T>.component2(): T
+fun ByteArray.component2(): Byte
+fun ShortArray.component2(): Short
+fun IntArray.component2(): Int
+fun LongArray.component2(): Long
+fun FloatArray.component2(): Float
+fun DoubleArray.component2(): Double
+fun BooleanArray.component2(): Boolean
+fun CharArray.component2(): Char
+fun <T> List<T>.component2(): T
+fun <K, V> Map.Entry<K, V>.component2(): V
+fun UIntArray.component2(): UInt
+fun ULongArray.component2(): ULong
+fun UByteArray.component2(): UByte
+fun UShortArray.component2(): UShort
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:221:26 Unresolved reference 'size'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:225:34 Argument type mismatch: actual type is 'Flow<uninferred R (of fun <T, R> Flow<T>.map)>', but 'List<EntityTrailPoint>' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:225:50 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:225:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:225:72 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:225:78 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:226:29 Unresolved reference 'TrailVertex'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:227:46 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:228:47 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:229:52 Unresolved reference 'altitudeMeters'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:230:54 Unresolved reference 'timestampEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:243:17 Unresolved reference 'setProviderEnabled' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:245:53 Expression 'byId' of type 'Map<String, WorldProviderSpec>' cannot be invoked as a function. Function 'invoke()' is not found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:247:17 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:248:39 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:250:96 Unresolved reference 'DISABLED'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:276:40 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:277:38 Unresolved reference 'toEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:284:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:285:13 Unresolved reference 'acknowledgeAllAlerts' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:288:33 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:289:13 Unresolved reference 'clearAllWatchAlerts' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:292:54 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:303:53 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:305:102 Unresolved reference 'REQUIRED_USER_API_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:306:75 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:307:18 Unresolved reference 'enabledByDefault' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:308:40 Unresolved reference 'DISABLED'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:311:31 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:312:28 Unresolved reference 'enabledByDefault' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:314:13 No parameter with name 'lastError' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt:314:30 Unresolved reference 'limitationNote' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:16:43 Unresolved reference 'toDomain'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:17:43 Unresolved reference 'toEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:19:45 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:20:45 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:37:23 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:41:13 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:42:37 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:42:37 Candidate 'fun <T> Iterable<T>.filter(predicate: (T) -> Boolean): List<T>' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:42:44 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:42:49 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:43:45 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:49:32 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:53:51 Unresolved reference 'minSeverity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:54:28 Unresolved reference 'categories'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:54:71 Unresolved reference 'not' for operator '!'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:54:82 Unresolved reference 'categories'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:55:29 Unresolved reference 'providerFilter'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:56:21 Unresolved reference 'not' for operator '!'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:56:56 Unresolved reference 'providerFilter'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:57:21 Unresolved reference 'not' for operator '!'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:57:58 Unresolved reference 'providerFilter'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:61:28 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:62:28 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:66:37 Unresolved reference 'radiusKm'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:68:47 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:71:27 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:73:44 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:74:46 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:77:85 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:89:23 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:89:23 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:89:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:89:47 Unresolved reference 'severity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:97:13 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:98:27 Unresolved reference 'getWatchRegionsSnapshot' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:98:59 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:99:39 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:102:41 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:104:37 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:106:22 Unresolved reference 'watchAlertExists' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:106:45 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:107:21 Unresolved reference 'insertWatchAlert' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:107:44 Unresolved reference 'toEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:111:13 Unresolved reference 'trimWatchAlerts' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:113:39 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:119:72 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:139:29 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:139:29 Candidate 'fun <T> List<T>.first(): T' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:151:20 Unresolved reference 'watchRegionName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:151:44 Unresolved reference 'summary'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:151:68 Unresolved reference 'providerName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:153:20 Unresolved reference 'watchRegionName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:153:44 Unresolved reference 'title'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:158:50 Unresolved reference 'title'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WatchtowerManager.kt:166:47 Unresolved reference 'watchRegionId'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:4:45 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:34:41 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:78:13 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'entityId'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'observerLat'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'observerLon'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'riseEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'culminationEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'setEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'riseAzimuthDeg'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'setAzimuthDeg'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:137:13 No value passed for parameter 'durationSeconds'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:138:17 No parameter with name 'noradId' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:140:17 No parameter with name 'startEpochMs' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:141:17 No parameter with name 'endEpochMs' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorJsBridge.kt:143:17 No parameter with name 'durationSec' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:5:43 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:6:45 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:7:45 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:8:45 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:56:60 Unresolved reference 'RainViewerFrame'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:56:79 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:57:31 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:57:54 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:63:19 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:67:55 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:69:58 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:69:81 Unresolved reference 'DISABLED'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:73:18 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:75:36 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:75:74 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:76:58 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:76:81 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:82:88 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:83:29 Unresolved reference 'limitationNote' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:84:36 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:85:58 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:90:61 Unresolved reference 'REQUIRED_USER_API_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:91:29 Unresolved reference 'limitationNote' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:92:36 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:92:74 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:93:58 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:93:81 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:98:44 Unresolved reference 'nextEligibleEpochMs' on receiver of type 'WorldProviderStateRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:100:26 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:105:35 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:106:22 Unresolved reference 'minGapMs' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:114:62 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:119:18 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:126:36 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:127:58 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:137:18 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:24 Unresolved reference 'lastModifiedHeader' on receiver of type 'WorldProviderStateRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:44 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:51 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:72 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:72 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:148:76 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:155:24 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:156:19 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:159:63 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:160:42 Unresolved reference 'north'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:160:53 Unresolved reference 'south'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:161:42 Unresolved reference 'east'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:161:52 Unresolved reference 'west'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:162:21 'operator' modifier is required on 'fun <T> Comparable<T>.compareTo(other: T): Int'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:162:39 'operator' modifier is required on 'fun <T> Comparable<T>.compareTo(other: T): Int'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:162:52 Unresolved reference 'altitudeMeters'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:164:22 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:169:45 Unresolved reference 'south'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:170:45 Unresolved reference 'west'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:171:45 Unresolved reference 'north'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:172:45 Unresolved reference 'east'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:188:23 Unresolved reference 'endpointDescription' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:189:14 Unresolved reference 'header'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:197:44 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:198:54 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:201:54 No value passed for parameter 'nowEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:201:68 Argument type mismatch: actual type is 'String', but 'WorldProviderSpec' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:201:73 Argument type mismatch: actual type is 'Long', but 'String' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:203:26 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:205:40 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:212:39 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:213:49 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:219:36 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:220:39 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:227:24 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:235:30 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:237:44 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:239:40 Unresolved reference 'cachedItemCount'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:242:74 Unresolved reference 'etag'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:243:86 Unresolved reference 'lastModifiedHeader'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:245:54 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:245:77 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:251:30 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:255:40 Unresolved reference 'cachedItemCount'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:260:54 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:264:52 Unresolved reference 'consecutiveFailures'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:267:30 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:271:40 Unresolved reference 'cachedItemCount'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:277:54 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:281:43 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:285:41 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:288:60 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:291:38 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:293:26 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:295:40 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:304:39 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:305:49 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:311:44 Unresolved reference 'consecutiveFailures'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:314:22 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:318:32 Unresolved reference 'cachedItemCount'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:324:39 Unresolved reference 'id' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:332:54 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:334:50 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:334:50 Return type mismatch: expected 'List<??? (Unresolved qualified name: GeoSearchResult)>', actual 'List<uninferred T (of fun <T> emptyList)>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:342:36 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:342:36 Return type mismatch: expected 'List<??? (Unresolved qualified name: GeoSearchResult)>', actual 'List<uninferred T (of fun <T> listOf)>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:343:21 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:356:78 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:358:55 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:358:96 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:421:61 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:434:9 Return type mismatch: expected 'List<??? (Unresolved qualified name: GeoSearchResult)>', actual 'List<Nothing>'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:435:44 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:451:17 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:464:60 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:467:29 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:475:20 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:492:20 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:507:20 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:520:88 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:521:24 Unresolved reference 'endpointDescription' on receiver of type 'WorldProviderSpec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:525:30 Unresolved reference 'west'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:526:31 Unresolved reference 'south'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:527:30 Unresolved reference 'east'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:528:31 Unresolved reference 'north'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:538:19 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:544:35 Unresolved reference 'etag'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:545:38 Unresolved reference 'lastModifiedHeader'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:546:69 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:546:96 Unresolved reference 'consecutiveFailures'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:550:13 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:552:37 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:555:71 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:555:106 Unresolved reference 'lastSuccessEpochMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:567:44 Unresolved reference 'WorldProviderStateEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:568:56 Unresolved reference 'status'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/worldmonitor/WorldMonitorSyncEngine.kt:568:98 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:46:45 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:47:45 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:49:45 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:52:45 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:215:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:215:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:215:54 Unresolved reference 'leftDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:215:69 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:215:108 Unresolved reference 'leftDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:216:22 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:216:22 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:216:55 Unresolved reference 'rightDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:216:71 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:216:110 Unresolved reference 'rightDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:225:31 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:225:61 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:225:74 Cannot infer type for value parameter 'style'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:226:21 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:229:46 Unresolved reference 'label'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:247:31 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:247:63 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:247:76 Cannot infer type for value parameter 'preset'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:248:21 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:251:47 Unresolved reference 'label'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:304:31 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:304:69 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:304:82 Cannot infer type for value parameter 'mode'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:305:21 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:308:45 Unresolved reference 'label'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:328:59 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:332:45 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:336:58 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:337:39 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:343:59 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:344:39 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:356:57 Unresolved reference 'splitPosition'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:377:48 Unresolved reference 'opacity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:380:44 Unresolved reference 'clusteringEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:381:92 Unresolved reference 'clusteringEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:385:44 Unresolved reference 'heatmapEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:386:89 Unresolved reference 'heatmapEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:392:33 Unresolved reference 'opacity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:762:27 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:762:65 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:762:78 Cannot infer type for value parameter 'preset'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:763:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:766:43 Unresolved reference 'label'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:795:180 Unresolved reference 'label'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:826:42 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:827:42 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:870:53 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:870:64 Cannot infer type for value parameter 'region'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:871:13 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:880:33 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:882:50 Unresolved reference 'radiusKm'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:882:84 Unresolved reference 'minSeverity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:884:36 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:885:36 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:891:63 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:891:80 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:894:75 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:900:33 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:900:33 Candidate 'fun <T> Collection<T>.isNotEmpty(): Boolean' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:918:56 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:918:67 Cannot infer type for value parameter 'alert'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:919:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:923:60 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:923:76 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:926:35 Unresolved reference 'watchRegionName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:926:62 Unresolved reference 'title'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:927:35 Unresolved reference 'summary'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:927:53 Unresolved reference 'providerName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1006:52 Unresolved reference 'ALL'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1006:65 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1006:76 Cannot infer type for value parameter 'spec'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1007:37 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1010:36 Unresolved reference 'HEALTHY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1011:69 Unresolved reference 'REQUIRES_KEY'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1015:13 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1028:53 Unresolved reference 'shortCode' on receiver of type 'CharCategory'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1030:39 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1033:37 Unresolved reference 'license'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1033:62 Unresolved reference 'cachedItemCount' on receiver of type 'WorldProviderRuntimeState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1033:102 Unresolved reference 'refreshIntervalMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1037:29 Unresolved reference 'lastError' on receiver of type 'WorldProviderRuntimeState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1037:40 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1037:40 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1037:46 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1041:30 Unresolved reference 'implemented'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1041:50 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1042:82 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1046:59 Unresolved reference 'enabledByDefault'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorDeckPanels.kt:1047:83 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:150:78 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:150:105 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:168:58 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:342:65 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:390:50 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:391:50 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:392:51 Unresolved reference 'altitudeMeters'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:393:50 Unresolved reference 'fps'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:478:43 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:478:43 Candidate 'fun <T> Collection<T>.isNotEmpty(): Boolean' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:486:73 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:486:91 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:486:106 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:486:126 Cannot infer type for value parameter 'res'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:487:29 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:496:46 Unresolved reference 'displayName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:497:67 Unresolved reference 'source'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:500:72 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:500:86 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:539:58 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:768:88 Unresolved reference 'confidenceScore' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:792:24 Unresolved reference 'attributes' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:795:32 Unresolved reference 'attributes' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:795:69 Cannot infer type for implicit value parameter 'it'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:795:69 Operator call 'component1()' is ambiguous for destructuring of type '??? (Unknown type for value parameter <destruct>)'. Applicable candidates:
+fun <T> Array<out T>.component1(): T
+fun ByteArray.component1(): Byte
+fun ShortArray.component1(): Short
+fun IntArray.component1(): Int
+fun LongArray.component1(): Long
+fun FloatArray.component1(): Float
+fun DoubleArray.component1(): Double
+fun BooleanArray.component1(): Boolean
+fun CharArray.component1(): Char
+fun <T> List<T>.component1(): T
+fun <K, V> Map.Entry<K, V>.component1(): K
+fun UIntArray.component1(): UInt
+fun ULongArray.component1(): ULong
+fun UByteArray.component1(): UByte
+fun UShortArray.component1(): UShort
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:795:69 Operator call 'component2()' is ambiguous for destructuring of type '??? (Unknown type for value parameter <destruct>)'. Applicable candidates:
+fun <T> Array<out T>.component2(): T
+fun ByteArray.component2(): Byte
+fun ShortArray.component2(): Short
+fun IntArray.component2(): Int
+fun LongArray.component2(): Long
+fun FloatArray.component2(): Float
+fun DoubleArray.component2(): Double
+fun BooleanArray.component2(): Boolean
+fun CharArray.component2(): Char
+fun <T> List<T>.component2(): T
+fun <K, V> Map.Entry<K, V>.component2(): V
+fun UIntArray.component2(): UInt
+fun ULongArray.component2(): ULong
+fun UByteArray.component2(): UByte
+fun UShortArray.component2(): UShort
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:796:29 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:817:61 Unresolved reference 'noradId' on receiver of type 'SatellitePassPrediction'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:817:75 Unresolved reference 'startEpochMs' on receiver of type 'SatellitePassPrediction'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:819:58 Unresolved reference 'startEpochMs' on receiver of type 'SatellitePassPrediction'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:819:117 Unresolved reference 'durationSec' on receiver of type 'SatellitePassPrediction'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:7:45 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:8:45 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:12:45 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:13:45 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:15:45 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:16:45 Unresolved reference 'HistoricalSplitState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:17:45 Unresolved reference 'LayerVisualConfig'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:18:45 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:22:45 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:23:45 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:24:45 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:90:19 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:90:35 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:91:18 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:91:33 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:93:22 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:93:39 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:94:26 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:94:49 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:103:26 Unresolved reference 'HistoricalSplitState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:103:49 Unresolved reference 'HistoricalSplitState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:104:47 Unresolved reference 'LayerVisualConfig'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:106:25 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:106:48 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:129:29 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:129:48 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:131:28 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:131:43 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:132:27 Unresolved reference 'WatchAlertRecord'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:132:47 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:139:60 Unresolved reference 'LayerVisualConfig'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:140:40 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:141:17 Unresolved reference 'LayerVisualConfig'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:208:31 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:208:31 Candidate 'fun <T> Collection<T>.isNotEmpty(): Boolean' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:234:46 Unresolved reference 'GlobeViewport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:354:58 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:354:58 Candidate 'fun <K, V> Map<out K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:354:71 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:354:76 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:400:27 Unresolved reference 'BasemapStyle'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:402:57 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:410:32 Unresolved reference 'MapStylePreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:412:64 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:415:34 Unresolved reference 'GlobePerformanceMode'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:417:64 Unresolved reference 'name'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:461:59 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:462:62 Unresolved reference 'leftDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:463:63 Unresolved reference 'rightDateIso'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:464:63 Unresolved reference 'splitPosition'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:466:20 Unresolved reference 'HistoricalSplitState'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:490:27 Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:490:27 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:490:27 This declaration needs opt-in. Its usage must be marked with '@kotlin.ExperimentalStdlibApi' or '@OptIn(kotlin.ExperimentalStdlibApi::class)'
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:491:13 No parameter with name 'enabled' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:491:38 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:492:13 No parameter with name 'opacity' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:492:39 Unresolved reference 'opacity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:493:13 No parameter with name 'clusteringEnabled' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:493:51 Unresolved reference 'clusteringEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:494:13 No parameter with name 'heatmapEnabled' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:494:45 Unresolved reference 'heatmapEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:497:70 Cannot infer type for type parameter 'B'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:501:36 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:502:36 Unresolved reference 'opacity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:503:46 Unresolved reference 'clusteringEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:504:43 Unresolved reference 'heatmapEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:565:13 None of the following candidates is applicable:
+
+fun put(key: String, element: JsonElement): JsonElement?:
+  Argument type mismatch: actual type is 'Any', but 'JsonElement' was expected.
+
+fun JsonObjectBuilder.put(key: String, value: Boolean?): JsonElement?:
+  Argument type mismatch: actual type is 'Any', but 'Boolean?' was expected.
+
+fun JsonObjectBuilder.put(key: String, value: Number?): JsonElement?:
+  Argument type mismatch: actual type is 'Any', but 'Number?' was expected.
+
+fun JsonObjectBuilder.put(key: String, value: String?): JsonElement?:
+  Argument type mismatch: actual type is 'Any', but 'String?' was expected.
+
+fun JsonObjectBuilder.put(key: String, value: Nothing?): JsonElement?:
+  Argument type mismatch: actual type is 'Any', but 'Nothing?' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:565:35 Unresolved reference 'attributes' on receiver of type 'WorldEntity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:569:35 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:570:35 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:586:21 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:586:21 Candidate 'fun <T> List<T>.firstOrNull(): T?' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:586:36 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:586:42 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:587:27 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:587:41 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:587:56 Unresolved reference 'recommendedAltitudeMeters'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:592:36 Unresolved reference 'GeoSearchResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:593:51 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:593:51 Argument type mismatch: actual type is 'List<uninferred T (of fun <T> emptyList)>', but 'List<??? (Unresolved qualified name: GeoSearchResult)>' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:593:85 Unresolved reference 'displayName'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:594:22 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:594:39 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:594:57 Unresolved reference 'recommendedAltitudeMeters'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:602:68 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:602:81 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:606:31 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:607:32 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:627:39 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:628:39 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:639:32 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:640:32 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:657:35 Unresolved reference 'TimelineWindowPreset'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:697:26 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:700:64 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:700:77 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:702:31 Unresolved reference 'latitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:703:32 Unresolved reference 'longitude'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:38 Unresolved reference 'ALL'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:56 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:85 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:85 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:85 Candidate 'fun <T, R> T.let(block: (T) -> R): R' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:743:91 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:744:45 Unresolved reference 'implemented'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:744:82 Unresolved reference 'id'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:749:31 Unresolved reference 'toGeoJsonFeatureCollection'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:752:31 Unresolved reference 'toCzmlDocument'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:762:54 Unresolved reference 'durationMs'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:763:62 None of the following candidates is applicable:
+
+fun minus(other: Byte): Long:
+  Argument type mismatch: actual type is 'Any', but 'Byte' was expected.
+
+fun minus(other: Short): Long:
+  Argument type mismatch: actual type is 'Any', but 'Short' was expected.
+
+fun minus(other: Int): Long:
+  Argument type mismatch: actual type is 'Any', but 'Int' was expected.
+
+fun minus(other: Long): Long:
+  Argument type mismatch: actual type is 'Any', but 'Long' was expected.
+
+fun minus(other: Float): Float:
+  Argument type mismatch: actual type is 'Any', but 'Float' was expected.
+
+fun minus(other: Double): Double:
+  Argument type mismatch: actual type is 'Any', but 'Double' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:765:46 Unresolved reference 'times' for operator '*' on receiver of type 'Any'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:772:34 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:800:41 Unresolved reference 'LayerVisualConfig'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:803:36 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:804:36 Unresolved reference 'opacity'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:805:46 Unresolved reference 'clusteringEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:806:43 Unresolved reference 'heatmapEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:838:54 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:838:54 Candidate 'fun <K, V> Map<out K, V>.filterValues(predicate: (V) -> Boolean): Map<K, V>' is inapplicable because of a receiver type mismatch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:838:67 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:838:72 Unresolved reference 'enabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:838:86 Unresolved reference 'showTrails'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:846:55 Unresolved reference 'WatchRegion'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:854:54 Unresolved reference 'BuildingFootprint3D'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:868:34 Unresolved reference 'WorldMonitorNormalizers.RainViewerFrame'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:870:39 Unresolved reference 'path'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/WorldMonitorViewModel.kt:871:42 Unresolved reference 'timeEpochSec'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/WorldMonitorWatchWorker.kt:42:31 Unresolved reference 'getWatchRegionsSnapshot' on receiver of type 'WorldMonitorDao'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/WorldMonitorWatchWorker.kt:42:66 Unresolved reference 'it'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/WorldMonitorWatchWorker.kt:49:35 Cannot infer type for value parameter 'r'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/WorldMonitorWatchWorker.kt:50:23 Unresolved reference 'categoriesCsv'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/worker/WorldMonitorWatchWorker.kt:66:83 Unresolved reference 'size'.
+
+> Task :app:compileDebugKotlin FAILED
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 2m 5s
-8 actionable tasks: 8 executed
-Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: UNRESOLVED_IMPORT
+       Kotlin compiler error
+         Unresolved reference 'BuildingFootprint3D'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/worldmonitor/WorldMonitorRepository.kt line 5
+
+* Try:
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+* Exception is:
+org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.lambda$executeIfValid$1(ExecuteActionsTaskExecuter.java:135)
+	at org.gradle.internal.Try$Failure.ifSuccessfulOrElse(Try.java:288)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:133)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:121)
+	at org.gradle.api.internal.tasks.execution.ProblemsTaskPathTrackingTaskExecuter.execute(ProblemsTaskPathTrackingTaskExecuter.java:41)
+	at org.gradle.api.internal.tasks.execution.ResolveTaskExecutionModeExecuter.execute(ResolveTaskExecutionModeExecuter.java:51)
+	at org.gradle.api.internal.tasks.execution.FinalizePropertiesTaskExecuter.execute(FinalizePropertiesTaskExecuter.java:46)
+	at org.gradle.api.internal.tasks.execution.SkipTaskWithNoActionsExecuter.execute(SkipTaskWithNoActionsExecuter.java:57)
+	at org.gradle.api.internal.tasks.execution.SkipOnlyIfTaskExecuter.execute(SkipOnlyIfTaskExecuter.java:74)
+	at org.gradle.api.internal.tasks.execution.CatchExceptionTaskExecuter.execute(CatchExceptionTaskExecuter.java:36)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.executeTask(EventFiringTaskExecuter.java:77)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:55)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter$1.call(EventFiringTaskExecuter.java:52)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.api.internal.tasks.execution.EventFiringTaskExecuter.execute(EventFiringTaskExecuter.java:52)
+	at org.gradle.execution.plan.DefaultNodeExecutor.executeLocalTaskNode(DefaultNodeExecutor.java:55)
+	at org.gradle.execution.plan.DefaultNodeExecutor.execute(DefaultNodeExecutor.java:34)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:355)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$InvokeNodeExecutorsAction.execute(DefaultTaskExecutionGraph.java:343)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.lambda$execute$0(DefaultTaskExecutionGraph.java:339)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:339)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
+	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
+	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
+Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:273)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:132)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$withoutLocksBlocking$0(DefaultWorkerLeaseService.java:412)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocksBlocking(DefaultWorkerLeaseService.java:407)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.blocking(DefaultWorkerLeaseService.java:257)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.blocking(DefaultWorkerLeaseService.java:239)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$1(DefaultAsyncWorkTracker.java:128)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.resources.AbstractResourceLockRegistry.whileDisallowingLockChanges(AbstractResourceLockRegistry.java:51)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.whileDisallowingProjectLockChanges(DefaultWorkerLeaseService.java:262)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:127)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForItemsAndGatherFailures(DefaultAsyncWorkTracker.java:93)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForAll(DefaultAsyncWorkTracker.java:79)
+	at org.gradle.internal.work.DefaultAsyncWorkTracker.waitForCompletion(DefaultAsyncWorkTracker.java:67)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$3.run(TaskExecution.java:267)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:30)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$1.execute(DefaultBuildOperationRunner.java:27)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.run(DefaultBuildOperationRunner.java:48)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeAction(TaskExecution.java:244)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeActions(TaskExecution.java:227)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.executeWithPreviousOutputFiles(TaskExecution.java:210)
+	at org.gradle.api.internal.tasks.execution.TaskExecution.execute(TaskExecution.java:176)
+	at org.gradle.internal.execution.steps.ExecuteStep.executeInternal(ExecuteStep.java:167)
+	at org.gradle.internal.execution.steps.ExecuteStep.access$000(ExecuteStep.java:47)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:137)
+	at org.gradle.internal.execution.steps.ExecuteStep$1.call(ExecuteStep.java:134)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.internal.execution.steps.ExecuteStep.execute(ExecuteStep.java:134)
+	at org.gradle.internal.execution.steps.ExecuteStep$Mutable.execute(ExecuteStep.java:80)
+	at org.gradle.internal.execution.steps.CancelExecutionStep.execute(CancelExecutionStep.java:42)
+	at org.gradle.internal.execution.steps.TimeoutStep.executeWithoutTimeout(TimeoutStep.java:75)
+	at org.gradle.internal.execution.steps.TimeoutStep.execute(TimeoutStep.java:55)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:51)
+	at org.gradle.internal.execution.steps.PreCreateOutputParentsStep.execute(PreCreateOutputParentsStep.java:29)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:67)
+	at org.gradle.internal.execution.steps.RemovePreviousOutputsStep.executeMutable(RemovePreviousOutputsStep.java:39)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:42)
+	at org.gradle.internal.execution.steps.BroadcastChangingOutputsStep.execute(BroadcastChangingOutputsStep.java:24)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:69)
+	at org.gradle.internal.execution.steps.CaptureOutputsAfterExecutionStep.execute(CaptureOutputsAfterExecutionStep.java:46)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:39)
+	at org.gradle.internal.execution.steps.ResolveInputChangesStep.executeMutable(ResolveInputChangesStep.java:28)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithoutCache(BuildCacheStep.java:189)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeAndStoreInCache(BuildCacheStep.java:145)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$executeWithCache$3(BuildCacheStep.java:104)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$executeWithCache$1(BuildCacheStep.java:104)
+	at org.gradle.internal.Try$Success.map(Try.java:170)
+	at org.gradle.internal.execution.steps.BuildCacheStep.executeWithCache(BuildCacheStep.java:88)
+	at org.gradle.internal.execution.steps.BuildCacheStep.lambda$execute$0(BuildCacheStep.java:75)
+	at org.gradle.internal.Either$Left.fold(Either.java:116)
+	at org.gradle.internal.execution.caching.CachingState.fold(CachingState.java:62)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:74)
+	at org.gradle.internal.execution.steps.BuildCacheStep.execute(BuildCacheStep.java:49)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:46)
+	at org.gradle.internal.execution.steps.StoreExecutionStateStep.executeMutable(StoreExecutionStateStep.java:35)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.executeBecause(SkipUpToDateStep.java:75)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.lambda$execute$2(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:53)
+	at org.gradle.internal.execution.steps.SkipUpToDateStep.execute(SkipUpToDateStep.java:35)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:37)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsFinishedStep.execute(MarkSnapshottingInputsFinishedStep.java:27)
+	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:70)
+	at org.gradle.internal.execution.steps.ResolveMutableCachingStateStep.executeDelegate(ResolveMutableCachingStateStep.java:32)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:69)
+	at org.gradle.internal.execution.steps.AbstractResolveCachingStateStep.execute(AbstractResolveCachingStateStep.java:37)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:63)
+	at org.gradle.internal.execution.steps.ResolveChangesStep.executeMutable(ResolveChangesStep.java:34)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:79)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.executeDelegate(ValidateStep.java:65)
+	at org.gradle.internal.execution.steps.ValidateStep.execute(ValidateStep.java:105)
+	at org.gradle.internal.execution.steps.ValidateStep$Mutable.execute(ValidateStep.java:65)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.executeMutable(CaptureMutableStateBeforeExecutionStep.java:86)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:65)
+	at org.gradle.internal.execution.steps.CaptureMutableStateBeforeExecutionStep.execute(CaptureMutableStateBeforeExecutionStep.java:45)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeWithNonEmptySources(SkipEmptyMutableWorkStep.java:210)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:90)
+	at org.gradle.internal.execution.steps.SkipEmptyMutableWorkStep.executeMutable(SkipEmptyMutableWorkStep.java:53)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:36)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.executeMutable(LoadPreviousExecutionStateStep.java:23)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$executeMutable$0(AssignMutableWorkspaceStep.java:34)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:30)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.executeMutable(AssignMutableWorkspaceStep.java:21)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:26)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:56)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
+	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
+	... 30 more
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'BuildingFootprint3D'.
+	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
+	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
+	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:68)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:103)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$1(DefaultWorkerExecutor.java:169)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:191)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$600(DefaultConditionalExecutionQueue.java:112)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:168)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:137)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:163)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:125)
+	... 2 more
+
+
+BUILD FAILED in 1m 9s
+8 actionable tasks: 2 executed, 6 from cache
