@@ -61,8 +61,8 @@ android {
         applicationId = "com.adshield.pro"
         minSdk = 29
         targetSdk = 36
-        versionCode = 21002
-        versionName = "2.10.2"
+        versionCode = 50100
+        versionName = "5.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -209,3 +209,17 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 }
+
+// The World Monitor is bundled, never a remote page. One shared implementation keeps the web
+// and native surfaces on the same tested parsers, filtering, map, watchlists and export code.
+val worldMonitorAssets = layout.buildDirectory.dir("generated/worldMonitorAssets")
+val prepareWorldMonitorAssets by tasks.registering(Sync::class) {
+    from(rootProject.layout.projectDirectory) {
+        include("world/**", "ui/dom.js", "ui/icons.js", "ui/theme.css", "ui/world.css")
+        include("security/storage.js", "security/sha256.js")
+        include("assets/world-land.svg", "assets/country-boundaries.json", "assets/country-data-license.txt")
+    }
+    into(worldMonitorAssets.map { it.dir("world-monitor") })
+}
+android.sourceSets.getByName("main").assets.srcDir(worldMonitorAssets)
+tasks.named("preBuild").configure { dependsOn(prepareWorldMonitorAssets) }

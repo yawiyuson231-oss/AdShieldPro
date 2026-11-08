@@ -35,6 +35,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Monitor counters, buckets, percentiles, bounded memory | `unit/monitor.test.mjs` |
 | SHA-256, storage failures, feeds, backup/recovery, k-anonymity | `unit/infrastructure.test.mjs` |
 | Whole app: boot, navigation, AETHER, false positives, DNS lab, feeds, snapshots, XSS, capability honesty | `integration/ui.test.mjs` |
+| World adapters, validation, TTL/backoff, cancel, custom sources, watch rules, reports, weather, country geography | `unit/world.test.mjs` |
+| Actual World Monitor controls, countries, custom feed form, daily cadence, hostile provider text, exports | `integration/world.test.mjs` |
+| Packaged Android HTML/JS entry point, background snapshot handoff and restricted message channels | `integration/world-embed.test.mjs` |
 | Architecture and claim policy | `scripts/verify.mjs` |
 
 ## 3. Non-obvious tests worth knowing about
@@ -58,9 +61,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 166 unit tests, 19 integration tests — all passing.
-- Static verification: 86 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
-- `npm run lint` — 25 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
+- World Monitor v2 baseline: 240 unit tests + 42 integration tests (282 total), passing at the first full upgrade check. Run the commands above for the current count.
+- Static verification: 103 checks passing at the first full upgrade check (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
+- `npm run lint` — 42 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.
@@ -77,7 +80,7 @@ Run `npm test` and `npm run verify` for live numbers. At the time of writing:
   target is not reached out-of-sample and the UI reports that instead of the target.
 - Base-rate precision (converted from recall/specificity): ≈ 0.06 at a 1% malicious base rate,
   ≈ 0.42 at 10%. This is why the model is weighted 7/100 and can never block.
-- Engine throughput: > 2,000 evaluations/ms budget; the test asserts < 0.5 ms/op.
+- Engine throughput: > 2,000 evaluations/second budget; the test asserts < 0.5 ms/op.
 
 ## 5. What the suite does not cover
 
@@ -85,3 +88,19 @@ Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 - Real browser rendering/CSS (jsdom has no layout engine; charts degrade gracefully).
 - Service-worker runtime semantics (only its file list is verified statically).
 - Real-world feed drift (upstream content changes daily; the shrink guard is what protects you).
+
+## World Monitor v2 manual checks
+
+1. Start with empty storage: no external world-provider requests and no invented map markers.
+2. Refresh providers: inspect failures, last-success timestamps, source coverage and retry cooldowns.
+3. Test desktop, 390px phone width, keyboard-only navigation, theme and Ctrl/Cmd+K finder.
+4. Search/filter/sort, open a marker, bookmark, create a watch, acknowledge and reload.
+5. Select Philippines and a territory without a bundled boundary; only the latter must report
+   unavailable geography. Neither an empty country view nor a missing coordinate is a safety claim.
+6. Export JSON/CSV/Markdown; import a watchlist; cancel a destructive clear; open a source safely.
+7. Weather: select a city, request explicitly, check both complete and partial-provider failures.
+8. Offline reload after a successful visit: app shell, map, metadata and last received records remain
+   available. Public APIs themselves must not be intercepted by the service worker.
+
+Automated test results are authoritative at the checked-out commit, not a promise about provider
+uptime. Network fixtures live only in `tests/fixtures/` and are excluded from deployment/APK assets.

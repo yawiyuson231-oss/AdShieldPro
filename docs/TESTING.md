@@ -148,3 +148,24 @@ Those cannot be exercised by JVM unit tests.
 23. Upgrade-install over the previous version and confirm DNS stats, rules, scan history and the
     intelligence event log survive the additive schema v5 migration (connector_state and
     threat_indicators are new tables).
+
+## World Monitor v2 Android acceptance
+
+The new `WorldMonitorTestSuite` checks native message origin, URL/export bounds, response shapes,
+provider allowlist, APK asset wiring, scheduling constraints and country-coverage disclosures. Shared
+runtime behaviour is covered by the web suite, including booting `world/embed.html` in a DOM.
+
+On a physical device, additionally verify:
+
+- The **World** tab loads its packaged UI in airplane mode, with no invented current events.
+- Refresh has independent provider error states, respects TLS and never disrupts the DNS VPN.
+- Export each MIME type through the Storage Access Framework; cancellation and provider write
+  failures must show feedback. Import a JSON watchlist from a user-selected document provider.
+- Country list, touch pan/pinch, selected markers, dialogs, screen reader and light/dark contrast.
+- Enable daily refresh, background/reboot the phone, and inspect the actual job outcome/snapshot;
+  disabled schedule cancels work. Force-stop/doze may delay jobs, which must not produce fake data.
+- Updating from 2.10.2 to 5.1.0 (code 50100) retains native settings, VPN rules, Room databases and
+  signing continuity. The World Monitor workspace is additive; no existing Room migration is needed.
+
+Daily scheduling and SAF interactions are device acceptance items, not claimed to be emulated by
+JVM or DOM tests.

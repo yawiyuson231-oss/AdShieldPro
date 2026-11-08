@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
@@ -85,6 +86,7 @@ import com.adshield.pro.ui.screens.CloudStorageScreen
 import com.adshield.pro.ui.screens.DownloaderScreen
 import com.adshield.pro.ui.screens.FileManagerScreen
 import com.adshield.pro.ui.screens.HomeScreen
+import com.adshield.pro.ui.screens.world.WorldMonitorScreen
 import com.adshield.pro.ui.screens.intelligence.IntelligenceMapScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
@@ -108,6 +110,7 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     INTELLIGENCE("Intel", Icons.Default.Hub),
+    WORLD("World", Icons.Default.Public),
     SECURITY("Security", Icons.Default.Security),
     FILES("Files", Icons.Default.Folder),
     CLOUD("Cloud", Icons.Default.Cloud),
@@ -273,6 +276,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                         connectorsOpen = true
                     }
                 )
+                MainNavDestination.WORLD -> WorldMonitorScreen()
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.FILES -> FilesDestination()
                 MainNavDestination.CLOUD -> CloudDestination()

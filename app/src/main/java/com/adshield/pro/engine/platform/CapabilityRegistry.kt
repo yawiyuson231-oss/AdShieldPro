@@ -64,7 +64,7 @@ object CapabilityRegistry {
     private const val PERM_BATTERY_STATS = "android.permission.BATTERY_STATS"
 
     /**
-     * The 100 capabilities from the product directive, as they actually stand.
+     * Tracked capabilities from the product directive, as they actually stand (not a padded feature count).
      * Statuses are deliberately conservative: a row only says IMPLEMENTED when the code path
      * exists on this branch and is exercised by the JVM suite or CI.
      */
@@ -900,6 +900,38 @@ object CapabilityRegistry {
                 "The UI draws at most 8 nodes, 7 connectors, 7 markers and 12 concurrent pulses; pulses are pruned when expired"
             ),
             "IntelligenceMapTestSuite.testAggregatorPerformanceBudget"
+        ),
+        cap(
+            "world-monitor-v2", "World Monitor v2: source-backed geographic and cyber workspace",
+            CapabilityArea.AI_INTELLIGENCE, CapabilityStatus.IMPLEMENTED,
+            "ui/screens/world/WorldMonitorScreen.kt", listOf(PERM_INTERNET),
+            listOf("12 public provider endpoints from the shared world/providers.json registry", "Offline-packaged JavaScript parsers, SVG map and watchlists"),
+            listOf("Public feeds can fail, rate-limit or disallow browser access; actual errors and cached timestamps remain visible", "Not an emergency alert service, prediction engine or comprehensive global risk score", "Custom HTTPS feeds are user-supplied and not endorsed; 100 total configured sources is a resource bound, not 100 verified providers"),
+            "WorldMonitorTestSuite.testWorldAssetsArePackagedAndScreenIsNavigable and testAllTwelveBackgroundFormatsHaveRealShapeGuards; shared browser unit and DOM integration suites"
+        ),
+        cap(
+            "world-country-dashboards", "Searchable country and territory dashboards with saved views",
+            CapabilityArea.AI_INTELLIGENCE, CapabilityStatus.IMPLEMENTED,
+            "ui/screens/world/WorldMonitorScreen.kt", listOf(PERM_INTERNET),
+            listOf("250 bundled directory entries from mledoze/countries (ODbL-1.0)", "237 approximate Natural Earth country boundaries (public domain)", "Explicit Open-Meteo weather and World Bank indicator lookups"),
+            listOf("13 territories have no separate bundled polygon; no geographic count is invented", "Publication years and model times are shown; metadata is a bundled snapshot, not a live census", "Country mentions are separated from geolocated reports; listings do not imply a position on sovereignty"),
+            "WorldMonitorTestSuite.testCountryDirectoryHasExplicitCoverageAndAttribution; shared point-in-polygon, dateline, country filter and UI tests"
+        ),
+        cap(
+            "world-daily-refresh", "Opt-in daily public-feed synchronization",
+            CapabilityArea.UPDATES, CapabilityStatus.PARTIAL,
+            "worker/WorldMonitorWorker.kt", listOf(PERM_INTERNET),
+            listOf("WorkManager 24-hour periodic work with connected-network and battery-not-low constraints", "Atomic on-device JSON snapshot; source-specific errors, size limits and rate-limit cooldowns"),
+            listOf("Android power management can delay jobs; exact daily delivery is not guaranteed", "Native background refresh covers enabled built-in sources only; custom feeds refresh while the view is open", "No emergency push notification or hidden location tracking; first periodic attempt is scheduled after 24 hours"),
+            "WorldMonitorTestSuite.testDailyUpdatesAreOptInConstrainedAndKeepPreviousEvidence and testScheduledSourcesAreDeduplicatedAndAllowlisted; manual device background/reboot verification required"
+        ),
+        cap(
+            "world-safe-exports", "User-confirmed world reports and watchlist transfer",
+            CapabilityArea.FILE_MANAGEMENT, CapabilityStatus.IMPLEMENTED,
+            "engine/world/WorldMonitorPolicy.kt", emptyList(),
+            listOf("JSON, spreadsheet-safe CSV and deterministic Markdown summaries of received records", "Android Storage Access Framework save dialog; origin-restricted WebMessage channels"),
+            listOf("Maximum 8 MB per export; filter a large dataset before exporting", "Secure exports need a recent Android System WebView; no unrestricted native JavaScript interface", "Snapshots and watchlists remain local unless explicitly exported; no automatic cloud synchronization"),
+            "WorldMonitorTestSuite.testTrustedOriginRequiresExactHttpsMainFrame and testExportPolicyAcceptsOnlyBoundedSafeDocuments and testExportRejectsTraversalExecutableMimeAndUtf8Oversize"
         )
     )
 

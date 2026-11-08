@@ -33,7 +33,8 @@ const FORBIDDEN_CLAIMS = [
 ];
 
 const MODULE_FILES = [
-  'app.js', 'engine.js', 'ui/dom.js',
+  'app.js', 'engine.js', 'ui/dom.js', 'ui/icons.js', 'ui/shell.js',
+  'world/catalog.js', 'world/countries-data.js', 'world/countries.js', 'world/country-view.js', 'world/custom.js', 'world/export.js', 'world/embed.js', 'world/map.js', 'world/model.js', 'world/native.js', 'world/network.js', 'world/parsers.js', 'world/store.js', 'world/view.js', 'world/weather.js',
   'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
@@ -69,7 +70,7 @@ export function verify() {
   /* 3. Navigation <-> sections <-> renderers. */
   const html = read('index.html');
   const navPages = [...html.matchAll(/data-page="([^"]+)"/g)].map((m) => m[1]);
-  const sections = [...html.matchAll(/id="page-([^"]+)"/g)].map((m) => m[1]);
+  const sections = [...html.matchAll(/<section[^>]*id="page-([^"]+)"/g)].map((m) => m[1]);
   add('every nav tab has a section', navPages.every((p) => sections.includes(p)),
     navPages.filter((p) => !sections.includes(p)).join(', '));
   add('every section has a nav tab', sections.every((s) => navPages.includes(s)),
@@ -91,7 +92,7 @@ export function verify() {
   add('service worker does not cache DoH', /url\.origin !== self\.location\.origin/.test(sw));
 
   /* 5. No HTML injection sinks in UI code. */
-  const uiSources = { 'app.js': appSource, 'ui/dom.js': read('ui/dom.js') };
+  const uiSources = Object.fromEntries(MODULE_FILES.filter((f) => f === 'app.js' || f.startsWith('ui/') || f.startsWith('world/')).map((f) => [f, read(f)]));
   const sinks = [];
   for (const [file, source] of Object.entries(uiSources)) {
     if (/\.innerHTML\s*=/.test(source)) sinks.push(`${file}: innerHTML assignment`);
@@ -103,7 +104,7 @@ export function verify() {
   add('no DOM XSS sinks in UI layer', sinks.length === 0, sinks.join('; '));
 
   /* 6. No fabricated claims in user-visible copy. */
-  const visible = [html, appSource, read('ui/dom.js')].join('\n').toLowerCase();
+  const visible = [html, ...Object.values(uiSources)].join('\n').toLowerCase();
   const hits = FORBIDDEN_CLAIMS.filter((phrase) => visible.includes(phrase));
   add('no fabricated security claims', hits.length === 0, hits.join('; '));
 
@@ -163,8 +164,8 @@ export function verify() {
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
   add('every page section has an accessible name',
-    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === 10,
-    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of 10`);
+    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === sections.length,
+    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of ${sections.length}`);
   add('a skip link targets the main landmark',
     /class="skip-link" href="#main"/.test(htmlA11y) && /<main id="main"/.test(htmlA11y));
 

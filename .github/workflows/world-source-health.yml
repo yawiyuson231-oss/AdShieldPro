@@ -1,0 +1,39 @@
+name: World Monitor daily source health
+
+# Scheduling begins only after this workflow is merged into the repository's default branch.
+# This audits provider health; it does not silently impersonate a live fetch in the app UI.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['arena/**']
+    paths: ['world/**', 'scripts/probe-world.mjs', '.github/workflows/world-source-health.yml']
+  schedule:
+    - cron: '15 2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: world-source-health-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check the native provider registry matches the shared catalogue
+        run: node scripts/sync-world-providers.mjs --check
+      - name: Probe public endpoints and validate actual response schemas
+        run: node scripts/probe-world.mjs --out "$RUNNER_TEMP/world-source-health.json"
+      - name: Publish dated source-health report
+        uses: actions/upload-artifact@v4
+        with:
+          name: world-source-health
+          path: ${{ runner.temp }}/world-source-health.json
+          retention-days: 14
+          if-no-files-found: error

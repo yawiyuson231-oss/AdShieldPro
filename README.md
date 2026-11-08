@@ -1,8 +1,26 @@
-# AdShield Pro 2.10.2 — Android DNS Ad & Tracker Protection
+# AdShield Pro / OmniShield X 5.1 — World Monitor v2
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
 AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+
+## World Monitor v2 (5.1 upgrade)
+
+The **World** Android tab and **World Monitor** browser page share the same packaged, tested
+implementation. This branch adds **250 country/territory profiles**, **237 approximate map
+boundaries**, **12 built-in public feeds**, eight event layers, custom keyless JSON subscriptions
+(up to 100 total configured sources), saved country views, watch alerts, bookmarks, weather/air
+lookups, dated country indicators and JSON/CSV/Markdown reports.
+
+**Daily updates are opt-in.** Android uses constrained WorkManager jobs (approximately 24 hours,
+not exact); the browser refreshes only while the page is open, visible and online. Custom feeds
+remain browser-side. No GPS tracking, provider outage guarantees, unlimited-source claims or
+invented activity. Details, source terms and test coverage: **[World Monitor v2](docs/WORLD_MONITOR_V2.md)**.
+
+The parent version is **5.1.0 / Android code 50100**; “v2” names the World Monitor workspace. This is
+an upgrade candidate on the working branch, **not a newly published release APK**. Existing release
+links still point to the last published build until the reviewed upgrade is released.
+
 ## Website and downloads
 
 - **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
@@ -73,9 +91,9 @@ over HTTP and it works offline after the first visit.
 
 ```bash
 npm install               # jsdom, used only by the integration tests
-npm test                  # 166 unit + 19 integration tests
+npm test                  # all engine + real-UI integration tests
 npm run lint              # house lint rules for the shipped runtime code
-npm run verify            # 86 static architecture, claim, artifact and packaging gates
+npm run verify            # architecture, claims, offline assets and packaging gates
 npm run serve             # http://localhost:8080  (ES modules need HTTP, not file://)
 npm run build:extension   # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 npm run stage             # assemble _site/ exactly as the Pages workflow does
@@ -83,6 +101,7 @@ npm run stage             # assemble _site/ exactly as the Pages workflow does
 
 | Document | Contents |
 |---|---|
+| [`docs/WORLD_MONITOR_V2.md`](docs/WORLD_MONITOR_V2.md) | Country views, feed catalogue, daily refresh, Android integration, privacy and limits |
 | [`docs/WEB_PLATFORM.md`](docs/WEB_PLATFORM.md) | Features, quick start, integration instructions |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module map: DNS plumbing, AETHER, Firewall AI, recovery, power governor, extension builder |
 | [`docs/AETHER.md`](docs/AETHER.md) | Signal weights, evidence floors, calibration methodology and measured metrics |

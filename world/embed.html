@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>World Monitor v2 · OmniShield X</title>
+  <link rel="stylesheet" href="../ui/theme.css">
+  <link rel="stylesheet" href="../ui/world.css">
+</head>
+<body class="world-embed">
+  <a class="skip-link" href="#world-workspace">Skip to World Monitor</a>
+  <main id="world-workspace" tabindex="-1" aria-label="World Monitor v2">
+    <section id="world-embedded" class="page" aria-label="Global intelligence workspace"><p class="muted">Loading the on-device World Monitor…</p></section>
+  </main>
+  <div id="toasts" class="toast-wrap" aria-live="polite"></div>
+  <script type="module" src="embed.js"></script>
+</body>
+</html>

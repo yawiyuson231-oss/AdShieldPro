@@ -23,6 +23,10 @@ import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
 import { createStorage } from './security/storage.js';
 import * as ui from './ui/dom.js';
+import { icon } from './ui/icons.js';
+import { setupShell } from './ui/shell.js';
+import { WorldStore } from './world/store.js';
+import { WorldMonitorView } from './world/view.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
 const BUNDLED = {
@@ -33,6 +37,9 @@ const BUNDLED = {
 
 const state = {
   storage: null,
+  world: null,
+  worldView: null,
+  shell: null,
   engine: null,
   aether: null,
   client: null,
@@ -79,6 +86,8 @@ async function fetchText(url) {
 async function boot() {
   try {
     state.storage = createStorage('omnishield-x');
+    state.world = new WorldStore({ storage: state.storage });
+    await state.world.load();
     state.monitor = new SecurityMonitor();
     state.analytics = new PrivateAnalytics({ storage: state.storage });
     await state.analytics.load();
@@ -96,8 +105,15 @@ async function boot() {
     } });
 
     await restoreConfiguration();
+    if (state.settings.aggressiveTier) {
+      const descriptor = BUNDLED.aggressive;
+      try { state.engine.loadFilterList(await fetchText(descriptor.file), descriptor.category, descriptor.source); }
+      catch (err) { state.settings.aggressiveTier = false; toast(`Aggressive tier could not be restored: ${err.message}`, 'warn'); }
+    }
+    await loadInstalledFeeds(state.engine);
     applyUserRules();
     await loadCachedModel();
+    state.worldUnsubscribe = state.world.subscribe(() => { if (state.currentPage === 'dashboard') renderDashboard(); });
 
     state.booted = true;
     setBootStatus(`ready · ${number(state.engine.totalRules())} rules`, 'ok');
@@ -168,10 +184,21 @@ async function rebuildEngine() {
   if (state.settings.aggressiveTier) {
     try { engine.loadFilterList(await fetchText(BUNDLED.aggressive.file), 'ADS', BUNDLED.aggressive.source); } catch { /* ignore */ }
   }
+  await loadInstalledFeeds(engine);
   state.customRules.forEach((rule) => engine.addUserRule(rule.pattern, rule.isAllow));
   state.engine = engine;
   state.aether.attachEngine(engine);
   state.client.setEngine(engine);
+}
+
+async function loadInstalledFeeds(engine) {
+  if (!state.feeds) return;
+  for (const descriptor of FEED_REGISTRY) {
+    try {
+      const verified = await state.feeds.verify(descriptor.id);
+      if (verified.ok) engine.loadFilterList(await state.feeds.content(descriptor.id), descriptor.category, descriptor.id);
+    } catch { /* an unreadable installed feed never replaces the bundled safety net */ }
+  }
 }
 
 function handleObservation(event) {
@@ -205,7 +232,7 @@ function buildState({ includeModel = false } = {}) {
   }
   return {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: '5.0.1',
+    appVersion: '5.1.0',
     savedAt: new Date().toISOString(),
     settings: { ...state.settings },
     customRules: state.customRules.map((r) => ({ pattern: r.pattern, isAllow: r.isAllow, rawPattern: r.pattern, ruleType: r.isAllow ? 'ALLOW' : 'BLOCK', matchType: 'SUFFIX', isEnabled: true })),
@@ -327,6 +354,7 @@ async function ensureModel(force = false) {
 
 const PAGE_RENDERERS = {
   dashboard: renderDashboard,
+  world: renderWorld,
   aether: renderAether,
   dns: renderDns,
   firewall: renderFirewall,
@@ -338,9 +366,12 @@ const PAGE_RENDERERS = {
   status: renderStatus
 };
 
-function navigate(page) {
+function navigate(page, { historyMode = 'push' } = {}) {
+  if (!Object.prototype.hasOwnProperty.call(PAGE_RENDERERS, page)) return false;
   const focusOnNavigate = state.booted && state.currentPage !== page;
   state.currentPage = page;
+  state.shell?.update(page);
+  state.worldView?.setActive(page === 'world');
   for (const section of document.querySelectorAll('.page')) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll('nav.tabs button')) {
     const active = button.dataset.page === page;
@@ -370,7 +401,11 @@ function navigate(page) {
       toast(`Render error on ${page}: ${err.message}`, 'bad');
     });
   } catch (err) { console.error(err); toast(`Render error on ${page}: ${err.message}`, 'bad'); }
-  if (location.hash !== `#${page}`) history.replaceState(null, '', `#${page}`);
+  if (historyMode !== 'none' && location.hash !== `#${page}`) {
+    if (historyMode === 'replace') history.replaceState(null, '', `#${page}`);
+    else history.pushState(null, '', `#${page}`);
+  }
+  return true;
 }
 
 function renderAll() {
@@ -387,12 +422,22 @@ document.querySelectorAll('nav.tabs button').forEach((button) => {
 /* Dashboard                                                           */
 /* ------------------------------------------------------------------ */
 
+function renderWorld() {
+  if (!state.world) return;
+  if (!state.worldView) state.worldView = new WorldMonitorView(document.getElementById('page-world'), state.world);
+  state.worldView.setActive(state.currentPage === 'world');
+}
+
 function renderDashboard() {
   if (!state.engine) return;
   const breakdown = state.engine.breakdown();
   const metrics = state.monitor.metrics();
   const clf = state.aether.classifier;
   const observations = state.aether.observations.size;
+  const worldEvents = state.world?.events.length || 0;
+  mount('#dash-world', icon('globe', 33), h('div', {}, h('h3', {}, 'A wider perspective. World Monitor v2.'),
+    h('p', {}, `${worldEvents ? `${number(worldEvents)} received world records` : '250 country and territory dashboards'} · public hazard, cyber and service feeds · private watchlists · daily refresh controls.`)),
+    h('button', { class: 'primary', type: 'button', onclick: () => navigate('world') }, 'Open World Monitor', icon('arrow', 15)));
 
   mount('#dash-kpis',
     kpi(number(breakdown.total), 'block rules active in this browser'),
@@ -1388,7 +1433,7 @@ function exportMergedConfig() {
     ...(state.importedBackup || {}),
     ...buildState({ includeModel: true }),
     exportedAt: new Date().toISOString(),
-    exportedBy: 'OmniShield X web platform v5.0.1'
+    exportedBy: 'OmniShield X web platform v5.1.0'
   };
   download('omnishield-x-config.json', JSON.stringify(payload, null, 2));
   toast('Merged configuration exported.', 'ok');
@@ -1439,6 +1484,12 @@ async function fetchJSONSafe(url) {
 }
 
 const CAPABILITIES = [
+  ['World Monitor v2: source-backed event map and filters', 'works', 'world.test.mjs + world UI integration — empty, malformed, offline, cancellation and safe-link cases'],
+  ['Country and territory dashboards', 'works', '250 profiles, 237 approximate boundaries; missing geometry is explicit; dated World Bank indicators'],
+  ['World source subscriptions and source health', 'works', '12 built-in adapters; custom HTTPS schemas; 100 configured-source resource cap, not 100 verified providers'],
+  ['Daily world-feed updates', 'partial', 'Web: only while open, visible and online. Android: optional constrained WorkManager, timing not guaranteed'],
+  ['Weather and air-quality context', 'works', 'Explicit Open-Meteo modelled data at chosen coordinates; partial failures and original timestamps retained'],
+  ['Watchlist, bookmarks and attributed exports', 'works', 'Local matching, acknowledgement, JSON transfer, CSV injection guard and deterministic Markdown briefing'],
   ['Deterministic DNS filter ladder', 'works', 'engine.test.mjs — ladder order, user allow overrides, undo symmetry'],
   ['Hosts-file + Adblock + plain-domain parsing', 'works', 'engine.test.mjs — formats'],
   ['Wildcard rules (with catch-all rejection)', 'works', 'engine.test.mjs — wildcards'],
@@ -1627,11 +1678,12 @@ function wireEvents() {
 /* Start                                                               */
 /* ------------------------------------------------------------------ */
 
+state.shell = setupShell(navigate);
 wireEvents();
 const initial = location.hash.replace('#', '');
 const ready = boot().then(() => {
-  if (initial && PAGE_RENDERERS[initial]) navigate(initial);
-  else navigate('dashboard');
+  if (initial && Object.prototype.hasOwnProperty.call(PAGE_RENDERERS, initial)) navigate(initial, { historyMode: 'replace' });
+  else navigate('world', { historyMode: 'replace' });
   return state;
 });
 
@@ -1653,6 +1705,9 @@ globalThis.__omnishield = {
   startMonitorLoop,
   stop() {
     clearInterval(state.monitorTimer);
+    state.worldView?.destroy();
+    state.worldUnsubscribe?.();
+    state.shell?.destroy();
     try { state.power?.stop(); } catch { /* ignore */ }
   }
 };

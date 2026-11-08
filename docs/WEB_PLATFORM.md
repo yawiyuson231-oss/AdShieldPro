@@ -1,4 +1,4 @@
-# OmniShield X web platform — AETHER AI Evolution (v5.0.1)
+# OmniShield X web platform — World Monitor v2 + AETHER (v5.1.0)
 
 > Part of the [AdShield Pro repository](../README.md). The Android app lives in
 > [`app/`](../app); this document covers the browser platform that sits beside it.
@@ -16,15 +16,29 @@ files (GitHub Pages compatible); works offline once visited.
 
 ```bash
 npm install        # jsdom, used only by the integration tests
-npm test           # 166 unit + 19 integration tests
-npm run verify     # 86 static architecture, claim, artifact and packaging gates
+npm test           # all engine and DOM integration suites
+npm run verify     # static architecture, claim, artifact and packaging gates
 npm run lint       # house lint rules for shipped runtime code
 npm run stage      # assemble the deployable _site/ (site at /, app at /app/)
 npm run serve      # http://localhost:8080  (ES modules require HTTP, not file://)
 npm run build:extension  # regenerate omnishield-x-extension.zip + assets/extension-facts.json
 ```
 
-## What this release adds
+## World Monitor v2 and the refreshed workspace
+
+The default browser page is now **World Monitor**: 250 searchable country/territory profiles,
+12 built-in source adapters, eight layers, an offline interactive map, local watchlists and saved
+events, custom public JSON feed subscriptions, explicit weather/air and dated country lookups,
+source-health diagnostics and downloadable briefings. The shared workspace is also bundled into
+the Android **World** tab. See [WORLD_MONITOR_V2.md](WORLD_MONITOR_V2.md) for contracts, privacy,
+licences, scheduling and limits. The UI has responsive navigation, light/dark themes and a keyboard
+command finder. Existing security workflows remain separate and tested.
+
+This upgrade also restores installed validated feeds after restart and engine rebuild, restores the
+aggressive-tier setting only if its asset loads, guards unknown routes, and protects the last good
+offline navigation shell from a server error.
+
+## Existing security features retained
 
 This is an **upgrade of the existing application**, not a rebuild. The v4 filter engine,
 evaluation ladder, bundled feeds and Android policy format are preserved; every existing
@@ -68,8 +82,9 @@ index.html  app.js  engine.js          shell, controller, deterministic filter l
 dns/       codec · cache · resolvers · dnssec · client
 aether/    reputation · classifier · typosquat · lexical · domain · data
 security/  firewall-ai · monitor · feedmanager · backup · privacy · sha256 · storage
-ui/dom.js  safe DOM construction (no innerHTML)
-tests/     161 unit + 18 integration   scripts/verify.mjs  static gates
+ui/        safe DOM helpers, icons, theme, command finder
+world/     sources, models, filters, maps, country profiles, shared Android entry point
+tests/     engine + UI + packaged-entry integration   scripts/verify.mjs  static gates
 ```
 
 Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) ·

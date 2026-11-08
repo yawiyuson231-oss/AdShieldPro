@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.1';
+const VERSION = 'omnishield-x-v5.1.0-world-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RULES_CACHE = `${VERSION}-rules`;
 
@@ -25,6 +25,30 @@ const SHELL_ASSETS = [
   './assets/core_supplement_ads.txt',
   './assets/core_supplement_aggressive.txt',
   './ui/dom.js',
+  './ui/icons.js',
+  './ui/shell.js',
+  './ui/theme.css',
+  './ui/world.css',
+  './assets/world-land.svg',
+  './assets/country-boundaries.json',
+  './assets/country-data-license.txt',
+  './world/catalog.js',
+  './world/countries-data.js',
+  './world/countries.js',
+  './world/country-view.js',
+  './world/custom.js',
+  './world/export.js',
+  './world/embed.html',
+  './world/embed.js',
+  './world/providers.json',
+  './world/map.js',
+  './world/model.js',
+  './world/native.js',
+  './world/network.js',
+  './world/parsers.js',
+  './world/store.js',
+  './world/view.js',
+  './world/weather.js',
   './dns/codec.js',
   './dns/cache.js',
   './dns/client.js',
@@ -69,7 +93,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => k.startsWith('omnishield-x-') && !k.startsWith(VERSION)).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -89,8 +113,11 @@ self.addEventListener('fetch', (event) => {
       try {
         const fresh = await fetch(request);
         const cache = await caches.open(SHELL_CACHE);
-        cache.put('./index.html', fresh.clone()).catch(() => {});
-        return fresh;
+        if (fresh.ok) {
+          cache.put('./index.html', fresh.clone()).catch(() => {});
+          return fresh;
+        }
+        return (await cache.match('./index.html')) || fresh;
       } catch {
         const cache = await caches.open(SHELL_CACHE);
         return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();

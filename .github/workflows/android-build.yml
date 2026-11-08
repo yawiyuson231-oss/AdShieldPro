@@ -78,6 +78,9 @@ jobs:
           chmod +x tools/check_ui_performance.py
           python3 tools/check_ui_performance.py
 
+      - name: Verify shared World Monitor provider registry
+        run: node scripts/sync-world-providers.mjs --check
+
       - name: Compile Kotlin (fails fast on the AGP 9 / Kotlin 2.4 migration)
         run: |
           set -o pipefail

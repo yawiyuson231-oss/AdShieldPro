@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "maxBytes": 6000000,
+  "sources": [
+    {
+      "id": "usgs",
+      "name": "USGS Earthquakes",
+      "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson",
+      "accept": "application/json",
+      "ttlMs": 300000,
+      "format": "usgs"
+    },
+    {
+      "id": "eonet",
+      "name": "NASA EONET",
+      "url": "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=200",
+      "accept": "application/json",
+      "ttlMs": 1800000,
+      "format": "eonet"
+    },
+    {
+      "id": "gdacs",
+      "name": "GDACS Disaster Alerts",
+      "url": "https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP",
+      "accept": "application/json",
+      "ttlMs": 900000,
+      "format": "gdacs"
+    },
+    {
+      "id": "nws",
+      "name": "US Weather Alerts",
+      "url": "https://api.weather.gov/alerts/active?status=actual",
+      "accept": "application/json",
+      "ttlMs": 600000,
+      "format": "nws"
+    },
+    {
+      "id": "kev",
+      "name": "CISA Known Exploited",
+      "url": "https://api.github.com/repos/cisagov/kev-data/contents/known_exploited_vulnerabilities.json",
+      "accept": "application/vnd.github.raw+json",
+      "ttlMs": 21600000,
+      "format": "kev"
+    },
+    {
+      "id": "advisories",
+      "name": "GitHub Security Advisories",
+      "url": "https://api.github.com/advisories?per_page=50&type=reviewed",
+      "accept": "application/vnd.github+json",
+      "ttlMs": 3600000,
+      "format": "advisories"
+    },
+    {
+      "id": "noaa",
+      "name": "NOAA Space Weather",
+      "url": "https://services.swpc.noaa.gov/products/alerts.json",
+      "accept": "application/json",
+      "ttlMs": 900000,
+      "format": "noaa"
+    },
+    {
+      "id": "geonet",
+      "name": "GeoNet New Zealand",
+      "url": "https://api.geonet.org.nz/quake?MMI=3",
+      "accept": "application/json",
+      "ttlMs": 600000,
+      "format": "geonet"
+    },
+    {
+      "id": "emsc",
+      "name": "EMSC Seismic Portal",
+      "url": "https://www.seismicportal.eu/fdsnws/event/1/query?limit=100&format=json",
+      "accept": "application/json",
+      "ttlMs": 600000,
+      "format": "emsc"
+    },
+    {
+      "id": "github-status",
+      "name": "GitHub Service Status",
+      "url": "https://www.githubstatus.com/api/v2/incidents.json",
+      "accept": "application/json",
+      "ttlMs": 600000,
+      "format": "github-status"
+    },
+    {
+      "id": "cloudflare-status",
+      "name": "Cloudflare Service Status",
+      "url": "https://www.cloudflarestatus.com/api/v2/incidents.json",
+      "accept": "application/json",
+      "ttlMs": 600000,
+      "format": "cloudflare-status"
+    },
+    {
+      "id": "gdelt",
+      "name": "GDELT World Headlines",
+      "url": "https://api.gdeltproject.org/api/v2/doc/doc?query=%28disaster%20OR%20cyberattack%20OR%20climate%20OR%20conflict%29&mode=artlist&format=json&maxrecords=75&sort=datedesc&timespan=1d",
+      "accept": "application/json",
+      "ttlMs": 900000,
+      "format": "gdelt"
+    }
+  ]
+}
