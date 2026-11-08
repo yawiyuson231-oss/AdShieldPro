@@ -1059,14 +1059,25 @@ private fun WatchtowerPanel(
                         .background(NavySurfaceVariant, RoundedCornerShape(8.dp))
                         .border(1.dp, severityColor(alert.severity).copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                         .clickable {
-                            viewModel.flyTo(alert.latitude, alert.longitude, 55_000.0, pitchDeg = -52.0)
-                            viewModel.onEntitySelected(alert.entityId)
+                            val matchedEnt = uiState.allEntities.firstOrNull { it.id == alert.entityId }
+                            if (matchedEnt != null) {
+                                viewModel.focusEntity(matchedEnt)
+                            } else {
+                                uiState.watchRegions.firstOrNull { it.id == alert.regionId }?.let { reg ->
+                                    viewModel.flyTo(reg.centerLat, reg.centerLon, 75_000.0, pitchDeg = -52.0)
+                                }
+                            }
                         }
                         .padding(8.dp)
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                         BadgePill(alert.severity.label, severityColor(alert.severity))
-                        Text("${alert.regionName} · ${alert.title}", color = TextPrimaryDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "${alert.regionName} · ${alert.title} (${"%.0f".format(Locale.US, alert.distanceKm)} km)",
+                            color = TextPrimaryDark,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                     Text("${alert.summary} (${alert.providerName})", color = TextSecondaryDark, fontSize = 10.sp)
                 }
