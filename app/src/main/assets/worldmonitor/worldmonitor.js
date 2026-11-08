@@ -1,88 +1,66 @@
-/* global Cesium, satellite, topojson */
 /**
- * OMNISHIELD X INFINITY — WORLD MONITOR 2035
- * 3D Digital Earth, Orbital SGP4 Engine & Geospatial Visualization Layer
- *
- * Open-source components loaded in index.html:
- *  - CesiumJS 1.147.0 (Apache-2.0)
- *  - satellite.js 6.0.1 (MIT)
- *  - topojson-client 3.1.0 + world-atlas 110m Natural Earth (ISC / Public Domain)
- *
- * Security & Epistemic Rules:
- *  - Zero commercial Ion token required; boots offline on bundled NaturalEarthII + country borders.
- *  - Never fabricates aircraft, vessels, satellites, weather or disasters.
- *  - Simulation Lab overlays are isolated in a dedicated SIMULATED dataSource with a visible banner.
- *  - All DOM text updates use textContent (zero innerHTML).
+ * OmniShield X Infinity — World Monitor 2035
+ * Resilient Dual-Path 3D Digital Earth Engine:
+ *   1. Primary: CesiumJS 1.147.0 WebGL2 / WebGL1 3D Globe (synchronous bundled NaturalEarthII
+ *      offline base layer, direct-GPU PolylineCollection country borders, mobile-safe MSAA=1,
+ *      continuous adaptive render loop, ResizeObserver, SGP4 satellite propagation).
+ *   2. Self-Healing Failsafe: Hardware-accelerated HTML5 3D Orthographic Spherical Globe Engine
+ *      automatically engaged if WebGL context creation fails, scene.renderError fires, or
+ *      WebWorker tile tessellation produces zero tiles on restricted OEM WebViews.
  */
 (function () {
   'use strict';
 
+  const BRIDGE_NAME = 'WorldMonitorBridge';
+  const ICON_CACHE = new Map();
+  const DEG_TO_RAD = Math.PI / 180.0;
+  const RAD_TO_DEG = 180.0 / Math.PI;
+
   const CATEGORY_COLORS = {
-    AVIATION: '#38BDF8',
-    MARITIME: '#2DD4BF',
-    SPACE: '#A78BFA',
     DISASTER: '#EF4444',
-    WEATHER: '#60A5FA',
-    CYBER: '#F59E0B',
-    NEWS: '#34D399',
-    INFRASTRUCTURE: '#94A3B8',
-    CORRELATION: '#F472B6',
-    WATCHTOWER: '#22D3EE',
-    SIMULATED: '#FBBF24'
+    WEATHER: '#38BDF8',
+    AVIATION: '#22D3EE',
+    MARITIME: '#3B82F6',
+    SPACE: '#A855F7',
+    INFRASTRUCTURE: '#10B981',
+    CONFLICT_HUMANITARIAN: '#F59E0B'
   };
 
   const SEVERITY_COLORS = {
     CRITICAL: '#EF4444',
     HIGH: '#F97316',
-    MEDIUM: '#F59E0B',
-    LOW: '#22D3EE',
+    MODERATE: '#F59E0B',
+    LOW: '#10B981',
     INFO: '#38BDF8'
   };
 
   const state = {
+    engineMode: 'cesium', // 'cesium' | 'canvas3d'
     viewer: null,
+    canvasEngine: null,
     ready: false,
-    basemap: 'SATELLITE_ESRI',
-    projection: 'GLOBE_3D',
-    stylePreset: 'CYBER_TACTICAL',
+    commandQueue: [],
     performanceMode: 'BALANCED',
+    projection: 'GLOBE_3D',
+    basemap: 'SATELLITE_ESRI',
+    basemapOpacity: 1.0,
+    stylePreset: 'CYBER_TACTICAL',
     terrainEnabled: false,
-    buildings3DEnabled: true,
-    dayNightLighting: true,
-    atmosphereEnabled: true,
     bordersVisible: true,
+    atmosphereEnabled: true,
+    dayNightLighting: true,
     labelsVisible: true,
+    buildings3DEnabled: true,
+    clusteringEnabled: true,
+    heatmapEnabled: false,
     cloudsEnabled: false,
-    cloudsOpacity: 0.45,
+    cloudsOpacity: 0.52,
     radarEnabled: false,
     radarAnimating: false,
-    radarOpacity: 0.60,
+    radarOpacity: 0.58,
     radarFrames: [],
     radarFrameIndex: 0,
     radarTimer: null,
-    clusteringEnabled: true,
-    heatmapEnabled: false,
-    basemapOpacity: 1.0,
-    layerVisibility: {
-      AVIATION: true,
-      MARITIME: true,
-      SPACE: true,
-      DISASTER: true,
-      WEATHER: true,
-      CYBER: true,
-      NEWS: true,
-      INFRASTRUCTURE: true
-    },
-    layerOpacity: {
-      AVIATION: 1.0,
-      MARITIME: 1.0,
-      SPACE: 1.0,
-      DISASTER: 1.0,
-      WEATHER: 1.0,
-      CYBER: 1.0,
-      NEWS: 1.0,
-      INFRASTRUCTURE: 0.9
-    },
     imageryRefs: {
       offlineBase: null,
       primaryBase: null,
@@ -94,50 +72,84 @@
       splitRight: null
     },
     dataSources: {},
-    bordersSource: null,
+    bordersCollection: null,
+    countryFeatures: [],
+    countryRings: [],
     correlationsSource: null,
     watchtowerSource: null,
-    buildingsSource: null,
     simulationSource: null,
-    satellites: new Map(), // entityId -> { entityData, satrec, cesiumEntity, orbitEntity, groundTrackEntity }
+    buildingsSource: null,
+    satellites: new Map(),
     selectedSatelliteId: null,
-    allEntitiesCache: [],
     orbitTimer: null,
-    moveDebounceTimer: null,
-    iconCache: new Map(),
-    clusterIconCache: new Map()
+    clockTimer: null,
+    watchdogTimer: null,
+    lastViewportSentAt: 0,
+    allEntitiesCache: [],
+    trailsCache: [],
+    correlationsCache: [],
+    watchRegionsCache: [],
+    buildingsCache: [],
+    simulationCache: null,
+    layerVisibility: {
+      DISASTER: true,
+      WEATHER: true,
+      AVIATION: true,
+      MARITIME: true,
+      SPACE: true,
+      INFRASTRUCTURE: true,
+      CONFLICT_HUMANITARIAN: true
+    },
+    layerOpacity: {
+      DISASTER: 1.0,
+      WEATHER: 1.0,
+      AVIATION: 1.0,
+      MARITIME: 1.0,
+      SPACE: 1.0,
+      INFRASTRUCTURE: 1.0,
+      CONFLICT_HUMANITARIAN: 1.0
+    }
   };
+
+  function hideBootSplash() {
+    const el = document.getElementById('wmBootSplash');
+    if (el) el.classList.add('hidden');
+  }
 
   function postToAndroid(method, payload) {
     try {
-      const json = JSON.stringify(payload);
-      if (window.WorldMonitorBridge && typeof window.WorldMonitorBridge[method] === 'function') {
-        window.WorldMonitorBridge[method](json);
+      const bridge = window[BRIDGE_NAME];
+      if (bridge && typeof bridge[method] === 'function') {
+        bridge[method](typeof payload === 'string' ? payload : JSON.stringify(payload));
       }
     } catch (err) {
-      console.warn('Bridge dispatch failed:', method, err && err.message ? err.message : err);
+      console.warn('Bridge call failed:', method, err && err.message ? err.message : err);
     }
   }
 
-  function decodeBase64Utf8(b64) {
-    const binary = window.atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
+  function formatCoord(lat, lon) {
+    const ns = lat >= 0 ? 'N' : 'S';
+    const ew = lon >= 0 ? 'E' : 'W';
+    return `${Math.abs(lat).toFixed(2)}°${ns} ${Math.abs(lon).toFixed(2)}°${ew}`;
+  }
+
+  function formatDistanceMeters(meters) {
+    if (!Number.isFinite(meters) || meters <= 0) return '0 m';
+    if (meters >= 1000) {
+      const km = meters / 1000;
+      return km >= 100 ? `${Math.round(km).toLocaleString()} km` : `${km.toFixed(1)} km`;
     }
-    return new TextDecoder('utf-8').decode(bytes);
+    return `${Math.round(meters)} m`;
   }
 
   function utcYesterdayIso() {
-    const d = new Date(Date.now() - 36 * 3600 * 1000);
+    const d = new Date(Date.now() - 30 * 3600 * 1000);
     return d.toISOString().slice(0, 10);
   }
 
-  /** Generates crisp tactical icons on an offscreen canvas so zero remote icon requests occur. */
   function getTacticalIcon(category, severity, subType, opacity) {
-    const alphaKey = Math.round((opacity ?? 1) * 10) / 10;
-    const key = `${category}|${severity}|${subType || ''}|${alphaKey}`;
-    if (state.iconCache.has(key)) return state.iconCache.get(key);
+    const key = `${category}|${severity}|${subType || ''}|${Math.round((opacity || 1) * 20)}`;
+    if (ICON_CACHE.has(key)) return ICON_CACHE.get(key);
 
     const size = 44;
     const canvas = document.createElement('canvas');
@@ -146,63 +158,61 @@
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
-    const baseHex = (category === 'DISASTER' || severity === 'CRITICAL' || severity === 'HIGH')
-      ? (SEVERITY_COLORS[severity] || CATEGORY_COLORS[category] || '#38BDF8')
-      : (CATEGORY_COLORS[category] || '#38BDF8');
-
-    ctx.globalAlpha = Math.max(0.2, Math.min(1.0, alphaKey));
     const cx = size / 2;
     const cy = size / 2;
+    const catColor = CATEGORY_COLORS[category] || '#38BDF8';
+    const sevColor = SEVERITY_COLORS[severity] || catColor;
+    const primary = (severity === 'CRITICAL' || severity === 'HIGH') ? sevColor : catColor;
 
-    // Outer tactical halo
+    ctx.globalAlpha = Math.max(0.15, Math.min(1.0, opacity || 1.0));
+
+    const grad = ctx.createRadialGradient(cx, cy, 3, cx, cy, 19);
+    grad.addColorStop(0, primary + 'AA');
+    grad.addColorStop(0.55, primary + '33');
+    grad.addColorStop(1, primary + '00');
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(cx, cy, 17, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(4, 13, 26, 0.80)';
+    ctx.arc(cx, cy, 19, 0, Math.PI * 2);
     ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = baseHex;
-    ctx.stroke();
 
-    ctx.fillStyle = baseHex;
-    ctx.strokeStyle = '#F8FAFC';
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = '#020813';
+    ctx.lineWidth = 2.2;
+    ctx.fillStyle = primary;
 
     if (category === 'AVIATION') {
-      // North-up aircraft silhouette (rotated dynamically via billboard.rotation)
       ctx.beginPath();
       ctx.moveTo(cx, cy - 11);
       ctx.lineTo(cx + 3, cy - 3);
       ctx.lineTo(cx + 11, cy + 2);
       ctx.lineTo(cx + 11, cy + 5);
       ctx.lineTo(cx + 3, cy + 3);
-      ctx.lineTo(cx + 2.5, cy + 9);
-      ctx.lineTo(cx + 6, cy + 11);
-      ctx.lineTo(cx - 6, cy + 11);
-      ctx.lineTo(cx - 2.5, cy + 9);
+      ctx.lineTo(cx + 2, cy + 9);
+      ctx.lineTo(cx + 5, cy + 11);
+      ctx.lineTo(cx - 5, cy + 11);
+      ctx.lineTo(cx - 2, cy + 9);
       ctx.lineTo(cx - 3, cy + 3);
       ctx.lineTo(cx - 11, cy + 5);
       ctx.lineTo(cx - 11, cy + 2);
       ctx.lineTo(cx - 3, cy - 3);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
     } else if (category === 'MARITIME') {
-      // Directional vessel chevron
       ctx.beginPath();
-      ctx.moveTo(cx, cy - 11);
-      ctx.lineTo(cx + 7, cy + 9);
+      ctx.moveTo(cx, cy - 10);
+      ctx.lineTo(cx + 7, cy + 8);
       ctx.lineTo(cx, cy + 5);
-      ctx.lineTo(cx - 7, cy + 9);
+      ctx.lineTo(cx - 7, cy + 8);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
     } else if (category === 'SPACE') {
-      // Orbital satellite solar-wing glyph
       ctx.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+      ctx.strokeRect(cx - 3.5, cy - 3.5, 7, 7);
+      ctx.fillStyle = '#38BDF8';
       ctx.fillRect(cx - 12, cy - 2.5, 6.5, 5);
       ctx.fillRect(cx + 5.5, cy - 2.5, 6.5, 5);
-      ctx.strokeRect(cx - 3.5, cy - 3.5, 7, 7);
     } else if (category === 'DISASTER') {
-      // Concentric hazard diamond / seismic pulse
       ctx.beginPath();
       ctx.moveTo(cx, cy - 10);
       ctx.lineTo(cx + 10, cy);
@@ -211,125 +221,97 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-    } else if (category === 'WEATHER') {
-      ctx.beginPath();
-      ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    } else if (category === 'CYBER') {
-      // Hexagonal cyber node
+      if (severity === 'CRITICAL') {
+        ctx.strokeStyle = '#FCA5A5';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (category === 'INFRASTRUCTURE') {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
-        const a = (Math.PI / 3) * i - Math.PI / 6;
-        const px = cx + Math.cos(a) * 9;
-        const py = cy + Math.sin(a) * 9;
-        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        const ang = (Math.PI / 3) * i - Math.PI / 6;
+        const px = cx + 8.5 * Math.cos(ang);
+        const py = cy + 8.5 * Math.sin(ang);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       }
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-    } else if (category === 'NEWS') {
-      ctx.beginPath();
-      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx, cy, 11, -0.7, 0.7);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy, 11, Math.PI - 0.7, Math.PI + 0.7);
-      ctx.stroke();
     } else {
-      // Infrastructure square node
-      ctx.fillRect(cx - 6, cy - 6, 12, 12);
-      ctx.strokeRect(cx - 6, cy - 6, 12, 12);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2.4, 0, Math.PI * 2);
+      ctx.fill();
     }
 
-    const dataUrl = canvas.toDataURL('image/png');
-    state.iconCache.set(key, dataUrl);
-    return dataUrl;
+    const url = canvas.toDataURL('image/png');
+    ICON_CACHE.set(key, url);
+    return url;
   }
 
-  function getClusterBadge(count, colorHex) {
-    const label = count > 999 ? '999+' : String(count);
-    const key = `${label}|${colorHex}`;
-    if (state.clusterIconCache.has(key)) return state.clusterIconCache.get(key);
-
-    const size = 48;
+  function createClusterPin(count) {
+    const key = `cluster:${count >= 100 ? '100+' : count}`;
+    if (ICON_CACHE.has(key)) return ICON_CACHE.get(key);
+    const size = 46;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
 
+    const r = count >= 50 ? 20 : (count >= 15 ? 17 : 15);
+    const color = count >= 50 ? '#EF4444' : (count >= 15 ? '#F59E0B' : '#0EA5E9');
+    ctx.fillStyle = color + '38';
     ctx.beginPath();
-    ctx.arc(24, 24, 20, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(6, 18, 33, 0.92)';
+    ctx.arc(23, 23, r + 3, 0, Math.PI * 2);
     ctx.fill();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = colorHex || '#22D3EE';
+
+    ctx.fillStyle = '#040D1A';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(23, 23, r - 2, 0, Math.PI * 2);
+    ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#F8FAFC';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(label, 24, 24);
+    ctx.fillText(count > 999 ? '999+' : String(count), 23, 23.5);
 
-    const url = canvas.toDataURL('image/png');
-    state.clusterIconCache.set(key, url);
-    return url;
+    const dataUrl = canvas.toDataURL('image/png');
+    ICON_CACHE.set(key, dataUrl);
+    return dataUrl;
   }
 
-  /**
-   * Keyless 3D Elevation Provider decoding open-data Mapzen/AWS Terrarium PNG tiles:
-   * elevationMeters = (R * 256 + G + B / 256) - 32768
-   */
-  function createOpenTerrariumTerrainProvider() {
-    const sampleSize = 64;
-    const tilingScheme = new Cesium.WebMercatorTilingScheme();
-    const decodeCanvas = document.createElement('canvas');
-    decodeCanvas.width = sampleSize;
-    decodeCanvas.height = sampleSize;
-    const decodeCtx = decodeCanvas.getContext('2d', { willReadFrequently: true });
-
-    return new Cesium.CustomHeightmapTerrainProvider({
-      width: sampleSize,
-      height: sampleSize,
-      tilingScheme: tilingScheme,
-      credit: 'AWS Open Data / Mapzen Terrarium Elevation (Public Domain / Open Data)',
-      callback: function (x, y, level) {
-        if (level > 13 || !decodeCtx) {
-          return new Float32Array(sampleSize * sampleSize);
-        }
-        const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${level}/${x}/${y}.png`;
-        return Cesium.Resource.fetchImage({ url: url })
-          .then(function (img) {
-            decodeCtx.clearRect(0, 0, sampleSize, sampleSize);
-            decodeCtx.drawImage(img, 0, 0, sampleSize, sampleSize);
-            const pixels = decodeCtx.getImageData(0, 0, sampleSize, sampleSize).data;
-            const heights = new Float32Array(sampleSize * sampleSize);
-            for (let i = 0, p = 0; i < heights.length; i++, p += 4) {
-              const h = (pixels[p] * 256.0 + pixels[p + 1] + pixels[p + 2] / 256.0) - 32768.0;
-              heights[i] = Number.isFinite(h) ? Math.max(-11000, Math.min(9000, h)) : 0;
-            }
-            if (state.viewer) state.viewer.scene.requestRender();
-            return heights;
-          })
-          .catch(function () {
-            return new Float32Array(sampleSize * sampleSize);
-          });
-      }
+  /** Synchronous, zero-XML bundled NaturalEarthII offline base imagery provider. */
+  function createBundledOfflineBaseProvider() {
+    return new Cesium.UrlTemplateImageryProvider({
+      url: './vendor/cesium/Assets/Textures/NaturalEarthII/{z}/{x}/{reverseY}.jpg',
+      tilingScheme: new Cesium.GeographicTilingScheme(),
+      maximumLevel: 2,
+      tileWidth: 256,
+      tileHeight: 256,
+      credit: 'Natural Earth II (Bundled Offline)'
     });
   }
 
-  function createBasemapProvider(kind, customDateIso) {
-    const dateStr = customDateIso || utcYesterdayIso();
+  function createBasemapProvider(kind, customGibsDate) {
+    const gibsDate = customGibsDate || utcYesterdayIso();
     switch (kind) {
-      case 'NASA_GIBS_TRUECOLOR':
+      case 'SATELLITE_ESRI':
         return new Cesium.UrlTemplateImageryProvider({
-          url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
-          maximumLevel: 9,
-          credit: 'NASA EOSDIS GIBS VIIRS Corrected Reflectance'
+          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19,
+          credit: 'Esri, Maxar, Earthstar Geographics, USDA, USGS, AeroGRID'
         });
       case 'OPENSTREETMAP':
         return new Cesium.UrlTemplateImageryProvider({
@@ -337,370 +319,437 @@
           maximumLevel: 19,
           credit: '© OpenStreetMap contributors (ODbL)'
         });
-      case 'SATELLITE_ESRI':
-      default:
+      case 'DARK_TACTICAL':
         return new Cesium.UrlTemplateImageryProvider({
-          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-          maximumLevel: 19,
-          credit: 'Esri, Maxar, Earthstar Geographics, USDA, USGS'
+          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 16,
+          credit: 'Esri, HERE, Garmin, OpenStreetMap contributors'
         });
+      case 'NASA_GIBS_TRUECOLOR':
+        return new Cesium.UrlTemplateImageryProvider({
+          url: `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${gibsDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
+          maximumLevel: 9,
+          credit: `NASA EOSDIS GIBS VIIRS SNPP (${gibsDate})`
+        });
+      case 'NASA_GIBS_NIGHTLIGHTS':
+        return new Cesium.UrlTemplateImageryProvider({
+          url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_CityLights_2012/default/2012-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg',
+          maximumLevel: 8,
+          credit: 'NASA Earth Observatory / NOAA NGDC VIIRS Nighttime Lights'
+        });
+      case 'OFFLINE_NATURAL_EARTH':
+      default:
+        return null;
     }
+  }
+
+  function attachOfflineFallbackWatcher(provider, getLayer) {
+    if (!provider || !provider.errorEvent || typeof provider.errorEvent.addEventListener !== 'function') {
+      return;
+    }
+    let consecutiveErrors = 0;
+    provider.errorEvent.addEventListener(function () {
+      consecutiveErrors += 1;
+      const layer = getLayer();
+      if (consecutiveErrors >= 6 && layer && state.viewer) {
+        layer.show = false;
+        state.viewer.scene.requestRender();
+      }
+    });
+  }
+
+  /**
+   * Global 3D DEM Terrain Decoder using AWS Open Data Mapzen Terrarium PNG tiles.
+   * Uses an isolated per-tile canvas and falls back cleanly to EllipsoidTerrainProvider on errors.
+   */
+  function createOpenTerrariumTerrainProvider() {
+    const sampleSize = 32;
+    const provider = new Cesium.CustomHeightmapTerrainProvider({
+      width: sampleSize,
+      height: sampleSize,
+      tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      credit: 'Mapzen / AWS Open Data Global Terrarium DEM',
+      callback: function (x, y, level) {
+        if (level > 11) {
+          return new Float32Array(sampleSize * sampleSize);
+        }
+        const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${level}/${x}/${y}.png`;
+        return Cesium.Resource.fetchImage({ url: url })
+          .then(function (img) {
+            const tileCanvas = document.createElement('canvas');
+            tileCanvas.width = sampleSize;
+            tileCanvas.height = sampleSize;
+            const ctx = tileCanvas.getContext('2d', { willReadFrequently: true });
+            if (!ctx) return new Float32Array(sampleSize * sampleSize);
+            ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
+            const pixels = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+            const heights = new Float32Array(sampleSize * sampleSize);
+            for (let i = 0, p = 0; i < heights.length; i++, p += 4) {
+              const r = pixels[p];
+              const g = pixels[p + 1];
+              const b = pixels[p + 2];
+              const h = (r * 256.0 + g + b / 256.0) - 32768.0;
+              heights[i] = Number.isFinite(h) && h > -11000 && h < 9000 ? h : 0.0;
+            }
+            return heights;
+          })
+          .catch(function () {
+            return new Float32Array(sampleSize * sampleSize);
+          });
+      }
+    });
+
+    if (provider.errorEvent && typeof provider.errorEvent.addEventListener === 'function') {
+      let terrainErrors = 0;
+      provider.errorEvent.addEventListener(function () {
+        terrainErrors += 1;
+        if (terrainErrors >= 4 && state.viewer) {
+          state.terrainEnabled = false;
+          state.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+          state.viewer.scene.requestRender();
+        }
+      });
+    }
+    return provider;
   }
 
   function applyImageryTone(layer) {
     if (!layer) return;
     if (state.stylePreset === 'CYBER_TACTICAL') {
-      layer.brightness = 0.88;
+      layer.brightness = 0.94;
+      layer.contrast = 1.12;
+      layer.saturation = 0.92;
+    } else if (state.stylePreset === 'NIGHT_OPS_DARK') {
+      layer.brightness = 0.65;
+      layer.contrast = 1.25;
+      layer.saturation = 0.65;
+    } else if (state.stylePreset === 'THERMAL_CONTRAST') {
+      layer.brightness = 0.90;
+      layer.contrast = 1.32;
+      layer.saturation = 1.35;
+    } else if (state.stylePreset === 'HIGH_VISIBILITY') {
+      layer.brightness = 1.08;
       layer.contrast = 1.16;
-      layer.saturation = 0.82;
-      layer.gamma = 0.96;
+      layer.saturation = 1.12;
     } else {
       layer.brightness = 1.0;
-      layer.contrast = 1.04;
+      layer.contrast = 1.0;
       layer.saturation = 1.0;
-      layer.gamma = 1.0;
     }
   }
 
-  function setupClustering(dataSource, category) {
-    const colorHex = CATEGORY_COLORS[category] || '#22D3EE';
-    dataSource.clustering.enabled = state.clusteringEnabled;
-    dataSource.clustering.pixelRange = state.performanceMode === 'LOW_POWER' ? 54 : 36;
-    dataSource.clustering.minimumClusterSize = state.performanceMode === 'LOW_POWER' ? 3 : 5;
-    dataSource.clustering.clusterEvent.addEventListener(function (clusteredEntities, cluster) {
-      cluster.label.show = false;
-      cluster.billboard.show = true;
-      cluster.billboard.id = cluster.label.id;
-      cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.CENTER;
-      cluster.billboard.image = getClusterBadge(clusteredEntities.length, colorHex);
-      cluster.billboard.width = 38;
-      cluster.billboard.height = 38;
-      cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
-    });
-  }
-
-  async function loadBundledCountryBorders() {
+  async function ensureCountryTopologyLoaded() {
+    if (state.countryRings.length > 0) return;
     try {
+      if (typeof topojson === 'undefined') return;
       const resp = await fetch('./vendor/countries-110m.json');
-      const topology = await resp.json();
-      if (!topology || !topology.objects || !topology.objects.countries || typeof topojson === 'undefined') {
-        return;
+      if (!resp.ok) return;
+      const topo = await resp.json();
+      if (!topo || !topo.objects || !topo.objects.countries) return;
+
+      const mesh = topojson.mesh(topo, topo.objects.countries);
+      if (mesh && mesh.type === 'MultiLineString' && Array.isArray(mesh.coordinates)) {
+        state.countryRings = mesh.coordinates;
       }
-      const geojson = topojson.feature(topology, topology.objects.countries);
-      const ds = await Cesium.GeoJsonDataSource.load(geojson, {
-        stroke: Cesium.Color.fromCssColorString('#22D3EE').withAlpha(0.50),
-        fill: Cesium.Color.fromCssColorString('#061221').withAlpha(0.01),
-        strokeWidth: 1.2,
-        clampToGround: false
-      });
-      ds.name = 'COUNTRY_BORDERS';
-      ds.show = state.bordersVisible;
-      const entities = ds.entities.values;
-      for (let i = 0; i < entities.length; i++) {
-        const ent = entities[i];
-        const countryName = ent.properties && ent.properties.name ? ent.properties.name.getValue() : ent.name;
-        ent.wmKind = 'COUNTRY_BORDER';
-        ent.wmCountryName = countryName || 'Sovereign Territory';
-        ent.wmIsoNumeric = ent.id || '';
+
+      const fc = topojson.feature(topo, topo.objects.countries);
+      if (fc && Array.isArray(fc.features)) {
+        state.countryFeatures = fc.features;
       }
-      state.bordersSource = ds;
-      state.viewer.dataSources.add(ds);
-      state.viewer.scene.requestRender();
     } catch (err) {
-      console.warn('Country border load warning:', err && err.message ? err.message : err);
+      console.warn('Country topology load skipped:', err && err.message ? err.message : err);
     }
   }
 
-  function updateHudReadout() {
-    if (!state.viewer) return;
-    const cam = state.viewer.camera;
-    const carto = cam.positionCartographic;
-    if (!carto) return;
-    const lat = Cesium.Math.toDegrees(carto.latitude);
-    const lon = Cesium.Math.toDegrees(carto.longitude);
-    const altM = Math.max(0, carto.height);
-    const groundH = state.viewer.scene.globe.getHeight(new Cesium.Cartographic(carto.longitude, carto.latitude)) || 0;
+  /**
+   * Direct-GPU country borders using Cesium.PolylineCollection (zero WebWorker overhead,
+   * guaranteed Frame-1 visibility even if TaskProcessor workers are busy).
+   */
+  async function loadBundledCountryBorders() {
+    await ensureCountryTopologyLoaded();
+    if (!state.viewer || state.countryRings.length === 0) return;
 
-    const coordEl = document.getElementById('wmCoordReadout');
-    const altEl = document.getElementById('wmAltReadout');
-    const elevEl = document.getElementById('wmElevReadout');
-    const projEl = document.getElementById('wmProjReadout');
-
-    if (coordEl) {
-      const ns = lat >= 0 ? 'N' : 'S';
-      const ew = lon >= 0 ? 'E' : 'W';
-      coordEl.textContent = `${Math.abs(lat).toFixed(4)}°${ns} ${Math.abs(lon).toFixed(4)}°${ew}`;
-    }
-    if (altEl) {
-      altEl.textContent = altM >= 10000
-        ? `ALT ${Math.round(altM / 1000).toLocaleString()} km`
-        : `ALT ${Math.round(altM).toLocaleString()} m`;
-    }
-    if (elevEl) {
-      elevEl.textContent = `ELEV ${Math.round(groundH)} m`;
-    }
-    if (projEl) {
-      projEl.textContent = state.projection === 'MAP_2D'
-        ? '2D MERCATOR'
-        : (state.projection === 'COLUMBUS_25D' ? '2.5D COLUMBUS' : '3D GLOBE');
-    }
-  }
-
-  function emitViewportChanged() {
-    if (!state.viewer) return;
-    updateHudReadout();
-    const cam = state.viewer.camera;
-    const carto = cam.positionCartographic;
-    if (!carto) return;
-    const lat = Cesium.Math.toDegrees(carto.latitude);
-    const lon = Cesium.Math.toDegrees(carto.longitude);
-    const altM = Math.max(0, carto.height);
-    const groundH = state.viewer.scene.globe.getHeight(new Cesium.Cartographic(carto.longitude, carto.latitude)) || 0;
-
-    let west = Math.max(-180, lon - 25);
-    let south = Math.max(-85, lat - 20);
-    let east = Math.min(180, lon + 25);
-    let north = Math.min(85, lat + 20);
-
-    const rect = cam.computeViewRectangle(state.viewer.scene.globe.ellipsoid);
-    if (rect) {
-      west = Cesium.Math.toDegrees(rect.west);
-      south = Cesium.Math.toDegrees(rect.south);
-      east = Cesium.Math.toDegrees(rect.east);
-      north = Cesium.Math.toDegrees(rect.north);
+    if (state.bordersCollection) {
+      state.viewer.scene.primitives.remove(state.bordersCollection);
+      state.bordersCollection = null;
     }
 
-    postToAndroid('onViewportChanged', {
-      west: Number(west.toFixed(5)),
-      south: Number(south.toFixed(5)),
-      east: Number(east.toFixed(5)),
-      north: Number(north.toFixed(5)),
-      centerLat: Number(lat.toFixed(5)),
-      centerLon: Number(lon.toFixed(5)),
-      cameraAltitudeMeters: Math.round(altM),
-      groundElevationMeters: Math.round(groundH),
-      headingDeg: Number(Cesium.Math.toDegrees(cam.heading).toFixed(1)),
-      pitchDeg: Number(Cesium.Math.toDegrees(cam.pitch).toFixed(1)),
-      projection: state.projection
+    const collection = new Cesium.PolylineCollection();
+    const borderMat = Cesium.Material.fromType('Color', {
+      color: Cesium.Color.fromCssColorString('#22D3EE').withAlpha(0.52)
     });
-  }
 
-  function setupSplitDragHandle() {
-    const bar = document.getElementById('wmSplitBar');
-    if (!bar) return;
-    let dragging = false;
-
-    const updateSplitFromClientX = function (clientX) {
-      if (!state.viewer) return;
-      const w = window.innerWidth || 1;
-      const pos = Math.max(0.06, Math.min(0.94, clientX / w));
-      state.viewer.scene.splitPosition = pos;
-      bar.style.left = `${(pos * 100).toFixed(2)}%`;
-      state.viewer.scene.requestRender();
-    };
-
-    bar.addEventListener('pointerdown', function (e) {
-      dragging = true;
-      bar.setPointerCapture(e.pointerId);
-      e.stopPropagation();
-    });
-    bar.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      updateSplitFromClientX(e.clientX);
-      e.stopPropagation();
-    });
-    bar.addEventListener('pointerup', function (e) {
-      dragging = false;
-      try { bar.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
-    });
-  }
-
-  /** Propagates real CelesTrak TLE satellites via satellite.js SGP4. */
-  function propagateSatellitesNow() {
-    if (!state.viewer || typeof satellite === 'undefined' || state.satellites.size === 0) return;
-    if (!state.layerVisibility.SPACE) return;
-
-    const now = new Date();
-    const gmst = satellite.gstime(now);
-
-    state.satellites.forEach(function (entry) {
-      if (!entry.satrec || !entry.cesiumEntity) return;
-      try {
-        const pv = satellite.propagate(entry.satrec, now);
-        if (!pv || !pv.position) return;
-        const gd = satellite.eciToGeodetic(pv.position, gmst);
-        const lat = satellite.degreesLat(gd.latitude);
-        const lon = satellite.degreesLong(gd.longitude);
-        const altMeters = Math.max(120000, gd.height * 1000.0);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(altMeters)) return;
-
-        entry.cesiumEntity.position = Cesium.Cartesian3.fromDegrees(lon, lat, altMeters);
-        if (pv.velocity) {
-          const speedKms = Math.sqrt(
-            pv.velocity.x * pv.velocity.x +
-            pv.velocity.y * pv.velocity.y +
-            pv.velocity.z * pv.velocity.z
-          );
-          entry.entityData.speedValue = Number(speedKms.toFixed(2));
-          entry.entityData.speedUnit = 'km/s';
+    for (let i = 0; i < state.countryRings.length; i++) {
+      const coords = state.countryRings[i];
+      if (!Array.isArray(coords) || coords.length < 2) continue;
+      const positions = [];
+      for (let j = 0; j < coords.length; j++) {
+        const pt = coords[j];
+        if (Array.isArray(pt) && pt.length >= 2 && Number.isFinite(pt[0]) && Number.isFinite(pt[1])) {
+          positions.push(Cesium.Cartesian3.fromDegrees(pt[0], pt[1], 1600));
         }
-        entry.entityData.latitude = Number(lat.toFixed(4));
-        entry.entityData.longitude = Number(lon.toFixed(4));
-        entry.entityData.altitudeMeters = Math.round(altMeters);
-      } catch (_) {
-        // Decayed or invalid SGP4 epoch; skip without crashing render loop.
       }
-    });
+      if (positions.length >= 2) {
+        collection.add({
+          positions: positions,
+          width: 1.2,
+          material: borderMat
+        });
+      }
+    }
 
+    collection.show = state.bordersVisible;
+    state.viewer.scene.primitives.add(collection);
+    state.bordersCollection = collection;
     state.viewer.scene.requestRender();
   }
 
-  function renderSatelliteOrbitAndGroundTrack(satId) {
-    const ds = state.dataSources.SPACE;
-    if (!ds || typeof satellite === 'undefined') return;
+  function updateTelemetryBarValues(latDeg, lonDeg, altM, scaleMeters) {
+    const utcEl = document.getElementById('wmUtcClock');
+    const coordsEl = document.getElementById('wmCamCoords');
+    const altEl = document.getElementById('wmCamAlt');
+    const scaleEl = document.getElementById('wmScaleLabel');
 
-    // Clear previous orbit/ground-track polylines
+    if (utcEl) {
+      const now = new Date();
+      utcEl.textContent = now.toISOString().slice(11, 19) + ' UTC';
+    }
+    if (coordsEl) coordsEl.textContent = formatCoord(latDeg, lonDeg);
+    if (altEl) altEl.textContent = `ALT ${formatDistanceMeters(altM)}`;
+    if (scaleEl) scaleEl.textContent = `SCALE ${formatDistanceMeters(scaleMeters)}`;
+  }
+
+  function updateHudReadout() {
+    if (state.engineMode === 'canvas3d' && state.canvasEngine) {
+      state.canvasEngine.emitTelemetry();
+      return;
+    }
+    const viewer = state.viewer;
+    if (!viewer) return;
+
+    const carto = viewer.camera.positionCartographic;
+    if (!carto) return;
+    const latDeg = Cesium.Math.toDegrees(carto.latitude);
+    const lonDeg = Cesium.Math.toDegrees(carto.longitude);
+    const altM = Math.max(0, carto.height);
+    const groundHeight = viewer.scene.globe.getHeight(carto) || 0;
+    const approxScale = Math.max(50, altM * 0.18);
+
+    updateTelemetryBarValues(latDeg, lonDeg, altM, approxScale);
+
+    const nowMs = Date.now();
+    if (nowMs - state.lastViewportSentAt > 320) {
+      state.lastViewportSentAt = nowMs;
+      let west = Math.max(-180, lonDeg - 35);
+      let south = Math.max(-85, latDeg - 25);
+      let east = Math.min(180, lonDeg + 35);
+      let north = Math.min(85, latDeg + 25);
+      try {
+        const rect = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+        if (rect) {
+          west = Cesium.Math.toDegrees(rect.west);
+          south = Cesium.Math.toDegrees(rect.south);
+          east = Cesium.Math.toDegrees(rect.east);
+          north = Cesium.Math.toDegrees(rect.north);
+        }
+      } catch (_) { /*horizon tilted*/ }
+
+      postToAndroid('onViewportChanged', {
+        centerLat: Number(latDeg.toFixed(5)),
+        centerLon: Number(lonDeg.toFixed(5)),
+        cameraAltitudeMeters: Math.round(altM),
+        groundElevationMeters: Math.round(groundHeight),
+        headingDeg: Number(Cesium.Math.toDegrees(viewer.camera.heading).toFixed(1)),
+        pitchDeg: Number(Cesium.Math.toDegrees(viewer.camera.pitch).toFixed(1)),
+        west: Number(west.toFixed(4)),
+        south: Number(south.toFixed(4)),
+        east: Number(east.toFixed(4)),
+        north: Number(north.toFixed(4)),
+        projection: state.projection
+      });
+    }
+  }
+
+  function propagatePointAtDate(satrec, dateObj) {
+    if (typeof satellite === 'undefined' || !satrec) return null;
+    const pv = satellite.propagate(satrec, dateObj);
+    if (!pv || !pv.position || typeof pv.position.x !== 'number') return null;
+    const gmst = satellite.gstime(dateObj);
+    const gd = satellite.eciToGeodetic(pv.position, gmst);
+    const lonDeg = satellite.degreesLong(gd.longitude);
+    const latDeg = satellite.degreesLat(gd.latitude);
+    const altMeters = Math.max(80000, gd.height * 1000.0);
+    if (!Number.isFinite(lonDeg) || !Number.isFinite(latDeg) || !Number.isFinite(altMeters)) {
+      return null;
+    }
+    let velKms = 7.66;
+    if (pv.velocity && typeof pv.velocity.x === 'number') {
+      velKms = Math.sqrt(
+        pv.velocity.x * pv.velocity.x +
+        pv.velocity.y * pv.velocity.y +
+        pv.velocity.z * pv.velocity.z
+      );
+    }
+    return { latDeg, lonDeg, altMeters, velKms };
+  }
+
+  function propagateSatellitesNow() {
+    if (state.satellites.size === 0 || !state.layerVisibility.SPACE) return;
+    const now = new Date();
+    state.satellites.forEach(function (entry) {
+      const pos = propagatePointAtDate(entry.satrec, now);
+      if (!pos) return;
+      entry.livePos = pos;
+      entry.entityData.latitude = pos.latDeg;
+      entry.entityData.longitude = pos.lonDeg;
+      entry.entityData.altitudeMeters = pos.altMeters;
+      entry.entityData.speedKnots = pos.velKms * 1943.84;
+      if (state.engineMode === 'cesium' && entry.cesiumEntity) {
+        entry.cesiumEntity.position = Cesium.Cartesian3.fromDegrees(pos.lonDeg, pos.latDeg, pos.altMeters);
+      }
+    });
+    if (state.engineMode === 'cesium' && state.viewer) {
+      state.viewer.scene.requestRender();
+    }
+  }
+
+  function renderSatelliteOrbitAndGroundTrack(entityId) {
+    if (state.engineMode === 'canvas3d') {
+      if (state.canvasEngine) state.canvasEngine.rebuildSelectedOrbit(entityId);
+      return;
+    }
+    const spaceDs = state.dataSources.SPACE;
+    if (!spaceDs) return;
+
     state.satellites.forEach(function (entry) {
       if (entry.orbitEntity) {
-        ds.entities.remove(entry.orbitEntity);
+        spaceDs.entities.remove(entry.orbitEntity);
         entry.orbitEntity = null;
       }
       if (entry.groundTrackEntity) {
-        ds.entities.remove(entry.groundTrackEntity);
+        spaceDs.entities.remove(entry.groundTrackEntity);
         entry.groundTrackEntity = null;
       }
     });
 
-    if (!satId || !state.satellites.has(satId)) return;
-    const entry = state.satellites.get(satId);
-    if (!entry || !entry.satrec) return;
+    const selected = state.satellites.get(entityId);
+    if (!selected) {
+      if (state.viewer) state.viewer.scene.requestRender();
+      return;
+    }
 
+    const nowMs = Date.now();
     const orbitPositions = [];
-    const groundPositions = [];
-    const baseMs = Date.now();
-    // Sample -48 minutes to +52 minutes (full ~100 min LEO orbit, or arc for MEO/GEO)
-    for (let min = -48; min <= 52; min += 2) {
-      const sampleDate = new Date(baseMs + min * 60000);
-      const pv = satellite.propagate(entry.satrec, sampleDate);
-      if (!pv || !pv.position) continue;
-      const gmst = satellite.gstime(sampleDate);
-      const gd = satellite.eciToGeodetic(pv.position, gmst);
-      const lat = satellite.degreesLat(gd.latitude);
-      const lon = satellite.degreesLong(gd.longitude);
-      const altMeters = Math.max(120000, gd.height * 1000.0);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-      orbitPositions.push(Cesium.Cartesian3.fromDegrees(lon, lat, altMeters));
-      groundPositions.push(Cesium.Cartesian3.fromDegrees(lon, lat, 2500));
+    const groundSegments = [[]];
+    let prevLon = null;
+
+    for (let min = -48; min <= 48; min += 2) {
+      const dt = new Date(nowMs + min * 60 * 1000);
+      const pt = propagatePointAtDate(selected.satrec, dt);
+      if (!pt) continue;
+      orbitPositions.push(Cesium.Cartesian3.fromDegrees(pt.lonDeg, pt.latDeg, pt.altMeters));
+
+      if (prevLon !== null && Math.abs(pt.lonDeg - prevLon) > 170) {
+        groundSegments.push([]);
+      }
+      groundSegments[groundSegments.length - 1].push(
+        Cesium.Cartesian3.fromDegrees(pt.lonDeg, pt.latDeg, 2500)
+      );
+      prevLon = pt.lonDeg;
     }
 
     if (orbitPositions.length >= 2) {
-      entry.orbitEntity = ds.entities.add({
+      selected.orbitEntity = spaceDs.entities.add({
         polyline: {
           positions: orbitPositions,
           width: 2.2,
           material: new Cesium.PolylineGlowMaterialProperty({
             glowPower: 0.22,
-            color: Cesium.Color.fromCssColorString('#A78BFA').withAlpha(0.92)
+            color: Cesium.Color.fromCssColorString('#C084FC').withAlpha(0.92)
           })
         }
       });
-      entry.groundTrackEntity = ds.entities.add({
+    }
+
+    const validSeg = groundSegments.find(function (s) { return s.length >= 2; });
+    if (validSeg) {
+      selected.groundTrackEntity = spaceDs.entities.add({
         polyline: {
-          positions: groundPositions,
-          width: 1.4,
+          positions: validSeg,
+          width: 1.5,
           material: new Cesium.PolylineDashMaterialProperty({
-            color: Cesium.Color.fromCssColorString('#22D3EE').withAlpha(0.70),
+            color: Cesium.Color.fromCssColorString('#38BDF8').withAlpha(0.75),
             dashLength: 12.0
           })
         }
       });
     }
-    state.viewer.scene.requestRender();
+
+    if (state.viewer) state.viewer.scene.requestRender();
   }
 
-  function scheduleOrbitTimer() {
-    if (state.orbitTimer) {
-      clearInterval(state.orbitTimer);
-      state.orbitTimer = null;
-    }
-    const intervalMs = state.performanceMode === 'HIGH'
-      ? 1200
-      : (state.performanceMode === 'BALANCED' ? 2500 : 5000);
-    state.orbitTimer = setInterval(propagateSatellitesNow, intervalMs);
-  }
+  function computeSatellitePasses(entityId, observerLatDeg, observerLonDeg, hoursAhead) {
+    const entry = state.satellites.get(entityId);
+    if (!entry || typeof satellite === 'undefined') return [];
 
-  /** Computes upcoming visible/radio passes over observer (lat, lon) using satellite.js ecfToLookAngles. */
-  function computeSatellitePasses(noradOrEntityId, observerLatDeg, observerLonDeg, hoursAhead) {
-    if (typeof satellite === 'undefined') return [];
-    let target = state.satellites.get(noradOrEntityId);
-    if (!target) {
-      state.satellites.forEach(function (val) {
-        if (String(val.entityData.id).endsWith(String(noradOrEntityId)) ||
-            String(val.entityData.subType).includes(String(noradOrEntityId))) {
-          target = val;
-        }
-      });
-    }
-    if (!target || !target.satrec) return [];
-
+    const horizonHours = Math.min(48, Math.max(1, hoursAhead || 24));
+    const stepMs = 30 * 1000;
+    const startMs = Date.now();
+    const endMs = startMs + horizonHours * 3600 * 1000;
     const obsGd = {
       longitude: satellite.degreesToRadians(observerLonDeg),
       latitude: satellite.degreesToRadians(observerLatDeg),
       height: 0.05
     };
-    const horizonRad = satellite.degreesToRadians(10.0);
-    const totalMinutes = Math.min(48, Math.max(6, hoursAhead || 24)) * 60;
-    const startMs = Date.now();
+
     const passes = [];
-    let currentPass = null;
+    let current = null;
 
-    for (let m = 0; m <= totalMinutes; m += 1) {
-      const tMs = startMs + m * 60000;
-      const dt = new Date(tMs);
-      const pv = satellite.propagate(target.satrec, dt);
+    for (let t = startMs; t <= endMs; t += stepMs) {
+      const d = new Date(t);
+      const pv = satellite.propagate(entry.satrec, d);
       if (!pv || !pv.position) continue;
-      const gmst = satellite.gstime(dt);
-      const posEcf = satellite.eciToEcf(pv.position, gmst);
-      const look = satellite.ecfToLookAngles(obsGd, posEcf);
+      const gmst = satellite.gstime(d);
+      const ecf = satellite.eciToEcf(pv.position, gmst);
+      const look = satellite.ecfToLookAngles(obsGd, ecf);
+      const elDeg = look.elevation * RAD_TO_DEG;
+      const azDeg = (look.azimuth * RAD_TO_DEG + 360.0) % 360.0;
 
-      if (look.elevation >= horizonRad) {
-        const elevDeg = satellite.radiansToDegrees(look.elevation);
-        const azDeg = satellite.radiansToDegrees(look.azimuth);
-        if (!currentPass) {
-          currentPass = {
-            entityId: target.entityData.id,
-            name: target.entityData.title,
-            observerLat: observerLatDeg,
-            observerLon: observerLonDeg,
-            riseEpochMs: tMs,
-            culminationEpochMs: tMs,
-            setEpochMs: tMs,
-            maxElevationDeg: elevDeg,
-            riseAzimuthDeg: azDeg,
-            setAzimuthDeg: azDeg
+      if (elDeg >= 10.0) {
+        if (!current) {
+          current = {
+            aosEpochMs: t,
+            losEpochMs: t,
+            maxElevationDeg: elDeg,
+            maxElevationEpochMs: t,
+            aosAzimuthDeg: azDeg,
+            losAzimuthDeg: azDeg
           };
         } else {
-          currentPass.setEpochMs = tMs;
-          currentPass.setAzimuthDeg = azDeg;
-          if (elevDeg > currentPass.maxElevationDeg) {
-            currentPass.maxElevationDeg = elevDeg;
-            currentPass.culminationEpochMs = tMs;
+          current.losEpochMs = t;
+          current.losAzimuthDeg = azDeg;
+          if (elDeg > current.maxElevationDeg) {
+            current.maxElevationDeg = elDeg;
+            current.maxElevationEpochMs = t;
           }
         }
-      } else if (currentPass) {
-        currentPass.durationSeconds = Math.max(60, Math.round((currentPass.setEpochMs - currentPass.riseEpochMs) / 1000));
-        currentPass.maxElevationDeg = Number(currentPass.maxElevationDeg.toFixed(1));
-        currentPass.riseAzimuthDeg = Number(currentPass.riseAzimuthDeg.toFixed(1));
-        currentPass.setAzimuthDeg = Number(currentPass.setAzimuthDeg.toFixed(1));
-        passes.push(currentPass);
-        currentPass = null;
-        if (passes.length >= 6) break;
+      } else if (current) {
+        passes.push({
+          aosEpochMs: current.aosEpochMs,
+          losEpochMs: current.losEpochMs,
+          maxElevationEpochMs: current.maxElevationEpochMs,
+          maxElevationDeg: Number(current.maxElevationDeg.toFixed(1)),
+          aosAzimuthDeg: Number(current.aosAzimuthDeg.toFixed(0)),
+          losAzimuthDeg: Number(current.losAzimuthDeg.toFixed(0)),
+          durationSec: Math.max(30, Math.round((current.losEpochMs - current.aosEpochMs) / 1000))
+        });
+        current = null;
+        if (passes.length >= 8) break;
       }
     }
     return passes;
   }
 
-  /** Renders an equirectangular density heatmap imagery overlay from real loaded entities. */
   async function rebuildDensityHeatmap() {
     if (!state.viewer) return;
     if (state.imageryRefs.heatmapOverlay) {
@@ -753,15 +802,61 @@
     }
   }
 
-  function addOrReplaceEntities(entities) {
-    if (!state.viewer || !Array.isArray(entities)) return;
-    state.allEntitiesCache = entities;
+  function registerSatellitesFromEntities(entities) {
+    state.satellites.clear();
+    if (typeof satellite === 'undefined' || !Array.isArray(entities)) return;
+    for (let i = 0; i < entities.length; i++) {
+      const item = entities[i];
+      if (item.category === 'SPACE' && item.tleLine1 && item.tleLine2) {
+        try {
+          const satrec = satellite.twoline2satrec(item.tleLine1, item.tleLine2);
+          state.satellites.set(item.id, {
+            entityData: item,
+            satrec: satrec,
+            cesiumEntity: null,
+            livePos: null,
+            orbitEntity: null,
+            groundTrackEntity: null
+          });
+        } catch (_) { /* ignore malformed TLE */ }
+      }
+    }
+  }
 
-    // Clear category dataSources and satellite map before repopulating
+  function selectDefaultIssIfNeeded() {
+    if (state.selectedSatelliteId && state.satellites.has(state.selectedSatelliteId)) {
+      renderSatelliteOrbitAndGroundTrack(state.selectedSatelliteId);
+      return;
+    }
+    if (state.satellites.size > 0) {
+      let issId = null;
+      state.satellites.forEach(function (val, key) {
+        if (String(val.entityData.title).toUpperCase().includes('ISS') || String(key).includes('25544')) {
+          issId = key;
+        }
+      });
+      if (issId) {
+        state.selectedSatelliteId = issId;
+        renderSatelliteOrbitAndGroundTrack(issId);
+      }
+    }
+  }
+
+  function addOrReplaceEntities(entities) {
+    if (!Array.isArray(entities)) return;
+    state.allEntitiesCache = entities;
+    registerSatellitesFromEntities(entities);
+
+    if (state.engineMode === 'canvas3d') {
+      propagateSatellitesNow();
+      selectDefaultIssIfNeeded();
+      return;
+    }
+    if (!state.viewer) return;
+
     Object.keys(state.dataSources).forEach(function (cat) {
       state.dataSources[cat].entities.removeAll();
     });
-    state.satellites.clear();
 
     const maxPerLayer = state.performanceMode === 'LOW_POWER' ? 180 : (state.performanceMode === 'BALANCED' ? 450 : 900);
     const countsByCat = {};
@@ -781,7 +876,6 @@
         ? (SEVERITY_COLORS[item.severity] || CATEGORY_COLORS[cat])
         : (CATEGORY_COLORS[cat] || '#38BDF8');
 
-      // LineString / Polygon geometry support (submarine cables, storm tracks, NWS alert areas)
       if (item.geometryType === 'LineString' && item.geometryCoordsJson) {
         try {
           const coords = JSON.parse(item.geometryCoordsJson);
@@ -866,38 +960,14 @@
       });
       cesiumEnt.wmEntity = item;
 
-      // Register real TLE satellites with satellite.js SGP4 propagator
-      if (cat === 'SPACE' && item.tleLine1 && item.tleLine2 && typeof satellite !== 'undefined') {
-        try {
-          const satrec = satellite.twoline2satrec(item.tleLine1, item.tleLine2);
-          state.satellites.set(item.id, {
-            entityData: item,
-            satrec: satrec,
-            cesiumEntity: cesiumEnt,
-            orbitEntity: null,
-            groundTrackEntity: null
-          });
-        } catch (_) { /* ignore invalid TLE */ }
+      const satEntry = state.satellites.get(item.id);
+      if (satEntry) {
+        satEntry.cesiumEntity = cesiumEnt;
       }
     }
 
     propagateSatellitesNow();
-    if (state.selectedSatelliteId && state.satellites.has(state.selectedSatelliteId)) {
-      renderSatelliteOrbitAndGroundTrack(state.selectedSatelliteId);
-    } else if (state.satellites.size > 0) {
-      // Show ISS ground track & 3D orbit by default when ISS is present
-      let issId = null;
-      state.satellites.forEach(function (val, key) {
-        if (String(val.entityData.title).toUpperCase().includes('ISS') || String(key).includes('25544')) {
-          issId = key;
-        }
-      });
-      if (issId) {
-        state.selectedSatelliteId = issId;
-        renderSatelliteOrbitAndGroundTrack(issId);
-      }
-    }
-
+    selectDefaultIssIfNeeded();
     if (state.heatmapEnabled) {
       rebuildDensityHeatmap();
     }
@@ -905,7 +975,10 @@
   }
 
   function updateEntityTrails(trails) {
-    if (!state.viewer || !Array.isArray(trails)) return;
+    if (!Array.isArray(trails)) return;
+    state.trailsCache = trails;
+    if (state.engineMode === 'canvas3d' || !state.viewer) return;
+
     trails.forEach(function (trail) {
       const ds = state.dataSources[trail.category];
       if (!ds || !Array.isArray(trail.points) || trail.points.length < 2) return;
@@ -927,7 +1000,10 @@
   }
 
   function updateCorrelations(incidents) {
-    if (!state.correlationsSource || !Array.isArray(incidents)) return;
+    if (!Array.isArray(incidents)) return;
+    state.correlationsCache = incidents;
+    if (state.engineMode === 'canvas3d' || !state.correlationsSource) return;
+
     state.correlationsSource.entities.removeAll();
     incidents.forEach(function (inc) {
       if (Array.isArray(inc.links)) {
@@ -953,7 +1029,10 @@
   }
 
   function updateWatchRegions(regions) {
-    if (!state.watchtowerSource || !Array.isArray(regions)) return;
+    if (!Array.isArray(regions)) return;
+    state.watchRegionsCache = regions;
+    if (state.engineMode === 'canvas3d' || !state.watchtowerSource) return;
+
     state.watchtowerSource.entities.removeAll();
     regions.forEach(function (reg) {
       if (!reg.enabled) return;
@@ -984,7 +1063,9 @@
   }
 
   function updateBuildings3D(buildings) {
-    if (!state.buildingsSource) return;
+    if (Array.isArray(buildings)) state.buildingsCache = buildings;
+    if (state.engineMode === 'canvas3d' || !state.buildingsSource) return;
+
     state.buildingsSource.entities.removeAll();
     if (!state.buildings3DEnabled || !Array.isArray(buildings)) {
       if (state.viewer) state.viewer.scene.requestRender();
@@ -1014,11 +1095,11 @@
   }
 
   function setSimulationOverlay(simPayload) {
-    if (!state.simulationSource) return;
-    state.simulationSource.entities.removeAll();
+    state.simulationCache = simPayload || null;
     const banner = document.getElementById('wmSimBanner');
     if (!simPayload || !simPayload.active) {
       if (banner) banner.classList.add('hidden');
+      if (state.simulationSource) state.simulationSource.entities.removeAll();
       if (state.viewer) state.viewer.scene.requestRender();
       return;
     }
@@ -1026,7 +1107,9 @@
       banner.textContent = `EXPERIMENTAL SIMULATION (${simPayload.label || 'SCENARIO'}) — NOT A CERTAIN PREDICTION`;
       banner.classList.remove('hidden');
     }
+    if (state.engineMode === 'canvas3d' || !state.simulationSource) return;
 
+    state.simulationSource.entities.removeAll();
     if (Array.isArray(simPayload.rings)) {
       simPayload.rings.forEach(function (ring, idx) {
         state.simulationSource.entities.add({
@@ -1073,21 +1156,29 @@
   }
 
   async function setBasemap(kind) {
-    if (!state.viewer) return;
-    state.basemap = kind;
+    state.basemap = kind || 'SATELLITE_ESRI';
+    if (state.engineMode === 'canvas3d' || !state.viewer) return;
+
     if (state.imageryRefs.primaryBase) {
       state.viewer.imageryLayers.remove(state.imageryRefs.primaryBase, true);
       state.imageryRefs.primaryBase = null;
     }
-    if (kind !== 'OFFLINE_NATURAL_EARTH') {
-      const provider = createBasemapProvider(kind);
-      const layer = state.viewer.imageryLayers.addImageryProvider(provider, 1);
-      layer.alpha = state.basemapOpacity;
-      applyImageryTone(layer);
-      state.imageryRefs.primaryBase = layer;
+    if (state.basemap !== 'OFFLINE_NATURAL_EARTH') {
+      try {
+        const provider = createBasemapProvider(state.basemap);
+        if (provider) {
+          const layer = state.viewer.imageryLayers.addImageryProvider(provider, 1);
+          layer.alpha = state.basemapOpacity;
+          applyImageryTone(layer);
+          state.imageryRefs.primaryBase = layer;
+          attachOfflineFallbackWatcher(provider, function () { return state.imageryRefs.primaryBase; });
+        }
+      } catch (err) {
+        console.warn('Basemap fallback to bundled NaturalEarthII:', err && err.message ? err.message : err);
+      }
     }
     if (state.imageryRefs.labelsOverlay) {
-      state.imageryRefs.labelsOverlay.show = state.labelsVisible && kind !== 'OPENSTREETMAP';
+      state.imageryRefs.labelsOverlay.show = state.labelsVisible && state.basemap !== 'OPENSTREETMAP';
     }
     state.viewer.scene.requestRender();
   }
@@ -1140,9 +1231,9 @@
   }
 
   function setCloudsOverlay(enabled, opacity) {
-    if (!state.viewer) return;
     state.cloudsEnabled = !!enabled;
     if (Number.isFinite(opacity)) state.cloudsOpacity = opacity;
+    if (!state.viewer) return;
     if (state.imageryRefs.cloudsOverlay) {
       state.viewer.imageryLayers.remove(state.imageryRefs.cloudsOverlay, true);
       state.imageryRefs.cloudsOverlay = null;
@@ -1162,8 +1253,13 @@
   }
 
   function renderCurrentRadarFrame() {
-    if (!state.viewer) return;
     const stampEl = document.getElementById('wmRadarStamp');
+    if (!state.viewer) {
+      if (stampEl && (!state.radarEnabled || state.radarFrames.length === 0)) {
+        stampEl.classList.add('hidden');
+      }
+      return;
+    }
     if (state.imageryRefs.radarOverlay) {
       state.viewer.imageryLayers.remove(state.imageryRefs.radarOverlay, true);
       state.imageryRefs.radarOverlay = null;
@@ -1216,17 +1312,32 @@
     renderCurrentRadarFrame();
   }
 
+  function scheduleOrbitTimer() {
+    if (state.orbitTimer) {
+      clearInterval(state.orbitTimer);
+      state.orbitTimer = null;
+    }
+    const intervalMs = state.performanceMode === 'LOW_POWER' ? 4000 : 1200;
+    state.orbitTimer = setInterval(propagateSatellitesNow, intervalMs);
+  }
+
   function handleCommand(cmd) {
-    if (!cmd || typeof cmd.type !== 'string' || !state.viewer) return;
+    if (!cmd || typeof cmd.type !== 'string') return;
+    if (state.engineMode === 'canvas3d' && state.canvasEngine) {
+      state.canvasEngine.handleCommand(cmd);
+      return;
+    }
+    if (!state.viewer) return;
+
     switch (cmd.type) {
       case 'SET_BASEMAP':
         setBasemap(cmd.basemap || 'SATELLITE_ESRI');
         break;
       case 'SET_PROJECTION':
         state.projection = cmd.projection || 'GLOBE_3D';
-        if (state.projection === 'MAP_2D') state.viewer.scene.morphTo2D(0.9);
-        else if (state.projection === 'COLUMBUS_25D') state.viewer.scene.morphToColumbusView(0.9);
-        else state.viewer.scene.morphTo3D(0.9);
+        if (state.projection === 'MAP_2D') state.viewer.scene.morphTo2D(0.8);
+        else if (state.projection === 'COLUMBUS_25D') state.viewer.scene.morphToColumbusView(0.8);
+        else state.viewer.scene.morphTo3D(0.8);
         updateHudReadout();
         break;
       case 'SET_STYLE_PRESET':
@@ -1237,9 +1348,13 @@
         break;
       case 'SET_TERRAIN':
         state.terrainEnabled = !!cmd.enabled;
-        state.viewer.terrainProvider = (state.terrainEnabled && state.performanceMode !== 'LOW_POWER')
-          ? createOpenTerrariumTerrainProvider()
-          : new Cesium.EllipsoidTerrainProvider();
+        try {
+          state.viewer.terrainProvider = (state.terrainEnabled && state.performanceMode !== 'LOW_POWER')
+            ? createOpenTerrariumTerrainProvider()
+            : new Cesium.EllipsoidTerrainProvider();
+        } catch (_) {
+          state.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
+        }
         state.viewer.scene.requestRender();
         break;
       case 'SET_SCENE_FLAGS':
@@ -1256,7 +1371,7 @@
         }
         if (typeof cmd.borders === 'boolean') {
           state.bordersVisible = cmd.borders;
-          if (state.bordersSource) state.bordersSource.show = state.bordersVisible;
+          if (state.bordersCollection) state.bordersCollection.show = state.bordersVisible;
         }
         if (typeof cmd.labels === 'boolean') {
           state.labelsVisible = cmd.labels;
@@ -1305,8 +1420,9 @@
       case 'SET_PERFORMANCE_MODE':
         state.performanceMode = cmd.mode || 'BALANCED';
         state.viewer.resolutionScale = state.performanceMode === 'LOW_POWER'
-          ? 0.72
-          : (state.performanceMode === 'BALANCED' ? 0.92 : 1.0);
+          ? 0.75
+          : (state.performanceMode === 'BALANCED' ? 0.94 : 1.0);
+        state.viewer.targetFrameRate = state.performanceMode === 'LOW_POWER' ? 28 : 60;
         state.viewer.scene.globe.maximumScreenSpaceError = state.performanceMode === 'LOW_POWER' ? 3.5 : 2.0;
         if (state.performanceMode === 'LOW_POWER' && state.terrainEnabled) {
           state.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
@@ -1353,7 +1469,7 @@
               pitch: Cesium.Math.toRadians(cmd.pitchDeg || -78),
               roll: 0
             },
-            duration: Number.isFinite(cmd.durationSec) ? cmd.durationSec : 1.35
+            duration: Number.isFinite(cmd.durationSec) ? cmd.durationSec : 1.25
           });
         }
         break;
@@ -1362,17 +1478,36 @@
           state.viewer.camera.zoomIn(Math.max(200, state.viewer.camera.positionCartographic.height * 0.38));
         } else if (cmd.action === 'ZOOM_OUT') {
           state.viewer.camera.zoomOut(Math.max(400, state.viewer.camera.positionCartographic.height * 0.55));
+        } else if (cmd.action === 'TILT_3D') {
+          if (state.projection !== 'GLOBE_3D') {
+            state.projection = 'GLOBE_3D';
+            state.viewer.scene.morphTo3D(0.5);
+          }
+          const c = state.viewer.camera.positionCartographic;
+          const curPitchDeg = Cesium.Math.toDegrees(state.viewer.camera.pitch);
+          const nextPitchDeg = curPitchDeg > -65 ? -88 : -44;
+          const targetAlt = nextPitchDeg > -65 ? Math.min(c.height, 2600000) : c.height;
+          state.viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, Math.max(800, targetAlt)),
+            orientation: {
+              heading: state.viewer.camera.heading,
+              pitch: Cesium.Math.toRadians(nextPitchDeg),
+              roll: 0
+            },
+            duration: 0.75
+          });
         } else if (cmd.action === 'RESET_NORTH') {
           const c = state.viewer.camera.positionCartographic;
           state.viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromRadians(c.longitude, c.latitude, c.height),
-            orientation: { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 },
+            orientation: { heading: 0, pitch: Cesium.Math.toRadians(-88), roll: 0 },
             duration: 0.7
           });
-        } else if (cmd.action === 'HOME_GLOBE') {
+        } else if (cmd.action === 'HOME' || cmd.action === 'HOME_GLOBE') {
           state.viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(120.9842, 14.5995, 14500000),
-            duration: 1.2
+            destination: Cesium.Cartesian3.fromDegrees(120.9842, 14.5995, 13800000),
+            orientation: { heading: 0, pitch: Cesium.Math.toRadians(-88), roll: 0 },
+            duration: 1.1
           });
         }
         state.viewer.scene.requestRender();
@@ -1394,199 +1529,1059 @@
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SELF-HEALING HARDWARE-ACCELERATED 3D ORTHOGRAPHIC SPHERICAL CANVAS ENGINE
+  // Activated automatically if WebGL / WebWorkers are unavailable or stalled.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function createCanvas3DGlobeEngine(canvas) {
+    const ctx = canvas.getContext('2d');
+    const cam = {
+      lat: 14.5995,
+      lon: 120.9842,
+      altMeters: 13800000,
+      pitchDeg: -88,
+      headingDeg: 0,
+      velLon: 0,
+      velLat: 0,
+      flyAnim: null
+    };
+
+    const pointers = new Map();
+    let lastPinchDist = null;
+    let dragMoved = false;
+    let downX = 0;
+    let downY = 0;
+    let selectedOrbitPts = [];
+    let animFrameId = null;
+    let renderedScreenMarkers = [];
+
+    // Load bundled NaturalEarthII offline hemisphere textures for surface shading
+    const texWest = new Image();
+    const texEast = new Image();
+    let texReadyCount = 0;
+    texWest.onload = function () { texReadyCount += 1; };
+    texEast.onload = function () { texReadyCount += 1; };
+    texWest.src = './vendor/cesium/Assets/Textures/NaturalEarthII/0/0/0.jpg';
+    texEast.src = './vendor/cesium/Assets/Textures/NaturalEarthII/0/1/0.jpg';
+
+    const stars = [];
+    for (let i = 0; i < 140; i++) {
+      stars.push({
+        u: ((i * 7919) % 1000) / 1000,
+        v: ((i * 6271) % 1000) / 1000,
+        r: (i % 3 === 0) ? 1.35 : 0.8,
+        a: 0.25 + ((i * 37) % 60) / 100
+      });
+    }
+
+    function resize() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = Math.max(320, window.innerWidth || canvas.clientWidth || 360);
+      const h = Math.max(320, window.innerHeight || canvas.clientHeight || 640);
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+    }
+
+    function globeRadiusPx(w, h) {
+      const base = Math.min(w, h) * 0.41;
+      const zoomFactor = Math.max(0.75, Math.min(14.0, 13800000 / Math.max(120000, cam.altMeters)));
+      return base * zoomFactor;
+    }
+
+    function project3D(latDeg, lonDeg, altMeters, cx, cy, R) {
+      if (state.projection === 'MAP_2D') {
+        const dLon = (((lonDeg - cam.lon + 540) % 360) - 180);
+        const scale = R / 95;
+        return {
+          x: cx + dLon * scale,
+          y: cy - (latDeg - cam.lat * 0.35) * scale,
+          z: 1,
+          visible: true
+        };
+      }
+      const phi = latDeg * DEG_TO_RAD;
+      const lam = lonDeg * DEG_TO_RAD;
+      const phi0 = cam.lat * DEG_TO_RAD;
+      const lam0 = cam.lon * DEG_TO_RAD;
+      const dLam = lam - lam0;
+      const altScale = 1.0 + Math.max(0, altMeters || 0) / 6371000.0;
+
+      const cosPhi = Math.cos(phi);
+      const sinPhi = Math.sin(phi);
+      const cosPhi0 = Math.cos(phi0);
+      const sinPhi0 = Math.sin(phi0);
+      const cosDLam = Math.cos(dLam);
+
+      const cosC = sinPhi0 * sinPhi + cosPhi0 * cosPhi * cosDLam;
+      const x = R * altScale * cosPhi * Math.sin(dLam);
+      const y = -R * altScale * (cosPhi0 * sinPhi - sinPhi0 * cosPhi * cosDLam);
+      return {
+        x: cx + x,
+        y: cy + y,
+        z: cosC,
+        visible: cosC > -0.04 * (altScale - 1.0) && cosC > 0.0
+      };
+    }
+
+    function unprojectSphere(px, py, cx, cy, R) {
+      if (state.projection === 'MAP_2D') {
+        const scale = R / 95;
+        const lon = (((cam.lon + (px - cx) / scale) + 540) % 360) - 180;
+        const lat = Math.max(-85, Math.min(85, cam.lat * 0.35 - (py - cy) / scale));
+        return { lat, lon };
+      }
+      const nx = (px - cx) / R;
+      const ny = (cy - py) / R;
+      const rho = Math.sqrt(nx * nx + ny * ny);
+      if (rho > 1.0) return null;
+      const c = Math.asin(rho);
+      const cosC = Math.cos(c);
+      const sinC = Math.sin(c);
+      const phi0 = cam.lat * DEG_TO_RAD;
+      const lam0 = cam.lon * DEG_TO_RAD;
+
+      const lat = rho < 1e-6
+        ? phi0
+        : Math.asin(cosC * Math.sin(phi0) + (ny * sinC * Math.cos(phi0)) / rho);
+      const lon = lam0 + Math.atan2(
+        nx * sinC,
+        rho * Math.cos(phi0) * cosC - ny * Math.sin(phi0) * sinC
+      );
+      return {
+        lat: Math.max(-89.9, Math.min(89.9, lat * RAD_TO_DEG)),
+        lon: (((lon * RAD_TO_DEG) + 540) % 360) - 180
+      };
+    }
+
+    function emitTelemetry() {
+      const approxScale = Math.max(80, cam.altMeters * 0.18);
+      updateTelemetryBarValues(cam.lat, cam.lon, cam.altMeters, approxScale);
+      const nowMs = Date.now();
+      if (nowMs - state.lastViewportSentAt > 320) {
+        state.lastViewportSentAt = nowMs;
+        const span = Math.min(75, Math.max(2, (cam.altMeters / 13800000) * 55));
+        postToAndroid('onViewportChanged', {
+          centerLat: Number(cam.lat.toFixed(5)),
+          centerLon: Number(cam.lon.toFixed(5)),
+          cameraAltitudeMeters: Math.round(cam.altMeters),
+          groundElevationMeters: 0,
+          headingDeg: cam.headingDeg,
+          pitchDeg: cam.pitchDeg,
+          west: Number(Math.max(-180, cam.lon - span).toFixed(4)),
+          south: Number(Math.max(-85, cam.lat - span * 0.7).toFixed(4)),
+          east: Number(Math.min(180, cam.lon + span).toFixed(4)),
+          north: Number(Math.min(85, cam.lat + span * 0.7).toFixed(4)),
+          projection: state.projection
+        });
+      }
+    }
+
+    function rebuildSelectedOrbit(entityId) {
+      selectedOrbitPts = [];
+      const selected = state.satellites.get(entityId);
+      if (!selected) return;
+      const nowMs = Date.now();
+      for (let min = -48; min <= 48; min += 2) {
+        const pt = propagatePointAtDate(selected.satrec, new Date(nowMs + min * 60 * 1000));
+        if (pt) selectedOrbitPts.push(pt);
+      }
+    }
+
+    function drawRingCoords(coords, cx, cy, R, fillStyle, strokeStyle, lineWidth) {
+      if (!Array.isArray(coords) || coords.length < 2) return;
+      ctx.beginPath();
+      let penDown = false;
+      let anyVisible = false;
+      for (let i = 0; i < coords.length; i++) {
+        const pt = coords[i];
+        const p = project3D(pt[1], pt[0], 0, cx, cy, R);
+        if (p.visible) {
+          anyVisible = true;
+          if (!penDown) {
+            ctx.moveTo(p.x, p.y);
+            penDown = true;
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        } else {
+          penDown = false;
+        }
+      }
+      if (!anyVisible) return;
+      if (fillStyle) {
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+      }
+      if (strokeStyle) {
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth || 1;
+        ctx.stroke();
+      }
+    }
+
+    function renderFrame() {
+      resize();
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      // Camera flyTo / inertia update
+      if (cam.flyAnim) {
+        const t = Math.min(1, ( performance.now() - cam.flyAnim.start ) / cam.flyAnim.durationMs);
+        const ease = 1 - Math.pow(1 - t, 3);
+        cam.lat = cam.flyAnim.fromLat + (cam.flyAnim.toLat - cam.flyAnim.fromLat) * ease;
+        let dLon = ((cam.flyAnim.toLon - cam.flyAnim.fromLon + 540) % 360) - 180;
+        cam.lon = (((cam.flyAnim.fromLon + dLon * ease) + 540) % 360) - 180;
+        cam.altMeters = cam.flyAnim.fromAlt + (cam.flyAnim.toAlt - cam.flyAnim.fromAlt) * ease;
+        if (t >= 1) cam.flyAnim = null;
+        emitTelemetry();
+      } else if (pointers.size === 0 && (Math.abs(cam.velLon) > 0.01 || Math.abs(cam.velLat) > 0.01)) {
+        cam.lon = (((cam.lon + cam.velLon) + 540) % 360) - 180;
+        cam.lat = Math.max(-84, Math.min(84, cam.lat + cam.velLat));
+        cam.velLon *= 0.91;
+        cam.velLat *= 0.91;
+        emitTelemetry();
+      }
+
+      // Deep space background + stars
+      ctx.fillStyle = '#020813';
+      ctx.fillRect(0, 0, w, h);
+      for (let i = 0; i < stars.length; i++) {
+        const st = stars[i];
+        ctx.fillStyle = `rgba(186, 230, 253, ${st.a})`;
+        ctx.beginPath();
+        ctx.arc(st.u * w, st.v * h, st.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const cx = w * 0.5;
+      const cy = h * 0.48;
+      const R = globeRadiusPx(w, h);
+
+      if (state.projection !== 'MAP_2D') {
+        // 3D Atmospheric outer halo
+        if (state.atmosphereEnabled) {
+          const halo = ctx.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * 1.18);
+          halo.addColorStop(0, 'rgba(34, 211, 238, 0.30)');
+          halo.addColorStop(0.55, 'rgba(14, 165, 233, 0.11)');
+          halo.addColorStop(1, 'rgba(2, 8, 19, 0)');
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(cx, cy, R * 1.18, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 3D Sphere Ocean Body with specular lighting
+        const oceanGrad = ctx.createRadialGradient(cx - R * 0.28, cy - R * 0.28, R * 0.06, cx, cy, R);
+        if (state.basemap === 'DARK_TACTICAL' || state.basemap === 'NASA_GIBS_NIGHTLIGHTS') {
+          oceanGrad.addColorStop(0, '#0B1D36');
+          oceanGrad.addColorStop(0.7, '#061124');
+          oceanGrad.addColorStop(1, '#020711');
+        } else {
+          oceanGrad.addColorStop(0, '#134E7A');
+          oceanGrad.addColorStop(0.58, '#0A2E52');
+          oceanGrad.addColorStop(1, '#041428');
+        }
+        ctx.fillStyle = oceanGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.clip();
+      } else {
+        ctx.fillStyle = '#071B34';
+        ctx.fillRect(0, 0, w, h);
+        ctx.save();
+      }
+
+      // Render 3D Graticule (Lat/Lon Grid)
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.13)';
+      ctx.lineWidth = 0.7;
+      for (let lat = -60; lat <= 60; lat += 30) {
+        ctx.beginPath();
+        let down = false;
+        for (let lon = -180; lon <= 180; lon += 6) {
+          const p = project3D(lat, lon, 0, cx, cy, R);
+          if (p.visible) {
+            if (!down) { ctx.moveTo(p.x, p.y); down = true; }
+            else ctx.lineTo(p.x, p.y);
+          } else down = false;
+        }
+        ctx.stroke();
+      }
+      for (let lon = -180; lon < 180; lon += 30) {
+        ctx.beginPath();
+        let down = false;
+        for (let lat = -85; lat <= 85; lat += 5) {
+          const p = project3D(lat, lon, 0, cx, cy, R);
+          if (p.visible) {
+            if (!down) { ctx.moveTo(p.x, p.y); down = true; }
+            else ctx.lineTo(p.x, p.y);
+          } else down = false;
+        }
+        ctx.stroke();
+      }
+
+      // Render 3D Continents from Natural Earth Country Polygons
+      const landFill = (state.basemap === 'DARK_TACTICAL' || state.basemap === 'NASA_GIBS_NIGHTLIGHTS')
+        ? 'rgba(17, 39, 66, 0.92)'
+        : (state.basemap === 'OPENSTREETMAP'
+          ? 'rgba(36, 84, 94, 0.88)'
+          : 'rgba(24, 74, 69, 0.90)');
+      for (let f = 0; f < state.countryFeatures.length; f++) {
+        const geom = state.countryFeatures[f].geometry;
+        if (!geom) continue;
+        if (geom.type === 'Polygon') {
+          for (let r = 0; r < geom.coordinates.length; r++) {
+            drawRingCoords(geom.coordinates[r], cx, cy, R, r === 0 ? landFill : null, null, 0);
+          }
+        } else if (geom.type === 'MultiPolygon') {
+          for (let pIdx = 0; pIdx < geom.coordinates.length; pIdx++) {
+            const poly = geom.coordinates[pIdx];
+            for (let r = 0; r < poly.length; r++) {
+              drawRingCoords(poly[r], cx, cy, R, r === 0 ? landFill : null, null, 0);
+            }
+          }
+        }
+      }
+
+      // Country Borders
+      if (state.bordersVisible) {
+        for (let i = 0; i < state.countryRings.length; i++) {
+          drawRingCoords(state.countryRings[i], cx, cy, R, null, 'rgba(34, 211, 238, 0.56)', 1.05);
+        }
+      }
+
+      // Day/Night Solar Terminator Shading
+      if (state.dayNightLighting && state.projection !== 'MAP_2D') {
+        const utcHours = (Date.now() % 86400000) / 3600000;
+        const sunLon = ((12.0 - utcHours) * 15.0 + 540) % 360 - 180;
+        const dSun = (((sunLon - cam.lon + 540) % 360) - 180) * DEG_TO_RAD;
+        const nightX = cx - Math.sin(dSun) * R * 0.65;
+        const termGrad = ctx.createRadialGradient(nightX, cy, R * 0.1, nightX, cy, R * 1.25);
+        termGrad.addColorStop(0, 'rgba(1, 4, 12, 0.50)');
+        termGrad.addColorStop(0.65, 'rgba(1, 4, 12, 0.16)');
+        termGrad.addColorStop(1, 'rgba(1, 4, 12, 0)');
+        ctx.fillStyle = termGrad;
+        ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+      }
+
+      // Watchtower Geofence Rings
+      for (let wIdx = 0; wIdx < state.watchRegionsCache.length; wIdx++) {
+        const reg = state.watchRegionsCache[wIdx];
+        if (!reg.enabled) continue;
+        const degRadius = Math.max(0.5, (reg.radiusKm || 250) / 111.32);
+        const ring = [];
+        for (let a = 0; a <= 360; a += 12) {
+          const rad = a * DEG_TO_RAD;
+          ring.push([
+            reg.centerLon + (degRadius * Math.cos(rad)) / Math.max(0.2, Math.cos(reg.centerLat * DEG_TO_RAD)),
+            Math.max(-88, Math.min(88, reg.centerLat + degRadius * Math.sin(rad)))
+          ]);
+        }
+        drawRingCoords(ring, cx, cy, R, 'rgba(34, 211, 238, 0.10)', 'rgba(34, 211, 238, 0.80)', 1.4);
+      }
+
+      // Simulation Hazard Rings
+      if (state.simulationCache && state.simulationCache.active && Array.isArray(state.simulationCache.rings)) {
+        state.simulationCache.rings.forEach(function (sRing) {
+          const degR = Math.max(0.3, (sRing.radiusKm || 120) / 111.32);
+          const ring = [];
+          for (let a = 0; a <= 360; a += 12) {
+            const rad = a * DEG_TO_RAD;
+            ring.push([
+              sRing.lon + (degR * Math.cos(rad)) / Math.max(0.2, Math.cos(sRing.lat * DEG_TO_RAD)),
+              Math.max(-88, Math.min(88, sRing.lat + degR * Math.sin(rad)))
+            ]);
+          }
+          drawRingCoords(ring, cx, cy, R, 'rgba(245, 158, 11, 0.20)', sRing.colorHex || '#F59E0B', 1.8);
+        });
+      }
+
+      // Entity Trails
+      for (let tIdx = 0; tIdx < state.trailsCache.length; tIdx++) {
+        const tr = state.trailsCache[tIdx];
+        if (!state.layerVisibility[tr.category] || !Array.isArray(tr.points) || tr.points.length < 2) continue;
+        const coords = tr.points.map(function (pt) { return [pt.lon, pt.lat]; });
+        drawRingCoords(coords, cx, cy, R, null, (CATEGORY_COLORS[tr.category] || '#38BDF8') + 'AA', 1.5);
+      }
+
+      // Correlated Incident Links
+      ctx.setLineDash([5, 4]);
+      for (let cIdx = 0; cIdx < state.correlationsCache.length; cIdx++) {
+        const inc = state.correlationsCache[cIdx];
+        if (!Array.isArray(inc.links)) continue;
+        for (let lIdx = 0; lIdx < inc.links.length; lIdx++) {
+          const lnk = inc.links[lIdx];
+          drawRingCoords([[lnk.fromLon, lnk.fromLat], [lnk.toLon, lnk.toLat]], cx, cy, R, null, '#F472B6', 1.8);
+        }
+      }
+      ctx.setLineDash([]);
+
+      ctx.restore(); // Remove sphere clip so elevated 3D orbits & billboards draw cleanly above limb
+
+      // Sphere Rim Highlight
+      if (state.projection !== 'MAP_2D') {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Selected Satellite 3D Orbit Ring
+      if (selectedOrbitPts.length >= 2 && state.layerVisibility.SPACE) {
+        ctx.strokeStyle = 'rgba(192, 132, 252, 0.88)';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        let down = false;
+        for (let i = 0; i < selectedOrbitPts.length; i++) {
+          const op = selectedOrbitPts[i];
+          const p = project3D(op.latDeg, op.lonDeg, op.altMeters, cx, cy, R);
+          if (p.visible) {
+            if (!down) { ctx.moveTo(p.x, p.y); down = true; }
+            else ctx.lineTo(p.x, p.y);
+          } else down = false;
+        }
+        ctx.stroke();
+      }
+
+      // Live Intelligence Entities (3D altitude-aware markers + LineString cables)
+      renderedScreenMarkers = [];
+      const maxPerCat = state.performanceMode === 'LOW_POWER' ? 140 : 350;
+      const counts = {};
+      for (let i = 0; i < state.allEntitiesCache.length; i++) {
+        const item = state.allEntitiesCache[i];
+        const cat = item.category;
+        if (!state.layerVisibility[cat]) continue;
+        counts[cat] = (counts[cat] || 0) + 1;
+        if (counts[cat] > maxPerCat) continue;
+
+        const color = (item.severity === 'CRITICAL' || item.severity === 'HIGH')
+          ? (SEVERITY_COLORS[item.severity] || CATEGORY_COLORS[cat])
+          : (CATEGORY_COLORS[cat] || '#38BDF8');
+
+        if (item.geometryType === 'LineString' && item.geometryCoordsJson) {
+          try {
+            const coords = JSON.parse(item.geometryCoordsJson);
+            drawRingCoords(coords, cx, cy, R, null, color + 'AA', 1.6);
+          } catch (_) { /* ignore */ }
+        }
+
+        if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) continue;
+        const p = project3D(item.latitude, item.longitude, item.altitudeMeters || 0, cx, cy, R);
+        if (!p.visible) continue;
+
+        const rad = item.severity === 'CRITICAL' ? 5.5 : 4.2;
+        ctx.fillStyle = color + '44';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rad + 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#020813';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        if (item.severity === 'CRITICAL' || cat === 'SPACE' || cam.altMeters < 4500000) {
+          ctx.fillStyle = '#F8FAFC';
+          ctx.font = '600 9.5px sans-serif';
+          ctx.fillText(String(item.title || '').slice(0, 22), p.x + 7, p.y + 3);
+        }
+
+        renderedScreenMarkers.push({ x: p.x, y: p.y, entity: item });
+      }
+
+      ctx.restore();
+      animFrameId = requestAnimationFrame(renderFrame);
+    }
+
+    canvas.addEventListener('pointerdown', function (ev) {
+      canvas.setPointerCapture(ev.pointerId);
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      cam.flyAnim = null;
+      cam.velLon = 0;
+      cam.velLat = 0;
+      if (pointers.size === 1) {
+        dragMoved = false;
+        downX = ev.clientX;
+        downY = ev.clientY;
+      } else if (pointers.size === 2) {
+        const pts = Array.from(pointers.values());
+        lastPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      }
+    });
+
+    canvas.addEventListener('pointermove', function (ev) {
+      const prev = pointers.get(ev.pointerId);
+      if (!prev) return;
+      const dx = ev.clientX - prev.x;
+      const dy = ev.clientY - prev.y;
+      pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+      if (pointers.size === 1) {
+        if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 5) {
+          dragMoved = true;
+        }
+        const w = Math.max(320, window.innerWidth || 360);
+        const h = Math.max(320, window.innerHeight || 640);
+        const degPerPx = Math.max(0.015, (95 / globeRadiusPx(w, h)));
+        cam.lon = (((cam.lon - dx * degPerPx) + 540) % 360) - 180;
+        cam.lat = Math.max(-84, Math.min(84, cam.lat + dy * degPerPx));
+        cam.velLon = -dx * degPerPx * 0.45;
+        cam.velLat = dy * degPerPx * 0.45;
+        emitTelemetry();
+      } else if (pointers.size === 2) {
+        dragMoved = true;
+        const pts = Array.from(pointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (lastPinchDist && dist > 8) {
+          const ratio = lastPinchDist / dist;
+          cam.altMeters = Math.max(150000, Math.min(32000000, cam.altMeters * ratio));
+          emitTelemetry();
+        }
+        lastPinchDist = dist;
+      }
+    });
+
+    function onPointerEnd(ev) {
+      pointers.delete(ev.pointerId);
+      if (pointers.size < 2) lastPinchDist = null;
+      if (pointers.size === 0 && !dragMoved) {
+        const rect = canvas.getBoundingClientRect();
+        const px = ev.clientX - rect.left;
+        const py = ev.clientY - rect.top;
+        let hit = null;
+        let bestDist = 20;
+        for (let i = renderedScreenMarkers.length - 1; i >= 0; i--) {
+          const m = renderedScreenMarkers[i];
+          const d = Math.hypot(m.x - px, m.y - py);
+          if (d < bestDist) {
+            bestDist = d;
+            hit = m.entity;
+          }
+        }
+        if (hit) {
+          postToAndroid('onEntitySelected', { entityId: hit.id });
+          if (hit.category === 'SPACE') {
+            state.selectedSatelliteId = hit.id;
+            rebuildSelectedOrbit(hit.id);
+          }
+          return;
+        }
+        const w = Math.max(320, window.innerWidth || 360);
+        const h = Math.max(320, window.innerHeight || 640);
+        const geo = unprojectSphere(px, py, w * 0.5, h * 0.48, globeRadiusPx(w, h));
+        if (geo) {
+          postToAndroid('onLocationSelected', {
+            lat: Number(geo.lat.toFixed(5)),
+            lon: Number(geo.lon.toFixed(5)),
+            terrainElevationMeters: 0,
+            countryHint: ''
+          });
+        }
+      }
+    }
+
+    canvas.addEventListener('pointerup', onPointerEnd);
+    canvas.addEventListener('pointercancel', onPointerEnd);
+    canvas.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      const factor = ev.deltaY > 0 ? 1.18 : 0.84;
+      cam.altMeters = Math.max(150000, Math.min(32000000, cam.altMeters * factor));
+      emitTelemetry();
+    }, { passive: false });
+
+    function flyTo(lat, lon, altM) {
+      cam.flyAnim = {
+        start: performance.now(),
+        durationMs: 900,
+        fromLat: cam.lat,
+        fromLon: cam.lon,
+        fromAlt: cam.altMeters,
+        toLat: Math.max(-85, Math.min(85, lat)),
+        toLon: (((lon) + 540) % 360) - 180,
+        toAlt: Math.max(150000, Math.min(32000000, altM || 2200000))
+      };
+    }
+
+    return {
+      start: function () {
+        resize();
+        emitTelemetry();
+        if (!animFrameId) animFrameId = requestAnimationFrame(renderFrame);
+      },
+      stop: function () {
+        if (animFrameId) {
+          cancelAnimationFrame(animFrameId);
+          animFrameId = null;
+        }
+      },
+      emitTelemetry: emitTelemetry,
+      rebuildSelectedOrbit: rebuildSelectedOrbit,
+      handleCommand: function (cmd) {
+        switch (cmd.type) {
+          case 'SET_BASEMAP':
+            state.basemap = cmd.basemap || 'SATELLITE_ESRI';
+            break;
+          case 'SET_PROJECTION':
+            state.projection = cmd.projection || 'GLOBE_3D';
+            emitTelemetry();
+            break;
+          case 'SET_STYLE_PRESET':
+            state.stylePreset = cmd.stylePreset || 'CYBER_TACTICAL';
+            document.body.setAttribute('data-style', state.stylePreset);
+            break;
+          case 'SET_SCENE_FLAGS':
+            if (typeof cmd.dayNightLighting === 'boolean') state.dayNightLighting = cmd.dayNightLighting;
+            if (typeof cmd.atmosphere === 'boolean') state.atmosphereEnabled = cmd.atmosphere;
+            if (typeof cmd.borders === 'boolean') state.bordersVisible = cmd.borders;
+            break;
+          case 'SET_LAYER_STATE':
+            if (cmd.category) {
+              if (typeof cmd.visible === 'boolean') state.layerVisibility[cmd.category] = cmd.visible;
+              if (Number.isFinite(cmd.opacity)) state.layerOpacity[cmd.category] = cmd.opacity;
+            }
+            break;
+          case 'SET_PERFORMANCE_MODE':
+            state.performanceMode = cmd.mode || 'BALANCED';
+            scheduleOrbitTimer();
+            break;
+          case 'UPDATE_ENTITIES':
+            addOrReplaceEntities(cmd.entities || []);
+            break;
+          case 'UPDATE_TRAILS':
+            updateEntityTrails(cmd.trails || []);
+            break;
+          case 'UPDATE_CORRELATIONS':
+            updateCorrelations(cmd.incidents || []);
+            break;
+          case 'UPDATE_WATCH_REGIONS':
+            updateWatchRegions(cmd.regions || []);
+            break;
+          case 'UPDATE_BUILDINGS_3D':
+            updateBuildings3D(cmd.buildings || []);
+            break;
+          case 'SET_SIMULATION_OVERLAY':
+            setSimulationOverlay(cmd.simulation);
+            break;
+          case 'FLY_TO':
+            if (Number.isFinite(cmd.lat) && Number.isFinite(cmd.lon)) {
+              flyTo(cmd.lat, cmd.lon, cmd.altitudeMeters || 1800000);
+            }
+            break;
+          case 'CAMERA_ACTION':
+            if (cmd.action === 'ZOOM_IN') {
+              cam.altMeters = Math.max(150000, cam.altMeters * 0.65);
+            } else if (cmd.action === 'ZOOM_OUT') {
+              cam.altMeters = Math.min(32000000, cam.altMeters * 1.48);
+            } else if (cmd.action === 'TILT_3D') {
+              state.projection = 'GLOBE_3D';
+              cam.pitchDeg = cam.pitchDeg > -65 ? -88 : -44;
+            } else if (cmd.action === 'RESET_NORTH') {
+              cam.headingDeg = 0;
+              cam.pitchDeg = -88;
+            } else if (cmd.action === 'HOME' || cmd.action === 'HOME_GLOBE') {
+              flyTo(14.5995, 120.9842, 13800000);
+            }
+            emitTelemetry();
+            break;
+          case 'COMPUTE_SATELLITE_PASSES': {
+            const passes = computeSatellitePasses(cmd.entityId, cmd.lat, cmd.lon, cmd.hoursAhead || 24);
+            postToAndroid('onSatellitePassesComputed', { entityId: cmd.entityId, passes: passes });
+            break;
+          }
+          case 'SELECT_SATELLITE_ORBIT':
+            state.selectedSatelliteId = cmd.entityId || null;
+            rebuildSelectedOrbit(state.selectedSatelliteId);
+            break;
+          default:
+            break;
+        }
+      }
+    };
+  }
+
+  async function activateFallback3DCanvasGlobe(reason) {
+    if (state.engineMode === 'canvas3d' && state.canvasEngine) return;
+    console.warn('Activating 3D Spherical Canvas Globe failsafe:', reason);
+
+    if (state.viewer) {
+      try { state.viewer.destroy(); } catch (_) { /* ignore */ }
+      state.viewer = null;
+    }
+
+    const cesiumDiv = document.getElementById('cesiumContainer');
+    if (cesiumDiv) cesiumDiv.classList.add('hidden');
+
+    const fallbackCanvas = document.getElementById('wmFallbackGlobeCanvas');
+    if (!fallbackCanvas) return;
+    fallbackCanvas.classList.remove('hidden');
+
+    await ensureCountryTopologyLoaded();
+
+    state.engineMode = 'canvas3d';
+    state.canvasEngine = createCanvas3DGlobeEngine(fallbackCanvas);
+    state.canvasEngine.start();
+
+    scheduleOrbitTimer();
+    if (!state.clockTimer) {
+      state.clockTimer = setInterval(updateHudReadout, 1000);
+    }
+
+    hideBootSplash();
+
+    const wasReady = state.ready;
+    state.ready = true;
+    while (state.commandQueue.length > 0) {
+      handleCommand(state.commandQueue.shift());
+    }
+    if (state.allEntitiesCache.length > 0) {
+      propagateSatellitesNow();
+      selectDefaultIssIfNeeded();
+    }
+    if (!wasReady) {
+      postToAndroid('onGlobeReady', {
+        webglSupported: true,
+        cesiumVersion: (typeof Cesium !== 'undefined' && Cesium.VERSION ? Cesium.VERSION : '1.147.0') + '-3DCanvas',
+        timestampMs: Date.now()
+      });
+    }
+  }
+
+  function createCesiumViewerWithWebGlFallback() {
+    function buildOptions(requestWebgl1) {
+      return {
+        baseLayer: new Cesium.ImageryLayer(createBundledOfflineBaseProvider()),
+        terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+        animation: false,
+        baseLayerPicker: false,
+        fullscreenButton: false,
+        vrButton: false,
+        geocoder: false,
+        homeButton: false,
+        infoBox: false,
+        sceneModePicker: false,
+        selectionIndicator: false,
+        timeline: false,
+        navigationHelpButton: false,
+        navigationInstructionsInitiallyVisible: false,
+        scene3DOnly: false,
+        shouldAnimate: true,
+        requestRenderMode: false,
+        targetFrameRate: 60,
+        msaaSamples: 1,
+        contextOptions: {
+          requestWebgl1: !!requestWebgl1,
+          webgl: {
+            alpha: false,
+            depth: true,
+            stencil: false,
+            antialias: true,
+            powerPreference: 'high-performance',
+            failIfMajorPerformanceCaveat: false
+          }
+        }
+      };
+    }
+
+    try {
+      return new Cesium.Viewer('cesiumContainer', buildOptions(false));
+    } catch (webgl2Err) {
+      console.warn('WebGL2 Cesium init failed, retrying WebGL1:', webgl2Err && webgl2Err.message ? webgl2Err.message : webgl2Err);
+      const container = document.getElementById('cesiumContainer');
+      if (container) container.innerHTML = '';
+      return new Cesium.Viewer('cesiumContainer', buildOptions(true));
+    }
+  }
+
   async function initGlobe() {
     if (typeof Cesium === 'undefined') {
-      postToAndroid('onGlobeError', { reason: 'CesiumJS bundle failed to initialize' });
+      await activateFallback3DCanvasGlobe('CesiumJS global unavailable');
       return;
     }
 
-    // Zero commercial Ion dependency
-    Cesium.Ion.defaultAccessToken = '';
+    try {
+      Cesium.Ion.defaultAccessToken = '';
+      const viewer = createCesiumViewerWithWebGlFallback();
+      state.viewer = viewer;
+      state.engineMode = 'cesium';
+      state.imageryRefs.offlineBase = viewer.imageryLayers.get(0);
 
-    // Guaranteed offline NaturalEarthII base imagery from bundled APK assets
-    const offlineBaseLayer = Cesium.ImageryLayer.fromProviderAsync(
-      Cesium.TileMapServiceImageryProvider.fromUrl('./vendor/cesium/Assets/Textures/NaturalEarthII')
-    );
-
-    const viewer = new Cesium.Viewer('cesiumContainer', {
-      baseLayer: offlineBaseLayer,
-      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
-      animation: false,
-      baseLayerPicker: false,
-      fullscreenButton: false,
-      vrButton: false,
-      geocoder: false,
-      homeButton: false,
-      infoBox: false,
-      sceneModePicker: false,
-      selectionIndicator: true,
-      timeline: false,
-      navigationHelpButton: false,
-      requestRenderMode: true,
-      maximumRenderTimeChange: Infinity,
-      msaaSamples: 1,
-      contextOptions: {
-        webgl: {
-          alpha: false,
-          antialias: true,
-          powerPreference: 'default',
-          failIfMajorPerformanceCaveat: false
-        }
+      // Scene & 3D Atmosphere configuration
+      viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#020813');
+      viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#071A33');
+      viewer.scene.globe.enableLighting = state.dayNightLighting;
+      viewer.scene.globe.showGroundAtmosphere = state.atmosphereEnabled;
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      viewer.scene.globe.maximumScreenSpaceError = 2.0;
+      if (viewer.scene.skyAtmosphere) {
+        viewer.scene.skyAtmosphere.show = state.atmosphereEnabled;
       }
-    });
+      viewer.resolutionScale = 0.94;
 
-    state.viewer = viewer;
-    state.imageryRefs.offlineBase = offlineBaseLayer;
-    viewer.resolutionScale = 0.92;
-    viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#020813');
-    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#061221');
-    viewer.scene.globe.enableLighting = state.dayNightLighting;
-    viewer.scene.globe.showGroundAtmosphere = state.atmosphereEnabled;
-    if (viewer.scene.skyAtmosphere) {
-      viewer.scene.skyAtmosphere.show = state.atmosphereEnabled;
-    }
+      // Explicit 3D Touch / Pointer Camera Controller tuning for mobile WebView
+      const ctrl = viewer.scene.screenSpaceCameraController;
+      ctrl.enableInputs = true;
+      ctrl.enableRotate = true;
+      ctrl.enableTranslate = true;
+      ctrl.enableZoom = true;
+      ctrl.enableTilt = true;
+      ctrl.enableLook = true;
+      ctrl.minimumZoomDistance = 120.0;
+      ctrl.maximumZoomDistance = 42000000.0;
+      ctrl.inertiaSpin = 0.88;
+      ctrl.inertiaTranslate = 0.88;
+      ctrl.inertiaZoom = 0.80;
 
-    // Add Esri Satellite Imagery + Hybrid Place/Street Labels on top of offline NaturalEarthII
-    await setBasemap('SATELLITE_ESRI');
-    const labelsProvider = new Cesium.UrlTemplateImageryProvider({
-      url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-      maximumLevel: 19,
-      credit: 'Esri Reference Boundaries & Labels'
-    });
-    const labelsLayer = viewer.imageryLayers.addImageryProvider(labelsProvider);
-    labelsLayer.alpha = 0.88;
-    state.imageryRefs.labelsOverlay = labelsLayer;
-
-    // Initialize independent module dataSources
-    ['AVIATION', 'MARITIME', 'SPACE', 'DISASTER', 'WEATHER', 'CYBER', 'NEWS', 'INFRASTRUCTURE'].forEach(function (cat) {
-      const ds = new Cesium.CustomDataSource(cat);
-      setupClustering(ds, cat);
-      state.dataSources[cat] = ds;
-      viewer.dataSources.add(ds);
-    });
-
-    state.correlationsSource = new Cesium.CustomDataSource('CORRELATIONS');
-    viewer.dataSources.add(state.correlationsSource);
-
-    state.watchtowerSource = new Cesium.CustomDataSource('WATCHTOWER');
-    viewer.dataSources.add(state.watchtowerSource);
-
-    state.buildingsSource = new Cesium.CustomDataSource('BUILDINGS_3D');
-    viewer.dataSources.add(state.buildingsSource);
-
-    state.simulationSource = new Cesium.CustomDataSource('SIMULATION_LAB');
-    viewer.dataSources.add(state.simulationSource);
-
-    await loadBundledCountryBorders();
-    setupSplitDragHandle();
-
-    // Initial view centered over Asia-Pacific / Philippines global perspective
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees(120.9842, 14.5995, 14500000)
-    });
-
-    viewer.camera.moveEnd.addEventListener(function () {
-      if (state.moveDebounceTimer) clearTimeout(state.moveDebounceTimer);
-      state.moveDebounceTimer = setTimeout(emitViewportChanged, 420);
-    });
-
-    const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-    handler.setInputAction(function (click) {
-      const picked = viewer.scene.pick(click.position);
-      if (Cesium.defined(picked) && picked.id) {
-        const ent = picked.id;
-        if (ent.wmEntity) {
-          if (ent.wmEntity.category === 'SPACE') {
-            state.selectedSatelliteId = ent.wmEntity.id;
-            renderSatelliteOrbitAndGroundTrack(ent.wmEntity.id);
+      // Resize observer so Compose AndroidView layout passes immediately resize WebGL viewport
+      const containerEl = document.getElementById('cesiumContainer');
+      if (typeof ResizeObserver !== 'undefined' && containerEl) {
+        const ro = new ResizeObserver(function () {
+          if (state.viewer && !state.viewer.isDestroyed()) {
+            state.viewer.resize();
+            state.viewer.scene.requestRender();
           }
-          postToAndroid('onEntitySelected', { entityId: ent.wmEntity.id });
-          return;
-        }
-        if (ent.wmBuilding) {
-          postToAndroid('onBuildingSelected', ent.wmBuilding);
-          return;
-        }
-        if (ent.wmKind === 'COUNTRY_BORDER') {
-          const ray = viewer.camera.getPickRay(click.position);
-          const pos = ray ? viewer.scene.globe.pick(ray, viewer.scene) : null;
-          let lat = 0;
-          let lon = 0;
-          if (pos) {
-            const c = Cesium.Cartographic.fromCartesian(pos);
-            lat = Cesium.Math.toDegrees(c.latitude);
-            lon = Cesium.Math.toDegrees(c.longitude);
-          }
-          postToAndroid('onLocationSelected', {
-            latitude: Number(lat.toFixed(5)),
-            longitude: Number(lon.toFixed(5)),
-            elevationMeters: 0,
-            countryName: ent.wmCountryName || ''
-          });
-          return;
-        }
+        });
+        ro.observe(containerEl);
       }
+      window.addEventListener('resize', function () {
+        if (state.viewer && !state.viewer.isDestroyed()) {
+          state.viewer.resize();
+          state.viewer.scene.requestRender();
+        }
+      });
 
-      const ray = viewer.camera.getPickRay(click.position);
-      const cartesian = ray ? viewer.scene.globe.pick(ray, viewer.scene) : null;
-      if (cartesian) {
-        const carto = Cesium.Cartographic.fromCartesian(cartesian);
-        const lat = Cesium.Math.toDegrees(carto.latitude);
-        const lon = Cesium.Math.toDegrees(carto.longitude);
-        const elev = viewer.scene.globe.getHeight(carto) || 0;
-        postToAndroid('onLocationSelected', {
-          latitude: Number(lat.toFixed(5)),
-          longitude: Number(lon.toFixed(5)),
-          elevationMeters: Math.round(elev),
-          countryName: ''
+      // Self-heal on fatal WebGL render error
+      if (viewer.scene.renderError && typeof viewer.scene.renderError.addEventListener === 'function') {
+        viewer.scene.renderError.addEventListener(function (_scene, err) {
+          activateFallback3DCanvasGlobe('WebGL renderError: ' + (err && err.message ? err.message : String(err)));
         });
       }
-    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    scheduleOrbitTimer();
-    state.ready = true;
-    emitViewportChanged();
-    postToAndroid('onGlobeReady', {
-      cesiumVersion: Cesium.VERSION,
-      satelliteJsLoaded: typeof satellite !== 'undefined',
-      topojsonLoaded: typeof topojson !== 'undefined'
-    });
+      // Watchdog: verify Cesium's WebWorker actually tessellated >=1 globe surface tile within 4.5s
+      let surfaceTileRendered = false;
+      viewer.scene.postRender.addEventListener(function () {
+        if (surfaceTileRendered || !state.viewer) return;
+        const surface = state.viewer.scene && state.viewer.scene.globe && state.viewer.scene.globe._surface;
+        const count = surface && surface._tilesToRender ? surface._tilesToRender.length : 0;
+        if (count > 0) {
+          surfaceTileRendered = true;
+          hideBootSplash();
+        }
+      });
+      state.watchdogTimer = setTimeout(function () {
+        hideBootSplash();
+        if (state.engineMode === 'cesium' && !surfaceTileRendered) {
+          activateFallback3DCanvasGlobe('Cesium WebWorker produced 0 globe tiles within watchdog window');
+        }
+      }, 4500);
+
+      // Create per-category CustomDataSources with clustering
+      Object.keys(CATEGORY_COLORS).forEach(function (cat) {
+        const ds = new Cesium.CustomDataSource(`wm_${cat}`);
+        ds.clustering.enabled = state.clusteringEnabled;
+        ds.clustering.pixelRange = 36;
+        ds.clustering.minimumClusterSize = 5;
+        ds.clustering.clusterEvent.addEventListener(function (clusteredEntities, cluster) {
+          cluster.label.show = false;
+          cluster.billboard.show = true;
+          cluster.billboard.id = cluster.label.id;
+          cluster.billboard.verticalOrigin = Cesium.VerticalOrigin.CENTER;
+          cluster.billboard.image = createClusterPin(clusteredEntities.length);
+          cluster.billboard.width = 36;
+          cluster.billboard.height = 36;
+          cluster.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+        });
+        viewer.dataSources.add(ds);
+        state.dataSources[cat] = ds;
+      });
+
+      state.correlationsSource = new Cesium.CustomDataSource('wm_correlations');
+      state.watchtowerSource = new Cesium.CustomDataSource('wm_watchtower');
+      state.simulationSource = new Cesium.CustomDataSource('wm_simulation');
+      state.buildingsSource = new Cesium.CustomDataSource('wm_buildings3d');
+      viewer.dataSources.add(state.correlationsSource);
+      viewer.dataSources.add(state.watchtowerSource);
+      viewer.dataSources.add(state.simulationSource);
+      viewer.dataSources.add(state.buildingsSource);
+
+      // Initial orbital view centered over Indo-Pacific / Philippines
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(120.9842, 14.5995, 13800000),
+        orientation: {
+          heading: 0,
+          pitch: Cesium.Math.toRadians(-88),
+          roll: 0
+        }
+      });
+
+      // Click / Tap Picking
+      const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      handler.setInputAction(function (movement) {
+        const picked = viewer.scene.pick(movement.position);
+        if (Cesium.defined(picked) && picked.id) {
+          if (Array.isArray(picked.id) && picked.id.length > 0) {
+            const first = picked.id[0];
+            if (first && first.position) {
+              const p = first.position.getValue(Cesium.JulianDate.now());
+              if (p) {
+                const c = Cesium.Cartographic.fromCartesian(p);
+                viewer.camera.flyTo({
+                  destination: Cesium.Cartesian3.fromRadians(
+                    c.longitude,
+                    c.latitude,
+                    Math.max(80000, viewer.camera.positionCartographic.height * 0.35)
+                  ),
+                  duration: 0.85
+                });
+              }
+            }
+            return;
+          }
+
+          const ent = picked.id;
+          if (ent.wmEntity) {
+            postToAndroid('onEntitySelected', { entityId: ent.wmEntity.id });
+            if (ent.wmEntity.category === 'SPACE') {
+              state.selectedSatelliteId = ent.wmEntity.id;
+              renderSatelliteOrbitAndGroundTrack(ent.wmEntity.id);
+            }
+            return;
+          }
+          if (ent.wmBuilding) {
+            postToAndroid('onBuildingSelected', ent.wmBuilding);
+            return;
+          }
+        }
+
+        const ray = viewer.camera.getPickRay(movement.position);
+        const cartesian = ray
+          ? (viewer.scene.globe.pick(ray, viewer.scene) || viewer.camera.pickEllipsoid(movement.position, viewer.scene.globe.ellipsoid))
+          : null;
+        if (cartesian) {
+          const carto = Cesium.Cartographic.fromCartesian(cartesian);
+          const lat = Cesium.Math.toDegrees(carto.latitude);
+          const lon = Cesium.Math.toDegrees(carto.longitude);
+          const elev = viewer.scene.globe.getHeight(carto) || 0;
+          postToAndroid('onLocationSelected', {
+            lat: Number(lat.toFixed(5)),
+            lon: Number(lon.toFixed(5)),
+            terrainElevationMeters: Math.round(elev),
+            countryHint: ''
+          });
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+      viewer.camera.changed.addEventListener(updateHudReadout);
+      viewer.camera.moveEnd.addEventListener(updateHudReadout);
+
+      // Split bar drag
+      const splitBar = document.getElementById('wmSplitBar');
+      if (splitBar) {
+        let dragging = false;
+        splitBar.addEventListener('pointerdown', function (ev) {
+          dragging = true;
+          splitBar.setPointerCapture(ev.pointerId);
+        });
+        splitBar.addEventListener('pointermove', function (ev) {
+          if (!dragging || !state.viewer) return;
+          const pct = Math.max(0.08, Math.min(0.92, ev.clientX / Math.max(1, window.innerWidth)));
+          state.viewer.scene.splitPosition = pct;
+          splitBar.style.left = `${(pct * 100).toFixed(1)}%`;
+          state.viewer.scene.requestRender();
+        });
+        splitBar.addEventListener('pointerup', function () { dragging = false; });
+      }
+
+      // Mark globe ready BEFORE optional remote layers so bridge handshake never stalls
+      state.ready = true;
+      scheduleOrbitTimer();
+      state.clockTimer = setInterval(updateHudReadout, 1000);
+      updateHudReadout();
+
+      while (state.commandQueue.length > 0) {
+        handleCommand(state.commandQueue.shift());
+      }
+
+      postToAndroid('onGlobeReady', {
+        webglSupported: true,
+        cesiumVersion: Cesium.VERSION || '1.147.0',
+        timestampMs: Date.now()
+      });
+
+      // Async non-blocking overlays (Esri Satellite + Labels + Bundled Country Borders)
+      setBasemap(state.basemap).catch(function () {});
+      try {
+        const labelsProvider = new Cesium.UrlTemplateImageryProvider({
+          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19,
+          credit: 'Esri Reference Boundaries & Labels'
+        });
+        const labelsLayer = viewer.imageryLayers.addImageryProvider(labelsProvider);
+        labelsLayer.alpha = 0.86;
+        labelsLayer.show = state.labelsVisible;
+        state.imageryRefs.labelsOverlay = labelsLayer;
+        attachOfflineFallbackWatcher(labelsProvider, function () { return state.imageryRefs.labelsOverlay; });
+      } catch (_) { /* optional labels */ }
+
+      loadBundledCountryBorders().catch(function () {});
+      setTimeout(hideBootSplash, 900);
+    } catch (err) {
+      await activateFallback3DCanvasGlobe(err && err.message ? err.message : String(err));
+    }
   }
 
-  window.WorldMonitorApp = {
-    receiveBase64: function (b64) {
+  window.WorldMonitorHost = {
+    dispatch: function (rawCommand) {
       try {
-        const raw = decodeBase64Utf8(b64);
-        const parsed = JSON.parse(raw);
-        handleCommand(parsed);
+        const cmd = typeof rawCommand === 'string' ? JSON.parse(rawCommand) : rawCommand;
+        if (!state.ready) {
+          state.commandQueue.push(cmd);
+          return true;
+        }
+        handleCommand(cmd);
+        return true;
       } catch (err) {
-        console.warn('Command parse error:', err && err.message ? err.message : err);
+        console.error('WorldMonitorHost.dispatch error:', err);
+        return false;
       }
     },
-    receiveCommand: handleCommand,
-    computeSatellitePasses: computeSatellitePasses,
-    getStateSnapshot: function () {
-      return {
-        ready: state.ready,
-        basemap: state.basemap,
-        projection: state.projection,
-        stylePreset: state.stylePreset,
-        performanceMode: state.performanceMode,
-        satelliteCount: state.satellites.size,
-        entityCount: state.allEntitiesCache.length
-      };
+    isReady: function () {
+      return state.ready;
+    },
+    getEngineMode: function () {
+      return state.engineMode;
+    },
+    destroy: function () {
+      if (state.orbitTimer) { clearInterval(state.orbitTimer); state.orbitTimer = null; }
+      if (state.clockTimer) { clearInterval(state.clockTimer); state.clockTimer = null; }
+      if (state.radarTimer) { clearInterval(state.radarTimer); state.radarTimer = null; }
+      if (state.watchdogTimer) { clearTimeout(state.watchdogTimer); state.watchdogTimer = null; }
+      if (state.canvasEngine && typeof state.canvasEngine.stop === 'function') {
+        state.canvasEngine.stop();
+      }
+      if (state.viewer) {
+        try { state.viewer.destroy(); } catch (_) { /* ignore */ }
+        state.viewer = null;
+      }
     }
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      initGlobe().catch(function (err) {
-        postToAndroid('onGlobeError', { reason: err && err.message ? err.message : String(err) });
-      });
-    });
+    document.addEventListener('DOMContentLoaded', initGlobe);
   } else {
-    initGlobe().catch(function (err) {
-      postToAndroid('onGlobeError', { reason: err && err.message ? err.message : String(err) });
-    });
+    initGlobe();
   }
 })();

@@ -3,7 +3,11 @@ package com.adshield.pro.ui.screens.worldmonitor
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -119,6 +123,7 @@ fun WorldMonitorScreen(
     ) {
         WorldMonitorGlobeWebView(
             viewModel = viewModel,
+            reloadNonce = uiState.reloadNonce,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -151,6 +156,7 @@ fun WorldMonitorScreen(
                 uiState = uiState,
                 onBack = onBack,
                 onSync = { viewModel.syncAllEnabled(force = true) },
+                onReloadGlobe = viewModel::reloadGlobe,
                 onLoadBuildings = viewModel::load3dBuildingsAtViewport,
                 onToggleFullscreen = viewModel::toggleFullscreen,
                 onSearchChange = viewModel::updateSearchQuery,
@@ -231,10 +237,11 @@ fun WorldMonitorScreen(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 private fun WorldMonitorGlobeWebView(
     viewModel: WorldMonitorViewModel,
+    reloadNonce: Int,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -242,11 +249,25 @@ private fun WorldMonitorGlobeWebView(
     val tileAndAssetServer: WorldMonitorAssetAndTileServer = remember(context) { WorldMonitorAssetAndTileServer(context) }
     val jsBridge: WorldMonitorJsBridge = remember(viewModel) { WorldMonitorJsBridge(viewModel) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var pageLoaded by remember { mutableStateOf(false) }
+    val pendingCommands = remember { ArrayDeque<String>() }
 
-    LaunchedEffect(webViewRef) {
-        val wv = webViewRef ?: return@LaunchedEffect
+    LaunchedEffect(viewModel) {
         viewModel.jsCommands.collect { expr ->
-            wv.evaluateJavascript(expr, null)
+            val wv = webViewRef
+            if (wv != null && pageLoaded) {
+                wv.evaluateJavascript(expr, null)
+            } else {
+                if (pendingCommands.size >= 256) pendingCommands.removeFirst()
+                pendingCommands.addLast(expr)
+            }
+        }
+    }
+
+    LaunchedEffect(reloadNonce) {
+        if (reloadNonce > 0) {
+            pageLoaded = false
+            webViewRef?.loadUrl(WorldMonitorAssetAndTileServer.ENTRY_URL)
         }
     }
 
@@ -267,6 +288,8 @@ private fun WorldMonitorGlobeWebView(
                 wv.destroy()
             }
             webViewRef = null
+            pageLoaded = false
+            pendingCommands.clear()
         }
     }
 
@@ -279,10 +302,26 @@ private fun WorldMonitorGlobeWebView(
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
                 setBackgroundColor(android.graphics.Color.parseColor("#020813"))
+                setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                isFocusable = true
+                isFocusableInTouchMode = true
+                isVerticalScrollBarEnabled = false
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                setOnTouchListener { v, event ->
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN,
+                        MotionEvent.ACTION_POINTER_DOWN,
+                        MotionEvent.ACTION_MOVE -> v.parent?.requestDisallowInterceptTouchEvent(true)
+                        MotionEvent.ACTION_UP,
+                        MotionEvent.ACTION_CANCEL -> v.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                    false
+                }
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
-                    databaseEnabled = false
+                    databaseEnabled = true
                     allowFileAccess = false
                     allowContentAccess = false
                     @Suppress("DEPRECATION")
@@ -291,12 +330,31 @@ private fun WorldMonitorGlobeWebView(
                     allowUniversalAccessFromFileURLs = false
                     mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                     mediaPlaybackRequiresUserGesture = false
+                    setSupportZoom(false)
+                    builtInZoomControls = false
+                    displayZoomControls = false
+                    useWideViewPort = true
+                    loadWithOverviewMode = true
                     setSupportMultipleWindows(false)
                     javaScriptCanOpenWindowsAutomatically = false
                     cacheMode = WebSettings.LOAD_DEFAULT
                 }
                 jsBridge.attachTo(this)
-                webChromeClient = WebChromeClient()
+                webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                        if (consoleMessage != null &&
+                            consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
+                        ) {
+                            val msg = consoleMessage.message().orEmpty()
+                            if (msg.contains("Uncaught", ignoreCase = true) ||
+                                msg.contains("SecurityError", ignoreCase = true)
+                            ) {
+                                viewModel.onGlobeError("Globe JS: ${msg.take(140)}")
+                            }
+                        }
+                        return true
+                    }
+                }
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(
                         view: WebView?,
@@ -307,6 +365,24 @@ private fun WorldMonitorGlobeWebView(
                         view: WebView?,
                         request: WebResourceRequest
                     ): Boolean = true
+
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        pageLoaded = true
+                        val wv = view ?: return
+                        while (pendingCommands.isNotEmpty()) {
+                            wv.evaluateJavascript(pendingCommands.removeFirst(), null)
+                        }
+                    }
+
+                    override fun onRenderProcessGone(
+                        view: WebView?,
+                        detail: RenderProcessGoneDetail?
+                    ): Boolean {
+                        pageLoaded = false
+                        viewModel.onGlobeError("WebView GPU process reset — tap Retry to restore 3D Earth.")
+                        return true
+                    }
                 }
                 loadUrl(WorldMonitorAssetAndTileServer.ENTRY_URL)
                 webViewRef = this
@@ -320,6 +396,7 @@ private fun WorldMonitorTopHud(
     uiState: WorldMonitorUiState,
     onBack: () -> Unit,
     onSync: () -> Unit,
+    onReloadGlobe: () -> Unit,
     onLoadBuildings: () -> Unit,
     onToggleFullscreen: () -> Unit,
     onSearchChange: (String) -> Unit,
@@ -490,7 +567,26 @@ private fun WorldMonitorTopHud(
                 }
 
                 uiState.globeError?.let { err ->
-                    Text(text = err, color = AlertRed, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = err,
+                            color = AlertRed,
+                            fontSize = 11.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = onReloadGlobe,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("Retry 3D", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
                 uiState.statusBanner?.let { msg ->
                     Text(

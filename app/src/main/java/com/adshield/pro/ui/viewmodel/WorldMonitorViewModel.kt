@@ -87,8 +87,9 @@ data class WorldMonitorUiState(
     val globeReady: Boolean = false,
     val globeError: String? = null,
     val cesiumVersion: String = "1.147.0",
+    val reloadNonce: Int = 0,
     val fullscreenMode: Boolean = false,
-    val deckExpanded: Boolean = true,
+    val deckExpanded: Boolean = false,
     val activeTab: WorldMonitorDeckTab = WorldMonitorDeckTab.FEED,
     val isSyncing: Boolean = false,
     val statusBanner: String? = null,
@@ -97,7 +98,7 @@ data class WorldMonitorUiState(
     val projection: GlobeProjection = GlobeProjection.GLOBE_3D,
     val stylePreset: GlobeStylePreset = GlobeStylePreset.CYBER_TACTICAL,
     val performanceMode: GraphicsPerformanceMode = GraphicsPerformanceMode.BALANCED,
-    val terrain3dEnabled: Boolean = true,
+    val terrain3dEnabled: Boolean = false,
     val bordersEnabled: Boolean = true,
     val atmosphereEnabled: Boolean = true,
     val dayNightLightingEnabled: Boolean = true,
@@ -159,7 +160,7 @@ class WorldMonitorViewModel @Inject constructor(
     )
     val uiState: StateFlow<WorldMonitorUiState> = _uiState.asStateFlow()
 
-    private val _jsCommands = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    private val _jsCommands = MutableSharedFlow<String>(extraBufferCapacity = 256)
     val jsCommands: SharedFlow<String> = _jsCommands.asSharedFlow()
 
     private var timelinePlayJob: Job? = null
@@ -316,7 +317,18 @@ class WorldMonitorViewModel @Inject constructor(
     fun toggleFullscreen() {
         _uiState.update { cur ->
             val next = !cur.fullscreenMode
-            cur.copy(fullscreenMode = next, deckExpanded = !next)
+            cur.copy(fullscreenMode = next, deckExpanded = if (next) false else cur.deckExpanded)
+        }
+    }
+
+    fun reloadGlobe() {
+        _uiState.update {
+            it.copy(
+                globeReady = false,
+                globeError = null,
+                reloadNonce = it.reloadNonce + 1,
+                statusBanner = "Reinitializing 3D Digital Earth engine…"
+            )
         }
     }
 
@@ -524,9 +536,13 @@ class WorldMonitorViewModel @Inject constructor(
 
     fun cameraAction(action: String) {
         if (action == "TILT_3D") {
-            val vp = _uiState.value.viewport
-            val nextPitch = if (vp.pitchDeg > -65.0) -90.0 else -42.0
-            flyTo(vp.centerLat, vp.centerLon, vp.cameraAltitudeMeters.toDouble().coerceAtMost(650_000.0), nextPitch)
+            if (_uiState.value.projection != GlobeProjection.GLOBE_3D) {
+                setProjection(GlobeProjection.GLOBE_3D)
+            }
+            sendCommand(buildJsonObject {
+                put("type", "CAMERA_ACTION")
+                put("action", "TILT_3D")
+            }.toString())
             return
         }
         sendCommand(buildJsonObject {

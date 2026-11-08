@@ -403,8 +403,11 @@ class WorldMonitorTestSuite {
 
         assertTrue(WorldMonitorAssetAndTileServer.isAllowedTileHost("services.arcgisonline.com"))
         assertTrue(WorldMonitorAssetAndTileServer.isAllowedTileHost("gibs.earthdata.nasa.gov"))
+        assertTrue(WorldMonitorAssetAndTileServer.isAllowedTileHost("s3.amazonaws.com"))
         assertFalse(WorldMonitorAssetAndTileServer.isAllowedTileHost("evil-tracker.example.com"))
         assertEquals("application/wasm", WorldMonitorAssetAndTileServer.resolveMimeType("/vendor/cesium/ThirdParty/draco.wasm", null))
+        assertEquals("application/xml", WorldMonitorAssetAndTileServer.resolveMimeType("/vendor/cesium/Assets/Textures/NaturalEarthII/tilemapresource.xml", null))
+        assertEquals("image/ktx2", WorldMonitorAssetAndTileServer.resolveMimeType("/vendor/cesium/Assets/Textures/sky.ktx2", null))
         assertEquals("text/javascript", WorldMonitorAssetAndTileServer.resolveMimeType("/assets/worldmonitor/worldmonitor.js", null))
     }
 

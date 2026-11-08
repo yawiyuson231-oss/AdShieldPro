@@ -6,6 +6,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import androidx.webkit.WebViewAssetLoader
 import okhttp3.Cache
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.ByteArrayInputStream
@@ -18,11 +19,13 @@ import java.util.concurrent.TimeUnit
  *
  * Responsibilities:
  *  1. Serves bundled `/assets/worldmonitor/` files under `https://appassets.androidplatform.net/`
- *     with normalized MIME types for `.js`, `.wasm`, `.json`, `.css`, `.png`, `.jpg` across all Android versions.
- *  2. Proxies allowlisted HTTPS map/terrain/weather tile requests through an OkHttp 120 MB disk cache
- *     so visited satellite imagery, OpenStreetMap tiles, NASA GIBS layers, RainViewer radar, and
- *     AWS Terrarium 3D elevation tiles persist across sessions and render offline when cached.
- *  3. Blocks any non-HTTPS or non-allowlisted WebView network request.
+ *     with normalized MIME types and permissive CORS headers so `blob:` / `data:` ES module
+ *     WebWorkers (`CESIUM_WORKERS`) can load terrain/IAU2006/worker chunks across all Android versions.
+ *  2. Allows native Chromium handling (`return null`) for internal `blob:` and `data:` schemes
+ *     used by CesiumJS geometry WebWorkers and canvas-rendered tactical icons.
+ *  3. Proxies allowlisted HTTPS map/terrain/weather tile requests through a fast-timeout OkHttp
+ *     disk cache so visited tiles render offline without stalling local APK asset loads.
+ *  4. Blocks unexpected non-HTTPS or non-allowlisted third-party hosts.
  */
 class WorldMonitorAssetAndTileServer(
     context: Context
@@ -35,11 +38,18 @@ class WorldMonitorAssetAndTileServer(
         .build()
 
     private val tileClient: OkHttpClient by lazy {
+        val dispatcher = Dispatcher().apply {
+            maxRequests = 48
+            maxRequestsPerHost = 16
+        }
         val cacheDir = File(appContext.cacheDir, "worldmonitor_tiles_v1")
         OkHttpClient.Builder()
+            .dispatcher(dispatcher)
             .cache(Cache(cacheDir, 120L * 1024L * 1024L))
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(3_500, TimeUnit.MILLISECONDS)
+            .readTimeout(4_500, TimeUnit.MILLISECONDS)
+            .callTimeout(5_500, TimeUnit.MILLISECONDS)
+            .retryOnConnectionFailure(false)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -48,19 +58,38 @@ class WorldMonitorAssetAndTileServer(
     fun intercept(request: WebResourceRequest): WebResourceResponse? {
         val uri = request.url ?: return blockedResponse("Invalid URI")
         val scheme = uri.scheme?.lowercase(Locale.US) ?: return blockedResponse("Missing scheme")
+
+        // Let Chromium natively handle internal blob: (Cesium WebWorkers) and data: (canvas icons) URLs
+        if (scheme == "blob" || scheme == "data") {
+            return null
+        }
+
         if (scheme != "https") {
             return blockedResponse("Non-HTTPS scheme blocked")
         }
 
         val host = uri.host?.lowercase(Locale.US) ?: return blockedResponse("Missing host")
 
+        if (request.method.equals("OPTIONS", ignoreCase = true) &&
+            (host == ASSET_HOST || isAllowedTileHost(host))
+        ) {
+            return WebResourceResponse(
+                "text/plain",
+                "UTF-8",
+                200,
+                "OK",
+                CORS_HEADERS,
+                ByteArrayInputStream(ByteArray(0))
+            )
+        }
+
         // 1. Local bundled CesiumJS + worldmonitor assets
         if (host == ASSET_HOST) {
             val res = assetLoader.shouldInterceptRequest(uri) ?: return null
             val normalizedMime = resolveMimeType(uri.path.orEmpty(), res.mimeType)
             res.mimeType = normalizedMime
-            res.responseHeaders = (res.responseHeaders ?: emptyMap()) + mapOf(
-                "Access-Control-Allow-Origin" to "https://$ASSET_HOST",
+            res.responseHeaders = (res.responseHeaders ?: emptyMap()) + CORS_HEADERS + mapOf(
+                "Cross-Origin-Resource-Policy" to "cross-origin",
                 "Cache-Control" to "public, max-age=31536000, immutable"
             )
             return res
@@ -79,7 +108,7 @@ class WorldMonitorAssetAndTileServer(
         return try {
             val req = Request.Builder()
                 .url(uri.toString())
-                .header("User-Agent", "OmniShieldX-WorldMonitor/2035.1 (Android; TileCache)")
+                .header("User-Agent", "OmniShieldX-WorldMonitor/2035.2 (Android; TileCache)")
                 .get()
                 .build()
             val response = tileClient.newCall(req).execute()
@@ -88,9 +117,9 @@ class WorldMonitorAssetAndTileServer(
                 return WebResourceResponse(
                     "text/plain",
                     "UTF-8",
-                    response.code,
+                    response.code.coerceIn(400, 599),
                     response.message.ifBlank { "Upstream Error" },
-                    mapOf("Access-Control-Allow-Origin" to "*"),
+                    CORS_HEADERS,
                     ByteArrayInputStream(ByteArray(0))
                 )
             }
@@ -100,26 +129,27 @@ class WorldMonitorAssetAndTileServer(
                 ?.trim()
                 ?.ifBlank { null }
                 ?: resolveMimeType(uri.path.orEmpty(), "application/octet-stream")
+            val bytes = body.bytes()
+            response.close()
 
             WebResourceResponse(
                 contentType,
                 null,
                 200,
                 "OK",
-                mapOf(
-                    "Access-Control-Allow-Origin" to "*",
-                    "Cache-Control" to "public, max-age=86400"
+                CORS_HEADERS + mapOf(
+                    "Cross-Origin-Resource-Policy" to "cross-origin",
+                    "Cache-Control" to "public, max-age=604800"
                 ),
-                body.byteStream()
+                ByteArrayInputStream(bytes)
             )
         } catch (_: Exception) {
-            // Offline or transient timeout: return clean 504 so Cesium gracefully falls back to parent/offline level
             WebResourceResponse(
                 "text/plain",
                 "UTF-8",
-                504,
+                404,
                 "Offline",
-                mapOf("Access-Control-Allow-Origin" to "*"),
+                CORS_HEADERS,
                 ByteArrayInputStream(ByteArray(0))
             )
         }
@@ -128,6 +158,12 @@ class WorldMonitorAssetAndTileServer(
     companion object {
         const val ASSET_HOST = "appassets.androidplatform.net"
         const val ENTRY_URL = "https://appassets.androidplatform.net/assets/worldmonitor/index.html"
+
+        private val CORS_HEADERS = mapOf(
+            "Access-Control-Allow-Origin" to "*",
+            "Access-Control-Allow-Methods" to "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers" to "Origin, Accept, Content-Type, Range"
+        )
 
         private val ALLOWED_TILE_SUFFIXES = listOf(
             "arcgisonline.com",
@@ -148,6 +184,7 @@ class WorldMonitorAssetAndTileServer(
             return when {
                 lower.endsWith(".js") || lower.endsWith(".mjs") -> "text/javascript"
                 lower.endsWith(".wasm") -> "application/wasm"
+                lower.endsWith(".ktx2") -> "image/ktx2"
                 lower.endsWith(".json") || lower.endsWith(".geojson") || lower.endsWith(".czml") || lower.endsWith(".topojson") -> "application/json"
                 lower.endsWith(".css") -> "text/css"
                 lower.endsWith(".html") -> "text/html"
@@ -155,6 +192,8 @@ class WorldMonitorAssetAndTileServer(
                 lower.endsWith(".jpg") || lower.endsWith(".jpeg") -> "image/jpeg"
                 lower.endsWith(".svg") -> "image/svg+xml"
                 lower.endsWith(".xml") -> "application/xml"
+                lower.endsWith(".woff2") -> "font/woff2"
+                lower.endsWith(".ttf") -> "font/ttf"
                 !fallback.isNullOrBlank() -> fallback
                 else -> "application/octet-stream"
             }

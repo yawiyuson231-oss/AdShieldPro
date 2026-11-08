@@ -1,53 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
   />
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'self' https://appassets.androidplatform.net https: data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://appassets.androidplatform.net blob:; worker-src 'self' https://appassets.androidplatform.net blob:; style-src 'self' 'unsafe-inline' https://appassets.androidplatform.net; img-src 'self' https: data: blob:; connect-src 'self' https: data: blob:;"
+    content="default-src * 'self' https://appassets.androidplatform.net data: blob: 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://appassets.androidplatform.net blob: data:; style-src 'self' 'unsafe-inline' https://appassets.androidplatform.net; img-src * data: blob:; connect-src * data: blob:; worker-src 'self' blob: data: https://appassets.androidplatform.net; child-src 'self' blob: data: https://appassets.androidplatform.net;"
   />
-  <title>OMNISHIELD X // WORLD MONITOR 2035</title>
+  <title>OmniShield X Infinity — World Monitor 2035</title>
   <link rel="stylesheet" href="./vendor/cesium/Widgets/widgets.css" />
   <link rel="stylesheet" href="./worldmonitor.css" />
   <script>
-    window.CESIUM_BASE_URL = new URL('./vendor/cesium/', window.location.href).toString();
+    window.CESIUM_BASE_URL = './vendor/cesium/';
+    if (typeof window.ImageBitmap === 'undefined') { window.ImageBitmap = function () {}; }
+    if (typeof window.OffscreenCanvas === 'undefined') { window.OffscreenCanvas = function () {}; }
   </script>
 </head>
 <body data-style="CYBER_TACTICAL">
-  <div id="cesiumContainer" aria-label="Interactive 3D Digital Earth"></div>
+  <div id="cesiumContainer" aria-label="3D Digital Earth"></div>
+  <canvas id="wmFallbackGlobeCanvas" class="hidden" aria-label="3D Tactical Earth"></canvas>
 
-  <!-- Split-screen Historical Imagery Comparison Handle -->
-  <div id="wmSplitOverlay" class="wm-split-overlay hidden" role="separator" aria-label="Historical imagery comparison slider">
-    <div id="wmSplitBadgeLeft" class="wm-split-badge wm-split-badge-left">BEFORE</div>
-    <div id="wmSplitBadgeRight" class="wm-split-badge wm-split-badge-right">AFTER</div>
+  <div id="wmBootSplash" class="wm-boot-splash">
+    <div class="wm-boot-ring"></div>
+    <div id="wmBootLabel" class="wm-boot-label">INITIALIZING 3D DIGITAL EARTH…</div>
+  </div>
+
+  <!-- Historical Satellite Imagery Split Divider -->
+  <div id="wmSplitOverlay" class="wm-split-overlay hidden">
     <div id="wmSplitBar" class="wm-split-bar">
-      <div class="wm-split-knob">&#8596;</div>
+      <div class="wm-split-handle">⇔</div>
     </div>
+    <div id="wmSplitBadgeLeft" class="wm-split-badge left">BEFORE</div>
+    <div id="wmSplitBadgeRight" class="wm-split-badge right">AFTER</div>
   </div>
 
-  <!-- Experimental Simulation Banner (only visible when Simulation Lab overlay is active) -->
+  <!-- Minimalist HUD Telemetry Readout (UTC Clock + Camera Coords + Scale Bar) -->
+  <div id="wmMiniTelemetry" class="wm-mini-telemetry">
+    <span id="wmUtcClock">00:00:00 UTC</span>
+    <span class="wm-sep">·</span>
+    <span id="wmCamCoords">14.60°N 120.98°E</span>
+    <span class="wm-sep">·</span>
+    <span id="wmCamAlt">ALT 14,500 km</span>
+    <span class="wm-sep">·</span>
+    <span id="wmScaleLabel">SCALE 2,500 km</span>
+  </div>
+
+  <!-- Experimental Simulation Watermark (only shown when Simulation Lab is active) -->
   <div id="wmSimBanner" class="wm-sim-banner hidden">
-    EXPERIMENTAL SIMULATION OVERLAY &mdash; NOT A CERTAIN PREDICTION
+    EXPERIMENTAL SIMULATION — HYPOTHETICAL SCENARIO (NOT REAL LIVE DATA)
   </div>
 
-  <!-- Compact Coordinate, Elevation & Attribution Telemetry Bar -->
-  <div id="wmTelemetryHud" class="wm-telemetry-hud">
-    <span id="wmCoordReadout">LAT 14.6000&deg; LON 120.9842&deg;</span>
-    <span class="wm-sep">&middot;</span>
-    <span id="wmAltReadout">ALT 14,500 km</span>
-    <span class="wm-sep">&middot;</span>
-    <span id="wmElevReadout">ELEV 0 m</span>
-    <span class="wm-sep">&middot;</span>
-    <span id="wmProjReadout">3D GLOBE</span>
-    <span id="wmRadarStamp" class="wm-radar-stamp hidden"></span>
-  </div>
+  <!-- Weather Radar Frame Timestamp Indicator -->
+  <div id="wmRadarStamp" class="wm-radar-stamp hidden">RADAR</div>
 
-  <div id="wmAttributionBar" class="wm-attribution-bar">
-    CesiumJS (Apache-2.0) &middot; satellite.js (MIT) &middot; Natural Earth &middot; OpenStreetMap &middot; NASA GIBS &middot; USGS &middot; NOAA &middot; CelesTrak
+  <!-- Attribution Footer -->
+  <div id="wmAttribution" class="wm-attribution">
+    CesiumJS (Apache-2.0) · Esri / OpenStreetMap / NASA GIBS / Natural Earth · USGS · NASA EONET · NOAA · OpenSky · CelesTrak
   </div>
 
   <script src="./vendor/cesium/Cesium.js"></script>

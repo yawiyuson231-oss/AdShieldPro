@@ -29,9 +29,14 @@
 -dontwarn okhttp3.**
 -dontwarn okio.**
 
-# World Monitor 2035 WebView @JavascriptInterface bridge
--keepattributes JavascriptInterface
--keepclassmembers class com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge {
+# World Monitor 2035 WebView @JavascriptInterface bridge & serializable models
+-keepattributes *Annotation*,JavascriptInterface,Signature,InnerClasses,EnclosingMethod
+-keep @interface android.webkit.JavascriptInterface
+-keep class com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge {
+    public <init>(...);
     @android.webkit.JavascriptInterface <methods>;
+    public *;
 }
+-keep interface com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge$Listener { *; }
+-keep class com.adshield.pro.domain.worldmonitor.** { *; }
 
