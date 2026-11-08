@@ -1,19 +1,24 @@
 package com.adshield.pro.engine.worldmonitor
 
 import com.adshield.pro.data.repository.ProviderCredentialStore
+import com.adshield.pro.data.worldmonitor.WorldGeocodeCacheRecord
 import com.adshield.pro.data.worldmonitor.WorldMonitorDao
-import com.adshield.pro.data.worldmonitor.WorldProviderStateEntity
-import com.adshield.pro.domain.worldmonitor.BuildingFootprint3D
-import com.adshield.pro.domain.worldmonitor.GeoSearchResult
-import com.adshield.pro.domain.worldmonitor.GlobeViewport
+import com.adshield.pro.data.worldmonitor.WorldProviderStateRecord
+import com.adshield.pro.di.WorldMonitorHttpClient
+import com.adshield.pro.domain.worldmonitor.GeocodeSearchResult
+import com.adshield.pro.domain.worldmonitor.OsmBuilding3D
 import com.adshield.pro.domain.worldmonitor.ProviderAuthRequirement
 import com.adshield.pro.domain.worldmonitor.ProviderSyncStatus
+import com.adshield.pro.domain.worldmonitor.RainViewerFrame
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldProviderSpec
+import com.adshield.pro.domain.worldmonitor.WorldViewport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -32,7 +37,6 @@ import java.io.ByteArrayOutputStream
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
-import com.adshield.pro.di.WorldMonitorHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,57 +57,58 @@ class WorldMonitorSyncEngine @Inject constructor(
         val providerId: String,
         val status: ProviderSyncStatus,
         val entities: List<WorldEntity> = emptyList(),
-        val rainViewerFrames: List<WorldMonitorNormalizers.RainViewerFrame> = emptyList(),
-        val buildings3D: List<BuildingFootprint3D> = emptyList(),
+        val rainViewerFrames: List<RainViewerFrame> = emptyList(),
+        val buildings3D: List<OsmBuilding3D> = emptyList(),
         val errorMessage: String? = null
     )
 
     suspend fun syncProvider(
         spec: WorldProviderSpec,
-        viewport: GlobeViewport? = null,
+        viewport: WorldViewport? = null,
         force: Boolean = false,
         nowEpochMs: Long = System.currentTimeMillis()
     ): ProviderFetchOutcome = withContext(Dispatchers.IO) {
-        val existingState = dao.getProviderState(spec.id)
+        val existingState = dao.getProviderState(spec.providerId)
         if (existingState != null && !existingState.enabled) {
-            return@withContext ProviderFetchOutcome(spec.id, ProviderSyncStatus.DISABLED)
+            return@withContext ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.IDLE)
         }
 
         // 1. Offline / Bundled Baseline Catalog
-        if (spec.id == "wm.infra.baseline") {
+        if (spec.providerId == "wm.infra.baseline") {
             val items = BaselineReferenceStore.buildBaselineEntities(nowEpochMs)
-            saveProviderState(spec.id, existingState, ProviderSyncStatus.HEALTHY, 200, items.size, null, nowEpochMs)
-            return@withContext ProviderFetchOutcome(spec.id, ProviderSyncStatus.HEALTHY, entities = items)
+            saveProviderState(spec.providerId, existingState, ProviderSyncStatus.OK, 200, items.size, 0L, null, nowEpochMs)
+            return@withContext ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.OK, entities = items)
         }
 
         // 2. Unimplemented / Backend-proxy-gated feeds (e.g. AISStream WebSocket)
         if (!spec.implemented) {
             val hasCred = spec.credentialSlot?.let { !credentialStore.get(it).isNullOrBlank() } == true
-            val status = if (hasCred) ProviderSyncStatus.ERROR else ProviderSyncStatus.REQUIRES_KEY
-            val note = spec.limitationNote ?: "Requires external WebSocket stream proxy or API credentials."
-            saveProviderState(spec.id, existingState, status, null, 0, note, nowEpochMs)
-            return@withContext ProviderFetchOutcome(spec.id, status, errorMessage = note)
+            val status = if (hasCred) ProviderSyncStatus.BACKEND_REQUIRED else ProviderSyncStatus.NEEDS_API_KEY
+            val note = spec.notes.ifBlank { "Requires external WebSocket stream proxy or API credentials." }
+            saveProviderState(spec.providerId, existingState, status, null, 0, null, note, nowEpochMs)
+            return@withContext ProviderFetchOutcome(spec.providerId, status, errorMessage = note)
         }
 
         // 3. Required API key check (e.g. NASA FIRMS MAP_KEY)
         val secret = spec.credentialSlot?.let { credentialStore.get(it) }
-        if (spec.authRequirement == ProviderAuthRequirement.REQUIRED_USER_API_KEY && secret.isNullOrBlank()) {
-            val note = spec.limitationNote ?: "Add your free API key in World Monitor Settings to enable this feed."
-            saveProviderState(spec.id, existingState, ProviderSyncStatus.REQUIRES_KEY, null, 0, note, nowEpochMs)
-            return@withContext ProviderFetchOutcome(spec.id, ProviderSyncStatus.REQUIRES_KEY, errorMessage = note)
+        if (spec.authRequirement == ProviderAuthRequirement.REQUIRED_USER_KEY && secret.isNullOrBlank()) {
+            val note = spec.notes.ifBlank { "Add your free API key in Sources settings to enable this feed." }
+            saveProviderState(spec.providerId, existingState, ProviderSyncStatus.NEEDS_API_KEY, null, 0, null, note, nowEpochMs)
+            return@withContext ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.NEEDS_API_KEY, errorMessage = note)
         }
 
-        // 4. Respect backoff & minimum provider gap (e.g. CelesTrak 2-hour policy!)
+        // 4. Respect backoff & minimum provider gap (CelesTrak 2-hour policy strictly enforced!)
         if (existingState != null) {
-            if (nowEpochMs < existingState.nextEligibleEpochMs) {
+            val nextAllowed = existingState.nextAllowedEpochMs ?: 0L
+            if (nowEpochMs < nextAllowed) {
                 return@withContext ProviderFetchOutcome(
-                    spec.id,
+                    spec.providerId,
                     ProviderSyncStatus.RATE_LIMITED,
                     errorMessage = "Cooling down until rate-limit window expires"
                 )
             }
-            val minGap = if (spec.id.startsWith("wm.space.celestrak.")) {
-                spec.minGapMs // Always enforce CelesTrak 2h rule even on manual tap if already cached!
+            val minGap = if (spec.providerId.startsWith("wm.space.celestrak.")) {
+                spec.minRequestGapMs
             } else if (force) {
                 10_000L
             } else {
@@ -111,20 +116,22 @@ class WorldMonitorSyncEngine @Inject constructor(
             }
             val lastOk = existingState.lastSuccessEpochMs ?: 0L
             if (lastOk > 0L && (nowEpochMs - lastOk) < minGap) {
-                return@withContext ProviderFetchOutcome(spec.id, existingStateStatus(existingState))
+                val curStatus = runCatching { ProviderSyncStatus.valueOf(existingState.status) }
+                    .getOrDefault(ProviderSyncStatus.OK)
+                return@withContext ProviderFetchOutcome(spec.providerId, curStatus)
             }
         }
 
         // 5. Special handling for Overpass 3D Buildings & Local Infra (POST with bbox < 0.6 deg)
-        if (spec.id == "wm.infra.overpass") {
+        if (spec.providerId == "wm.infra.overpass") {
             return@withContext fetchOverpassViewport(spec, existingState, viewport, nowEpochMs)
         }
 
         // 6. Build HTTPS request URL
         val resolvedUrl = resolveEndpointUrl(spec, secret, viewport)
         if (!resolvedUrl.startsWith("https://", ignoreCase = true)) {
-            saveProviderState(spec.id, existingState, ProviderSyncStatus.ERROR, null, 0, "Blocked non-HTTPS URL", nowEpochMs)
-            return@withContext ProviderFetchOutcome(spec.id, ProviderSyncStatus.ERROR, errorMessage = "Non-HTTPS endpoint")
+            saveProviderState(spec.providerId, existingState, ProviderSyncStatus.ERROR, null, 0, null, "Blocked non-HTTPS URL", nowEpochMs)
+            return@withContext ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.ERROR, errorMessage = "Non-HTTPS endpoint")
         }
 
         val reqBuilder = Request.Builder()
@@ -133,8 +140,7 @@ class WorldMonitorSyncEngine @Inject constructor(
             .header("Accept", "application/json, application/xml, text/csv, text/plain, */*")
             .get()
 
-        // Optional OpenSky credentials (`username:password` or Bearer token)
-        if (spec.id == "wm.aviation.opensky" && !secret.isNullOrBlank()) {
+        if (spec.providerId == "wm.aviation.opensky" && !secret.isNullOrBlank()) {
             if (secret.contains(':')) {
                 val user = secret.substringBefore(':')
                 val pass = secret.substringAfter(':')
@@ -145,23 +151,25 @@ class WorldMonitorSyncEngine @Inject constructor(
         }
 
         existingState?.etag?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-None-Match", it) }
-        existingState?.lastModifiedHeader?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-Modified-Since", it) }
+        existingState?.lastModified?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-Modified-Since", it) }
 
-        return@withContext executeFeedRequest(spec, reqBuilder.build(), existingState, nowEpochMs)
+        val qLat = viewport?.centerLat ?: 14.5995
+        val qLon = viewport?.centerLon ?: 120.9842
+        return@withContext executeFeedRequest(spec, reqBuilder.build(), existingState, nowEpochMs, qLat, qLon)
     }
 
     private suspend fun fetchOverpassViewport(
         spec: WorldProviderSpec,
-        existingState: WorldProviderStateEntity?,
-        viewport: GlobeViewport?,
+        existingState: WorldProviderStateRecord?,
+        viewport: WorldViewport?,
         nowEpochMs: Long
     ): ProviderFetchOutcome {
-        val vp = viewport ?: return ProviderFetchOutcome(spec.id, ProviderSyncStatus.IDLE)
+        val vp = viewport ?: return ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.IDLE)
         val latSpan = kotlin.math.abs(vp.north - vp.south)
         val lonSpan = kotlin.math.abs(vp.east - vp.west)
-        if (latSpan > 0.65 || lonSpan > 0.65 || vp.altitudeMeters > 35_000.0) {
+        if (latSpan > 0.65 || lonSpan > 0.65 || vp.cameraAltitudeMeters > 35_000L) {
             return ProviderFetchOutcome(
-                spec.id,
+                spec.providerId,
                 ProviderSyncStatus.IDLE,
                 errorMessage = "Zoom closer (< 35 km altitude) to stream live OSM 3D buildings & street infrastructure."
             )
@@ -179,130 +187,141 @@ class WorldMonitorSyncEngine @Inject constructor(
               node["power"="substation"]($s,$w,$n,$e);
               node["man_made"="mast"]($s,$w,$n,$e);
             );
-            out body center 180;
+            out body geom center 180;
         """.trimIndent()
         val formBody = ("data=" + URLEncoder.encode(ql, "UTF-8"))
             .toRequestBody("application/x-www-form-urlencoded".toMediaType())
 
         val req = Request.Builder()
-            .url(spec.endpointDescription)
+            .url(spec.endpoint)
             .header("User-Agent", USER_AGENT)
             .post(formBody)
             .build()
 
+        val started = System.currentTimeMillis()
         return try {
             httpClient.newCall(req).execute().use { resp ->
+                val latency = System.currentTimeMillis() - started
                 if (!resp.isSuccessful) {
                     val status = if (resp.code == 429) ProviderSyncStatus.RATE_LIMITED else ProviderSyncStatus.ERROR
-                    saveProviderState(spec.id, existingState, status, resp.code, 0, "HTTP ${resp.code}", nowEpochMs)
-                    return ProviderFetchOutcome(spec.id, status, errorMessage = "HTTP ${resp.code}")
+                    saveProviderState(spec.providerId, existingState, status, resp.code, 0, latency, "HTTP ${resp.code}", nowEpochMs)
+                    return ProviderFetchOutcome(spec.providerId, status, errorMessage = "HTTP ${resp.code}")
                 }
                 val raw = readBoundedUtf8(resp.body.byteStream(), MAX_BODY_BYTES)
-                val parsed = WorldMonitorNormalizers.parseOverpass(raw, nowEpochMs)
+                val parsed = WorldMonitorNormalizers.parseOverpass(spec, raw, nowEpochMs)
                 saveProviderState(
-                    spec.id,
+                    spec.providerId,
                     existingState,
-                    ProviderSyncStatus.HEALTHY,
+                    ProviderSyncStatus.OK,
                     200,
                     parsed.infrastructureEntities.size + parsed.buildings3D.size,
+                    latency,
                     null,
                     nowEpochMs
                 )
                 ProviderFetchOutcome(
-                    providerId = spec.id,
-                    status = ProviderSyncStatus.HEALTHY,
+                    providerId = spec.providerId,
+                    status = ProviderSyncStatus.OK,
                     entities = parsed.infrastructureEntities,
                     buildings3D = parsed.buildings3D
                 )
             }
         } catch (e: Exception) {
-            saveProviderState(spec.id, existingState, ProviderSyncStatus.OFFLINE, null, 0, e.message, nowEpochMs)
-            ProviderFetchOutcome(spec.id, ProviderSyncStatus.OFFLINE, errorMessage = e.message)
+            saveProviderState(spec.providerId, existingState, ProviderSyncStatus.OFFLINE, null, 0, null, e.message, nowEpochMs)
+            ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.OFFLINE, errorMessage = e.message)
         }
     }
 
     private suspend fun executeFeedRequest(
         spec: WorldProviderSpec,
         request: Request,
-        existingState: WorldProviderStateEntity?,
-        nowEpochMs: Long
+        existingState: WorldProviderStateRecord?,
+        nowEpochMs: Long,
+        queryLat: Double,
+        queryLon: Double
     ): ProviderFetchOutcome {
+        val started = System.currentTimeMillis()
         return try {
             httpClient.newCall(request).execute().use { response ->
+                val latency = System.currentTimeMillis() - started
                 val code = response.code
                 if (code == 304) {
                     saveProviderState(
-                        spec.id,
+                        spec.providerId,
                         existingState,
-                        ProviderSyncStatus.HEALTHY,
+                        ProviderSyncStatus.OK,
                         304,
-                        existingState?.cachedItemCount ?: 0,
+                        existingState?.itemCount ?: 0,
+                        latency,
                         null,
                         nowEpochMs,
                         etag = response.header("ETag") ?: existingState?.etag,
-                        lastMod = response.header("Last-Modified") ?: existingState?.lastModifiedHeader
+                        lastMod = response.header("Last-Modified") ?: existingState?.lastModified
                     )
-                    return ProviderFetchOutcome(spec.id, ProviderSyncStatus.HEALTHY)
+                    return ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.OK)
                 }
 
                 if (code == 429) {
                     val retrySec = response.header("Retry-After")?.trim()?.toLongOrNull()?.coerceIn(30L, 7_200L) ?: 300L
                     saveProviderState(
-                        spec.id,
+                        spec.providerId,
                         existingState,
                         ProviderSyncStatus.RATE_LIMITED,
                         429,
-                        existingState?.cachedItemCount ?: 0,
+                        existingState?.itemCount ?: 0,
+                        latency,
                         "Rate limited (retry in ${retrySec}s)",
                         nowEpochMs,
                         backoffMs = retrySec * 1000L
                     )
-                    return ProviderFetchOutcome(spec.id, ProviderSyncStatus.RATE_LIMITED, errorMessage = "HTTP 429")
+                    return ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.RATE_LIMITED, errorMessage = "HTTP 429")
                 }
 
                 if (!response.isSuccessful) {
                     val failures = (existingState?.consecutiveFailures ?: 0) + 1
                     val backoff = (30_000L * (1L shl failures.coerceAtMost(6))).coerceAtMost(1_800_000L)
                     saveProviderState(
-                        spec.id,
+                        spec.providerId,
                         existingState,
                         ProviderSyncStatus.ERROR,
                         code,
-                        existingState?.cachedItemCount ?: 0,
+                        existingState?.itemCount ?: 0,
+                        latency,
                         "HTTP $code",
                         nowEpochMs,
                         consecutiveFailures = failures,
                         backoffMs = backoff
                     )
-                    return ProviderFetchOutcome(spec.id, ProviderSyncStatus.ERROR, errorMessage = "HTTP $code")
+                    return ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.ERROR, errorMessage = "HTTP $code")
                 }
 
                 val bodyText = readBoundedUtf8(response.body.byteStream(), MAX_BODY_BYTES)
-                val rainFrames = if (spec.id == "wm.weather.rainviewer") {
+                val rainFrames = if (spec.providerId == "wm.weather.rainviewer") {
                     WorldMonitorNormalizers.parseRainViewerFrames(bodyText)
                 } else emptyList()
 
-                val entities = if (spec.id == "wm.weather.rainviewer") {
+                val entities = if (spec.providerId == "wm.weather.rainviewer") {
                     emptyList()
                 } else {
-                    WorldMonitorNormalizers.normalize(spec.id, bodyText, nowEpochMs)
+                    WorldMonitorNormalizers.normalize(spec, bodyText, nowEpochMs, queryLat, queryLon)
                 }
 
-                val count = if (spec.id == "wm.weather.rainviewer") rainFrames.size else entities.size
+                val count = if (spec.providerId == "wm.weather.rainviewer") rainFrames.size else entities.size
                 saveProviderState(
-                    spec.id,
+                    spec.providerId,
                     existingState,
-                    ProviderSyncStatus.HEALTHY,
+                    ProviderSyncStatus.OK,
                     code,
                     count,
+                    latency,
                     null,
                     nowEpochMs,
                     etag = response.header("ETag"),
                     lastMod = response.header("Last-Modified")
                 )
                 ProviderFetchOutcome(
-                    providerId = spec.id,
-                    status = ProviderSyncStatus.HEALTHY,
+                    providerId = spec.providerId,
+                    status = ProviderSyncStatus.OK,
                     entities = entities,
                     rainViewerFrames = rainFrames
                 )
@@ -311,49 +330,68 @@ class WorldMonitorSyncEngine @Inject constructor(
             val failures = (existingState?.consecutiveFailures ?: 0) + 1
             val backoff = (20_000L * failures.coerceAtMost(6)).coerceAtMost(600_000L)
             saveProviderState(
-                spec.id,
+                spec.providerId,
                 existingState,
                 ProviderSyncStatus.OFFLINE,
                 null,
-                existingState?.cachedItemCount ?: 0,
+                existingState?.itemCount ?: 0,
+                null,
                 e.message ?: "Network unreachable",
                 nowEpochMs,
                 consecutiveFailures = failures,
                 backoffMs = backoff
             )
-            ProviderFetchOutcome(spec.id, ProviderSyncStatus.OFFLINE, errorMessage = e.message)
+            ProviderFetchOutcome(spec.providerId, ProviderSyncStatus.OFFLINE, errorMessage = e.message)
         }
     }
 
     /**
      * Global geographic search: combines instant offline baseline matches (countries, capitals,
-     * airports, seaports) with live OpenStreetMap Nominatim geocoding (cities, landmarks, addresses).
+     * airports, seaports) with cached + live OpenStreetMap Nominatim geocoding.
      */
-    suspend fun searchLocations(query: String): List<GeoSearchResult> = withContext(Dispatchers.IO) {
+    suspend fun searchLocations(query: String): List<GeocodeSearchResult> = withContext(Dispatchers.IO) {
         val clean = query.trim()
         if (clean.length < 2) return@withContext emptyList()
 
-        // Coordinate literal support: e.g. "14.5995, 120.9842"
         val coordParts = clean.split(Regex("[,\\s]+")).filter { it.isNotBlank() }
         if (coordParts.size == 2) {
             val lat = coordParts[0].toDoubleOrNull()
             val lon = coordParts[1].toDoubleOrNull()
             if (lat != null && lon != null && GeoSpatialIndex.isValidCoordinate(lat, lon)) {
                 return@withContext listOf(
-                    GeoSearchResult(
+                    GeocodeSearchResult(
                         displayName = "Coordinates %.4f°, %.4f°".format(Locale.US, lat, lon),
-                        category = "Coordinate",
                         latitude = lat,
                         longitude = lon,
-                        recommendedAltitudeMeters = 45_000.0,
-                        source = "Direct WGS84 Input"
+                        boundingBoxKm = 45.0,
+                        category = "Coordinate",
+                        attribution = "Direct WGS84 Input"
                     )
                 )
             }
         }
 
-        val offlineMatches = searchOfflineBaseline(clean)
-        val liveMatches = runCatching { queryNominatim(clean) }.getOrDefault(emptyList())
+        val offlineMatches = BaselineReferenceStore.searchOffline(clean)
+        val now = System.currentTimeMillis()
+        val cacheKey = "q:${clean.lowercase(Locale.US)}"
+        val cachedGeocode = dao.getGeocodeCache(cacheKey, now)?.let { rec ->
+            runCatching { json.decodeFromString<List<GeocodeSearchResult>>(rec.payloadJson) }.getOrNull()
+        }
+        val liveMatches = cachedGeocode ?: runCatching {
+            val fetched = queryNominatim(clean)
+            if (fetched.isNotEmpty()) {
+                dao.putGeocodeCache(
+                    WorldGeocodeCacheRecord(
+                        queryKey = cacheKey,
+                        payloadJson = json.encodeToString(fetched),
+                        fetchedAtEpochMs = now,
+                        expiresAtEpochMs = now + 7L * 24 * 3_600_000L
+                    )
+                )
+            }
+            fetched
+        }.getOrDefault(emptyList())
+
         (offlineMatches + liveMatches)
             .distinctBy { "${"%.2f".format(Locale.US, it.latitude)}:${"%.2f".format(Locale.US, it.longitude)}" }
             .take(12)
@@ -375,7 +413,7 @@ class WorldMonitorSyncEngine @Inject constructor(
         val place = runCatching {
             nominatimMutex.withLock {
                 val wait = 1_100L - (System.currentTimeMillis() - lastNominatimCallMs)
-                if (wait > 0) kotlinx.coroutines.delay(wait)
+                if (wait > 0) delay(wait)
                 lastNominatimCallMs = System.currentTimeMillis()
                 val url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&lat=${"%.4f".format(Locale.US, lat)}&lon=${"%.4f".format(Locale.US, lon)}"
                 val req = Request.Builder()
@@ -418,9 +456,9 @@ class WorldMonitorSyncEngine @Inject constructor(
         }.getOrNull()
     }
 
-    private suspend fun queryNominatim(query: String): List<GeoSearchResult> = nominatimMutex.withLock {
+    private suspend fun queryNominatim(query: String): List<GeocodeSearchResult> = nominatimMutex.withLock {
         val wait = 1_100L - (System.currentTimeMillis() - lastNominatimCallMs)
-        if (wait > 0) kotlinx.coroutines.delay(wait)
+        if (wait > 0) delay(wait)
         lastNominatimCallMs = System.currentTimeMillis()
 
         val encoded = URLEncoder.encode(query, "UTF-8")
@@ -443,82 +481,26 @@ class WorldMonitorSyncEngine @Inject constructor(
                 val type = obj["type"]?.jsonPrimitive?.content ?: "Place"
                 val addr = obj["address"] as? JsonObject
                 val cc = addr?.get("country_code")?.jsonPrimitive?.content?.uppercase(Locale.US)
-                val alt = when (type) {
-                    "country", "administrative" -> 1_800_000.0
-                    "city", "state" -> 120_000.0
-                    else -> 12_000.0
+                val bboxKm = when (type) {
+                    "country", "administrative" -> 1_600.0
+                    "city", "state" -> 110.0
+                    else -> 16.0
                 }
-                GeoSearchResult(
+                GeocodeSearchResult(
                     displayName = name,
-                    category = type.replaceFirstChar { it.uppercase() },
                     latitude = lat,
                     longitude = lon,
+                    boundingBoxKm = bboxKm,
+                    category = type.replaceFirstChar { it.uppercase() },
                     countryCode = cc,
-                    recommendedAltitudeMeters = alt,
-                    source = "OpenStreetMap Nominatim"
+                    attribution = "© OpenStreetMap contributors (Nominatim)"
                 )
             }
         }
     }
 
-    private fun searchOfflineBaseline(query: String): List<GeoSearchResult> {
-        val q = query.lowercase(Locale.US)
-        val payload = BaselineReferenceStore.load()
-        val out = ArrayList<GeoSearchResult>()
-
-        payload.countries.filter {
-            it.name.lowercase(Locale.US).contains(q) ||
-                it.capital.lowercase(Locale.US).contains(q) ||
-                it.iso2.equals(query, ignoreCase = true) ||
-                it.iso3.equals(query, ignoreCase = true)
-        }.take(4).forEach { c ->
-            out += GeoSearchResult(
-                displayName = "${c.name} (Capital: ${c.capital})",
-                category = "Country",
-                latitude = c.lat,
-                longitude = c.lon,
-                countryCode = c.iso2,
-                recommendedAltitudeMeters = 2_400_000.0,
-                source = "Offline World Reference"
-            )
-        }
-
-        payload.airports.filter {
-            it.iata.equals(query, ignoreCase = true) ||
-                it.icao.equals(query, ignoreCase = true) ||
-                it.name.lowercase(Locale.US).contains(q) ||
-                it.city.lowercase(Locale.US).contains(q)
-        }.take(4).forEach { a ->
-            out += GeoSearchResult(
-                displayName = "${a.iata}/${a.icao} — ${a.name}, ${a.city}",
-                category = "Airport",
-                latitude = a.lat,
-                longitude = a.lon,
-                countryCode = a.country,
-                recommendedAltitudeMeters = 18_000.0,
-                source = "OurAirports Reference"
-            )
-        }
-
-        payload.seaports.filter {
-            it.locode.equals(query, ignoreCase = true) ||
-                it.name.lowercase(Locale.US).contains(q)
-        }.take(3).forEach { p ->
-            out += GeoSearchResult(
-                displayName = "${p.locode} — Port of ${p.name}",
-                category = "Seaport",
-                latitude = p.lat,
-                longitude = p.lon,
-                countryCode = p.country,
-                recommendedAltitudeMeters = 22_000.0,
-                source = "WPI Reference"
-            )
-        }
-        return out
-    }
-
-    private fun resolveEndpointUrl(spec: WorldProviderSpec, secret: String?, viewport: GlobeViewport?): String {
-        var url = spec.endpointDescription
+    private fun resolveEndpointUrl(spec: WorldProviderSpec, secret: String?, viewport: WorldViewport?): String {
+        var url = spec.endpoint
         if (url.contains("{apiKey}") && !secret.isNullOrBlank()) {
             url = url.replace("{apiKey}", URLEncoder.encode(secret.trim(), "UTF-8"))
         }
@@ -526,52 +508,55 @@ class WorldMonitorSyncEngine @Inject constructor(
         val south = viewport?.south ?: -70.0
         val east = viewport?.east ?: 180.0
         val north = viewport?.north ?: 75.0
+        val lat = viewport?.centerLat ?: 14.5995
+        val lon = viewport?.centerLon ?: 120.9842
         url = url.replace("{west}", "%.2f".format(Locale.US, west))
             .replace("{south}", "%.2f".format(Locale.US, south))
             .replace("{east}", "%.2f".format(Locale.US, east))
             .replace("{north}", "%.2f".format(Locale.US, north))
+            .replace("{lat}", "%.3f".format(Locale.US, lat))
+            .replace("{lon}", "%.3f".format(Locale.US, lon))
         return url
     }
 
     private suspend fun saveProviderState(
         providerId: String,
-        previous: WorldProviderStateEntity?,
+        previous: WorldProviderStateRecord?,
         status: ProviderSyncStatus,
         httpCode: Int?,
         itemCount: Int,
+        latencyMs: Long?,
         error: String?,
         nowEpochMs: Long,
         etag: String? = previous?.etag,
-        lastMod: String? = previous?.lastModifiedHeader,
-        consecutiveFailures: Int = if (status == ProviderSyncStatus.HEALTHY) 0 else (previous?.consecutiveFailures ?: 0),
+        lastMod: String? = previous?.lastModified,
+        consecutiveFailures: Int = if (status == ProviderSyncStatus.OK) 0 else (previous?.consecutiveFailures ?: 0),
         backoffMs: Long = 0L
     ) {
         dao.upsertProviderState(
-            WorldProviderStateEntity(
+            WorldProviderStateRecord(
                 providerId = providerId,
-                enabled = previous?.enabled ?: true,
                 status = status.name,
-                lastSyncEpochMs = nowEpochMs,
-                lastSuccessEpochMs = if (status == ProviderSyncStatus.HEALTHY) nowEpochMs else previous?.lastSuccessEpochMs,
-                nextEligibleEpochMs = if (backoffMs > 0L) nowEpochMs + backoffMs else 0L,
-                lastHttpCode = httpCode,
-                lastError = error,
+                enabled = previous?.enabled ?: true,
+                lastAttemptEpochMs = nowEpochMs,
+                lastSuccessEpochMs = if (status == ProviderSyncStatus.OK) nowEpochMs else previous?.lastSuccessEpochMs,
+                httpCode = httpCode,
+                itemCount = itemCount,
+                latencyMs = latencyMs,
+                errorMessage = error,
                 etag = etag,
-                lastModifiedHeader = lastMod,
-                cachedItemCount = itemCount,
+                lastModified = lastMod,
+                nextAllowedEpochMs = if (backoffMs > 0L) nowEpochMs + backoffMs else null,
                 consecutiveFailures = consecutiveFailures
             )
         )
     }
 
-    private fun existingStateStatus(state: WorldProviderStateEntity): ProviderSyncStatus =
-        runCatching { ProviderSyncStatus.valueOf(state.status) }.getOrDefault(ProviderSyncStatus.HEALTHY)
-
     companion object {
         private const val USER_AGENT = "OmniShieldX-WorldMonitor/2035.1 (Android; Passive-OSINT-Earth-Viewer)"
-        private const val MAX_BODY_BYTES = 4 * 1024 * 1024 // 4 MB safety ceiling per provider response
+        private const val MAX_BODY_BYTES = 4 * 1024 * 1024
 
-        private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+        private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
         internal fun readBoundedUtf8(stream: java.io.InputStream, maxBytes: Int): String {
             val out = ByteArrayOutputStream(minOf(maxBytes, 65_536))

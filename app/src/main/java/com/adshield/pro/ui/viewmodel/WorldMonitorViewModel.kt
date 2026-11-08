@@ -4,28 +4,27 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adshield.pro.data.worldmonitor.WorldMonitorRepository
 import com.adshield.pro.domain.worldmonitor.AiAnalystResponse
-import com.adshield.pro.domain.worldmonitor.BasemapStyle
-import com.adshield.pro.domain.worldmonitor.BuildingFootprint3D
 import com.adshield.pro.domain.worldmonitor.CorrelatedIncident
 import com.adshield.pro.domain.worldmonitor.DigitalTwinSnapshot
 import com.adshield.pro.domain.worldmonitor.FreshnessClass
-import com.adshield.pro.domain.worldmonitor.GeoSearchResult
-import com.adshield.pro.domain.worldmonitor.GlobePerformanceMode
+import com.adshield.pro.domain.worldmonitor.GeocodeSearchResult
+import com.adshield.pro.domain.worldmonitor.GlobeBasemap
 import com.adshield.pro.domain.worldmonitor.GlobeProjection
-import com.adshield.pro.domain.worldmonitor.GlobeViewport
-import com.adshield.pro.domain.worldmonitor.HistoricalSplitState
-import com.adshield.pro.domain.worldmonitor.LayerVisualConfig
-import com.adshield.pro.domain.worldmonitor.MapStylePreset
+import com.adshield.pro.domain.worldmonitor.GlobeStylePreset
+import com.adshield.pro.domain.worldmonitor.GraphicsPerformanceMode
+import com.adshield.pro.domain.worldmonitor.HistoricalImagerySplitState
+import com.adshield.pro.domain.worldmonitor.OsmBuilding3D
 import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
 import com.adshield.pro.domain.worldmonitor.SimulationKind
 import com.adshield.pro.domain.worldmonitor.SimulationResult
-import com.adshield.pro.domain.worldmonitor.TimelineWindowPreset
-import com.adshield.pro.domain.worldmonitor.WatchAlertRecord
-import com.adshield.pro.domain.worldmonitor.WatchRegion
+import com.adshield.pro.domain.worldmonitor.WatchtowerAlert
+import com.adshield.pro.domain.worldmonitor.WatchtowerRegion
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldProviderRuntimeState
 import com.adshield.pro.domain.worldmonitor.WorldSeverity
+import com.adshield.pro.domain.worldmonitor.WorldTimelineWindow
+import com.adshield.pro.domain.worldmonitor.WorldViewport
 import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
 import com.adshield.pro.engine.worldmonitor.CzmlAndGeoJsonBuilder
 import com.adshield.pro.engine.worldmonitor.DigitalTwinEngine
@@ -50,7 +49,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.Locale
@@ -68,6 +67,12 @@ enum class WorldMonitorDeckTab(val label: String) {
     WATCHTOWER("Watchtower"),
     SOURCES("Sources")
 }
+
+data class LayerUiState(
+    val category: WorldIntelCategory,
+    val visible: Boolean = true,
+    val opacity: Float = 1.0f
+)
 
 data class ClickedLocationInfo(
     val latitude: Double,
@@ -87,24 +92,27 @@ data class WorldMonitorUiState(
     val activeTab: WorldMonitorDeckTab = WorldMonitorDeckTab.FEED,
     val isSyncing: Boolean = false,
     val statusBanner: String? = null,
-    val viewport: GlobeViewport = GlobeViewport(),
-    val basemap: BasemapStyle = BasemapStyle.SATELLITE_HYBRID,
+    val viewport: WorldViewport = WorldViewport(),
+    val basemap: GlobeBasemap = GlobeBasemap.SATELLITE_ESRI,
     val projection: GlobeProjection = GlobeProjection.GLOBE_3D,
-    val stylePreset: MapStylePreset = MapStylePreset.STANDARD_SATELLITE,
-    val performanceMode: GlobePerformanceMode = GlobePerformanceMode.STANDARD,
+    val stylePreset: GlobeStylePreset = GlobeStylePreset.CYBER_TACTICAL,
+    val performanceMode: GraphicsPerformanceMode = GraphicsPerformanceMode.BALANCED,
     val terrain3dEnabled: Boolean = true,
     val bordersEnabled: Boolean = true,
     val atmosphereEnabled: Boolean = true,
     val dayNightLightingEnabled: Boolean = true,
     val labelsEnabled: Boolean = true,
+    val clusteringEnabled: Boolean = true,
+    val heatmapEnabled: Boolean = false,
     val cloudsOverlayEnabled: Boolean = false,
     val radarOverlayEnabled: Boolean = false,
     val trailsEnabled: Boolean = true,
-    val historicalSplit: HistoricalSplitState = HistoricalSplitState(),
-    val layerConfigs: Map<WorldIntelCategory, LayerVisualConfig> = defaultLayerConfigs(),
+    val historicalSplit: HistoricalImagerySplitState = HistoricalImagerySplitState(),
+    val layerStates: Map<WorldIntelCategory, LayerUiState> =
+        WorldIntelCategory.entries.associateWith { LayerUiState(it, visible = true, opacity = 1.0f) },
     val minSeverityFilter: WorldSeverity = WorldSeverity.INFO,
-    val timelinePreset: TimelineWindowPreset = TimelineWindowPreset.ALL_CACHED,
-    val timelineProgress: Float = 1.0f, // 0f..1f scrub across selected window
+    val timelineWindow: WorldTimelineWindow = WorldTimelineWindow.ALL_CACHED,
+    val timelineProgress: Float = 1.0f,
     val timelinePlaying: Boolean = false,
     val allEntities: List<WorldEntity> = emptyList(),
     val filteredEntities: List<WorldEntity> = emptyList(),
@@ -126,29 +134,14 @@ data class WorldMonitorUiState(
     ),
     val searchQuery: String = "",
     val isSearching: Boolean = false,
-    val searchResults: List<GeoSearchResult> = emptyList(),
+    val searchResults: List<GeocodeSearchResult> = emptyList(),
     val providerStates: List<WorldProviderRuntimeState> = emptyList(),
-    val watchRegions: List<WatchRegion> = emptyList(),
-    val watchAlerts: List<WatchAlertRecord> = emptyList(),
-    val unacknowledgedAlertCount: Int = 0,
+    val watchRegions: List<WatchtowerRegion> = emptyList(),
+    val watchAlerts: List<WatchtowerAlert> = emptyList(),
     val hasOpenSkyKey: Boolean = false,
     val hasFirmsKey: Boolean = false,
     val hasAisStreamKey: Boolean = false
-) {
-    companion object {
-        fun defaultLayerConfigs(): Map<WorldIntelCategory, LayerVisualConfig> =
-            WorldIntelCategory.entries.associateWith { cat ->
-                LayerVisualConfig(
-                    category = cat,
-                    enabled = true,
-                    opacity = 1.0f,
-                    clusteringEnabled = cat == WorldIntelCategory.AVIATION || cat == WorldIntelCategory.INFRASTRUCTURE,
-                    heatmapEnabled = false,
-                    showTrails = cat == WorldIntelCategory.AVIATION || cat == WorldIntelCategory.MARITIME || cat == WorldIntelCategory.SPACE
-                )
-            }
-    }
-}
+)
 
 @HiltViewModel
 class WorldMonitorViewModel @Inject constructor(
@@ -166,7 +159,6 @@ class WorldMonitorViewModel @Inject constructor(
     )
     val uiState: StateFlow<WorldMonitorUiState> = _uiState.asStateFlow()
 
-    /** Outbound JS expressions evaluated on the WebView main thread. */
     private val _jsCommands = MutableSharedFlow<String>(extraBufferCapacity = 64)
     val jsCommands: SharedFlow<String> = _jsCommands.asSharedFlow()
 
@@ -199,18 +191,13 @@ class WorldMonitorViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            repository.unacknowledgedAlertCountFlow.collectLatest { count ->
-                _uiState.update { it.copy(unacknowledgedAlertCount = count) }
-            }
-        }
-        viewModelScope.launch {
             repository.buildings3D.collectLatest { buildings ->
                 if (buildings.isNotEmpty()) pushBuildingsToGlobe(buildings)
             }
         }
     }
 
-    // ── Bridge Listener Callbacks (may arrive on WebView JavaBridge thread) ──
+    // ── Bridge Listener Callbacks ────────────────────────────────────────────
 
     override fun onGlobeReady(webglSupported: Boolean, cesiumVersion: String) {
         viewModelScope.launch {
@@ -231,7 +218,7 @@ class WorldMonitorViewModel @Inject constructor(
         }
     }
 
-    override fun onViewportChanged(viewport: GlobeViewport) {
+    override fun onViewportChanged(viewport: WorldViewport) {
         viewModelScope.launch {
             _uiState.update { it.copy(viewport = viewport) }
         }
@@ -256,7 +243,7 @@ class WorldMonitorViewModel @Inject constructor(
         id: String,
         name: String,
         heightMeters: Double,
-        levels: Int,
+        heightEstimated: Boolean,
         lat: Double,
         lon: Double
     ) {
@@ -268,7 +255,7 @@ class WorldMonitorViewModel @Inject constructor(
                         latitude = lat,
                         longitude = lon,
                         elevationMeters = heightMeters.toInt(),
-                        placeName = "$name (${heightMeters.toInt()}m · ${if (levels > 0) "$levels floors" else "OSM 3D Footprint"})",
+                        placeName = "$name (${heightMeters.toInt()} m · ${if (heightEstimated) "OSM Levels Est." else "Surveyed"})",
                         countryName = country?.name,
                         population = country?.population
                     )
@@ -277,7 +264,7 @@ class WorldMonitorViewModel @Inject constructor(
         }
     }
 
-    override fun onLocationSelected(lat: Double, lon: Double, terrainElevationMeters: Int) {
+    override fun onLocationSelected(lat: Double, lon: Double, terrainElevationMeters: Int, countryHint: String) {
         viewModelScope.launch {
             val country = BaselineReferenceStore.nearestCountry(lat, lon)
             _uiState.update {
@@ -286,7 +273,7 @@ class WorldMonitorViewModel @Inject constructor(
                         latitude = lat,
                         longitude = lon,
                         elevationMeters = terrainElevationMeters,
-                        placeName = country?.let { c -> "Sector near ${c.capital}, ${c.name}" },
+                        placeName = countryHint.ifBlank { country?.let { c -> "Sector near ${c.capital}, ${c.name}" } },
                         countryName = country?.name,
                         population = country?.population
                     )
@@ -305,11 +292,7 @@ class WorldMonitorViewModel @Inject constructor(
         }
     }
 
-    override fun onSatellitePassesComputed(
-        noradId: String,
-        satName: String,
-        passes: List<SatellitePassPrediction>
-    ) {
+    override fun onSatellitePassesComputed(entityId: String, passes: List<SatellitePassPrediction>) {
         viewModelScope.launch {
             _uiState.update { it.copy(satellitePasses = passes) }
         }
@@ -351,7 +334,7 @@ class WorldMonitorViewModel @Inject constructor(
             _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing live global feeds…") }
             val vp = _uiState.value.viewport
             val okCount = repository.syncEnabledProviders(
-                categories = _uiState.value.layerConfigs.filterValues { it.enabled }.keys,
+                categories = _uiState.value.layerStates.filterValues { it.visible }.keys,
                 viewport = vp,
                 force = force,
                 notifyWatchtower = false
@@ -397,54 +380,82 @@ class WorldMonitorViewModel @Inject constructor(
 
     // ── Globe & Layer Controls ───────────────────────────────────────────────
 
-    fun setBasemap(style: BasemapStyle) {
-        _uiState.update { it.copy(basemap = style) }
-        sendCommand("SET_BASEMAP", """{"style":"${style.name}"}""")
+    fun setBasemap(basemap: GlobeBasemap) {
+        _uiState.update { it.copy(basemap = basemap) }
+        sendCommand(buildJsonObject {
+            put("type", "SET_BASEMAP")
+            put("basemap", basemap.name)
+        }.toString())
     }
 
     fun setProjection(projection: GlobeProjection) {
         _uiState.update { it.copy(projection = projection) }
-        sendCommand("SET_PROJECTION", """{"projection":"${projection.name}"}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_PROJECTION")
+            put("projection", projection.name)
+        }.toString())
     }
 
-    fun setStylePreset(preset: MapStylePreset) {
+    fun setStylePreset(preset: GlobeStylePreset) {
         _uiState.update { it.copy(stylePreset = preset) }
-        sendCommand("SET_STYLE_PRESET", """{"preset":"${preset.name}"}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_STYLE_PRESET")
+            put("stylePreset", preset.name)
+        }.toString())
     }
 
-    fun setPerformanceMode(mode: GlobePerformanceMode) {
+    fun setPerformanceMode(mode: GraphicsPerformanceMode) {
         _uiState.update { it.copy(performanceMode = mode) }
-        sendCommand("SET_PERFORMANCE_MODE", """{"mode":"${mode.name}"}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_PERFORMANCE_MODE")
+            put("mode", mode.name)
+        }.toString())
     }
 
     fun setTerrainEnabled(enabled: Boolean) {
         _uiState.update { it.copy(terrain3dEnabled = enabled) }
-        sendCommand("SET_TERRAIN", """{"enabled":$enabled}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_TERRAIN")
+            put("enabled", enabled)
+        }.toString())
     }
 
     fun updateSceneFlags(
         borders: Boolean = _uiState.value.bordersEnabled,
         atmosphere: Boolean = _uiState.value.atmosphereEnabled,
         dayNight: Boolean = _uiState.value.dayNightLightingEnabled,
-        labels: Boolean = _uiState.value.labelsEnabled
+        labels: Boolean = _uiState.value.labelsEnabled,
+        clustering: Boolean = _uiState.value.clusteringEnabled,
+        heatmap: Boolean = _uiState.value.heatmapEnabled
     ) {
         _uiState.update {
             it.copy(
                 bordersEnabled = borders,
                 atmosphereEnabled = atmosphere,
                 dayNightLightingEnabled = dayNight,
-                labelsEnabled = labels
+                labelsEnabled = labels,
+                clusteringEnabled = clustering,
+                heatmapEnabled = heatmap
             )
         }
-        sendCommand(
-            "SET_SCENE_FLAGS",
-            """{"borders":$borders,"atmosphere":$atmosphere,"dayNightLighting":$dayNight,"labels":$labels}"""
-        )
+        sendCommand(buildJsonObject {
+            put("type", "SET_SCENE_FLAGS")
+            put("borders", borders)
+            put("atmosphere", atmosphere)
+            put("dayNightLighting", dayNight)
+            put("labels", labels)
+            put("clustering", clustering)
+            put("heatmap", heatmap)
+        }.toString())
     }
 
     fun setCloudsOverlay(enabled: Boolean) {
         _uiState.update { it.copy(cloudsOverlayEnabled = enabled) }
-        sendCommand("SET_CLOUDS", """{"enabled":$enabled,"opacity":0.55}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_CLOUDS")
+            put("enabled", enabled)
+            put("opacity", 0.55)
+        }.toString())
     }
 
     fun setRadarOverlay(enabled: Boolean) {
@@ -463,47 +474,39 @@ class WorldMonitorViewModel @Inject constructor(
         rightDateIso: String = _uiState.value.historicalSplit.rightDateIso,
         splitPosition: Float = _uiState.value.historicalSplit.splitPosition
     ) {
-        val next = HistoricalSplitState(
+        val next = HistoricalImagerySplitState(
             enabled = enabled,
             leftDateIso = leftDateIso,
             rightDateIso = rightDateIso,
-            splitPosition = splitPosition.coerceIn(0.05f, 0.95f)
+            splitPosition = splitPosition.coerceIn(0.1f, 0.9f)
         )
         _uiState.update { it.copy(historicalSplit = next) }
-        val payload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "SET_HISTORICAL_SPLIT")
             put("enabled", next.enabled)
             put("leftDateIso", next.leftDateIso)
             put("rightDateIso", next.rightDateIso)
             put("splitPosition", next.splitPosition.toDouble())
-        }.toString()
-        sendCommand("SET_HISTORICAL_SPLIT", payload)
+        }.toString())
     }
 
-    fun updateLayerConfig(
+    fun updateLayerState(
         category: WorldIntelCategory,
-        enabled: Boolean? = null,
-        opacity: Float? = null,
-        clustering: Boolean? = null,
-        heatmap: Boolean? = null
+        visible: Boolean? = null,
+        opacity: Float? = null
     ) {
-        val cur = _uiState.value.layerConfigs[category] ?: return
+        val cur = _uiState.value.layerStates[category] ?: LayerUiState(category)
         val updated = cur.copy(
-            enabled = enabled ?: cur.enabled,
-            opacity = (opacity ?: cur.opacity).coerceIn(0.15f, 1.0f),
-            clusteringEnabled = clustering ?: cur.clusteringEnabled,
-            heatmapEnabled = heatmap ?: cur.heatmapEnabled
+            visible = visible ?: cur.visible,
+            opacity = (opacity ?: cur.opacity).coerceIn(0.15f, 1.0f)
         )
-        _uiState.update { state ->
-            state.copy(layerConfigs = state.layerConfigs + (category to updated))
-        }
-        val payload = buildJsonObject {
+        _uiState.update { s -> s.copy(layerStates = s.layerStates + (category to updated)) }
+        sendCommand(buildJsonObject {
+            put("type", "SET_LAYER_STATE")
             put("category", category.name)
-            put("enabled", updated.enabled)
+            put("visible", updated.visible)
             put("opacity", updated.opacity.toDouble())
-            put("clusteringEnabled", updated.clusteringEnabled)
-            put("heatmapEnabled", updated.heatmapEnabled)
-        }.toString()
-        sendCommand("SET_LAYER_STATE", payload)
+        }.toString())
         recomputeDerivedIntelligence(_uiState.value.allEntities)
     }
 
@@ -520,56 +523,54 @@ class WorldMonitorViewModel @Inject constructor(
     // ── Camera & Geographic Search ───────────────────────────────────────────
 
     fun cameraAction(action: String) {
-        sendCommand("CAMERA_ACTION", """{"action":"$action"}""")
+        if (action == "TILT_3D") {
+            val vp = _uiState.value.viewport
+            val nextPitch = if (vp.pitchDeg > -65.0) -90.0 else -42.0
+            flyTo(vp.centerLat, vp.centerLon, vp.cameraAltitudeMeters.toDouble().coerceAtMost(650_000.0), nextPitch)
+            return
+        }
+        sendCommand(buildJsonObject {
+            put("type", "CAMERA_ACTION")
+            put("action", if (action == "HOME") "HOME_GLOBE" else action)
+        }.toString())
     }
 
-    fun flyTo(lat: Double, lon: Double, altitudeMeters: Double = 350_000.0, pitchDeg: Double = -55.0) {
-        val payload = buildJsonObject {
+    fun flyTo(lat: Double, lon: Double, altitudeMeters: Double = 350_000.0, pitchDeg: Double = -58.0) {
+        sendCommand(buildJsonObject {
+            put("type", "FLY_TO")
             put("lat", lat)
             put("lon", lon)
             put("altitudeMeters", altitudeMeters)
             put("pitchDeg", pitchDeg)
-        }.toString()
-        sendCommand("FLY_TO", payload)
+        }.toString())
     }
 
     fun focusEntity(entity: WorldEntity) {
         _uiState.update { it.copy(selectedEntity = entity) }
         val targetAlt = when (entity.category) {
-            WorldIntelCategory.SPACE -> (entity.altitudeMeters ?: 420_000.0).coerceAtLeast(900_000.0)
+            WorldIntelCategory.SPACE -> (entity.altitudeMeters ?: 420_000.0).coerceAtLeast(1_200_000.0)
             WorldIntelCategory.AVIATION, WorldIntelCategory.MARITIME -> 85_000.0
             else -> 220_000.0
         }
-        flyTo(entity.latitude, entity.longitude, targetAlt, -50.0)
+        flyTo(entity.latitude, entity.longitude, targetAlt, -55.0)
         if (entity.category == WorldIntelCategory.SPACE && !entity.tleLine1.isNullOrBlank()) {
-            showSatelliteOrbit(entity)
+            sendCommand(buildJsonObject {
+                put("type", "SELECT_SATELLITE_ORBIT")
+                put("entityId", entity.id)
+            }.toString())
             computePassesForSelectedSatellite(entity)
         }
     }
 
-    fun showSatelliteOrbit(entity: WorldEntity) {
-        val l1 = entity.tleLine1 ?: return
-        val l2 = entity.tleLine2 ?: return
-        val payload = buildJsonObject {
-            put("line1", l1)
-            put("line2", l2)
-        }.toString()
-        sendCommand("SELECT_SATELLITE_ORBIT", payload)
-    }
-
     fun computePassesForSelectedSatellite(entity: WorldEntity) {
-        val l1 = entity.tleLine1 ?: return
-        val l2 = entity.tleLine2 ?: return
         val vp = _uiState.value.viewport
-        val payload = buildJsonObject {
-            put("noradId", entity.attributes["NORAD ID"] ?: entity.id)
-            put("name", entity.title)
-            put("line1", l1)
-            put("line2", l2)
-            put("observerLat", vp.latitude)
-            put("observerLon", vp.longitude)
-        }.toString()
-        sendCommand("COMPUTE_SATELLITE_PASSES", payload)
+        sendCommand(buildJsonObject {
+            put("type", "COMPUTE_SATELLITE_PASSES")
+            put("entityId", entity.id)
+            put("lat", vp.centerLat)
+            put("lon", vp.centerLon)
+            put("hoursAhead", 24)
+        }.toString())
     }
 
     fun updateSearchQuery(query: String) {
@@ -584,14 +585,14 @@ class WorldMonitorViewModel @Inject constructor(
             val results = repository.searchLocations(q)
             _uiState.update { it.copy(isSearching = false, searchResults = results) }
             results.firstOrNull()?.let { top ->
-                flyTo(top.latitude, top.longitude, top.recommendedAltitudeMeters, -55.0)
+                flyTo(top.latitude, top.longitude, (top.boundingBoxKm * 2_200.0).coerceIn(8_000.0, 2_800_000.0), -58.0)
             }
         }
     }
 
-    fun selectSearchResult(result: GeoSearchResult) {
+    fun selectSearchResult(result: GeocodeSearchResult) {
         _uiState.update { it.copy(searchResults = emptyList(), searchQuery = result.displayName) }
-        flyTo(result.latitude, result.longitude, result.recommendedAltitudeMeters, -55.0)
+        flyTo(result.latitude, result.longitude, (result.boundingBoxKm * 2_200.0).coerceIn(8_000.0, 2_800_000.0), -58.0)
     }
 
     // ── Digital Twin, AI Analyst, Simulation Lab, Timeline, Watchtower ───────
@@ -599,12 +600,12 @@ class WorldMonitorViewModel @Inject constructor(
     fun refreshDigitalTwin(compareCountryIso: String = _uiState.value.compareCountryIso) {
         viewModelScope.launch(Dispatchers.Default) {
             val vp = _uiState.value.viewport
-            val nearest = BaselineReferenceStore.nearestCountry(vp.latitude, vp.longitude)
+            val nearest = BaselineReferenceStore.nearestCountry(vp.centerLat, vp.centerLon)
             val livePop = nearest?.iso2?.let { repository.fetchLiveWorldBankPopulation(it) }
-            val elev = _uiState.value.clickedLocation?.elevationMeters ?: 0
+            val elev = _uiState.value.clickedLocation?.elevationMeters ?: vp.groundElevationMeters
             val snapshot = DigitalTwinEngine.buildRegionalTwin(
-                latitude = vp.latitude,
-                longitude = vp.longitude,
+                latitude = vp.centerLat,
+                longitude = vp.centerLon,
                 elevationMeters = elev,
                 radiusKm = 450.0,
                 allEntities = _uiState.value.allEntities,
@@ -624,8 +625,8 @@ class WorldMonitorViewModel @Inject constructor(
                 correlations = s.correlations,
                 providerStates = s.providerStates,
                 selectedEntity = s.selectedEntity,
-                focusLat = s.viewport.latitude,
-                focusLon = s.viewport.longitude
+                focusLat = s.viewport.centerLat,
+                focusLon = s.viewport.centerLon
             )
             _uiState.update { it.copy(aiResponse = response, activeTab = WorldMonitorDeckTab.AI_ANALYST, deckExpanded = true) }
         }
@@ -636,26 +637,32 @@ class WorldMonitorViewModel @Inject constructor(
             val vp = _uiState.value.viewport
             val result = SimulationLabEngine.runScenario(
                 kind = kind,
-                centerLat = vp.latitude,
-                centerLon = vp.longitude,
+                centerLat = vp.centerLat,
+                centerLon = vp.centerLon,
                 intensityOrRadiusParameter = parameterValue,
                 windBearingDeg = bearingDeg,
                 referenceEntities = _uiState.value.allEntities
             )
             _uiState.update { it.copy(simulation = result) }
-            sendCommand("SET_SIMULATION_OVERLAY", json.encodeToString(result))
-            flyTo(result.centerLat, result.centerLon, 950_000.0, -52.0)
+            sendCommand(buildJsonObject {
+                put("type", "SET_SIMULATION_OVERLAY")
+                put("simulation", json.parseToJsonElement(json.encodeToString(result)))
+            }.toString())
+            flyTo(result.centerLat, result.centerLon, 950_000.0, -55.0)
         }
     }
 
     fun clearSimulation() {
         val cleared = _uiState.value.simulation.copy(active = false, rings = emptyList(), waypoints = emptyList())
         _uiState.update { it.copy(simulation = cleared) }
-        sendCommand("SET_SIMULATION_OVERLAY", """{"active":false}""")
+        sendCommand(buildJsonObject {
+            put("type", "SET_SIMULATION_OVERLAY")
+            put("simulation", JsonNull)
+        }.toString())
     }
 
-    fun setTimelinePreset(preset: TimelineWindowPreset) {
-        _uiState.update { it.copy(timelinePreset = preset, timelineProgress = 1.0f) }
+    fun setTimelineWindow(window: WorldTimelineWindow) {
+        _uiState.update { it.copy(timelineWindow = window, timelineProgress = 1.0f) }
         recomputeDerivedIntelligence(_uiState.value.allEntities)
     }
 
@@ -694,17 +701,18 @@ class WorldMonitorViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val vp = _uiState.value.viewport
-            val region = WatchRegion(
+            val region = WatchtowerRegion(
                 id = "watch:${UUID.randomUUID().toString().take(8)}",
                 name = name.trim().ifBlank {
-                    "Sector %.2f°, %.2f°".format(Locale.US, vp.latitude, vp.longitude)
+                    "Sector %.2f°, %.2f°".format(Locale.US, vp.centerLat, vp.centerLon)
                 },
-                latitude = vp.latitude,
-                longitude = vp.longitude,
+                centerLat = vp.centerLat,
+                centerLon = vp.centerLon,
                 radiusKm = radiusKm.coerceIn(15.0, 2_500.0),
-                minSeverity = minSeverity,
                 categories = categories,
-                enabled = true
+                minSeverity = minSeverity,
+                enabled = true,
+                createdAtEpochMs = System.currentTimeMillis()
             )
             repository.addWatchRegion(region)
             _uiState.update { it.copy(statusBanner = "Watchtower geofence '${region.name}' armed") }
@@ -713,10 +721,6 @@ class WorldMonitorViewModel @Inject constructor(
 
     fun deleteWatchRegion(id: String) {
         viewModelScope.launch { repository.deleteWatchRegion(id) }
-    }
-
-    fun acknowledgeAllWatchAlerts() {
-        viewModelScope.launch { repository.acknowledgeAllAlerts() }
     }
 
     fun clearWatchAlerts() {
@@ -740,16 +744,16 @@ class WorldMonitorViewModel @Inject constructor(
                 statusBanner = if (secret.isBlank()) "Removed credential $slot" else "Encrypted credential saved in Android Keystore ($slot)"
             )
         }
-        WorldMonitorProviderRegistry.ALL.firstOrNull { it.credentialSlot == slot }?.let { spec ->
-            if (secret.isNotBlank() && spec.implemented) syncSingleProvider(spec.id)
+        WorldMonitorProviderRegistry.providers.firstOrNull { it.credentialSlot == slot }?.let { spec ->
+            if (secret.isNotBlank() && spec.implemented) syncSingleProvider(spec.providerId)
         }
     }
 
     fun exportVisibleGeoJson(): String =
-        CzmlAndGeoJsonBuilder.toGeoJsonFeatureCollection(_uiState.value.filteredEntities)
+        CzmlAndGeoJsonBuilder.buildGeoJsonFeatureCollection(_uiState.value.filteredEntities)
 
     fun exportVisibleCzml(): String =
-        CzmlAndGeoJsonBuilder.toCzmlDocument(_uiState.value.filteredEntities)
+        CzmlAndGeoJsonBuilder.buildCzmlDocument(_uiState.value.filteredEntities)
 
     // ── Internal State Synchronization with CesiumJS ─────────────────────────
 
@@ -759,7 +763,7 @@ class WorldMonitorViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             val counts = entities.groupingBy { it.category }.eachCount()
 
-            val windowHorizon = state.timelinePreset.durationMs
+            val windowHorizon = state.timelineWindow.durationMs
             val cutoffStart = if (windowHorizon != null) now - windowHorizon else 0L
             val cutoffEnd = if (windowHorizon != null) {
                 cutoffStart + (windowHorizon * state.timelineProgress).toLong()
@@ -768,10 +772,11 @@ class WorldMonitorViewModel @Inject constructor(
             }
 
             val visible = entities.filter { e ->
-                val cfg = state.layerConfigs[e.category]
-                val catOk = cfg?.enabled != false
+                val cfg = state.layerStates[e.category]
+                val catOk = cfg?.visible != false
                 val sevOk = e.severity.rank >= state.minSeverityFilter.rank
                 val timeOk = e.freshness == FreshnessClass.HISTORICAL ||
+                    e.freshness == FreshnessClass.ESTIMATED ||
                     (e.eventTimeEpochMs in cutoffStart..cutoffEnd)
                 catOk && sevOk && timeOk
             }
@@ -796,16 +801,21 @@ class WorldMonitorViewModel @Inject constructor(
         setStylePreset(s.stylePreset)
         setPerformanceMode(s.performanceMode)
         setTerrainEnabled(s.terrain3dEnabled)
-        updateSceneFlags(s.bordersEnabled, s.atmosphereEnabled, s.dayNightLightingEnabled, s.labelsEnabled)
-        s.layerConfigs.values.forEach { cfg ->
-            val payload = buildJsonObject {
+        updateSceneFlags(
+            borders = s.bordersEnabled,
+            atmosphere = s.atmosphereEnabled,
+            dayNight = s.dayNightLightingEnabled,
+            labels = s.labelsEnabled,
+            clustering = s.clusteringEnabled,
+            heatmap = s.heatmapEnabled
+        )
+        s.layerStates.values.forEach { cfg ->
+            sendCommand(buildJsonObject {
+                put("type", "SET_LAYER_STATE")
                 put("category", cfg.category.name)
-                put("enabled", cfg.enabled)
+                put("visible", cfg.visible)
                 put("opacity", cfg.opacity.toDouble())
-                put("clusteringEnabled", cfg.clusteringEnabled)
-                put("heatmapEnabled", cfg.heatmapEnabled)
-            }.toString()
-            sendCommand("SET_LAYER_STATE", payload)
+            }.toString())
         }
         pushEntitiesAndCorrelationsToGlobe(s.filteredEntities, s.correlations)
         pushWatchRegionsToGlobe(s.watchRegions)
@@ -818,66 +828,60 @@ class WorldMonitorViewModel @Inject constructor(
     ) {
         if (!_uiState.value.globeReady) return
         val capped = entities.take(2_500)
-        val entitiesPayload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "UPDATE_ENTITIES")
             put("entities", json.parseToJsonElement(json.encodeToString(capped)))
-        }.toString()
-        sendCommand("UPDATE_ENTITIES", entitiesPayload)
+        }.toString())
 
-        val corrPayload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "UPDATE_CORRELATIONS")
             put("incidents", json.parseToJsonElement(json.encodeToString(correlations)))
-        }.toString()
-        sendCommand("UPDATE_CORRELATIONS", corrPayload)
+        }.toString())
     }
 
     private suspend fun refreshTrailsOnGlobe() {
         if (!_uiState.value.globeReady) return
         if (!_uiState.value.trailsEnabled) {
-            sendCommand("UPDATE_TRAILS", """{"trails":[]}""")
+            sendCommand("""{"type":"UPDATE_TRAILS","trails":[]}""")
             return
         }
-        val activeCats = _uiState.value.layerConfigs.filterValues { it.enabled && it.showTrails }.keys
+        val activeCats = _uiState.value.layerStates.filterValues { it.visible }.keys
         val trails = repository.loadRecentTrails(activeCats)
-        val payload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "UPDATE_TRAILS")
             put("trails", json.parseToJsonElement(json.encodeToString(trails)))
-        }.toString()
-        sendCommand("UPDATE_TRAILS", payload)
+        }.toString())
     }
 
-    private fun pushWatchRegionsToGlobe(regions: List<WatchRegion>) {
+    private fun pushWatchRegionsToGlobe(regions: List<WatchtowerRegion>) {
         if (!_uiState.value.globeReady) return
-        val payload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "UPDATE_WATCH_REGIONS")
             put("regions", json.parseToJsonElement(json.encodeToString(regions)))
-        }.toString()
-        sendCommand("UPDATE_WATCH_REGIONS", payload)
+        }.toString())
     }
 
-    private fun pushBuildingsToGlobe(buildings: List<BuildingFootprint3D>) {
+    private fun pushBuildingsToGlobe(buildings: List<OsmBuilding3D>) {
         if (!_uiState.value.globeReady) return
-        val payload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "UPDATE_BUILDINGS_3D")
             put("buildings", json.parseToJsonElement(json.encodeToString(buildings)))
-        }.toString()
-        sendCommand("UPDATE_BUILDINGS_3D", payload)
+        }.toString())
     }
 
     private fun pushRadarStateToGlobe(enabled: Boolean) {
         val frames = repository.rainViewerFrames.value
-        val payload = buildJsonObject {
+        sendCommand(buildJsonObject {
+            put("type", "SET_RADAR")
             put("enabled", enabled)
+            put("animating", true)
             put("opacity", 0.58)
-            put("frames", buildJsonArray {
-                frames.forEach { f ->
-                    add(buildJsonObject {
-                        put("path", f.path)
-                        put("timeSec", f.timeEpochSec)
-                    })
-                }
-            })
-        }.toString()
-        sendCommand("SET_RADAR", payload)
+            put("frames", json.parseToJsonElement(json.encodeToString(frames)))
+        }.toString())
     }
 
-    private fun sendCommand(type: String, payloadJsonObject: String) {
-        val jsExpr = WorldMonitorJsBridge.buildJsDispatchExpression(type, payloadJsonObject)
+    private fun sendCommand(commandJsonObject: String) {
+        val jsExpr = WorldMonitorJsBridge.buildJsDispatchExpression(commandJsonObject)
         _jsCommands.tryEmit(jsExpr)
     }
 }

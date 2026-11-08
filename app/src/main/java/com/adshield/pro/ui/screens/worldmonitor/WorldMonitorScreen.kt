@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,7 +34,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -78,6 +76,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.worldmonitor.FreshnessClass
+import com.adshield.pro.domain.worldmonitor.GeocodeSearchResult
 import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
@@ -105,11 +104,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
-/**
- * OMNISHIELD X INFINITY — WORLD MONITOR 2035
- *
- * Full-screen interactive 3D Digital Earth & Global Intelligence Command Surface.
- */
 @Composable
 fun WorldMonitorScreen(
     viewModel: WorldMonitorViewModel,
@@ -123,13 +117,11 @@ fun WorldMonitorScreen(
             .fillMaxSize()
             .background(DeepNavyBackground)
     ) {
-        // 1. Hardware-Accelerated 3D CesiumJS Digital Earth WebView
         WorldMonitorGlobeWebView(
             viewModel = viewModel,
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. Top HUD Overlay (hidden in Fullscreen mode except minimal exit pill)
         if (uiState.fullscreenMode) {
             Row(
                 modifier = Modifier
@@ -147,7 +139,7 @@ fun WorldMonitorScreen(
                     Text("Show HUD", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Text(
-                    text = "%.3f°, %.3f°".format(Locale.US, uiState.viewport.latitude, uiState.viewport.longitude),
+                    text = "%.3f°, %.3f°".format(Locale.US, uiState.viewport.centerLat, uiState.viewport.centerLon),
                     color = TextSecondaryDark,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
@@ -165,14 +157,13 @@ fun WorldMonitorScreen(
                 onSearchSubmit = viewModel::submitGeographicSearch,
                 onSelectSearchResult = viewModel::selectSearchResult,
                 onToggleCategory = { cat ->
-                    val cur = uiState.layerConfigs[cat]?.enabled ?: true
-                    viewModel.updateLayerConfig(cat, enabled = !cur)
+                    val cur = uiState.layerStates[cat]?.visible ?: true
+                    viewModel.updateLayerState(cat, visible = !cur)
                 },
                 modifier = Modifier.align(Alignment.TopCenter)
             )
         }
 
-        // 3. Right-hand Camera & Navigation Controls
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -186,7 +177,6 @@ fun WorldMonitorScreen(
             GlobeRoundAction("🌐") { viewModel.cameraAction("HOME") }
         }
 
-        // 4. Clicked Location Dossier Banner (when user taps terrain or 3D building)
         val clicked = uiState.clickedLocation
         if (clicked != null && uiState.selectedEntity == null) {
             ClickedLocationCard(
@@ -206,7 +196,6 @@ fun WorldMonitorScreen(
             )
         }
 
-        // 5. Selected Intelligence Entity Epistemic Dossier
         val selected = uiState.selectedEntity
         if (selected != null) {
             SelectedEntityDossierCard(
@@ -232,7 +221,6 @@ fun WorldMonitorScreen(
             )
         }
 
-        // 6. Bottom Collapsible Command Deck
         if (!uiState.fullscreenMode) {
             WorldMonitorBottomDeck(
                 uiState = uiState,
@@ -318,10 +306,7 @@ private fun WorldMonitorGlobeWebView(
                     override fun shouldOverrideUrlLoading(
                         view: WebView?,
                         request: WebResourceRequest
-                    ): Boolean {
-                        // Never navigate the globe WebView away from the local appassets origin
-                        return true
-                    }
+                    ): Boolean = true
                 }
                 loadUrl(WorldMonitorAssetAndTileServer.ENTRY_URL)
                 webViewRef = this
@@ -339,7 +324,7 @@ private fun WorldMonitorTopHud(
     onToggleFullscreen: () -> Unit,
     onSearchChange: (String) -> Unit,
     onSearchSubmit: () -> Unit,
-    onSelectSearchResult: (com.adshield.pro.domain.worldmonitor.GeoSearchResult) -> Unit,
+    onSelectSearchResult: (GeocodeSearchResult) -> Unit,
     onToggleCategory: (WorldIntelCategory) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -348,7 +333,6 @@ private fun WorldMonitorTopHud(
             .fillMaxWidth()
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        // Top Header Bar
         Surface(
             color = NavySurface.copy(alpha = 0.90f),
             shape = RoundedCornerShape(14.dp),
@@ -385,12 +369,12 @@ private fun WorldMonitorTopHud(
                             }
                         }
                         Text(
-                            text = "%.3f°, %.3f° · Alt %,d km · %d FPS · %,d items".format(
+                            text = "%.3f°, %.3f° · Alt %,d km · Elev %d m · %,d items".format(
                                 Locale.US,
-                                uiState.viewport.latitude,
-                                uiState.viewport.longitude,
-                                (uiState.viewport.altitudeMeters / 1000.0).toInt(),
-                                uiState.viewport.fps,
+                                uiState.viewport.centerLat,
+                                uiState.viewport.centerLon,
+                                (uiState.viewport.cameraAltitudeMeters / 1000L),
+                                uiState.viewport.groundElevationMeters,
                                 uiState.filteredEntities.size
                             ),
                             color = TextSecondaryDark,
@@ -428,7 +412,6 @@ private fun WorldMonitorTopHud(
                     }
                 }
 
-                // Compact Geographic Search Row
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -474,7 +457,6 @@ private fun WorldMonitorTopHud(
                     }
                 }
 
-                // Search Autocomplete Results
                 if (uiState.searchResults.isNotEmpty()) {
                     LazyColumn(
                         modifier = Modifier
@@ -494,7 +476,7 @@ private fun WorldMonitorTopHud(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(res.displayName, color = TextPrimaryDark, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("${res.category} · ${res.source}", color = TextSecondaryDark, fontSize = 10.sp)
+                                    Text("${res.category} · ${res.attribution}", color = TextSecondaryDark, fontSize = 10.sp)
                                 }
                                 Text(
                                     "%.2f, %.2f".format(Locale.US, res.latitude, res.longitude),
@@ -508,12 +490,7 @@ private fun WorldMonitorTopHud(
                 }
 
                 uiState.globeError?.let { err ->
-                    Text(
-                        text = err,
-                        color = AlertRed,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Text(text = err, color = AlertRed, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 uiState.statusBanner?.let { msg ->
                     Text(
@@ -528,7 +505,6 @@ private fun WorldMonitorTopHud(
             }
         }
 
-        // Category Quick-Filter Chips (A–H)
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -536,7 +512,7 @@ private fun WorldMonitorTopHud(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(items = WorldIntelCategory.entries, key = { it.name }) { cat ->
-                val enabled = uiState.layerConfigs[cat]?.enabled != false
+                val enabled = uiState.layerStates[cat]?.visible != false
                 val count = uiState.categoryCounts[cat] ?: 0
                 FilterChip(
                     selected = enabled,
@@ -574,7 +550,6 @@ private fun WorldMonitorBottomDeck(
             .border(1.dp, NavyBorder, RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Deck Tab Strip + Expand/Collapse Handle
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -591,7 +566,7 @@ private fun WorldMonitorBottomDeck(
                             WorldMonitorDeckTab.CORRELATE ->
                                 if (uiState.correlations.isNotEmpty()) " (${uiState.correlations.size})" else ""
                             WorldMonitorDeckTab.WATCHTOWER ->
-                                if (uiState.unacknowledgedAlertCount > 0) " (${uiState.unacknowledgedAlertCount}!)" else ""
+                                if (uiState.watchAlerts.isNotEmpty()) " (${uiState.watchAlerts.size})" else ""
                             else -> ""
                         }
                         FilterChip(
@@ -718,6 +693,8 @@ private fun SelectedEntityDossierCard(
             timeZone = TimeZone.getTimeZone("UTC")
         }
     }
+    val metricEntries = remember(entity.metricsMap) { entity.metricsMap.entries.take(8) }
+
     Surface(
         color = NavySurface.copy(alpha = 0.96f),
         shape = RoundedCornerShape(14.dp),
@@ -765,7 +742,7 @@ private fun SelectedEntityDossierCard(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "Provider: ${entity.providerName} · Confidence ${entity.confidenceScore}% (${entity.verificationStatus.label})",
+                        text = "Provider: ${entity.providerName} · Confidence ${entity.confidence}% (${entity.verificationStatus.label})",
                         color = CyberCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold
@@ -782,23 +759,23 @@ private fun SelectedEntityDossierCard(
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = "Attribution: ${entity.attribution}",
+                        text = "Attribution: ${entity.attribution} · ${entity.licenseInfo}",
                         color = TextSecondaryDark,
                         fontSize = 10.sp
                     )
                 }
             }
 
-            if (entity.attributes.isNotEmpty()) {
+            if (metricEntries.isNotEmpty()) {
                 item(key = "attributes") {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        entity.attributes.entries.take(8).forEach { (k, v) ->
+                        for (entry in metricEntries) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(k, color = TextSecondaryDark, fontSize = 11.sp)
-                                Text(v, color = TextPrimaryDark, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                                Text(entry.key, color = TextSecondaryDark, fontSize = 11.sp)
+                                Text(entry.value, color = TextPrimaryDark, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
@@ -814,9 +791,9 @@ private fun SelectedEntityDossierCard(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                items(items = passes.take(4), key = { "${it.noradId}:${it.startEpochMs}" }) { pass ->
+                items(items = passes.take(4), key = { "${it.entityId}:${it.riseEpochMs}" }) { pass ->
                     Text(
-                        text = "• ${fmt.format(Date(pass.startEpochMs))} · Max El ${pass.maxElevationDeg}° · ${pass.durationSec}s",
+                        text = "• ${fmt.format(Date(pass.riseEpochMs))} · Max El ${"%.1f".format(Locale.US, pass.maxElevationDeg)}° · ${pass.durationSeconds}s",
                         color = TextPrimaryDark,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace

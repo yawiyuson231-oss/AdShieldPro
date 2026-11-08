@@ -8,12 +8,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -43,15 +40,15 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.adshield.pro.domain.worldmonitor.BasemapStyle
-import com.adshield.pro.domain.worldmonitor.GlobePerformanceMode
+import com.adshield.pro.domain.worldmonitor.GlobeBasemap
 import com.adshield.pro.domain.worldmonitor.GlobeProjection
-import com.adshield.pro.domain.worldmonitor.MapStylePreset
+import com.adshield.pro.domain.worldmonitor.GlobeStylePreset
+import com.adshield.pro.domain.worldmonitor.GraphicsPerformanceMode
 import com.adshield.pro.domain.worldmonitor.ProviderSyncStatus
 import com.adshield.pro.domain.worldmonitor.SimulationKind
-import com.adshield.pro.domain.worldmonitor.TimelineWindowPreset
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldSeverity
+import com.adshield.pro.domain.worldmonitor.WorldTimelineWindow
 import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
 import com.adshield.pro.engine.worldmonitor.WorldMonitorProviderRegistry
 import com.adshield.pro.ui.theme.AlertRed
@@ -222,7 +219,7 @@ private fun LayersAndMapPanel(
         item(key = "basemaps") {
             Text("Basemap Imagery", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(items = BasemapStyle.entries, key = { it.name }) { style ->
+                items(items = GlobeBasemap.entries, key = { it.name }) { style ->
                     FilterChip(
                         selected = uiState.basemap == style,
                         onClick = { viewModel.setBasemap(style) },
@@ -233,7 +230,7 @@ private fun LayersAndMapPanel(
         }
 
         item(key = "projection_and_preset") {
-            Text("Projection & Tactical Style Preset", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text("Projection & Visual Style Preset", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(items = GlobeProjection.entries, key = { it.name }) { proj ->
                     FilterChip(
@@ -244,7 +241,7 @@ private fun LayersAndMapPanel(
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(items = MapStylePreset.entries, key = { it.name }) { preset ->
+                items(items = GlobeStylePreset.entries, key = { it.name }) { preset ->
                     FilterChip(
                         selected = uiState.stylePreset == preset,
                         onClick = { viewModel.setStylePreset(preset) },
@@ -255,7 +252,7 @@ private fun LayersAndMapPanel(
         }
 
         item(key = "scene_toggles") {
-            Text("Earth Scene, Weather Overlays & Graphics Mode", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text("Earth Scene, Clustering, Density & Graphics Mode", color = CyberCyan, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 item(key = "terrain") {
                     FilterChip(
@@ -276,6 +273,20 @@ private fun LayersAndMapPanel(
                         selected = uiState.dayNightLightingEnabled,
                         onClick = { viewModel.updateSceneFlags(dayNight = !uiState.dayNightLightingEnabled) },
                         label = { Text("Day/Night", fontSize = 11.sp) }
+                    )
+                }
+                item(key = "cluster") {
+                    FilterChip(
+                        selected = uiState.clusteringEnabled,
+                        onClick = { viewModel.updateSceneFlags(clustering = !uiState.clusteringEnabled) },
+                        label = { Text("Cluster", fontSize = 11.sp) }
+                    )
+                }
+                item(key = "heatmap") {
+                    FilterChip(
+                        selected = uiState.heatmapEnabled,
+                        onClick = { viewModel.updateSceneFlags(heatmap = !uiState.heatmapEnabled) },
+                        label = { Text("Density Heatmap", fontSize = 11.sp) }
                     )
                 }
                 item(key = "clouds") {
@@ -301,7 +312,7 @@ private fun LayersAndMapPanel(
                 }
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(items = GlobePerformanceMode.entries, key = { it.name }) { mode ->
+                items(items = GraphicsPerformanceMode.entries, key = { it.name }) { mode ->
                     FilterChip(
                         selected = uiState.performanceMode == mode,
                         onClick = { viewModel.setPerformanceMode(mode) },
@@ -362,7 +373,7 @@ private fun LayersAndMapPanel(
         }
 
         items(items = WorldIntelCategory.entries, key = { "layercfg:${it.name}" }) { cat ->
-            val cfg = uiState.layerConfigs[cat] ?: return@items
+            val cfg = uiState.layerStates[cat] ?: return@items
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -374,23 +385,15 @@ private fun LayersAndMapPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("${cat.label} (${(cfg.opacity * 100).toInt()}%)", color = TextPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = cfg.clusteringEnabled,
-                            onClick = { viewModel.updateLayerConfig(cat, clustering = !cfg.clusteringEnabled) },
-                            label = { Text("Cluster", fontSize = 10.sp) }
-                        )
-                        FilterChip(
-                            selected = cfg.heatmapEnabled,
-                            onClick = { viewModel.updateLayerConfig(cat, heatmap = !cfg.heatmapEnabled) },
-                            label = { Text("Density", fontSize = 10.sp) }
-                        )
-                    }
+                    Text("${cat.label} Opacity (${(cfg.opacity * 100).toInt()}%)", color = TextPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Switch(
+                        checked = cfg.visible,
+                        onCheckedChange = { viewModel.updateLayerState(cat, visible = it) }
+                    )
                 }
                 Slider(
                     value = cfg.opacity,
-                    onValueChange = { viewModel.updateLayerConfig(cat, opacity = it) },
+                    onValueChange = { viewModel.updateLayerState(cat, opacity = it) },
                     valueRange = 0.2f..1.0f
                 )
             }
@@ -759,10 +762,10 @@ private fun TimelinePanel(
     ) {
         Text("Global Event Window & Temporal Replay", color = CyberCyan, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(items = TimelineWindowPreset.entries, key = { it.name }) { preset ->
+            items(items = WorldTimelineWindow.entries, key = { it.name }) { preset ->
                 FilterChip(
-                    selected = uiState.timelinePreset == preset,
-                    onClick = { viewModel.setTimelinePreset(preset) },
+                    selected = uiState.timelineWindow == preset,
+                    onClick = { viewModel.setTimelineWindow(preset) },
                     label = { Text(preset.label, fontSize = 11.sp) }
                 )
             }
@@ -792,7 +795,7 @@ private fun TimelinePanel(
             )
         }
         Text(
-            "Showing ${uiState.filteredEntities.size} of ${uiState.allEntities.size} cached records up to ${(uiState.timelineProgress * 100).toInt()}% of ${uiState.timelinePreset.label}.",
+            "Showing ${uiState.filteredEntities.size} of ${uiState.allEntities.size} cached records up to ${(uiState.timelineProgress * 100).toInt()}% of ${uiState.timelineWindow.label}.",
             color = TextSecondaryDark,
             fontSize = 11.sp
         )
@@ -823,8 +826,8 @@ private fun WatchtowerPanel(
                 Text(
                     "Arm Watchtower Geofence at Current Globe Crosshair (%.2f°, %.2f°)".format(
                         Locale.US,
-                        uiState.viewport.latitude,
-                        uiState.viewport.longitude
+                        uiState.viewport.centerLat,
+                        uiState.viewport.centerLon
                     ),
                     color = EmeraldPrimary,
                     fontSize = 11.sp,
@@ -881,14 +884,14 @@ private fun WatchtowerPanel(
                     Text(
                         "%.2f°, %.2f° · ${region.radiusKm.toInt()} km · ≥ ${region.minSeverity.label}".format(
                             Locale.US,
-                            region.latitude,
-                            region.longitude
+                            region.centerLat,
+                            region.centerLon
                         ),
                         color = CyberCyan,
                         fontSize = 10.sp
                     )
                 }
-                TextButton(onClick = { viewModel.flyTo(region.latitude, region.longitude, 400_000.0) }) {
+                TextButton(onClick = { viewModel.flyTo(region.centerLat, region.centerLon, 400_000.0) }) {
                     Text("Fly", color = SkyBlueGlow, fontSize = 11.sp)
                 }
                 TextButton(onClick = { viewModel.deleteWatchRegion(region.id) }) {
@@ -905,25 +908,19 @@ private fun WatchtowerPanel(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Triggered Watchtower Alerts (${uiState.watchAlerts.size})", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Row {
-                        TextButton(onClick = viewModel::acknowledgeAllWatchAlerts) {
-                            Text("Ack All", color = EmeraldPrimary, fontSize = 11.sp)
-                        }
-                        TextButton(onClick = viewModel::clearWatchAlerts) {
-                            Text("Clear", color = TextSecondaryDark, fontSize = 11.sp)
-                        }
+                    TextButton(onClick = viewModel::clearWatchAlerts) {
+                        Text("Clear History", color = TextSecondaryDark, fontSize = 11.sp)
                     }
                 }
             }
-            items(items = uiState.watchAlerts, key = { it.id }) { alert ->
+            items(items = uiState.watchAlerts, key = { "${it.regionId}:${it.entityId}:${it.id}" }) { alert ->
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(NavySurfaceVariant, RoundedCornerShape(8.dp))
-                        .clickable { viewModel.flyTo(alert.latitude, alert.longitude, 300_000.0) }
                         .padding(8.dp)
                 ) {
-                    Text("${alert.watchRegionName} · ${alert.title}", color = TextPrimaryDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${alert.regionName} · ${alert.title}", color = TextPrimaryDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Text("${alert.summary} (${alert.providerName})", color = TextSecondaryDark, fontSize = 10.sp)
                 }
             }
@@ -1003,13 +1000,13 @@ private fun SourcesAndCredentialsPanel(
             }
         }
 
-        items(items = WorldMonitorProviderRegistry.ALL, key = { it.id }) { spec ->
-            val st = stateById[spec.id]
+        items(items = WorldMonitorProviderRegistry.providers, key = { it.providerId }) { spec ->
+            val st = stateById[spec.providerId]
             val status = st?.status ?: ProviderSyncStatus.IDLE
             val statusColor = when (status) {
-                ProviderSyncStatus.HEALTHY -> EmeraldPrimary
-                ProviderSyncStatus.RATE_LIMITED, ProviderSyncStatus.REQUIRES_KEY -> WarningAmber
-                ProviderSyncStatus.ERROR, ProviderSyncStatus.OFFLINE -> AlertRed
+                ProviderSyncStatus.OK -> EmeraldPrimary
+                ProviderSyncStatus.RATE_LIMITED, ProviderSyncStatus.NEEDS_API_KEY, ProviderSyncStatus.CACHED_FALLBACK -> WarningAmber
+                ProviderSyncStatus.ERROR, ProviderSyncStatus.OFFLINE, ProviderSyncStatus.BACKEND_REQUIRED -> AlertRed
                 else -> TextSecondaryDark
             }
             Column(
@@ -1026,25 +1023,25 @@ private fun SourcesAndCredentialsPanel(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                             BadgePill(spec.category.shortCode, ElectricBlue)
-                            BadgePill(status.name, statusColor)
+                            BadgePill(status.label, statusColor)
                             Text(spec.name, color = TextPrimaryDark, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Text(
-                            "${spec.license} · Cached: ${st?.cachedItemCount ?: 0} · Refresh ${(spec.refreshIntervalMs / 60_000L).coerceAtLeast(1)}m",
+                            "${spec.licenseInfo} · Cached: ${st?.itemCount ?: 0} · Refresh ${(spec.refreshIntervalMs / 60_000L).coerceAtLeast(1)}m",
                             color = TextSecondaryDark,
                             fontSize = 10.sp
                         )
-                        st?.lastError?.let { err ->
+                        st?.errorMessage?.let { err ->
                             Text(err, color = WarningAmber, fontSize = 10.sp)
                         }
                     }
-                    if (spec.implemented && spec.id != "wm.infra.baseline") {
-                        TextButton(onClick = { viewModel.syncSingleProvider(spec.id) }) {
+                    if (spec.implemented && spec.providerId != "wm.infra.baseline") {
+                        TextButton(onClick = { viewModel.syncSingleProvider(spec.providerId) }) {
                             Text("Sync", color = CyberCyan, fontSize = 11.sp)
                         }
                         Switch(
-                            checked = st?.enabled ?: spec.enabledByDefault,
-                            onCheckedChange = { viewModel.setProviderEnabled(spec.id, it) }
+                            checked = st?.enabled ?: spec.defaultEnabled,
+                            onCheckedChange = { viewModel.setProviderEnabled(spec.providerId, it) }
                         )
                     }
                 }

@@ -21,11 +21,6 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Low-battery background synchronization & Watchtower geofence worker for World Monitor 2035.
- *
- * Deliberately lightweight:
- *  - Runs only when network is connected AND battery is not low.
- *  - Skips high-churn global aircraft state vectors in background unless an Aviation watch region
- *    is explicitly configured by the user, saving mobile data and battery.
  */
 @HiltWorker
 class WorldMonitorWatchWorker @AssistedInject constructor(
@@ -39,8 +34,7 @@ class WorldMonitorWatchWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val startedAt = System.currentTimeMillis()
         return try {
-            val regions = dao.getWatchRegionsSnapshot().filter { it.enabled }
-            // Only background-poll high-signal alert feeds + categories watched by active geofences
+            val regions = dao.getEnabledWatchRegions()
             val watchedCats = buildSet {
                 add(WorldIntelCategory.DISASTER)
                 add(WorldIntelCategory.WEATHER)

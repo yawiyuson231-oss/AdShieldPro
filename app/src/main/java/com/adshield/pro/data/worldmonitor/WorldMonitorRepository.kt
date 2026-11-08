@@ -2,21 +2,22 @@ package com.adshield.pro.data.worldmonitor
 
 import android.content.Context
 import com.adshield.pro.data.repository.ProviderCredentialStore
-import com.adshield.pro.domain.worldmonitor.BuildingFootprint3D
 import com.adshield.pro.domain.worldmonitor.EntityTrail
-import com.adshield.pro.domain.worldmonitor.GeoSearchResult
-import com.adshield.pro.domain.worldmonitor.GlobeViewport
+import com.adshield.pro.domain.worldmonitor.GeocodeSearchResult
+import com.adshield.pro.domain.worldmonitor.OsmBuilding3D
+import com.adshield.pro.domain.worldmonitor.ProviderAuthRequirement
 import com.adshield.pro.domain.worldmonitor.ProviderSyncStatus
-import com.adshield.pro.domain.worldmonitor.TrailVertex
-import com.adshield.pro.domain.worldmonitor.WatchAlertRecord
-import com.adshield.pro.domain.worldmonitor.WatchRegion
+import com.adshield.pro.domain.worldmonitor.RainViewerFrame
+import com.adshield.pro.domain.worldmonitor.WatchtowerAlert
+import com.adshield.pro.domain.worldmonitor.WatchtowerRegion
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldProviderRuntimeState
 import com.adshield.pro.domain.worldmonitor.WorldProviderSpec
+import com.adshield.pro.domain.worldmonitor.WorldViewport
 import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
+import com.adshield.pro.engine.worldmonitor.GeoSpatialIndex
 import com.adshield.pro.engine.worldmonitor.WatchtowerManager
-import com.adshield.pro.engine.worldmonitor.WorldMonitorNormalizers
 import com.adshield.pro.engine.worldmonitor.WorldMonitorProviderRegistry
 import com.adshield.pro.engine.worldmonitor.WorldMonitorSyncEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -37,9 +38,6 @@ import javax.inject.Singleton
 
 /**
  * Offline-First Repository for OMNISHIELD X INFINITY — WORLD MONITOR 2035.
- *
- * Manages SQLite caching, spatial/temporal queries, kinematic trail history, RainViewer radar
- * frames, 3D OSM buildings, optional encrypted user credentials, and Watchtower geofence evaluation.
  */
 @Singleton
 class WorldMonitorRepository @Inject constructor(
@@ -50,13 +48,13 @@ class WorldMonitorRepository @Inject constructor(
 ) {
     private val syncSemaphore = Semaphore(4)
 
-    private val _rainViewerFrames = MutableStateFlow<List<WorldMonitorNormalizers.RainViewerFrame>>(emptyList())
-    val rainViewerFrames: StateFlow<List<WorldMonitorNormalizers.RainViewerFrame>> = _rainViewerFrames.asStateFlow()
+    private val _rainViewerFrames = MutableStateFlow<List<RainViewerFrame>>(emptyList())
+    val rainViewerFrames: StateFlow<List<RainViewerFrame>> = _rainViewerFrames.asStateFlow()
 
-    private val _buildings3D = MutableStateFlow<List<BuildingFootprint3D>>(emptyList())
-    val buildings3D: StateFlow<List<BuildingFootprint3D>> = _buildings3D.asStateFlow()
+    private val _buildings3D = MutableStateFlow<List<OsmBuilding3D>>(emptyList())
+    val buildings3D: StateFlow<List<OsmBuilding3D>> = _buildings3D.asStateFlow()
 
-    val entitiesFlow: Flow<List<WorldEntity>> = dao.observeActiveEntities(5_000)
+    val entitiesFlow: Flow<List<WorldEntity>> = dao.observeEntities(4_000)
         .map { rows ->
             val now = System.currentTimeMillis()
             rows.map { it.toDomain(now) }
@@ -65,38 +63,41 @@ class WorldMonitorRepository @Inject constructor(
     val providerStatesFlow: Flow<List<WorldProviderRuntimeState>> = dao.observeProviderStates()
         .map { rows ->
             val byId = rows.associateBy { it.providerId }
-            WorldMonitorProviderRegistry.ALL.map { spec ->
-                byId[spec.id]?.toDomain() ?: defaultProviderState(spec)
+            WorldMonitorProviderRegistry.providers.map { spec ->
+                byId[spec.providerId]?.toDomain() ?: defaultProviderState(spec)
             }
         }
 
-    val watchRegionsFlow: Flow<List<WatchRegion>> = dao.observeWatchRegions()
+    val watchRegionsFlow: Flow<List<WatchtowerRegion>> = dao.observeWatchRegions()
         .map { list -> list.map { it.toDomain() } }
 
-    val watchAlertsFlow: Flow<List<WatchAlertRecord>> = dao.observeWatchAlerts(200)
+    val watchAlertsFlow: Flow<List<WatchtowerAlert>> = dao.observeWatchAlerts(200)
         .map { list -> list.map { it.toDomain() } }
-
-    val unacknowledgedAlertCountFlow: Flow<Int> = dao.observeUnacknowledgedAlertCount()
 
     suspend fun ensureBaselineSeeded() = withContext(Dispatchers.IO) {
         val state = dao.getProviderState("wm.infra.baseline")
-        if (state == null || state.cachedItemCount == 0) {
+        if (state == null || state.itemCount == 0) {
             val now = System.currentTimeMillis()
-            val entities = BaselineReferenceStore.buildBaselineEntities(now)
-            dao.upsertEntities(entities.map { it.toEntity(365L * 24 * 3_600_000L) })
+            val entities = BaselineReferenceStore.buildBaselineEntities(now, appContext)
+            dao.upsertEntities(
+                entities.map { e ->
+                    WorldEntityRecord.fromDomain(e, GeoSpatialIndex.encodeGeohash(e.latitude, e.longitude, 4))
+                }
+            )
             dao.upsertProviderState(
-                WorldProviderStateEntity(
+                WorldProviderStateRecord(
                     providerId = "wm.infra.baseline",
+                    status = ProviderSyncStatus.OK.name,
                     enabled = true,
-                    status = ProviderSyncStatus.HEALTHY.name,
-                    lastSyncEpochMs = now,
+                    lastAttemptEpochMs = now,
                     lastSuccessEpochMs = now,
-                    nextEligibleEpochMs = 0L,
-                    lastHttpCode = 200,
-                    lastError = null,
+                    httpCode = 200,
+                    itemCount = entities.size,
+                    latencyMs = 1L,
+                    errorMessage = null,
                     etag = "bundled-v1",
-                    lastModifiedHeader = null,
-                    cachedItemCount = entities.size,
+                    lastModified = null,
+                    nextAllowedEpochMs = null,
                     consecutiveFailures = 0
                 )
             )
@@ -105,20 +106,23 @@ class WorldMonitorRepository @Inject constructor(
 
     suspend fun syncEnabledProviders(
         categories: Set<WorldIntelCategory> = WorldIntelCategory.entries.toSet(),
-        viewport: GlobeViewport? = null,
+        viewport: WorldViewport? = null,
         force: Boolean = false,
         notifyWatchtower: Boolean = true
     ): Int = withContext(Dispatchers.IO) {
         ensureBaselineSeeded()
         val now = System.currentTimeMillis()
         dao.pruneExpiredEntities(now)
-        dao.pruneOldTrails(now - 12L * 3_600_000L)
+        dao.pruneOldTrailPoints(now - 12L * 3_600_000L)
+        dao.pruneGeocodeCache(now)
 
-        val specs = WorldMonitorProviderRegistry.ALL.filter { spec ->
+        val storedStates = dao.getAllProviderStates().associateBy { it.providerId }
+        val specs = WorldMonitorProviderRegistry.providers.filter { spec ->
+            val enabledFlag = storedStates[spec.providerId]?.enabled ?: spec.defaultEnabled
             spec.category in categories &&
-                spec.id != "wm.infra.baseline" &&
-                spec.id != "wm.infra.overpass" &&
-                (force || spec.enabledByDefault || dao.getProviderState(spec.id)?.enabled == true)
+                spec.providerId != "wm.infra.baseline" &&
+                spec.providerId != "wm.infra.overpass" &&
+                enabledFlag
         }
 
         val outcomes = coroutineScope {
@@ -142,15 +146,15 @@ class WorldMonitorRepository @Inject constructor(
                 notifyUser = notifyWatchtower
             )
         }
-        outcomes.count { it.status == ProviderSyncStatus.HEALTHY }
+        outcomes.count { it.status == ProviderSyncStatus.OK }
     }
 
     suspend fun syncSingleProvider(
         providerId: String,
-        viewport: GlobeViewport? = null,
+        viewport: WorldViewport? = null,
         force: Boolean = true
     ): WorldMonitorSyncEngine.ProviderFetchOutcome = withContext(Dispatchers.IO) {
-        val spec = WorldMonitorProviderRegistry.byId(providerId)
+        val spec = WorldMonitorProviderRegistry.find(providerId)
             ?: return@withContext WorldMonitorSyncEngine.ProviderFetchOutcome(
                 providerId,
                 ProviderSyncStatus.ERROR,
@@ -165,7 +169,7 @@ class WorldMonitorRepository @Inject constructor(
         outcome
     }
 
-    suspend fun syncBuildingsAndStreetInfra(viewport: GlobeViewport): WorldMonitorSyncEngine.ProviderFetchOutcome {
+    suspend fun syncBuildingsAndStreetInfra(viewport: WorldViewport): WorldMonitorSyncEngine.ProviderFetchOutcome {
         return syncSingleProvider("wm.infra.overpass", viewport = viewport, force = true)
     }
 
@@ -181,26 +185,29 @@ class WorldMonitorRepository @Inject constructor(
             _buildings3D.value = outcome.buildings3D
         }
         if (outcome.entities.isNotEmpty()) {
-            if (spec.category == WorldIntelCategory.AVIATION && spec.id != "wm.aviation.ourairports") {
-                dao.deleteEntitiesForProvider(spec.id)
+            if (spec.category == WorldIntelCategory.AVIATION && spec.providerId != "wm.aviation.ourairports") {
+                dao.deleteEntitiesForProvider(spec.providerId)
             }
-            dao.upsertEntities(outcome.entities.map { it.toEntity(spec.cacheTtlMs) })
+            dao.upsertEntities(
+                outcome.entities.map { e ->
+                    WorldEntityRecord.fromDomain(e, GeoSpatialIndex.encodeGeohash(e.latitude, e.longitude, 4))
+                }
+            )
 
-            // Record kinematic position trails for moving aircraft, vessels, and ISS
             if (spec.category == WorldIntelCategory.AVIATION ||
                 spec.category == WorldIntelCategory.MARITIME ||
-                spec.id == "wm.space.iss"
+                spec.providerId == "wm.space.iss"
             ) {
                 val trailRows = outcome.entities
-                    .filter { it.speedValue != null || spec.id == "wm.space.iss" }
+                    .filter { it.speedValue != null || spec.providerId == "wm.space.iss" }
                     .take(220)
                     .map { e ->
-                        WorldEntityTrailPointEntity(
+                        WorldEntityTrailPointRecord(
                             entityId = e.id,
                             category = e.category.name,
                             latitude = e.latitude,
                             longitude = e.longitude,
-                            altitudeMeters = e.altitudeMeters,
+                            altitudeMeters = e.altitudeMeters ?: 0.0,
                             timestampEpochMs = nowEpochMs
                         )
                     }
@@ -213,25 +220,18 @@ class WorldMonitorRepository @Inject constructor(
 
     suspend fun loadRecentTrails(categories: Set<WorldIntelCategory>): List<EntityTrail> = withContext(Dispatchers.IO) {
         val since = System.currentTimeMillis() - 3L * 3_600_000L
+        val catNames = categories.map { it.name }.toSet()
+        val points = dao.getRecentTrailPoints(since).filter { it.category in catNames }
         val out = ArrayList<EntityTrail>()
-        for (cat in categories) {
-            if (cat != WorldIntelCategory.AVIATION && cat != WorldIntelCategory.MARITIME && cat != WorldIntelCategory.SPACE) continue
-            val points = dao.queryRecentTrailsForCategory(cat.name, since, 1_800)
-            points.groupBy { it.entityId }.forEach { (entityId, rows) ->
-                if (rows.size >= 2) {
-                    out += EntityTrail(
-                        entityId = entityId,
-                        category = cat,
-                        points = rows.sortedBy { it.timestampEpochMs }.map { r ->
-                            TrailVertex(
-                                latitude = r.latitude,
-                                longitude = r.longitude,
-                                altitudeMeters = r.altitudeMeters,
-                                timestampEpochMs = r.timestampEpochMs
-                            )
-                        }
-                    )
-                }
+        points.groupBy { it.entityId }.forEach { (entityId, rows) ->
+            if (rows.size >= 2) {
+                val parsedCat = runCatching { WorldIntelCategory.valueOf(rows.first().category) }
+                    .getOrDefault(WorldIntelCategory.AVIATION)
+                out += EntityTrail(
+                    entityId = entityId,
+                    category = parsedCat,
+                    points = rows.sortedBy { it.timestampEpochMs }.map { it.toTrailPoint() }
+                )
             }
         }
         out
@@ -240,22 +240,23 @@ class WorldMonitorRepository @Inject constructor(
     suspend fun setProviderEnabled(providerId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         val existing = dao.getProviderState(providerId)
         if (existing != null) {
-            dao.setProviderEnabled(providerId, enabled)
+            dao.upsertProviderState(existing.copy(enabled = enabled))
         } else {
-            val spec = WorldMonitorProviderRegistry.byId(providerId) ?: return@withContext
+            val spec = WorldMonitorProviderRegistry.find(providerId) ?: return@withContext
             dao.upsertProviderState(
-                WorldProviderStateEntity(
-                    providerId = spec.id,
+                WorldProviderStateRecord(
+                    providerId = spec.providerId,
+                    status = ProviderSyncStatus.IDLE.name,
                     enabled = enabled,
-                    status = if (enabled) ProviderSyncStatus.IDLE.name else ProviderSyncStatus.DISABLED.name,
-                    lastSyncEpochMs = null,
+                    lastAttemptEpochMs = null,
                     lastSuccessEpochMs = null,
-                    nextEligibleEpochMs = 0L,
-                    lastHttpCode = null,
-                    lastError = null,
+                    httpCode = null,
+                    itemCount = 0,
+                    latencyMs = null,
+                    errorMessage = null,
                     etag = null,
-                    lastModifiedHeader = null,
-                    cachedItemCount = 0,
+                    lastModified = null,
+                    nextAllowedEpochMs = null,
                     consecutiveFailures = 0
                 )
             )
@@ -269,27 +270,19 @@ class WorldMonitorRepository @Inject constructor(
         if (clean.isEmpty()) credentialStore.remove(slot) else credentialStore.put(slot, clean)
     }
 
-    fun removeCredential(slot: String) {
-        credentialStore.remove(slot)
-    }
-
-    suspend fun addWatchRegion(region: WatchRegion) = withContext(Dispatchers.IO) {
-        dao.upsertWatchRegion(region.toEntity())
+    suspend fun addWatchRegion(region: WatchtowerRegion) = withContext(Dispatchers.IO) {
+        dao.upsertWatchRegion(WatchtowerRegionRecord.fromDomain(region))
     }
 
     suspend fun deleteWatchRegion(id: String) = withContext(Dispatchers.IO) {
         dao.deleteWatchRegion(id)
     }
 
-    suspend fun acknowledgeAllAlerts() = withContext(Dispatchers.IO) {
-        dao.acknowledgeAllAlerts()
-    }
-
     suspend fun clearAlerts() = withContext(Dispatchers.IO) {
-        dao.clearAllWatchAlerts()
+        dao.clearWatchAlerts()
     }
 
-    suspend fun searchLocations(query: String): List<GeoSearchResult> =
+    suspend fun searchLocations(query: String): List<GeocodeSearchResult> =
         syncEngine.searchLocations(query)
 
     suspend fun lookupElevationAndPlace(lat: Double, lon: Double): Pair<Int?, String?> =
@@ -300,18 +293,17 @@ class WorldMonitorRepository @Inject constructor(
 
     private fun defaultProviderState(spec: WorldProviderSpec): WorldProviderRuntimeState {
         val status = when {
-            !spec.implemented -> ProviderSyncStatus.REQUIRES_KEY
+            !spec.implemented -> ProviderSyncStatus.BACKEND_REQUIRED
             spec.credentialSlot != null &&
-                spec.authRequirement == com.adshield.pro.domain.worldmonitor.ProviderAuthRequirement.REQUIRED_USER_API_KEY &&
-                !hasCredential(spec.credentialSlot) -> ProviderSyncStatus.REQUIRES_KEY
-            spec.enabledByDefault -> ProviderSyncStatus.IDLE
-            else -> ProviderSyncStatus.DISABLED
+                spec.authRequirement == ProviderAuthRequirement.REQUIRED_USER_KEY &&
+                !hasCredential(spec.credentialSlot) -> ProviderSyncStatus.NEEDS_API_KEY
+            else -> ProviderSyncStatus.IDLE
         }
         return WorldProviderRuntimeState(
-            providerId = spec.id,
-            enabled = spec.enabledByDefault,
+            providerId = spec.providerId,
             status = status,
-            lastError = spec.limitationNote
+            enabled = spec.defaultEnabled,
+            errorMessage = spec.notes.ifBlank { null }
         )
     }
 }
