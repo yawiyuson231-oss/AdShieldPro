@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.CybersecurityPlatformTestSuite" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-08T16:09:22.681Z" hostname="runnervmwuk1x" time="0.056">
+  <properties/>
+  <testcase name="fileScannerFlagsEncodedPowerShellDropper" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.004"/>
+  <testcase name="validatorRejectsWrongQuestionTruncationServfailAndTrailingData" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.012"/>
+  <testcase name="diagnosticQueryUsesEdns0AndNormalisesCase" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.001"/>
+  <testcase name="dnssecModeReportsUpstreamAdAndStrictModeRejectsUnsignedPositiveAnswers" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.001"/>
+  <testcase name="strictDnssecFailsClosedWithServfailInsteadOfAnUnsignedAnswer" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.011"/>
+  <testcase name="resolverServesTtlCacheWithoutRequeryingUpstream" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.008"/>
+  <testcase name="resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.002"/>
+  <testcase name="appNetworkAndEmergencyPoliciesAreDeterministic" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.004"/>
+  <testcase name="providerPlanIsExplicitAndNeverCrossFailsPlaintextDns" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.0"/>
+  <testcase name="healthCircuitOpensClosesAndUsesOnlyMeasuredLatency" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.004"/>
+  <testcase name="resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt" classname="com.adshield.pro.CybersecurityPlatformTestSuite" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
