@@ -34,7 +34,7 @@ const FORBIDDEN_CLAIMS = [
 
 const MODULE_FILES = [
   'app.js', 'engine.js', 'ui/dom.js', 'ui/icons.js', 'ui/shell.js',
-  'world/catalog.js', 'world/countries-data.js', 'world/countries.js', 'world/country-view.js', 'world/custom.js', 'world/export.js', 'world/embed.js', 'world/map.js', 'world/model.js', 'world/native.js', 'world/network.js', 'world/parsers.js', 'world/store.js', 'world/view.js', 'world/weather.js',
+  'world/catalog.js', 'world/countries-data.js', 'world/countries.js', 'world/country-view.js', 'world/custom.js', 'world/export.js', 'world/embed.js', 'world/map.js', 'world/model.js', 'world/native.js', 'world/network.js', 'world/parsers.js', 'world/store.js', 'world/storage.js', 'world/view.js', 'world/weather.js',
   'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',

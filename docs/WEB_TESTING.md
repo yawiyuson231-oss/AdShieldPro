@@ -38,6 +38,7 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Monitor counters, buckets, percentiles, bounded memory | `unit/monitor.test.mjs` |
 | SHA-256, storage failures, feeds, backup/recovery, k-anonymity | `unit/infrastructure.test.mjs` |
 | Whole app: boot, navigation, AETHER, false positives, DNS lab, feeds, snapshots, XSS, capability honesty | `integration/ui.test.mjs` |
+| Large-cache IndexedDB, legacy migration/fallback and byte-bounded offline snapshots | `unit/world-storage.test.mjs` |
 | World adapters, validation, TTL/backoff, cancel, custom sources, watch rules, reports, weather, country geography | `unit/world.test.mjs` |
 | Actual World Monitor controls, countries, custom feed form, daily cadence, hostile provider text, exports | `integration/world.test.mjs` |
 | Packaged Android HTML/JS entry point, background snapshot handoff and restricted message channels | `integration/world-embed.test.mjs` |
@@ -64,10 +65,10 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 249 unit tests + 44 integration tests (293 total), passing.
-- 12 real-Chromium acceptance checks passing at 1440px and 390px, including actual downloads and offline reload. Provider responses in these checks are explicitly synthetic fixtures.
-- Static verification: 103 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
-- `npm run lint` — 42 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
+- 259 unit tests + 44 integration tests (303 total), passing.
+- 12 real-Chromium acceptance checks passing at 1440px and 390px, including actual downloads, a 6 MB IndexedDB round-trip and offline reload. Provider responses in these checks are explicitly synthetic fixtures.
+- Static verification: 104 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
+- `npm run lint` — 43 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.

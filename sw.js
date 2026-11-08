@@ -47,6 +47,7 @@ const SHELL_ASSETS = [
   './world/network.js',
   './world/parsers.js',
   './world/store.js',
+  './world/storage.js',
   './world/view.js',
   './world/weather.js',
   './dns/codec.js',

@@ -113,4 +113,4 @@ export const WEATHER_PLACES = Object.freeze([
   { id: 'new-york', name: 'New York', lat: 40.71, lon: -74.01, zone: 'America/New_York' },
   { id: 'sydney', name: 'Sydney', lat: -33.87, lon: 151.21, zone: 'Australia/Sydney' }
 ]);
-export const LIMITS = Object.freeze({ eventsPerSource: 800, watches: 30, bookmarks: 200, alerts: 300, bytes: 6_000_000, timeoutMs: 15_000 });
+export const LIMITS = Object.freeze({ eventsPerSource: 800, watches: 30, bookmarks: 200, alerts: 300, bytes: 6_000_000, workspaceBytes: 12_000_000, timeoutMs: 15_000 });

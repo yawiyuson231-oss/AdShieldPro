@@ -45,6 +45,8 @@ try {
   await page.goto(`${base}/#world`); await page.waitForFunction(() => globalThis.__omnishield?.state.booted);
   await page.evaluate(async () => { __omnishield.state.settings.autoUpdateFeeds = false; await navigator.serviceWorker.ready; });
   await page.waitForFunction(() => navigator.serviceWorker.controller);
+  assert.equal(await page.evaluate(() => __omnishield.state.world.storage.constructor.name), 'WorldIndexedStorage');
+  await page.evaluate(async () => { const storage = __omnishield.state.world.storage; await storage.setItem('world:browser-size-check', 'x'.repeat(6_000_000)); if ((await storage.getItem('world:browser-size-check')).length !== 6_000_000) throw new Error('Large cache was truncated'); await storage.removeItem('world:browser-size-check'); });
   assert.equal(providerCalls.length, 0); assert.equal(await page.locator('.wm-map-node').count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 1440);
   await page.screenshot({ path: `${screenshots}/world-desktop-empty.png`, fullPage: true });

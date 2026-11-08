@@ -112,6 +112,7 @@ export class WorldMonitorView {
     mount(this.noticeHost,
       this.notice ? h('div', { class: 'wm-notice' }, note(this.notice.message, this.notice.kind), button('Dismiss', () => { this.notice = null; this.renderNotice(); }, { class: 'sm ghost' })) : null,
       this.store.storageError ? note(this.store.storageError, 'warn') : null,
+      this.store.cacheNotice ? note(this.store.cacheNotice, 'warn') : null,
       !any && !this.store.busy ? h('div', { class: 'wm-onboarding' }, icon('lock'), h('p', {}, h('strong', {}, 'You decide when to connect. '),
         'Refresh feeds to request public data directly from the enabled providers. They receive your IP address, not your DNS history or precise location. Until then, this map has no live events.')) : null);
   }

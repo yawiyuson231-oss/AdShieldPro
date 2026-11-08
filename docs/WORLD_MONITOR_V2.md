@@ -129,7 +129,7 @@ world/catalog.js + custom.js        reviewed registry / explicit custom subscrip
 world/network.js                   bounded, credential-free HTTPS, timeout and rate-limit handling
 world/parsers.js                    per-provider validation / normalization
 world/model.js                     filters, watches, clustering, histogram, exports
-world/store.js                     cache, source health, concurrency, cancellation, inbox, persistence
+world/store.js + storage.js        bounded snapshots, IndexedDB, cache health, concurrency, inbox
 world/countries*.js                 directory, geographic lookup, dated country indicators
 world/weather.js                   explicit forecast + air requests with independent failure handling
 world/map.js + view.js              shared DOM/SVG interface; no remote scripts or HTML sinks
@@ -154,6 +154,12 @@ WorldMonitorPolicy.kt               pure URL/origin/export/response policy with 
 - At most 800 records/source, 200 bookmarks, 30 watches, 300 inbox entries, 6 MB/provider response,
   15-second browser timeout and 3 concurrent source requests. Export cap: 8 MB. Native cache cap:
   30 MB. Quota failures are visible and in-memory results remain usable.
+- World records use IndexedDB so larger feed caches do not consume the small localStorage quota
+  used by existing DNS/security settings. Legacy world records migrate only after a confirmed write.
+  If IndexedDB is unavailable, the previous adapter remains available; quota failures stay visible.
+  Offline snapshots have a 12 MB UTF-8 budget and retain newest records fairly across providers.
+  Reduction is disclosed after reload; watches/bookmarks are never silently discarded. In-memory
+  records remain available for filtered exports.
 - Local browser/webview storage is not encrypted; a person with access to the device/profile can
   read it. Browser and Android workspaces are separate; use explicit exports to transfer watches.
 - SW caches only the local shell/assets. API responses are never silently served from the SW.
@@ -181,7 +187,7 @@ runtime and every offline asset. New tests are in `tests/unit/world.test.mjs`,
 `WorldMonitorTestSuite.kt`. They use labelled synthetic fixtures only at the fetch boundary; fixture
 files are not bundled into the website/APK. The running UI has no demo-event injection.
 
-The `World Monitor daily source health` workflow probes all 12 public endpoints and parses actual responses. It reports HTTP, record counts, CORS permission and failures in a dated artifact; its daily cron starts only after merge to the default branch. A green audit means the audit ran, not that every provider is reachable. `npm run probe:world` performs the same optional network check.
+The `World Monitor daily source health` workflow probes all 12 public event endpoints and the actual weather/air and country-indicator clients using a fixed Manila/Philippines sample, and parses actual responses. It reports HTTP, record counts, CORS permission and failures in a dated artifact; its daily cron starts only after merge to the default branch. A green audit means the audit ran, not that every provider is reachable. `npm run probe:world` performs the same optional network check.
 
 Android compilation, JVM tests, R8 packaging and lint are run by the Android workflow. `tools/check_world_assets.py` compares every shared runtime asset inside both real APKs byte-for-byte with the tested source and rejects missing/extra files. A physical
 Android device is still required to verify document-picker providers, touch/pinch gestures,

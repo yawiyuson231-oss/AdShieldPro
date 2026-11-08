@@ -1,5 +1,6 @@
 /** Packaged entry point: exactly the same monitor and tests, with no remote scripts or unrestricted native interface. */
 import { WorldStore } from './store.js';
+import { createWorldStorage } from './storage.js';
 import { WorldMonitorView } from './view.js';
 import { createStorage } from '../security/storage.js';
 import { h, mount, note } from '../ui/dom.js';
@@ -10,6 +11,8 @@ const store = new WorldStore({ storage: createStorage('omnishield-world-native')
 let view;
 const ready = (async () => {
   try {
+    store.storage = await createWorldStorage(store.storage);
+    if (store.storage?.available === true) store.storageError = null;
     await store.load();
     view = new WorldMonitorView(document.getElementById('world-embedded'), store);
     view.setActive(true);

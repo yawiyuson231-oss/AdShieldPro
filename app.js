@@ -26,6 +26,7 @@ import * as ui from './ui/dom.js';
 import { icon } from './ui/icons.js';
 import { setupShell } from './ui/shell.js';
 import { WorldStore } from './world/store.js';
+import { createWorldStorage } from './world/storage.js';
 import { WorldMonitorView } from './world/view.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
@@ -86,7 +87,7 @@ async function fetchText(url) {
 async function boot() {
   try {
     state.storage = createStorage('omnishield-x');
-    state.world = new WorldStore({ storage: state.storage });
+    state.world = new WorldStore({ storage: await createWorldStorage(state.storage) });
     await state.world.load();
     state.monitor = new SecurityMonitor();
     state.analytics = new PrivateAnalytics({ storage: state.storage });

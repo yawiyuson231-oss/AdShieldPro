@@ -23,6 +23,7 @@
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {
+    "fake-indexeddb": "^6.2.7",
     "jsdom": "^30.1.3",
     "playwright": "^1.65.0"
   }

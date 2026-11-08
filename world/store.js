@@ -20,9 +20,30 @@ export function sanitizeFilters(raw = {}) {
   };
 }
 
+const CACHE_NOTICE = 'The offline snapshot was reduced to fit its cache budget. Newest records are retained across providers; watches and saved events are preserved. The current session still contains all received records.';
+
+/** A fair, byte-bounded offline snapshot; never save a value that the next load must reject. */
+export function serializeWorkspace(snapshot, maxBytes = LIMITS.workspaceBytes) {
+  const encoder = new TextEncoder();
+  const groups = Object.entries(snapshot.sources).map(([id, row]) => ({ id, row, events: [...row.events].sort((a, b) => b.occurredAt - a.occurredAt), closed: !row.events.length }));
+  const bounded = { ...snapshot, cacheTrimmed: groups.some(({ row }) => row.cacheReduced === true), sources: Object.fromEntries(groups.map(({ id, row }) => [id, { ...row, cacheReduced: row.cacheReduced === true, events: [] }])) };
+  let remaining = maxBytes - encoder.encode(JSON.stringify(bounded)).length;
+  if (remaining < 0) throw new Error('Saved workspace metadata exceeds its safety limit. Export watches and saved events before removing unused items.');
+  while (groups.some((group) => !group.closed)) {
+    for (const group of groups) {
+      if (group.closed) continue;
+      const kept = bounded.sources[group.id].events; const event = group.events[kept.length];
+      const size = encoder.encode(JSON.stringify(event)).length + (kept.length ? 1 : 0);
+      if (size <= remaining) { kept.push(event); remaining -= size; group.closed = kept.length === group.events.length; }
+      else { group.closed = true; bounded.cacheTrimmed = true; bounded.sources[group.id].cacheReduced = true; }
+    }
+  }
+  return { json: JSON.stringify(bounded), trimmed: bounded.cacheTrimmed };
+}
+
 export class WorldStore {
-  constructor({ storage, fetchImpl = globalThis.fetch?.bind(globalThis), clock = () => Date.now(), timeoutMs = LIMITS.timeoutMs } = {}) {
-    this.storage = storage; this.fetchImpl = fetchImpl; this.clock = clock; this.timeoutMs = timeoutMs;
+  constructor({ storage, fetchImpl = globalThis.fetch?.bind(globalThis), clock = () => Date.now(), timeoutMs = LIMITS.timeoutMs, cacheMaxBytes = LIMITS.workspaceBytes } = {}) {
+    this.storage = storage; this.fetchImpl = fetchImpl; this.clock = clock; this.timeoutMs = timeoutMs; this.cacheMaxBytes = Math.min(LIMITS.workspaceBytes, cacheMaxBytes); this.cacheNotice = null;
     this.sources = Object.fromEntries(SOURCES.map((s) => [s.id, { enabled: s.enabled, events: [], health: freshHealth() }]));
     this.customSources = []; this.country = 'PH'; this.savedCountries = []; this.dailyRefresh = false; this.lastDaily = 0;
     this.filters = sanitizeFilters(); this.watches = []; this.bookmarks = []; this.alerts = [];
@@ -55,9 +76,10 @@ export class WorldStore {
     try {
       const raw = await this.storage.getItem(KEY);
       if (!raw) return;
-      if (raw.length > 12_000_000) throw new Error('cache is too large');
+      if (raw.length > LIMITS.workspaceBytes) throw new Error('cache is too large');
       const saved = JSON.parse(raw);
       if (saved?.version !== 1) throw new Error('unsupported workspace version');
+      this.cacheNotice = saved.cacheTrimmed === true ? 'The saved cache contains a reduced, byte-bounded snapshot. Refresh to request current records. Watches and saved events are retained.' : null;
       for (const raw of (Array.isArray(saved.customSources) ? saved.customSources : []).slice(0, MAX_CUSTOM_SOURCES)) {
         try {
           const spec = normalizeCustomSource(raw);
@@ -79,7 +101,7 @@ export class WorldStore {
         const events = Array.isArray(record.events) ? record.events.slice(0, LIMITS.eventsPerSource).map((e) => normalizeEvent(e, spec.id, this.clock())).filter(Boolean) : [];
         this.sources[spec.id] = {
           enabled: typeof record.enabled === 'boolean' ? record.enabled : spec.enabled,
-          events: [...new Map(events.map((e) => [e.id, e])).values()],
+          events: [...new Map(events.map((e) => [e.id, e])).values()], cacheReduced: record.cacheReduced === true,
           health: { ...freshHealth(), lastSuccess, status: ['error', 'offline', 'rate-limited'].includes(record.status) ? record.status : lastSuccess ? 'cached' : 'idle',
             error: cleanText(record.error, 300) || null, lastAttempt: Number.isFinite(record.lastAttempt) && record.lastAttempt <= this.clock() ? record.lastAttempt : null,
             failures: Number.isInteger(record.failures) ? Math.max(0, Math.min(12, record.failures)) : 0,
@@ -109,15 +131,22 @@ export class WorldStore {
   }
 
   persist() {
-    const value = JSON.stringify({ version: 1, filters: this.filters, customSources: this.customSources, country: this.country, savedCountries: this.savedCountries, dailyRefresh: this.dailyRefresh, lastDaily: this.lastDaily,
-      sources: Object.fromEntries(this.catalog.map((s) => [s.id, { enabled: this.sources[s.id].enabled, lastSuccess: this.sources[s.id].health.lastSuccess, status: this.sources[s.id].health.status, error: this.sources[s.id].health.error, lastAttempt: this.sources[s.id].health.lastAttempt, failures: this.sources[s.id].health.failures, retryAt: this.sources[s.id].health.retryAt, events: this.sources[s.id].events }])),
+    const snapshot = { version: 1, filters: this.filters, customSources: this.customSources, country: this.country, savedCountries: this.savedCountries, dailyRefresh: this.dailyRefresh, lastDaily: this.lastDaily,
+      sources: Object.fromEntries(this.catalog.map((s) => [s.id, { enabled: this.sources[s.id].enabled, cacheReduced: this.sources[s.id].cacheReduced === true, lastSuccess: this.sources[s.id].health.lastSuccess, status: this.sources[s.id].health.status, error: this.sources[s.id].health.error, lastAttempt: this.sources[s.id].health.lastAttempt, failures: this.sources[s.id].health.failures, retryAt: this.sources[s.id].health.retryAt, events: this.sources[s.id].events }])),
       watches: this.watches, bookmarks: this.bookmarks.map((e) => ({ ...e, sourceMeta: SOURCE_BY_ID.get(e.source)?.custom ? SOURCE_BY_ID.get(e.source) : undefined })), acknowledged: this.alerts.filter((a) => a.read).map((a) => a.key)
-    });
+    };
+    let value;
+    try { value = serializeWorkspace(snapshot, this.cacheMaxBytes); }
+    catch (error) { this.storageError = error.message; this.emit(); return this.writeChain; }
     this.writeChain = this.writeChain.then(async () => {
       try {
         if (!this.storage) throw new Error('no storage');
-        await this.storage.setItem(KEY, value);
+        await this.storage.setItem(KEY, value.json);
+        const notice = value.trimmed ? CACHE_NOTICE : null;
+        const changed = this.cacheNotice !== notice;
+        this.cacheNotice = notice;
         if (this.storage.constructor?.name !== 'MemoryStorage') this.storageError = null;
+        if (changed) this.emit();
       } catch { this.storageError = 'Changes are available in this session, but could not be saved (storage unavailable or full). Export your watchlist to keep it.'; this.emit(); }
     });
     return this.writeChain;
@@ -160,7 +189,7 @@ export class WorldStore {
       const payload = await fetchJson(spec.url, { fetchImpl: this.fetchImpl, signal: controller.signal, timeoutMs: this.timeoutMs, accept: spec.accept, now: this.clock() });
       const parsed = parseSource(spec.id, payload, this.clock());
       if (revision !== this.revision || controller.signal.aborted || !row.enabled) return { ok: false, reason: 'cancelled' };
-      row.events = parsed.events;
+      row.events = parsed.events; row.cacheReduced = false;
       row.health = { ...freshHealth(), status: 'live', lastAttempt: previous.lastAttempt, lastSuccess: this.clock(), count: row.events.length, rejected: parsed.rejected, truncated: parsed.truncated, received: parsed.received };
       row.health.lastAttempt = this.clock();
       this.fresh.add(spec.id); this.collectAlerts();
@@ -209,7 +238,7 @@ export class WorldStore {
   async clearCache() {
     this.cancel();
     await Promise.allSettled([...this.inflight.values()].map((e) => e.promise));
-    for (const row of Object.values(this.sources)) { row.events = []; row.health = freshHealth(); }
+    for (const row of Object.values(this.sources)) { row.events = []; row.cacheReduced = false; row.health = freshHealth(); }
     this.fresh.clear(); this.alerts = [];
     this.emit(); await this.persist();
   }
@@ -268,7 +297,7 @@ export class WorldStore {
       try {
         if (Number.isFinite(entry.fetchedAt) && entry.fetchedAt <= this.clock() && entry.fetchedAt > (row.health.lastSuccess || 0) && entry.data) {
           const parsed = parseSource(spec.id, entry.data, this.clock());
-          row.events = parsed.events;
+          row.events = parsed.events; row.cacheReduced = false;
           row.health = { ...freshHealth(), status: 'cached', lastSuccess: entry.fetchedAt, lastAttempt: attemptedAt, received: parsed.received, rejected: parsed.rejected, truncated: parsed.truncated, background: true };
           this.fresh.delete(spec.id); imported++;
         }
