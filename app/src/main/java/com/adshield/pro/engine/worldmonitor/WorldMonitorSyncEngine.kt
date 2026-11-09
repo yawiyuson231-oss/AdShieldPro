@@ -98,21 +98,21 @@ class WorldMonitorSyncEngine @Inject constructor(
         }
 
         // 4. Respect backoff & minimum provider gap (CelesTrak 2-hour policy strictly enforced!)
+        val isCelestrak = spec.providerId.startsWith("wm.space.celestrak.")
         if (existingState != null) {
             val nextAllowed = existingState.nextAllowedEpochMs ?: 0L
-            if (nowEpochMs < nextAllowed) {
+            if (nowEpochMs < nextAllowed && (isCelestrak || !force)) {
                 return@withContext ProviderFetchOutcome(
                     spec.providerId,
                     ProviderSyncStatus.RATE_LIMITED,
                     errorMessage = "Cooling down until rate-limit window expires"
                 )
             }
-            val minGap = if (spec.providerId.startsWith("wm.space.celestrak.")) {
-                spec.minRequestGapMs
-            } else if (force) {
-                10_000L
-            } else {
-                spec.refreshIntervalMs
+            val minGap = when {
+                isCelestrak -> spec.minRequestGapMs
+                force && spec.supportsViewportBbox -> 2_500L
+                force -> 8_000L
+                else -> spec.refreshIntervalMs
             }
             val lastOk = existingState.lastSuccessEpochMs ?: 0L
             if (lastOk > 0L && (nowEpochMs - lastOk) < minGap) {
@@ -150,8 +150,11 @@ class WorldMonitorSyncEngine @Inject constructor(
             }
         }
 
-        existingState?.etag?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-None-Match", it) }
-        existingState?.lastModified?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-Modified-Since", it) }
+        // Only attach conditional ETag/Last-Modified headers for static-URL global feeds (never for coordinate/country parameterized feeds)
+        if (!spec.supportsViewportBbox && !force) {
+            existingState?.etag?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-None-Match", it) }
+            existingState?.lastModified?.takeIf { it.isNotBlank() }?.let { reqBuilder.header("If-Modified-Since", it) }
+        }
 
         val qLat = viewport?.centerLat ?: 14.5995
         val qLon = viewport?.centerLon ?: 120.9842
@@ -550,18 +553,37 @@ class WorldMonitorSyncEngine @Inject constructor(
         if (url.contains("{apiKey}") && !secret.isNullOrBlank()) {
             url = url.replace("{apiKey}", URLEncoder.encode(secret.trim(), "UTF-8"))
         }
-        val west = viewport?.west ?: -180.0
-        val south = viewport?.south ?: -70.0
-        val east = viewport?.east ?: 180.0
-        val north = viewport?.north ?: 75.0
         val lat = viewport?.centerLat ?: 14.5995
         val lon = viewport?.centerLon ?: 120.9842
+        val isOpenSky = spec.providerId == "wm.aviation.opensky"
+        val west = if (isOpenSky) {
+            (lon - 12.0).coerceIn(-180.0, 180.0)
+        } else {
+            viewport?.west ?: -180.0
+        }
+        val south = if (isOpenSky) {
+            (lat - 12.0).coerceIn(-85.0, 85.0)
+        } else {
+            viewport?.south ?: -70.0
+        }
+        val east = if (isOpenSky) {
+            (lon + 12.0).coerceIn(-180.0, 180.0)
+        } else {
+            viewport?.east ?: 180.0
+        }
+        val north = if (isOpenSky) {
+            (lat + 12.0).coerceIn(-85.0, 85.0)
+        } else {
+            viewport?.north ?: 75.0
+        }
+        val countryIso = BaselineReferenceStore.nearestCountry(lat, lon)?.iso2 ?: "PH"
         url = url.replace("{west}", "%.2f".format(Locale.US, west))
             .replace("{south}", "%.2f".format(Locale.US, south))
             .replace("{east}", "%.2f".format(Locale.US, east))
             .replace("{north}", "%.2f".format(Locale.US, north))
             .replace("{lat}", "%.3f".format(Locale.US, lat))
             .replace("{lon}", "%.3f".format(Locale.US, lon))
+            .replace("{country}", countryIso)
         return url
     }
 
@@ -600,7 +622,7 @@ class WorldMonitorSyncEngine @Inject constructor(
 
     companion object {
         private const val USER_AGENT = "OmniShieldX-WorldMonitor/2035.1 (Android; Passive-OSINT-Earth-Viewer)"
-        private const val MAX_BODY_BYTES = 4 * 1024 * 1024
+        private const val MAX_BODY_BYTES = 8 * 1024 * 1024
 
         private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 

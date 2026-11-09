@@ -86,6 +86,7 @@ import com.adshield.pro.domain.worldmonitor.SatellitePassPrediction
 import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldSeverity
+import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
 import com.adshield.pro.engine.worldmonitor.OrbitalAndGlobeMath
 import com.adshield.pro.engine.worldmonitor.WorldMonitorAssetAndTileServer
 import com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge
@@ -125,13 +126,31 @@ private val QUICK_TELEPORT_PLACES = listOf(
     QuickTeleportCity("dvo", "🇵🇭 Davao", 7.1907, 125.4553, 4_800.0),
     QuickTeleportCity("sic", "🇵🇭 Siclong", 15.4850, 120.9660, 2_800.0),
     QuickTeleportCity("tyo", "🇯🇵 Tokyo", 35.6762, 139.6503, 4_200.0),
+    QuickTeleportCity("sel", "🇰🇷 Seoul", 37.5665, 126.9780, 4_200.0),
     QuickTeleportCity("sin", "🇸🇬 Singapore", 1.3521, 103.8198, 4_200.0),
+    QuickTeleportCity("jkt", "🇮🇩 Jakarta", -6.2088, 106.8456, 4_800.0),
+    QuickTeleportCity("bkk", "🇹🇭 Bangkok", 13.7563, 100.5018, 4_500.0),
+    QuickTeleportCity("del", "🇮🇳 Delhi", 28.6139, 77.2090, 5_200.0),
+    QuickTeleportCity("syd", "🇦🇺 Sydney", -33.8688, 151.2093, 4_200.0),
     QuickTeleportCity("dxb", "🇦🇪 Dubai", 25.2048, 55.2708, 4_500.0),
+    QuickTeleportCity("ruh", "🇸🇦 Riyadh", 24.7136, 46.6753, 5_200.0),
+    QuickTeleportCity("ist", "🇹🇷 Istanbul", 41.0082, 28.9784, 4_600.0),
+    QuickTeleportCity("cai", "🇪🇬 Cairo", 30.0444, 31.2357, 4_800.0),
+    QuickTeleportCity("nbo", "🇰🇪 Nairobi", -1.2921, 36.8219, 4_800.0),
+    QuickTeleportCity("los", "🇳🇬 Lagos", 6.5244, 3.3792, 4_800.0),
     QuickTeleportCity("lon", "🇬🇧 London", 51.5072, -0.1276, 4_200.0),
+    QuickTeleportCity("par", "🇫🇷 Paris", 48.8566, 2.3522, 4_000.0),
+    QuickTeleportCity("ber", "🇩🇪 Berlin", 52.5200, 13.4050, 4_200.0),
+    QuickTeleportCity("iev", "🇺🇦 Kyiv", 50.4501, 30.5234, 4_600.0),
     QuickTeleportCity("nyc", "🇺🇸 NYC", 40.7128, -74.0060, 3_800.0),
     QuickTeleportCity("sfo", "🇺🇸 SF", 37.7749, -122.4194, 4_200.0),
+    QuickTeleportCity("yyz", "🇨🇦 Toronto", 43.6532, -79.3832, 4_200.0),
+    QuickTeleportCity("mex", "🇲🇽 Mexico City", 19.4326, -99.1332, 5_200.0),
+    QuickTeleportCity("gru", "🇧🇷 São Paulo", -23.5505, -46.6333, 4_800.0),
+    QuickTeleportCity("eze", "🇦🇷 Buenos Aires", -34.6037, -58.3816, 4_800.0),
     QuickTeleportCity("hmz", "⚓ Hormuz", 26.5667, 56.2500, 180_000.0),
-    QuickTeleportCity("suz", "⚓ Suez", 30.5852, 32.2654, 95_000.0)
+    QuickTeleportCity("suz", "⚓ Suez", 30.5852, 32.2654, 95_000.0),
+    QuickTeleportCity("pnm", "⚓ Panama", 9.0800, -79.6800, 85_000.0)
 )
 
 @Composable
@@ -217,6 +236,8 @@ fun WorldMonitorScreen(
                 uiState = uiState,
                 onBack = onBack,
                 onSync = { viewModel.syncAllEnabled(force = true) },
+                onPulseLive = viewModel::pulseLiveNow,
+                onOpenCountries = { viewModel.setShowCountryDirectory(true) },
                 onReloadGlobe = viewModel::reloadGlobe,
                 onLoadBuildings = viewModel::load3dBuildingsAtViewport,
                 onToggleFullscreen = viewModel::toggleFullscreen,
@@ -231,6 +252,18 @@ fun WorldMonitorScreen(
                     viewModel.updateLayerState(cat, visible = !cur)
                 },
                 modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
+        if (uiState.showCountryDirectory) {
+            WorldCountryDirectoryModal(
+                uiState = uiState,
+                onQueryChange = viewModel::updateCountryFilterQuery,
+                onSelectCountry = viewModel::selectCountry,
+                onDismiss = { viewModel.setShowCountryDirectory(false) },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 14.dp, vertical = 28.dp)
             )
         }
 
@@ -499,6 +532,8 @@ private fun WorldMonitorTopHud(
     uiState: WorldMonitorUiState,
     onBack: () -> Unit,
     onSync: () -> Unit,
+    onPulseLive: () -> Unit,
+    onOpenCountries: () -> Unit,
     onReloadGlobe: () -> Unit,
     onLoadBuildings: () -> Unit,
     onToggleFullscreen: () -> Unit,
@@ -557,24 +592,39 @@ private fun WorldMonitorTopHud(
                                 overflow = TextOverflow.Ellipsis
                             )
                             BadgePill("Z$zoomTile", SkyBlueGlow)
-                            if (uiState.futureOffsetHours > 0) {
-                                BadgePill("FUTURE +${uiState.futureOffsetHours}H", WarningAmber)
-                            } else if (uiState.simulation.active) {
-                                BadgePill("SIMULATION", WarningAmber)
-                            } else {
-                                BadgePill(
-                                    if (uiState.globeReady) "3D LIVE" else "INIT",
-                                    if (uiState.globeReady) EmeraldPrimary else CyberCyan
+                            Surface(
+                                color = (if (uiState.futureOffsetHours > 0) WarningAmber else EmeraldPrimary).copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier
+                                    .border(
+                                        1.dp,
+                                        if (uiState.futureOffsetHours > 0) WarningAmber else EmeraldPrimary,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable(onClick = onPulseLive)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = when {
+                                        uiState.futureOffsetHours > 0 -> "FUTURE +${uiState.futureOffsetHours}H"
+                                        uiState.isSyncing -> "● SYNCING"
+                                        uiState.liveAutoSyncEnabled -> "● LIVE"
+                                        else -> "○ PAUSED"
+                                    },
+                                    color = if (uiState.futureOffsetHours > 0) WarningAmber else EmeraldPrimary,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
                             }
                         }
                         Text(
-                            text = "%.4f°, %.4f° · Alt %s · Elev %d m · %,d nodes".format(
+                            text = "%s (%s) · %.3f°, %.3f° · %s · %,d nodes".format(
                                 Locale.US,
+                                uiState.activeCountryName,
+                                uiState.activeCountryIso,
                                 uiState.viewport.centerLat,
                                 uiState.viewport.centerLon,
                                 altLabel,
-                                uiState.viewport.groundElevationMeters,
                                 uiState.filteredEntities.size
                             ),
                             color = TextSecondaryDark,
@@ -584,6 +634,19 @@ private fun WorldMonitorTopHud(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+
+                    Surface(
+                        color = EmeraldPrimary.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .border(1.dp, EmeraldPrimary.copy(alpha = 0.65f), RoundedCornerShape(8.dp))
+                            .clickable(onClick = onOpenCountries)
+                            .padding(horizontal = 7.dp, vertical = 4.dp)
+                    ) {
+                        Text("🌍 234", color = EmeraldPrimary, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+
+                    Spacer(Modifier.width(4.dp))
 
                     Surface(
                         color = CyberCyan.copy(alpha = 0.16f),
@@ -633,7 +696,7 @@ private fun WorldMonitorTopHud(
                         onValueChange = onSearchChange,
                         placeholder = {
                             Text(
-                                "Jump to ANY city, street, town, airport (MNL/JFK), or lat,lon…",
+                                "Search 234 countries, capitals, cities, airports (MNL/JFK), or lat,lon…",
                                 fontSize = 11.sp,
                                 color = TextSecondaryDark
                             )
@@ -668,13 +731,30 @@ private fun WorldMonitorTopHud(
                     }
                 }
 
-                // 1-Tap Quick-Teleport Global & Philippine City / Chokepoint Bar
+                // 1-Tap Quick-Teleport Global Countries, Capitals & Chokepoint Bar
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    item(key = "all_countries_btn") {
+                        Surface(
+                            color = EmeraldPrimary.copy(alpha = 0.20f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .border(1.dp, EmeraldPrimary, RoundedCornerShape(10.dp))
+                                .clickable(onClick = onOpenCountries)
+                                .padding(horizontal = 9.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "🌍 All 234 Countries",
+                                color = EmeraldPrimary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
                     items(items = QUICK_TELEPORT_PLACES, key = { it.id }) { place ->
                         Surface(
                             color = NavySurfaceVariant.copy(alpha = 0.88f),
@@ -1339,3 +1419,167 @@ internal fun freshnessColor(freshness: FreshnessClass): Color = when (freshness)
     FreshnessClass.ESTIMATED -> Color(0xFFA78BFA)
     FreshnessClass.SIMULATED -> AlertRed
 }
+
+@Composable
+private fun WorldCountryDirectoryModal(
+    uiState: WorldMonitorUiState,
+    onQueryChange: (String) -> Unit,
+    onSelectCountry: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val countries = remember { BaselineReferenceStore.load().countries }
+    val q = uiState.countryFilterQuery.trim()
+    val filtered = remember(countries, q) {
+        if (q.isEmpty()) {
+            countries
+        } else {
+            countries.filter { c ->
+                c.name.contains(q, ignoreCase = true) ||
+                    c.capital.contains(q, ignoreCase = true) ||
+                    c.iso2.equals(q, ignoreCase = true) ||
+                    c.iso3.equals(q, ignoreCase = true)
+            }
+        }
+    }
+
+    Surface(
+        color = NavySurface.copy(alpha = 0.97f),
+        shape = RoundedCornerShape(18.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = 520.dp)
+            .border(
+                1.5.dp,
+                Brush.horizontalGradient(listOf(EmeraldPrimary, CyberCyan, ElectricBlue)),
+                RoundedCornerShape(18.dp)
+            )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "🌍 Global Country & Territory Directory (${countries.size})",
+                        color = TextPrimaryDark,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Tap any country to fly 3D Earth & stream live flights, weather, AQI, waves & BGP",
+                        color = TextSecondaryDark,
+                        fontSize = 11.sp
+                    )
+                }
+                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondaryDark)
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = uiState.countryFilterQuery,
+                onValueChange = onQueryChange,
+                placeholder = {
+                    Text(
+                        "Filter ${countries.size} countries by name, capital, or ISO code (PH, JP, IS, BR…)",
+                        fontSize = 11.sp,
+                        color = TextSecondaryDark
+                    )
+                },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(16.dp))
+                },
+                trailingIcon = {
+                    if (uiState.countryFilterQuery.isNotEmpty()) {
+                        IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextSecondaryDark, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                },
+                textStyle = MaterialTheme.typography.bodySmall.copy(color = TextPrimaryDark, fontSize = 12.sp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(items = filtered, key = { it.iso2 }) { country ->
+                    val isSelected = country.iso2 == uiState.activeCountryIso
+                    val popLabel = when {
+                        country.population >= 1_000_000_000L -> "%.2fB".format(Locale.US, country.population / 1_000_000_000.0)
+                        country.population >= 1_000_000L -> "%.1fM".format(Locale.US, country.population / 1_000_000.0)
+                        else -> "%,d".format(Locale.US, country.population)
+                    }
+                    Surface(
+                        color = if (isSelected) EmeraldPrimary.copy(alpha = 0.18f) else NavySurfaceVariant.copy(alpha = 0.90f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(
+                                1.dp,
+                                if (isSelected) EmeraldPrimary else NavyBorder,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onSelectCountry(country.iso2) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    BadgePill(country.iso2, if (isSelected) EmeraldPrimary else CyberCyan)
+                                    Text(
+                                        text = country.name,
+                                        color = TextPrimaryDark,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Text(
+                                    text = "★ ${country.capital} · Pop $popLabel · %.2f°, %.2f°".format(
+                                        Locale.US,
+                                        country.lat,
+                                        country.lon
+                                    ),
+                                    color = TextSecondaryDark,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Text(
+                                text = if (isSelected) "ACTIVE ●" else "FLY →",
+                                color = if (isSelected) EmeraldPrimary else CyberCyan,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

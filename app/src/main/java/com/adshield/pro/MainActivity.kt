@@ -283,7 +283,11 @@ fun AdShieldMainApp(
                     onBack = { currentTab = MainNavDestination.HOME }
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
-                MainNavDestination.LIVE -> LiveDestination(viewModel)
+                MainNavDestination.LIVE -> LiveDestination(
+                    viewModel = viewModel,
+                    onToggleProtection = handleToggleVpn,
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
+                )
                 MainNavDestination.INTELLIGENCE -> IntelligenceDestination(
                     adShieldViewModel = viewModel,
                     connectorState = connectorState,
@@ -478,9 +482,17 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
 }
 
 @Composable
-private fun LiveDestination(viewModel: AdShieldViewModel) {
+private fun LiveDestination(
+    viewModel: AdShieldViewModel,
+    onToggleProtection: () -> Unit,
+    onOpenWorldMonitor: () -> Unit
+) {
     val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
-    LiveNetworkScreen(snapshot = liveNetwork)
+    LiveNetworkScreen(
+        snapshot = liveNetwork,
+        onToggleProtection = onToggleProtection,
+        onOpenWorldMonitor = onOpenWorldMonitor
+    )
 }
 
 /** Maps an intelligence module to the app screen that owns its data and controls. */

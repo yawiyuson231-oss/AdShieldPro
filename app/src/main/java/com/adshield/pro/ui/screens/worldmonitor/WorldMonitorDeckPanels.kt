@@ -488,14 +488,30 @@ private fun DigitalTwinPanel(
             }
 
             item(key = "twin_compare_selector") {
-                Text(
-                    "Compare Region Against (${twin.comparisonTargetName ?: uiState.compareCountryIso}):",
-                    color = CyberCyan,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Compare Across All ${countries.size} Countries (${twin.comparisonTargetName ?: uiState.compareCountryIso}):",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "🌍 Fly Country",
+                        color = EmeraldPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { viewModel.setShowCountryDirectory(true) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    items(items = countries.take(16), key = { it.iso2 }) { c ->
+                    items(items = countries, key = { it.iso2 }) { c ->
                         FilterChip(
                             selected = uiState.compareCountryIso == c.iso2,
                             onClick = { viewModel.refreshDigitalTwin(c.iso2) },
@@ -805,6 +821,49 @@ private fun TimelinePanel(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
+        item(key = "live_sync_control") {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(NavySurfaceVariant, RoundedCornerShape(10.dp))
+                    .border(1.dp, EmeraldPrimary.copy(alpha = 0.60f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (uiState.liveAutoSyncEnabled) "● Continuous 45s LIVE Telemetry Active" else "○ LIVE Auto-Sync Paused",
+                        color = if (uiState.liveAutoSyncEnabled) EmeraldPrimary else WarningAmber,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = "Active Country: ${uiState.activeCountryName} (${uiState.activeCountryIso}) · Pulse #${uiState.livePulseCount}",
+                        color = TextSecondaryDark,
+                        fontSize = 10.sp
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = viewModel::toggleLiveAutoSync,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text(if (uiState.liveAutoSyncEnabled) "Pause" else "Auto", fontSize = 10.sp, color = CyberCyan)
+                    }
+                    Button(
+                        onClick = viewModel::pulseLiveNow,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 3.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                        modifier = Modifier.height(30.dp)
+                    ) {
+                        Text("LIVE NOW", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+                    }
+                }
+            }
+        }
+
         item(key = "future_horizon") {
             Column(
                 modifier = Modifier

@@ -318,6 +318,8 @@ fun NativeWorldGlobe3D(
         viewModel.onGlobeReady(true, "Native-3D-GPU-2.0")
     }
 
+    val sovereignCountries = remember { BaselineReferenceStore.load().countries }
+
     // Parse TLE orbital catalog whenever entities update
     val parsedSatellites = remember(uiState.filteredEntities) {
         val map = LinkedHashMap<String, OrbitalAndGlobeMath.ParsedTleElements>()
@@ -980,6 +982,53 @@ fun NativeWorldGlobe3D(
                 }
             }
 
+            // 5B. 202 Sovereign Countries & Capitals 3D Map Layer (zoom-decluttered)
+            if (uiState.labelsEnabled) {
+                val minPop = when {
+                    camAlt > 7_000_000.0 -> 28_000_000L
+                    camAlt > 3_200_000.0 -> 6_500_000L
+                    camAlt > 1_400_000.0 -> 850_000L
+                    else -> 0L
+                }
+                val cellW = if (camAlt > 3_500_000.0) 118f else 92f
+                val cellH = 34f
+                val usedCells = HashSet<Long>(64)
+                val savedTextSize = paints.labelPaint.textSize
+                paints.labelPaint.textSize = if (camAlt < 1_800_000.0) 24f else 21f
+
+                for (country in sovereignCountries) {
+                    val isActiveCountry = country.iso2 == uiState.activeCountryIso
+                    if (!isActiveCountry && country.population < minPop) continue
+                    val cp = OrbitalAndGlobeMath.projectToScreen(
+                        country.lat, country.lon, 0.0, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                    )
+                    if (!cp.visible || cp.x < 24f || cp.x > w - 80f || cp.y < 30f || cp.y > h - 30f) continue
+                    val gx = (cp.x / cellW).toInt()
+                    val gy = (cp.y / cellH).toInt()
+                    val cellKey = (gx.toLong() shl 32) or (gy.toLong() and 0xFFFFFFFFL)
+                    if (!isActiveCountry && !usedCells.add(cellKey)) continue
+                    usedCells.add(cellKey)
+
+                    paints.fillPaint.shader = null
+                    paints.fillPaint.color = if (isActiveCountry) 0xFF10B981.toInt() else 0xCC38BDF8.toInt()
+                    nc.drawCircle(cp.x, cp.y, if (isActiveCountry) 6.2f else 3.6f, paints.fillPaint)
+                    if (isActiveCountry) {
+                        paints.strokePaint.color = 0xAA34D399.toInt()
+                        paints.strokePaint.strokeWidth = 2.0f
+                        nc.drawCircle(cp.x, cp.y, 11.5f, paints.strokePaint)
+                    }
+                    val countryLabel = if (camAlt < 1_350_000.0) {
+                        "★ ${country.capital} · ${country.name}"
+                    } else {
+                        country.name
+                    }
+                    paints.labelPaint.color = if (isActiveCountry) 0xFF6EE7B7.toInt() else 0xDCE2E8F0.toInt()
+                    nc.drawText(countryLabel, cp.x + 8f, cp.y + 6f, paints.labelPaint)
+                }
+                paints.labelPaint.textSize = savedTextSize
+                paints.labelPaint.color = 0xFFF8FAFC.toInt()
+            }
+
             // Optional Clouds / Radar atmospheric sweeps
             if (uiState.cloudsOverlayEnabled) {
                 for (band in 0 until 9) {
@@ -1281,33 +1330,43 @@ fun NativeWorldGlobe3D(
                 var eLon = satVec?.longitude ?: entity.longitude
                 val eAlt = satVec?.altitudeMeters ?: (entity.altitudeMeters ?: 0.0)
 
-                // Dead-reckon moving aircraft & ships when Future Horizon (+1H..+72H) is active!
-                if (uiState.futureOffsetHours > 0 &&
-                    (entity.category == WorldIntelCategory.AVIATION || entity.category == WorldIntelCategory.MARITIME) &&
+                // Dead-reckon moving aircraft & ships both in real-time LIVE mode (0H) and Future Horizon (+1H..+72H)!
+                if ((entity.category == WorldIntelCategory.AVIATION || entity.category == WorldIntelCategory.MARITIME) &&
                     (entity.speedValue ?: 0.0) > 5.0 &&
                     entity.headingDeg != null
                 ) {
-                    val liveSp = OrbitalAndGlobeMath.projectToScreen(
-                        eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
-                    )
                     val speedKmh = (entity.speedValue ?: 0.0) * 1.852
-                    val hrs = if (entity.category == WorldIntelCategory.AVIATION) {
-                        min(6, uiState.futureOffsetHours).toDouble()
+                    if (uiState.futureOffsetHours == 0) {
+                        val liveElapsedHrs = ((orbitClockMs - entity.retrievedAtEpochMs).coerceIn(0L, 120_000L)) / 3_600_000.0
+                        if (liveElapsedHrs > 0.0001) {
+                            val livePos = OrbitalAndGlobeMath.projectAlongBearing(
+                                eLat, eLon, entity.headingDeg, speedKmh * liveElapsedHrs
+                            )
+                            eLat = livePos.first
+                            eLon = livePos.second
+                        }
                     } else {
-                        uiState.futureOffsetHours.toDouble()
-                    }
-                    val projected = OrbitalAndGlobeMath.projectAlongBearing(
-                        eLat, eLon, entity.headingDeg, speedKmh * hrs
-                    )
-                    eLat = projected.first
-                    eLon = projected.second
-                    val futSp = OrbitalAndGlobeMath.projectToScreen(
-                        eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
-                    )
-                    if (liveSp.visible && futSp.visible) {
-                        paints.dashedPaint.color = 0xAA22D3EE.toInt()
-                        paints.dashedPaint.strokeWidth = 2.0f
-                        nc.drawLine(liveSp.x, liveSp.y, futSp.x, futSp.y, paints.dashedPaint)
+                        val liveSp = OrbitalAndGlobeMath.projectToScreen(
+                            eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                        )
+                        val hrs = if (entity.category == WorldIntelCategory.AVIATION) {
+                            min(6, uiState.futureOffsetHours).toDouble()
+                        } else {
+                            uiState.futureOffsetHours.toDouble()
+                        }
+                        val projected = OrbitalAndGlobeMath.projectAlongBearing(
+                            eLat, eLon, entity.headingDeg, speedKmh * hrs
+                        )
+                        eLat = projected.first
+                        eLon = projected.second
+                        val futSp = OrbitalAndGlobeMath.projectToScreen(
+                            eLat, eLon, eAlt, camLat, camLon, camPitch, camHeading, uiState.projection, cx, cy, rPx
+                        )
+                        if (liveSp.visible && futSp.visible) {
+                            paints.dashedPaint.color = 0xAA22D3EE.toInt()
+                            paints.dashedPaint.strokeWidth = 2.0f
+                            nc.drawLine(liveSp.x, liveSp.y, futSp.x, futSp.y, paints.dashedPaint)
+                        }
                     }
                 }
 

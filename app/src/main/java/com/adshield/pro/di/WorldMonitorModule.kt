@@ -48,12 +48,19 @@ object WorldMonitorModule {
     fun provideWorldMonitorOkHttpClient(
         @ApplicationContext context: Context
     ): OkHttpClient {
-        val cacheDir = File(context.cacheDir, "worldmonitor_feed_cache_v1")
+        val cacheDir = File(context.cacheDir, "worldmonitor_feed_cache_v2")
+        val dispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 48
+            maxRequestsPerHost = 12
+        }
         return OkHttpClient.Builder()
-            .cache(Cache(cacheDir, 24L * 1024L * 1024L))
+            .dispatcher(dispatcher)
+            .connectionPool(okhttp3.ConnectionPool(16, 5, TimeUnit.MINUTES))
+            .cache(Cache(cacheDir, 48L * 1024L * 1024L))
             .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(18, TimeUnit.SECONDS)
-            .callTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(28, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()

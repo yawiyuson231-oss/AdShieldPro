@@ -76,7 +76,7 @@ class WorldMonitorRepository @Inject constructor(
 
     suspend fun ensureBaselineSeeded() = withContext(Dispatchers.IO) {
         val state = dao.getProviderState("wm.infra.baseline")
-        if (state == null || state.itemCount == 0) {
+        if (state == null || state.itemCount == 0 || state.etag != "bundled-v3") {
             val now = System.currentTimeMillis()
             val entities = BaselineReferenceStore.buildBaselineEntities(now, appContext)
             dao.upsertEntities(
@@ -95,7 +95,7 @@ class WorldMonitorRepository @Inject constructor(
                     itemCount = entities.size,
                     latencyMs = 1L,
                     errorMessage = null,
-                    etag = "bundled-v1",
+                    etag = "bundled-v3",
                     lastModified = null,
                     nextAllowedEpochMs = null,
                     consecutiveFailures = 0
@@ -169,6 +169,46 @@ class WorldMonitorRepository @Inject constructor(
         outcome
     }
 
+    suspend fun syncViewportLiveProviders(
+        viewport: WorldViewport,
+        force: Boolean = true
+    ): Int = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        dao.pruneExpiredEntities(now)
+        val storedStates = dao.getAllProviderStates().associateBy { it.providerId }
+        val regionalIds = listOf(
+            "wm.aviation.airplaneslive",
+            "wm.aviation.opensky",
+            "wm.space.iss",
+            "wm.weather.openmeteo",
+            "wm.weather.airquality",
+            "wm.weather.marine",
+            "wm.weather.waves",
+            "wm.weather.forecast72h",
+            "wm.cyber.ripestat",
+            "wm.infra.wikipedia.geo"
+        )
+        val specs = regionalIds.mapNotNull { WorldMonitorProviderRegistry.find(it) }
+            .filter { spec -> storedStates[spec.providerId]?.enabled ?: spec.defaultEnabled }
+
+        val outcomes = coroutineScope {
+            specs.map { spec ->
+                async {
+                    syncSemaphore.withPermit {
+                        val outcome = syncEngine.syncProvider(spec, viewport = viewport, force = force, nowEpochMs = now)
+                        persistOutcome(spec, outcome, now)
+                        outcome
+                    }
+                }
+            }.awaitAll()
+        }
+        val freshEntities = outcomes.flatMap { it.entities }
+        if (freshEntities.isNotEmpty()) {
+            WatchtowerManager.evaluateAndPersist(appContext, dao, freshEntities, notifyUser = false)
+        }
+        outcomes.count { it.status == ProviderSyncStatus.OK }
+    }
+
     suspend fun syncBuildingsAndStreetInfra(viewport: WorldViewport): WorldMonitorSyncEngine.ProviderFetchOutcome =
         withContext(Dispatchers.IO) {
             coroutineScope {
@@ -194,9 +234,6 @@ class WorldMonitorRepository @Inject constructor(
             _buildings3D.value = outcome.buildings3D
         }
         if (outcome.entities.isNotEmpty()) {
-            if (spec.category == WorldIntelCategory.AVIATION && spec.providerId != "wm.aviation.ourairports") {
-                dao.deleteEntitiesForProvider(spec.providerId)
-            }
             dao.upsertEntities(
                 outcome.entities.map { e ->
                     WorldEntityRecord.fromDomain(e, GeoSpatialIndex.encodeGeohash(e.latitude, e.longitude, 4))

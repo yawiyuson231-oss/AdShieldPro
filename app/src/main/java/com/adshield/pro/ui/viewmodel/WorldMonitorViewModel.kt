@@ -67,7 +67,7 @@ enum class WorldMonitorDeckTab(val label: String) {
     SIM_LAB("Sim Lab"),
     TIMELINE("Time & Future"),
     WATCHTOWER("Watchtower"),
-    SOURCES("Sources (39)")
+    SOURCES("Sources (47)")
 }
 
 data class LayerUiState(
@@ -162,6 +162,13 @@ data class WorldMonitorUiState(
     val measureModeEnabled: Boolean = false,
     val measureStart: Pair<Double, Double>? = null,
     val measureEnd: Pair<Double, Double>? = null,
+    val liveAutoSyncEnabled: Boolean = true,
+    val livePulseCount: Int = 0,
+    val lastLiveSyncEpochMs: Long = 0L,
+    val activeCountryIso: String = "PH",
+    val activeCountryName: String = "Philippines",
+    val showCountryDirectory: Boolean = false,
+    val countryFilterQuery: String = "",
     val hasOpenSkyKey: Boolean = false,
     val hasFirmsKey: Boolean = false,
     val hasAisStreamKey: Boolean = false
@@ -190,11 +197,39 @@ class WorldMonitorViewModel @Inject constructor(
     val nativeGlobeCommands: SharedFlow<NativeGlobeCommand> = _nativeGlobeCommands.asSharedFlow()
 
     private var timelinePlayJob: Job? = null
+    private var viewportLiveSyncJob: Job? = null
+    private var lastSyncedCountryIso: String = "PH"
+    private var lastSyncedViewportLat: Double = 14.5995
+    private var lastSyncedViewportLon: Double = 120.9842
 
     init {
         viewModelScope.launch {
             repository.ensureBaselineSeeded()
             syncAllEnabled(force = false)
+        }
+        // Continuous 45-second real-time live telemetry loop (flights, ISS, local country weather/AQI/waves/BGP & global feeds)
+        viewModelScope.launch {
+            while (isActive) {
+                delay(45_000L)
+                val cur = _uiState.value
+                if (!cur.liveAutoSyncEnabled || cur.isSyncing) continue
+                val vp = cur.viewport
+                val okRegional = repository.syncViewportLiveProviders(vp, force = true)
+                repository.syncEnabledProviders(
+                    categories = cur.layerStates.filterValues { it.visible }.keys,
+                    viewport = vp,
+                    force = false,
+                    notifyWatchtower = false
+                )
+                refreshTrailsOnGlobe()
+                val now = System.currentTimeMillis()
+                _uiState.update {
+                    it.copy(
+                        livePulseCount = it.livePulseCount + 1,
+                        lastLiveSyncEpochMs = if (okRegional > 0) now else it.lastLiveSyncEpochMs
+                    )
+                }
+            }
         }
         viewModelScope.launch {
             repository.entitiesFlow.collectLatest { entities ->
@@ -248,7 +283,34 @@ class WorldMonitorViewModel @Inject constructor(
 
     override fun onViewportChanged(viewport: WorldViewport) {
         viewModelScope.launch {
-            _uiState.update { it.copy(viewport = viewport) }
+            val nearest = BaselineReferenceStore.nearestCountry(viewport.centerLat, viewport.centerLon)
+            _uiState.update {
+                it.copy(
+                    viewport = viewport,
+                    activeCountryIso = nearest?.iso2 ?: it.activeCountryIso,
+                    activeCountryName = nearest?.name ?: it.activeCountryName
+                )
+            }
+            val countryChanged = nearest != null && nearest.iso2 != lastSyncedCountryIso
+            val movedDeg = kotlin.math.abs(viewport.centerLat - lastSyncedViewportLat) +
+                kotlin.math.abs(viewport.centerLon - lastSyncedViewportLon)
+            if (_uiState.value.liveAutoSyncEnabled && (countryChanged || movedDeg >= 3.5)) {
+                viewportLiveSyncJob?.cancel()
+                viewportLiveSyncJob = viewModelScope.launch {
+                    delay(1_250L)
+                    lastSyncedCountryIso = nearest?.iso2 ?: lastSyncedCountryIso
+                    lastSyncedViewportLat = viewport.centerLat
+                    lastSyncedViewportLon = viewport.centerLon
+                    val ok = repository.syncViewportLiveProviders(viewport, force = true)
+                    refreshTrailsOnGlobe()
+                    if (ok > 0) {
+                        _uiState.update { s -> s.copy(lastLiveSyncEpochMs = System.currentTimeMillis()) }
+                    }
+                    if (_uiState.value.activeTab == WorldMonitorDeckTab.TWIN) {
+                        refreshDigitalTwin()
+                    }
+                }
+            }
         }
     }
 
@@ -297,6 +359,8 @@ class WorldMonitorViewModel @Inject constructor(
             val country = BaselineReferenceStore.nearestCountry(lat, lon)
             _uiState.update {
                 it.copy(
+                    activeCountryIso = country?.iso2 ?: it.activeCountryIso,
+                    activeCountryName = country?.name ?: it.activeCountryName,
                     clickedLocation = ClickedLocationInfo(
                         latitude = lat,
                         longitude = lon,
@@ -306,6 +370,20 @@ class WorldMonitorViewModel @Inject constructor(
                         population = country?.population
                     )
                 )
+            }
+            // Concurrently stream live regional flights, weather, AQI, waves, BGP & landmarks for the tapped country/sector!
+            launch {
+                val tapVp = WorldViewport(
+                    west = (lon - 8.0).coerceIn(-180.0, 180.0),
+                    south = (lat - 8.0).coerceIn(-85.0, 85.0),
+                    east = (lon + 8.0).coerceIn(-180.0, 180.0),
+                    north = (lat + 8.0).coerceIn(-85.0, 85.0),
+                    centerLat = lat,
+                    centerLon = lon,
+                    cameraAltitudeMeters = _uiState.value.viewport.cameraAltitudeMeters
+                )
+                repository.syncViewportLiveProviders(tapVp, force = true)
+                refreshTrailsOnGlobe()
             }
             val (liveElev, reverseName) = repository.lookupElevationAndPlace(lat, lon)
             _uiState.update { cur ->
@@ -378,7 +456,7 @@ class WorldMonitorViewModel @Inject constructor(
     fun syncAllEnabled(force: Boolean = true) {
         if (_uiState.value.isSyncing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing 39 global & local intelligence feeds…") }
+            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing 47 global & regional live feeds…") }
             val vp = _uiState.value.viewport
             val okCount = repository.syncEnabledProviders(
                 categories = _uiState.value.layerStates.filterValues { it.visible }.keys,
@@ -390,10 +468,89 @@ class WorldMonitorViewModel @Inject constructor(
             if (_uiState.value.radarOverlayEnabled) {
                 pushRadarStateToGlobe(true)
             }
+            val now = System.currentTimeMillis()
             _uiState.update {
                 it.copy(
                     isSyncing = false,
-                    statusBanner = "Synced $okCount live feed(s) · ${_uiState.value.allEntities.size} entities active"
+                    lastLiveSyncEpochMs = now,
+                    livePulseCount = it.livePulseCount + 1,
+                    statusBanner = "LIVE SYNC OK · $okCount feed(s) refreshed · ${_uiState.value.allEntities.size} entities active"
+                )
+            }
+        }
+    }
+
+    fun pulseLiveNow() {
+        _uiState.update {
+            it.copy(
+                liveAutoSyncEnabled = true,
+                futureOffsetHours = 0,
+                timelineWindow = WorldTimelineWindow.ALL_CACHED,
+                timelineProgress = 1.0f
+            )
+        }
+        recomputeDerivedIntelligence(_uiState.value.allEntities)
+        syncAllEnabled(force = true)
+    }
+
+    fun toggleLiveAutoSync() {
+        val next = !_uiState.value.liveAutoSyncEnabled
+        _uiState.update {
+            it.copy(
+                liveAutoSyncEnabled = next,
+                statusBanner = if (next) {
+                    "LIVE Auto-Sync enabled (45s continuous flight, space, weather, seismic & cyber telemetry)"
+                } else {
+                    "LIVE Auto-Sync paused — tap ● LIVE anytime to resume"
+                }
+            )
+        }
+        if (next) pulseLiveNow()
+    }
+
+    fun setShowCountryDirectory(show: Boolean) {
+        _uiState.update { it.copy(showCountryDirectory = show, countryFilterQuery = if (show) it.countryFilterQuery else "") }
+    }
+
+    fun updateCountryFilterQuery(query: String) {
+        _uiState.update { it.copy(countryFilterQuery = query) }
+    }
+
+    fun selectCountry(countryIso: String) {
+        val country = BaselineReferenceStore.countryByIso(countryIso) ?: return
+        val targetVp = WorldViewport(
+            west = (country.lon - 8.0).coerceIn(-180.0, 180.0),
+            south = (country.lat - 8.0).coerceIn(-85.0, 85.0),
+            east = (country.lon + 8.0).coerceIn(-180.0, 180.0),
+            north = (country.lat + 8.0).coerceIn(-85.0, 85.0),
+            centerLat = country.lat,
+            centerLon = country.lon,
+            cameraAltitudeMeters = 680_000L
+        )
+        lastSyncedCountryIso = country.iso2
+        lastSyncedViewportLat = country.lat
+        lastSyncedViewportLon = country.lon
+        _uiState.update {
+            it.copy(
+                activeCountryIso = country.iso2,
+                activeCountryName = country.name,
+                showCountryDirectory = false,
+                countryFilterQuery = "",
+                viewport = targetVp,
+                statusBanner = "Flying to ${country.name} (${country.capital}) · Syncing live airspace, weather, AQI & BGP…"
+            )
+        }
+        flyTo(country.lat, country.lon, altitudeMeters = 680_000.0, pitchDeg = -54.0)
+        viewModelScope.launch {
+            val ok = repository.syncViewportLiveProviders(targetVp, force = true)
+            refreshTrailsOnGlobe()
+            if (_uiState.value.activeTab == WorldMonitorDeckTab.TWIN) {
+                refreshDigitalTwin()
+            }
+            _uiState.update { s ->
+                s.copy(
+                    lastLiveSyncEpochMs = System.currentTimeMillis(),
+                    statusBanner = "${country.name} (${country.iso2}) LIVE · $ok local feed(s) synced around ${country.capital}"
                 )
             }
         }
@@ -739,16 +896,38 @@ class WorldMonitorViewModel @Inject constructor(
             val results = repository.searchLocations(q)
             _uiState.update { it.copy(isSearching = false, searchResults = results) }
             results.firstOrNull()?.let { top ->
-                val alt = (top.boundingBoxKm * 1_450.0).coerceIn(2_400.0, 2_800_000.0)
-                flyTo(top.latitude, top.longitude, alt, -54.0)
+                selectSearchResult(top)
             }
         }
     }
 
     fun selectSearchResult(result: GeocodeSearchResult) {
-        _uiState.update { it.copy(searchResults = emptyList(), searchQuery = result.displayName) }
+        val nearest = BaselineReferenceStore.countryByIso(result.countryCode)
+            ?: BaselineReferenceStore.nearestCountry(result.latitude, result.longitude)
         val alt = (result.boundingBoxKm * 1_450.0).coerceIn(2_400.0, 2_800_000.0)
+        val targetVp = WorldViewport(
+            west = (result.longitude - 8.0).coerceIn(-180.0, 180.0),
+            south = (result.latitude - 8.0).coerceIn(-85.0, 85.0),
+            east = (result.longitude + 8.0).coerceIn(-180.0, 180.0),
+            north = (result.latitude + 8.0).coerceIn(-85.0, 85.0),
+            centerLat = result.latitude,
+            centerLon = result.longitude,
+            cameraAltitudeMeters = alt.toLong()
+        )
+        _uiState.update {
+            it.copy(
+                searchResults = emptyList(),
+                searchQuery = result.displayName,
+                viewport = targetVp,
+                activeCountryIso = nearest?.iso2 ?: it.activeCountryIso,
+                activeCountryName = nearest?.name ?: it.activeCountryName
+            )
+        }
         flyTo(result.latitude, result.longitude, alt, -54.0)
+        viewModelScope.launch {
+            repository.syncViewportLiveProviders(targetVp, force = true)
+            refreshTrailsOnGlobe()
+        }
     }
 
     // ── Digital Twin, AI Analyst, Simulation Lab, Timeline, Watchtower ───────
@@ -973,9 +1152,22 @@ class WorldMonitorViewModel @Inject constructor(
                 val cfg = state.layerStates[e.category]
                 val catOk = cfg?.visible != false
                 val sevOk = e.severity.rank >= state.minSeverityFilter.rank
-                val timeOk = e.freshness == FreshnessClass.HISTORICAL ||
-                    e.freshness == FreshnessClass.ESTIMATED ||
-                    (e.eventTimeEpochMs in cutoffStart..cutoffEnd)
+                val timeOk = when (state.timelineWindow) {
+                    WorldTimelineWindow.ALL_CACHED -> true
+                    WorldTimelineWindow.LIVE_1H -> {
+                        e.freshness == FreshnessClass.LIVE ||
+                            e.freshness == FreshnessClass.NEAR_REAL_TIME ||
+                            e.freshness == FreshnessClass.HISTORICAL ||
+                            e.freshness == FreshnessClass.ESTIMATED ||
+                            e.retrievedAtEpochMs >= now - 6 * 3_600_000L ||
+                            e.eventTimeEpochMs >= cutoffStart
+                    }
+                    else -> {
+                        e.freshness == FreshnessClass.HISTORICAL ||
+                            e.freshness == FreshnessClass.ESTIMATED ||
+                            (e.eventTimeEpochMs in cutoffStart..(cutoffEnd + 72 * 3_600_000L))
+                    }
+                }
                 catOk && sevOk && timeOk
             }
 

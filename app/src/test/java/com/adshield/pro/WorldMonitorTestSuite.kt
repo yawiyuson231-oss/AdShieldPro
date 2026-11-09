@@ -658,4 +658,100 @@ class WorldMonitorTestSuite {
         assertEquals(1, wikiEnts.size)
         assertEquals("Rizal Park", wikiEnts.first().title)
     }
+
+    @Test
+    fun testGlobal234CountriesAndLiveFeedsEndToEnd() {
+        // 1. Verify expanded 234-country planetary baseline catalog
+        val catalog = BaselineReferenceStore.load()
+        assertTrue("Expected >= 230 countries & territories, got ${catalog.countries.size}", catalog.countries.size >= 230)
+        assertTrue("Expected >= 65 international airports, got ${catalog.airports.size}", catalog.airports.size >= 65)
+        assertTrue("Expected >= 45 global seaports, got ${catalog.seaports.size}", catalog.seaports.size >= 45)
+        assertEquals("PH", catalog.countries.first().iso2)
+
+        for (iso in listOf("PH", "US", "JP", "IS", "GL", "BR", "NG", "KE", "FJ", "UA", "AQ", "SG", "AU", "DE")) {
+            assertNotNull("Expected country $iso in BaselineReferenceStore", BaselineReferenceStore.countryByIso(iso))
+        }
+        assertTrue("Offline search for Reykjavik must succeed", BaselineReferenceStore.searchOffline("Reykjavik").isNotEmpty())
+        assertTrue("Offline search for Nuuk must succeed", BaselineReferenceStore.searchOffline("Nuuk").isNotEmpty())
+        assertTrue("Offline search for Clark CRK must succeed", BaselineReferenceStore.searchOffline("CRK").isNotEmpty())
+        assertEquals("IS", BaselineReferenceStore.nearestCountry(64.1466, -21.9426)?.iso2)
+
+        // 2. Verify 47 providers & zero retired HTTP 410 URLs
+        val providers = WorldMonitorProviderRegistry.providers
+        assertEquals(47, providers.size)
+        providers.forEach { p ->
+            assertFalse("Retired ReliefWeb v1 URL must not appear", p.endpoint.contains("api.reliefweb.int/v1"))
+            assertFalse("Retired URLhaus CSV URL must not appear", p.endpoint.contains("urlhaus.abuse.ch/downloads/csv_recent"))
+        }
+
+        // 3. Verify GDACS 24h XML RSS parsing in reliefweb-disasters normalizer
+        val gdacsRss = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <rss version="2.0" xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#" xmlns:gdacs="http://www.gdacs.org">
+              <channel>
+                <item>
+                  <title>Red earthquake alert (Magnitude 6.9M) in Japan</title>
+                  <description>Earthquake of magnitude 6.9M in Honshu, Japan.</description>
+                  <link>https://www.gdacs.org/report.aspx?eventtype=EQ&amp;eventid=1999999</link>
+                  <geo:lat>38.297</geo:lat>
+                  <geo:long>142.373</geo:long>
+                  <gdacs:alertlevel>Red</gdacs:alertlevel>
+                  <gdacs:country>Japan</gdacs:country>
+                </item>
+              </channel>
+            </rss>
+        """.trimIndent()
+        val gdacsEnts = WorldMonitorNormalizers.normalize(spec("wm.disaster.reliefweb"), gdacsRss, fixedNowMs)
+        assertEquals(1, gdacsEnts.size)
+        assertEquals(WorldSeverity.CRITICAL, gdacsEnts.first().severity)
+        assertEquals("JP", gdacsEnts.first().countryCode)
+
+        // 4. Verify abuse.ch SSLBL live IPv4/CSV blacklist parsing in urlhaus-csv normalizer
+        val sslblRaw = """
+            # SSLBL Botnet C2 IP Blacklist
+            2026-11-08 11:00:00,198.51.100.42,443
+            203.0.113.77
+        """.trimIndent()
+        val sslblEnts = WorldMonitorNormalizers.normalize(spec("wm.cyber.urlhaus"), sslblRaw, fixedNowMs)
+        assertEquals(2, sslblEnts.size)
+        assertEquals(WorldIntelCategory.CYBER, sslblEnts.first().category)
+
+        // 5. Verify OpenPhish live phishing feed geolocation
+        val phishRaw = """
+            https://secure-login-verify.jp/account
+            https://update-token-portal.br/auth
+        """.trimIndent()
+        val phishEnts = WorldMonitorNormalizers.normalize(spec("wm.cyber.openphish"), phishRaw, fixedNowMs)
+        assertEquals(2, phishEnts.size)
+        assertEquals("JP", phishEnts[0].countryCode)
+        assertEquals("BR", phishEnts[1].countryCode)
+
+        // 6. Verify dynamic {country} RIPEstat BGP posture for Japan & Iceland
+        val ripeJpRaw = """{"data":{"query_parameters":{"resource":"JP"},"resources":{"asn":["2497","2516","4713"],"ipv4":["1.0.16.0/20"],"ipv6":["2001:200::/32"]}}}"""
+        val ripeJp = WorldMonitorNormalizers.normalize(spec("wm.cyber.ripestat"), ripeJpRaw, fixedNowMs, 35.6762, 139.6503)
+        assertEquals(1, ripeJp.size)
+        assertEquals("JP", ripeJp.first().countryCode)
+        assertTrue(ripeJp.first().title.contains("Japan"))
+
+        // 7. Verify batched multi-capital Open-Meteo JsonArray parsing
+        val batchWeatherRaw = """
+            [
+              {"latitude":14.60,"longitude":120.98,"current":{"temperature_2m":30.8,"precipitation":0.2,"wind_speed_10m":18.0,"wind_direction_10m":90,"surface_pressure":1009.0,"cloud_cover":40,"weather_code":1}},
+              {"latitude":64.15,"longitude":-21.94,"current":{"temperature_2m":2.4,"precipitation":1.1,"wind_speed_10m":34.0,"wind_direction_10m":210,"surface_pressure":994.0,"cloud_cover":88,"weather_code":61}}
+            ]
+        """.trimIndent()
+        val batchWx = WorldMonitorNormalizers.normalize(spec("wm.weather.global.capitals"), batchWeatherRaw, fixedNowMs)
+        assertEquals(2, batchWx.size)
+
+        // 8. Verify BBC World News RSS does not collide with UN News RSS
+        val bbcRss = """
+            <rss version="2.0"><channel>
+              <item><title>Iceland volcanic fissure monitored near Grindavik</title><description>Scientists in Iceland monitor seismic swarm.</description><link>https://www.bbc.com/news/world-europe-1001</link></item>
+            </channel></rss>
+        """.trimIndent()
+        val bbcEnts = WorldMonitorNormalizers.normalize(spec("wm.news.bbc.world"), bbcRss, fixedNowMs)
+        assertEquals(1, bbcEnts.size)
+        assertTrue(bbcEnts.first().id.startsWith("news:bbc:"))
+        assertEquals("IS", bbcEnts.first().countryCode)
+    }
 }
