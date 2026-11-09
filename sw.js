@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.1';
+const VERSION = 'omnishield-x-v5.0.1-aura';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RULES_CACHE = `${VERSION}-rules`;
 
@@ -38,6 +38,10 @@ const SHELL_ASSETS = [
   './aether/typosquat.js',
   './aether/reputation.js',
   './aether/classifier.js',
+  './aura/knowledge.js',
+  './aura/release.js',
+  './aura/assistant.js',
+  './aura/view.js',
   './security/monitor.js',
   './security/firewall-ai.js',
   './security/feedmanager.js',

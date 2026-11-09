@@ -22,6 +22,8 @@ import { BackupManager, SCHEMA_VERSION } from './security/backup.js';
 import { PrivateAnalytics } from './security/privacy.js';
 import { PowerGovernor } from './security/power.js';
 import { createStorage } from './security/storage.js';
+import { AuraAssistant } from './aura/assistant.js';
+import { createAuraView } from './aura/view.js';
 import * as ui from './ui/dom.js';
 import { h, mount, pill, note, empty, kpi, table, kv, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy } from './ui/dom.js';
 
@@ -54,7 +56,9 @@ const state = {
   bundled: {},
   snapshotTimer: null,
   lastSnapshotId: null,
-  currentPage: 'dashboard'
+  currentPage: 'dashboard',
+  aura: null,
+  auraView: null
 };
 
 /* ------------------------------------------------------------------ */
@@ -327,6 +331,7 @@ async function ensureModel(force = false) {
 
 const PAGE_RENDERERS = {
   dashboard: renderDashboard,
+  aura: renderAura,
   aether: renderAether,
   dns: renderDns,
   firewall: renderFirewall,
@@ -350,6 +355,8 @@ function navigate(page) {
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
+  const fab = document.getElementById('aura-fab');
+  if (fab) fab.hidden = page === 'aura';
   const section = document.getElementById(`page-${page}`);
   if (section) {
     section.setAttribute('aria-current', 'true');
@@ -382,6 +389,40 @@ function renderAll() {
 document.querySelectorAll('nav.tabs button').forEach((button) => {
   button.addEventListener('click', () => navigate(button.dataset.page));
 });
+
+/* ------------------------------------------------------------------ */
+/* Aura AI Assistant                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Aura is a separate surface: its UI lives in `aura/view.js` and its matcher in
+ * `aura/assistant.js`. The controller only owns the instance (so a conversation
+ * survives navigation) and the two jump controls in the introduction.
+ */
+function renderAura() {
+  if (!state.aura) state.aura = new AuraAssistant();
+  if (!state.auraView) {
+    state.auraView = createAuraView({ assistant: state.aura, onNavigate: navigate });
+  }
+  state.auraView.render();
+
+  const jumpChat = document.getElementById('aura-jump-chat');
+  if (jumpChat && !jumpChat.dataset.wired) {
+    jumpChat.dataset.wired = '1';
+    jumpChat.addEventListener('click', () => {
+      document.getElementById('aura-input')?.focus();
+      document.getElementById('aura-chat')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    });
+  }
+
+  const jumpDownload = document.getElementById('aura-jump-download');
+  if (jumpDownload && !jumpDownload.dataset.wired) {
+    jumpDownload.dataset.wired = '1';
+    jumpDownload.addEventListener('click', () => {
+      document.getElementById('aura-download')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    });
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* Dashboard                                                           */
@@ -1585,6 +1626,9 @@ function wireEvents() {
     const file = event.target.files?.[0];
     if (file) importFirewallLog(file);
   });
+
+  const auraFab = document.getElementById('aura-fab');
+  if (auraFab) auraFab.addEventListener('click', () => navigate('aura'));
 
   document.getElementById('feeds-check').addEventListener('click', checkFeedUpdates);
   document.getElementById('feeds-verify').addEventListener('click', verifyFeeds);

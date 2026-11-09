@@ -19,6 +19,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, relative } from 'node:path';
 import { inspect as inspectExtension, MAX_STATIC_RULES } from './build-extension.mjs';
 import { lint as lintRuntime } from './lint.mjs';
+import { AURA_RELEASE, isAllowedDownloadUrl } from '../aura/release.js';
+import { AURA_TOPICS, AURA_LIMITS, AURA_PILLARS } from '../aura/knowledge.js';
+import { AuraAssistant, CONFIDENCE_FLOOR } from '../aura/assistant.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const abs = (p) => resolve(ROOT, p);
@@ -37,6 +40,7 @@ const MODULE_FILES = [
   'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
+  'aura/knowledge.js', 'aura/release.js', 'aura/assistant.js', 'aura/view.js',
   'security/monitor.js', 'security/firewall-ai.js', 'security/feedmanager.js',
   'security/backup.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js'
 ];
@@ -162,9 +166,11 @@ export function verify() {
   add('boot status is an aria-live region', /id="boot-status"[^>]*role="status"/.test(htmlA11y));
   add('toast container is aria-live', /id="toasts"[^>]*aria-live="polite"/.test(htmlA11y));
   add('navigation landmark is labelled', /<nav[^>]*aria-label="[^"]+"/.test(htmlA11y));
+  const pageSections = (htmlA11y.match(/<section class="page"/g) || []).length;
+  const namedSections = (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length;
   add('every page section has an accessible name',
-    (htmlA11y.match(/<section class="page"[^>]*aria-label="[^"]+"/g) || []).length === 10,
-    `${(htmlA11y.match(/<section class="page"[^>]*aria-label=/g) || []).length} of 10`);
+    pageSections >= 10 && namedSections === pageSections,
+    `${namedSections} of ${pageSections}`);
   add('a skip link targets the main landmark',
     /class="skip-link" href="#main"/.test(htmlA11y) && /<main id="main"/.test(htmlA11y));
 
@@ -230,6 +236,50 @@ export function verify() {
     /APP_DIRS/.test(read('scripts/stage-site.mjs')) && /app'/.test(read('scripts/stage-site.mjs')));
   add('the assembler verifies every service-worker precache target',
     /checkPrecache/.test(read('scripts/stage-site.mjs')) && /is not self-sufficient/.test(read('scripts/stage-site.mjs')));
+
+  /* 9g. Aura AI Assistant: a real surface, an honest download, no network. */
+  add('Aura has a navigation target and a labelled section',
+    /data-page="aura"/.test(html) && /<section class="page" id="page-aura" aria-label="Aura AI Assistant"/.test(html));
+  add('Aura introduction, conversation and download surfaces are all present',
+    ['aura-hero', 'aura-chat', 'aura-log', 'aura-download', 'aura-topics']
+      .every((id) => new RegExp(`id="${id}"|class="card[^"]*${id}`).test(html)));
+  add('Aura is reachable in one click from every page',
+    /id="aura-fab"[^>]*aria-label="[^"]+"/.test(html) && /aura-fab/.test(appSource));
+
+  const auraSources = ['aura/knowledge.js', 'aura/release.js', 'aura/assistant.js', 'aura/view.js']
+    .filter(exists).map(read).join('\n');
+  add('Aura runtime makes no network calls and does not read the clipboard',
+    !/\bfetch\s*\(|XMLHttpRequest|WebSocket|sendBeacon|clipboard\.read/.test(auraSources));
+
+  add('Aura download URL is https on an allowlisted host',
+    isAllowedDownloadUrl(AURA_RELEASE.pageUrl), AURA_RELEASE.pageUrl);
+  add('Aura release file name encodes the advertised version',
+    AURA_RELEASE.fileName === `aura-${AURA_RELEASE.version}.apk`,
+    `${AURA_RELEASE.fileName} vs v${AURA_RELEASE.version}`);
+  add('Aura does not fabricate an integrity value it cannot verify',
+    AURA_RELEASE.sha256 === null && !/[0-9a-f]{64}/i.test(read('aura/release.js')),
+    AURA_RELEASE.sha256 ? 'published hash present' : 'no published hash — stated honestly');
+
+  const topicIds = AURA_TOPICS.map((topic) => topic.id);
+  add('Aura knowledge entries have unique ids', new Set(topicIds).size === topicIds.length,
+    `${topicIds.length} entries`);
+  add('every Aura entry is answerable (answer, keywords and phrases)',
+    AURA_TOPICS.every((topic) => topic.answer?.length >= 1 && topic.keywords?.length >= 3 && topic.phrases?.length >= 1),
+    AURA_TOPICS.filter((t) => !(t.answer?.length >= 1 && t.keywords?.length >= 3 && t.phrases?.length >= 1))
+      .map((t) => t.id).join(', '));
+  add('Aura introduction states its own limits', AURA_LIMITS.length >= 3 && AURA_PILLARS.length >= 3);
+
+  const probe = new AuraAssistant();
+  const downloadReply = probe.reply('Where do I download the APK?');
+  add('Aura answers a download question from the release manifest',
+    downloadReply.topicId === 'download' && downloadReply.confidence >= CONFIDENCE_FLOOR,
+    `${downloadReply.topicId} @ ${downloadReply.confidence}`);
+  const privacyReply = probe.reply('Does my chat leave this device?');
+  add('Aura answers privacy questions with the privacy entry', privacyReply.topicId === 'privacy',
+    String(privacyReply.topicId));
+  const offTopic = probe.reply('what is the capital of France');
+  add('Aura declines off-topic questions instead of improvising',
+    offTopic.kind === 'fallback' && offTopic.confidence === 0, `${offTopic.kind} @ ${offTopic.confidence}`);
 
   /* 10. Package scripts point at real test globs. */
   const pkg = JSON.parse(read('package.json'));
