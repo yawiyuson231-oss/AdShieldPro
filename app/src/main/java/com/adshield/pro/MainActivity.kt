@@ -8,6 +8,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.service.quicksettings.TileService
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -76,6 +78,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceAction
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
@@ -88,6 +91,7 @@ import com.adshield.pro.ui.screens.HomeScreen
 import com.adshield.pro.ui.screens.intelligence.IntelligenceMapScreen
 import com.adshield.pro.ui.screens.LiveNetworkScreen
 import com.adshield.pro.ui.screens.OptimizerScreen
+import com.adshield.pro.ui.screens.QuickSettingsTilesScreen
 import com.adshield.pro.ui.screens.SecurityScreen
 import com.adshield.pro.ui.screens.SettingsScreen
 import com.adshield.pro.ui.theme.AdShieldProTheme
@@ -124,13 +128,29 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val quickTilesLaunchTrigger = mutableIntStateOf(if (isQuickTilesIntent(intent)) 1 else 0)
+        addOnNewIntentListener { newIntent ->
+            if (isQuickTilesIntent(newIntent)) {
+                setIntent(newIntent)
+                quickTilesLaunchTrigger.intValue += 1
+            }
+        }
         setContent {
             val viewModel: AdShieldViewModel = hiltViewModel()
             val settings by viewModel.settingsState.collectAsStateWithLifecycle()
             AdShieldProTheme(themePreference = settings.darkThemeMode) {
-                AdShieldMainApp(viewModel = viewModel)
+                AdShieldMainApp(
+                    viewModel = viewModel,
+                    openQuickTilesTrigger = quickTilesLaunchTrigger.intValue
+                )
             }
         }
+    }
+
+    private fun isQuickTilesIntent(launchIntent: Intent?): Boolean {
+        val action = launchIntent?.action ?: return false
+        return action == TileService.ACTION_QS_TILE_PREFERENCES ||
+            action == SystemPreferencesController.ACTION_OPEN_QUICK_TILES
     }
 }
 
@@ -139,10 +159,15 @@ class MainActivity : ComponentActivity() {
  * renders, so a DNS tick on Home does not recompose Battery/Settings/Optimizer state holders.
  */
 @Composable
-fun AdShieldMainApp(viewModel: AdShieldViewModel) {
+fun AdShieldMainApp(
+    viewModel: AdShieldViewModel,
+    openQuickTilesTrigger: Int = 0
+) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
+    var showQuickTilesScreen by rememberSaveable { mutableStateOf(false) }
+    var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
     val connectorViewModel: ConnectorViewModel = hiltViewModel()
@@ -150,8 +175,22 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val uiFeedback by viewModel.uiFeedbackMessage.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = showAboutScreen || connectorsOpen) {
-        if (connectorsOpen) connectorsOpen = false else showAboutScreen = false
+    LaunchedEffect(openQuickTilesTrigger) {
+        if (openQuickTilesTrigger > handledQuickTilesTrigger) {
+            handledQuickTilesTrigger = openQuickTilesTrigger
+            connectorsOpen = false
+            showAboutScreen = false
+            currentTab = MainNavDestination.SETTINGS
+            showQuickTilesScreen = true
+        }
+    }
+
+    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || connectorsOpen) {
+        when {
+            connectorsOpen -> connectorsOpen = false
+            showQuickTilesScreen -> showQuickTilesScreen = false
+            else -> showAboutScreen = false
+        }
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -242,7 +281,7 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen && !connectorsOpen) {
+            if (!showAboutScreen && !showQuickTilesScreen && !connectorsOpen) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -284,7 +323,10 @@ fun AdShieldMainApp(viewModel: AdShieldViewModel) {
                     viewModel = viewModel,
                     showAboutScreen = showAboutScreen,
                     onOpenAbout = { showAboutScreen = true },
-                    onCloseAbout = { showAboutScreen = false }
+                    onCloseAbout = { showAboutScreen = false },
+                    showQuickTilesScreen = showQuickTilesScreen,
+                    onOpenQuickTiles = { showQuickTilesScreen = true },
+                    onCloseQuickTiles = { showQuickTilesScreen = false }
                 )
                 MainNavDestination.STATUS -> StatusDestination(viewModel)
             }
@@ -810,9 +852,40 @@ private fun SettingsDestination(
     viewModel: AdShieldViewModel,
     showAboutScreen: Boolean,
     onOpenAbout: () -> Unit,
-    onCloseAbout: () -> Unit
+    onCloseAbout: () -> Unit,
+    showQuickTilesScreen: Boolean,
+    onOpenQuickTiles: () -> Unit,
+    onCloseQuickTiles: () -> Unit
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+    if (showQuickTilesScreen) {
+        val systemTilesStatus by viewModel.systemTilesStatus.collectAsStateWithLifecycle()
+        QuickSettingsTilesScreen(
+            onBack = onCloseQuickTiles,
+            status = systemTilesStatus,
+            dnsConfig = settings.privateDnsTileConfig,
+            usbConfig = settings.usbDebuggingTileConfig,
+            onRefreshStatus = viewModel::refreshSystemTilesStatus,
+            onApplyPrivateDnsStep = viewModel::applyPrivateDnsStep,
+            onCyclePrivateDnsNow = viewModel::cyclePrivateDnsNow,
+            onSetPrivateDnsIncludeOff = viewModel::setPrivateDnsIncludeOff,
+            onSetPrivateDnsIncludeAuto = viewModel::setPrivateDnsIncludeAuto,
+            onSetPrivateDnsHostnameEnabled = viewModel::setPrivateDnsHostnameEnabled,
+            onMovePrivateDnsHostname = viewModel::movePrivateDnsHostname,
+            onAddPrivateDnsHostname = viewModel::addPrivateDnsCustomHostname,
+            onRemovePrivateDnsHostname = viewModel::removePrivateDnsHostname,
+            onSetPrivateDnsRequireUnlock = viewModel::setPrivateDnsRequireUnlock,
+            onSetPrivateDnsAutoRevert = viewModel::setPrivateDnsAutoRevert,
+            onCancelPrivateDnsAutoRevert = viewModel::cancelPrivateDnsAutoRevert,
+            onSetUsbDebuggingEnabled = viewModel::setUsbDebuggingEnabled,
+            onSetUsbDebuggingAutoRevert = viewModel::setUsbDebuggingAutoRevert,
+            onArmUsbDebuggingAutoRevertNow = viewModel::armUsbDebuggingAutoRevertNow,
+            onCancelUsbDebuggingAutoRevert = viewModel::cancelUsbDebuggingAutoRevert,
+            onSetUsbDebuggingRequireUnlock = viewModel::setUsbDebuggingRequireUnlock,
+            onFeedback = viewModel::notifyQuickTileFeedback
+        )
+        return
+    }
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
     val dnsDiagnosticReport by viewModel.dnsDiagnosticReport.collectAsStateWithLifecycle()
     val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
@@ -821,6 +894,7 @@ private fun SettingsDestination(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
         onCloseAbout = onCloseAbout,
+        onOpenQuickTiles = onOpenQuickTiles,
         settings = settings,
         installedApps = installedApps,
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,

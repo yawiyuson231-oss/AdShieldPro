@@ -900,6 +900,37 @@ object CapabilityRegistry {
                 "The UI draws at most 8 nodes, 7 connectors, 7 markers and 12 concurrent pulses; pulses are pruned when expired"
             ),
             "IntelligenceMapTestSuite.testAggregatorPerformanceBudget"
+        ),
+        cap(
+            "qs-tile-private-dns", "Quick Settings tile for Private DNS (Off, Auto, Hostnames)",
+            CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "service/PrivateDnsTileService.kt",
+            listOf("android.permission.WRITE_SECURE_SETTINGS", "android.permission.BIND_QUICK_SETTINGS_TILE"),
+            listOf(
+                "Settings.Global private_dns_mode and private_dns_specifier read-back",
+                "User-configured cycle steps and custom DNS-over-TLS hostnames in DataStore"
+            ),
+            listOf(
+                "Requires a one-time ADB grant of WRITE_SECURE_SETTINGS; without it the tile opens setup instead of writing",
+                "Some OEM or managed enterprise builds reject Settings.Global writes; read-back verification detects and reports rejections",
+                "Optional auto-revert relies on WorkManager and inexact AlarmManager so OS battery optimization can delay execution slightly"
+            ),
+            "SystemTilesTestSuite.testPrivateDnsCycleAdvancesAndWrapsCorrectly and SystemTilesTestSuite.testPrivateDnsAutoRevertPreservesOriginalTargetAcrossMultipleTapsAndCancelsOnReturn"
+        ),
+        cap(
+            "qs-tile-usb-debugging", "Quick Settings tile for USB Debugging with optional auto-revert",
+            CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "service/UsbDebuggingTileService.kt",
+            listOf("android.permission.WRITE_SECURE_SETTINGS", "android.permission.BIND_QUICK_SETTINGS_TILE"),
+            listOf(
+                "Settings.Global.ADB_ENABLED and Settings.Global.DEVELOPMENT_SETTINGS_ENABLED read-back",
+                "User-configured auto-revert delay and lock-screen guard in DataStore"
+            ),
+            listOf(
+                "Requires a one-time ADB grant of WRITE_SECURE_SETTINGS and Developer Options to be enabled on Android",
+                "Requires device unlock to toggle by default; auto-revert timing via WorkManager and setAndAllowWhileIdle is approximate"
+            ),
+            "SystemTilesTestSuite.testUsbDebuggingAutoRevertArmsOnEnableAndClearsOnDisable and SystemTilesTestSuite.testTilePresentationsReflectPermissionAndRealSystemState"
         )
     )
 
