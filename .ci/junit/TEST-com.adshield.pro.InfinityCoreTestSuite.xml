@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.InfinityCoreTestSuite" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-09T09:44:46.335Z" hostname="runnervmwuk1x" time="0.043">
+  <properties/>
+  <testcase name="testWebDavPaths_rejectTraversalAndBuildSafeChildren" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testWebDavXml_parsesRealMultistatusEntriesAndQuota" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.028"/>
+  <testcase name="testAetherReportExplainer_usesOnlyRecordedEvidenceAndCannotAuthorizeDeletion" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
+  <testcase name="testStorageEndpoints_requireHttpsAndRejectEmbeddedCredentials" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testDirectMediaInput_enforcesHttpsAndSafeFileNames" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testCapacityAggregation_sumsMultipleVerifiedServersWithoutAssumedCapacity" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.001"/>
+  <testcase name="testPrivateSearch_selectsProviderAndUpgradesCleartextNavigation" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
+  <testcase name="testAetherReportExplainer_emptyHistoryDoesNotInventThreats" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.0"/>
+  <testcase name="testCapacityAggregation_countsOnlyOnlineProvidersWithMeasuredQuota" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.0"/>
+  <testcase name="testWebDavXml_parsesOnlyHttpsNextcloudShareLinks" classname="com.adshield.pro.InfinityCoreTestSuite" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
