@@ -484,13 +484,13 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
 @Composable
 private fun LiveDestination(
     viewModel: AdShieldViewModel,
-    onToggleProtection: () -> Unit,
+    onToggleProtection: (Boolean) -> Unit,
     onOpenWorldMonitor: () -> Unit
 ) {
     val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
     LiveNetworkScreen(
         snapshot = liveNetwork,
-        onToggleProtection = onToggleProtection,
+        onToggleProtection = { onToggleProtection(!liveNetwork.vpnConnected) },
         onOpenWorldMonitor = onOpenWorldMonitor
     )
 }

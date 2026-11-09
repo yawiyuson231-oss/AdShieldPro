@@ -1428,7 +1428,8 @@ private fun WorldCountryDirectoryModal(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val countries = remember { BaselineReferenceStore.load().countries }
+    val context = LocalContext.current
+    val countries = remember(context) { BaselineReferenceStore.load(context.applicationContext).countries }
     val q = uiState.countryFilterQuery.trim()
     val filtered = remember(countries, q) {
         if (q.isEmpty()) {

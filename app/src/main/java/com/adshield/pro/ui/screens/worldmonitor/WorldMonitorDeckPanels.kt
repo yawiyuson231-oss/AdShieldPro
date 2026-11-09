@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -427,7 +429,8 @@ private fun DigitalTwinPanel(
     viewModel: WorldMonitorViewModel
 ) {
     val twin = uiState.digitalTwin
-    val countries = remember { BaselineReferenceStore.load().countries }
+    val context = LocalContext.current
+    val countries = remember(context) { BaselineReferenceStore.load(context.applicationContext).countries }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

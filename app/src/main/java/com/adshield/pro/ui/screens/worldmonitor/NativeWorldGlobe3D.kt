@@ -40,6 +40,7 @@ import com.adshield.pro.domain.worldmonitor.WorldEntity
 import com.adshield.pro.domain.worldmonitor.WorldIntelCategory
 import com.adshield.pro.domain.worldmonitor.WorldSeverity
 import com.adshield.pro.domain.worldmonitor.WorldViewport
+import com.adshield.pro.engine.worldmonitor.BaselineReferenceStore
 import com.adshield.pro.engine.worldmonitor.OrbitalAndGlobeMath
 import com.adshield.pro.ui.viewmodel.NativeGlobeCommand
 import com.adshield.pro.ui.viewmodel.WorldMonitorUiState
@@ -318,7 +319,7 @@ fun NativeWorldGlobe3D(
         viewModel.onGlobeReady(true, "Native-3D-GPU-2.0")
     }
 
-    val sovereignCountries = remember { BaselineReferenceStore.load().countries }
+    val sovereignCountries = remember(context) { BaselineReferenceStore.load(context.applicationContext).countries }
 
     // Parse TLE orbital catalog whenever entities update
     val parsedSatellites = remember(uiState.filteredEntities) {
