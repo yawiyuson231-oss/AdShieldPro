@@ -285,7 +285,7 @@ class SystemTilesTestSuite {
             nowEpochMs = now
         )
         assertEquals(TileVisualState.INACTIVE, dnsNeedsSetup.state)
-        assertEquals("Tap to set up", dnsNeedsSetup.subtitle)
+        assertEquals("Tap for setup", dnsNeedsSetup.subtitle)
 
         val dnsHostActive = SystemTileEngine.presentPrivateDnsTile(
             PrivateDnsSystemState(PrivateDnsMode.HOSTNAME, "dns.adguard-dns.com", readable = true),
@@ -313,5 +313,40 @@ class SystemTilesTestSuite {
         )
         assertEquals(TileVisualState.ACTIVE, usbArmed.state)
         assertEquals("On · 15m", usbArmed.subtitle)
+    }
+
+    @Test
+    fun testQuickSetupCommandFormattingAndChecklistEvaluation() {
+        assertEquals(
+            "adb shell pm grant com.adshield.pro.debug android.permission.WRITE_SECURE_SETTINGS",
+            SystemTileEngine.buildAdbGrantCommand(" com.adshield.pro.debug ")
+        )
+        assertEquals(
+            "pm grant com.adshield.pro android.permission.WRITE_SECURE_SETTINGS",
+            SystemTileEngine.buildLocalShellGrantCommand("com.adshield.pro")
+        )
+
+        val pendingWithRoot = SystemTileEngine.evaluateQuickSetupChecklist(
+            hasPermission = false,
+            developerOptionsEnabled = false,
+            hasSuBinary = true,
+            isShizukuInstalled = true
+        )
+        assertFalse(pendingWithRoot.developerOptionsReady)
+        assertFalse(pendingWithRoot.permissionGranted)
+        assertFalse(pendingWithRoot.tilesReadyToUse)
+        assertTrue(pendingWithRoot.rootQuickGrantAvailable)
+        assertTrue(pendingWithRoot.shizukuDetected)
+
+        val ready = SystemTileEngine.evaluateQuickSetupChecklist(
+            hasPermission = true,
+            developerOptionsEnabled = false,
+            hasSuBinary = true,
+            isShizukuInstalled = false
+        )
+        assertTrue(ready.developerOptionsReady)
+        assertTrue(ready.permissionGranted)
+        assertTrue(ready.tilesReadyToUse)
+        assertFalse(ready.rootQuickGrantAvailable)
     }
 }

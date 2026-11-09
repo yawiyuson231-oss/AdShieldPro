@@ -911,11 +911,11 @@ object CapabilityRegistry {
                 "User-configured cycle steps and custom DNS-over-TLS hostnames in DataStore"
             ),
             listOf(
-                "Requires a one-time ADB grant of WRITE_SECURE_SETTINGS; without it the tile opens setup instead of writing",
+                "Requires a one-time grant of WRITE_SECURE_SETTINGS via Wireless/USB ADB, Shizuku/LADB shell, or optional root; without it the tile opens quick setup",
                 "Some OEM or managed enterprise builds reject Settings.Global writes; read-back verification detects and reports rejections",
                 "Optional auto-revert relies on WorkManager and inexact AlarmManager so OS battery optimization can delay execution slightly"
             ),
-            "SystemTilesTestSuite.testPrivateDnsCycleAdvancesAndWrapsCorrectly and SystemTilesTestSuite.testPrivateDnsAutoRevertPreservesOriginalTargetAcrossMultipleTapsAndCancelsOnReturn"
+            "SystemTilesTestSuite.testPrivateDnsCycleAdvancesAndWrapsCorrectly and SystemTilesTestSuite.testPrivateDnsAutoRevertPreservesOriginalTargetAcrossMultipleTapsAndCancelsOnReturn and SystemTilesTestSuite.testQuickSetupCommandFormattingAndChecklistEvaluation"
         ),
         cap(
             "qs-tile-usb-debugging", "Quick Settings tile for USB Debugging with optional auto-revert",

@@ -5,6 +5,7 @@ import com.adshield.pro.domain.model.PrivateDnsHostnameOption
 import com.adshield.pro.domain.model.PrivateDnsMode
 import com.adshield.pro.domain.model.PrivateDnsSystemState
 import com.adshield.pro.domain.model.PrivateDnsTileConfig
+import com.adshield.pro.domain.model.QuickSetupChecklistState
 import com.adshield.pro.domain.model.TilePresentation
 import com.adshield.pro.domain.model.TileVisualState
 import com.adshield.pro.domain.model.UsbDebuggingSystemState
@@ -304,6 +305,25 @@ object SystemTileEngine {
         return !matchesStep(current, target)
     }
 
+    fun buildAdbGrantCommand(packageName: String): String =
+        "adb shell pm grant ${packageName.trim()} android.permission.WRITE_SECURE_SETTINGS"
+
+    fun buildLocalShellGrantCommand(packageName: String): String =
+        "pm grant ${packageName.trim()} android.permission.WRITE_SECURE_SETTINGS"
+
+    fun evaluateQuickSetupChecklist(
+        hasPermission: Boolean,
+        developerOptionsEnabled: Boolean,
+        hasSuBinary: Boolean,
+        isShizukuInstalled: Boolean
+    ): QuickSetupChecklistState = QuickSetupChecklistState(
+        developerOptionsReady = developerOptionsEnabled || hasPermission,
+        permissionGranted = hasPermission,
+        tilesReadyToUse = hasPermission,
+        rootQuickGrantAvailable = hasSuBinary && !hasPermission,
+        shizukuDetected = isShizukuInstalled
+    )
+
     // ------------------------------------------------------------------ Tile presentations
 
     fun formatRemainingShort(remainingMs: Long): String {
@@ -326,7 +346,7 @@ object SystemTileEngine {
         if (!hasPermission) {
             return TilePresentation(
                 label = "Private DNS",
-                subtitle = "Tap to set up",
+                subtitle = "Tap for setup",
                 state = TileVisualState.INACTIVE,
                 contentDescription = "Private DNS Quick Settings tile requires WRITE_SECURE_SETTINGS setup"
             )
@@ -384,7 +404,7 @@ object SystemTileEngine {
         if (!hasPermission) {
             return TilePresentation(
                 label = "USB Debugging",
-                subtitle = "Tap to set up",
+                subtitle = "Tap for setup",
                 state = TileVisualState.INACTIVE,
                 contentDescription = "USB Debugging Quick Settings tile requires WRITE_SECURE_SETTINGS setup"
             )

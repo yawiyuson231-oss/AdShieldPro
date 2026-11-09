@@ -858,14 +858,17 @@ private fun SettingsDestination(
     onCloseQuickTiles: () -> Unit
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+    val systemTilesStatus by viewModel.systemTilesStatus.collectAsStateWithLifecycle()
     if (showQuickTilesScreen) {
-        val systemTilesStatus by viewModel.systemTilesStatus.collectAsStateWithLifecycle()
+        val isGrantingRoot by viewModel.isGrantingQuickTilePermission.collectAsStateWithLifecycle()
         QuickSettingsTilesScreen(
             onBack = onCloseQuickTiles,
             status = systemTilesStatus,
             dnsConfig = settings.privateDnsTileConfig,
             usbConfig = settings.usbDebuggingTileConfig,
+            isAttemptingRootGrant = isGrantingRoot,
             onRefreshStatus = viewModel::refreshSystemTilesStatus,
+            onTryGrantWithRoot = viewModel::tryGrantQuickTilePermissionWithRoot,
             onApplyPrivateDnsStep = viewModel::applyPrivateDnsStep,
             onCyclePrivateDnsNow = viewModel::cyclePrivateDnsNow,
             onSetPrivateDnsIncludeOff = viewModel::setPrivateDnsIncludeOff,
@@ -895,6 +898,7 @@ private fun SettingsDestination(
         onOpenAbout = onOpenAbout,
         onCloseAbout = onCloseAbout,
         onOpenQuickTiles = onOpenQuickTiles,
+        hasQuickTilePermission = systemTilesStatus.hasWriteSecureSettingsPermission,
         settings = settings,
         installedApps = installedApps,
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,

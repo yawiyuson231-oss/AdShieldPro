@@ -1355,6 +1355,9 @@ class AdShieldViewModel @Inject constructor(
     private val _systemTilesStatus = MutableStateFlow(systemPreferencesController.readLiveStatus())
     val systemTilesStatus: StateFlow<SystemTilesLiveStatus> = _systemTilesStatus.asStateFlow()
 
+    private val _isGrantingQuickTilePermission = MutableStateFlow(false)
+    val isGrantingQuickTilePermission: StateFlow<Boolean> = _isGrantingQuickTilePermission.asStateFlow()
+
     fun refreshSystemTilesStatus() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -1546,6 +1549,22 @@ class AdShieldViewModel @Inject constructor(
 
     fun notifyQuickTileFeedback(message: String) {
         showFeedback(message)
+    }
+
+    fun tryGrantQuickTilePermissionWithRoot() {
+        if (_isGrantingQuickTilePermission.value) return
+        viewModelScope.launch {
+            _isGrantingQuickTilePermission.value = true
+            try {
+                val result = systemPreferencesController.tryGrantPermissionWithRoot()
+                _systemTilesStatus.value = withContext(Dispatchers.IO) {
+                    systemPreferencesController.readLiveStatus()
+                }
+                handleSystemWriteResult(result)
+            } finally {
+                _isGrantingQuickTilePermission.value = false
+            }
+        }
     }
 
     private fun handleSystemWriteResult(result: SystemPreferenceWriteResult) {

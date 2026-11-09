@@ -160,5 +160,19 @@ sealed class SystemPreferenceWriteResult {
 data class SystemTilesLiveStatus(
     val hasWriteSecureSettingsPermission: Boolean = false,
     val privateDnsState: PrivateDnsSystemState = PrivateDnsSystemState(),
-    val usbDebuggingState: UsbDebuggingSystemState = UsbDebuggingSystemState()
+    val usbDebuggingState: UsbDebuggingSystemState = UsbDebuggingSystemState(),
+    val isRootBinaryDetected: Boolean = false,
+    val isShizukuInstalled: Boolean = false,
+    val isLadbInstalled: Boolean = false
+)
+
+/**
+ * Pure summary of the 3-step Quick Setup checklist for enabling Quick Settings tiles.
+ */
+data class QuickSetupChecklistState(
+    val developerOptionsReady: Boolean,
+    val permissionGranted: Boolean,
+    val tilesReadyToUse: Boolean,
+    val rootQuickGrantAvailable: Boolean,
+    val shizukuDetected: Boolean
 )

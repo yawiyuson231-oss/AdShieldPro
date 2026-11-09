@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -106,8 +107,68 @@ class SystemPreferencesController @Inject constructor(
     fun readLiveStatus(): SystemTilesLiveStatus = SystemTilesLiveStatus(
         hasWriteSecureSettingsPermission = hasWriteSecureSettingsPermission(),
         privateDnsState = readPrivateDnsState(),
-        usbDebuggingState = readUsbDebuggingState()
+        usbDebuggingState = readUsbDebuggingState(),
+        isRootBinaryDetected = isRootBinaryDetected(),
+        isShizukuInstalled = isPackageLaunchable(PKG_SHIZUKU),
+        isLadbInstalled = isPackageLaunchable(PKG_LADB)
     )
+
+    fun isRootBinaryDetected(): Boolean = SU_CANDIDATE_PATHS.any { path ->
+        runCatching { File(path).exists() }.getOrDefault(false)
+    }
+
+    private fun isPackageLaunchable(packageName: String): Boolean = runCatching {
+        context.packageManager.getLaunchIntentForPackage(packageName) != null
+    }.getOrDefault(false)
+
+    /**
+     * Attempts a one-tap permission grant via `su` on rooted devices and immediately verifies
+     * with [hasWriteSecureSettingsPermission]. Fails cleanly and honestly on non-rooted devices.
+     */
+    suspend fun tryGrantPermissionWithRoot(): SystemPreferenceWriteResult = withContext(Dispatchers.IO) {
+        if (hasWriteSecureSettingsPermission()) {
+            requestTileUpdates()
+            return@withContext SystemPreferenceWriteResult.Success("WRITE_SECURE_SETTINGS is already granted.")
+        }
+        if (!isRootBinaryDetected()) {
+            return@withContext SystemPreferenceWriteResult.RejectedBySystem(
+                "No root (su) binary detected on this device. Use Wireless Debugging (LADB/Shizuku) or PC ADB."
+            )
+        }
+        var process: Process? = null
+        try {
+            val command = SystemTileEngine.buildLocalShellGrantCommand(context.packageName)
+            process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+            val finished = process.waitFor(10, TimeUnit.SECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                return@withContext SystemPreferenceWriteResult.RejectedBySystem(
+                    "Root shell prompt timed out. Approve the superuser dialog or use ADB."
+                )
+            }
+            if (hasWriteSecureSettingsPermission()) {
+                intelligenceRecorder.emit(
+                    IntelligenceEventFactory.privacySettingChanged(
+                        title = "Quick Settings tile permission granted",
+                        detail = "Granted WRITE_SECURE_SETTINGS on device via root shell",
+                        timestampEpochMs = System.currentTimeMillis()
+                    )
+                )
+                requestTileUpdates()
+                SystemPreferenceWriteResult.Success("Permission granted! Quick Settings tiles are now ready.")
+            } else {
+                SystemPreferenceWriteResult.RejectedBySystem(
+                    "Root grant was denied or failed (exit ${process.exitValue()}). Use Wireless Debugging or PC ADB."
+                )
+            }
+        } catch (error: Exception) {
+            SystemPreferenceWriteResult.RejectedBySystem(
+                "Root grant unavailable (${error.message ?: error.javaClass.simpleName}). Use Wireless Debugging or PC ADB."
+            )
+        } finally {
+            runCatching { process?.destroy() }
+        }
+    }
 
     suspend fun cyclePrivateDnsFromTile(): SystemPreferenceWriteResult = withContext(Dispatchers.IO) {
         val current = readPrivateDnsState()
@@ -602,5 +663,19 @@ class SystemPreferencesController @Inject constructor(
         private const val CHANNEL_ID = "adshield_quick_tiles_revert_channel"
         private const val NOTIF_ID_USB_REVERT = 4301
         private const val NOTIF_ID_DNS_REVERT = 4302
+
+        const val PKG_SHIZUKU = "moe.shizuku.privileged.api"
+        const val PKG_LADB = "com.draco.ladb"
+
+        private val SU_CANDIDATE_PATHS = listOf(
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/sbin/su",
+            "/vendor/bin/su",
+            "/su/bin/su",
+            "/system/bin/.ext/.su",
+            "/data/local/su",
+            "/data/local/xbin/su"
+        )
     }
 }

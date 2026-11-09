@@ -5,8 +5,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,8 +28,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
@@ -36,6 +40,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -76,6 +81,7 @@ import com.adshield.pro.domain.model.PrivateDnsMode
 import com.adshield.pro.domain.model.PrivateDnsTileConfig
 import com.adshield.pro.domain.model.SystemTilesLiveStatus
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
+import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.engine.platform.SystemTileEngine
 import com.adshield.pro.service.PrivateDnsTileService
 import com.adshield.pro.service.UsbDebuggingTileService
@@ -92,7 +98,9 @@ fun QuickSettingsTilesScreen(
     status: SystemTilesLiveStatus,
     dnsConfig: PrivateDnsTileConfig,
     usbConfig: UsbDebuggingTileConfig,
+    isAttemptingRootGrant: Boolean = false,
     onRefreshStatus: () -> Unit,
+    onTryGrantWithRoot: () -> Unit = {},
     onApplyPrivateDnsStep: (PrivateDnsCycleStep) -> Unit,
     onCyclePrivateDnsNow: () -> Unit,
     onSetPrivateDnsIncludeOff: (Boolean) -> Unit,
@@ -146,10 +154,34 @@ fun QuickSettingsTilesScreen(
         }
     }
 
+    // Poll every 2 seconds ONLY while permission setup is incomplete and this screen is visible,
+    // so running `pm grant` via PC ADB, split-screen LADB/Termux, or Shizuku updates automatically.
+    LaunchedEffect(status.hasWriteSecureSettingsPermission) {
+        if (status.hasWriteSecureSettingsPermission) return@LaunchedEffect
+        while (isActive) {
+            delay(2_000L)
+            onRefreshStatus()
+        }
+    }
+
     var newHostnameLabel by remember { mutableStateOf("") }
     var newHostnameValue by remember { mutableStateOf("") }
+    var showSetupDetailsWhenReady by remember { mutableStateOf(false) }
+    var showWirelessGuide by remember { mutableStateOf(false) }
+
     val adbCommand = remember(context.packageName) {
-        "adb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
+        SystemTileEngine.buildAdbGrantCommand(context.packageName)
+    }
+    val localShellCommand = remember(context.packageName) {
+        SystemTileEngine.buildLocalShellGrantCommand(context.packageName)
+    }
+    val checklist = remember(status) {
+        SystemTileEngine.evaluateQuickSetupChecklist(
+            hasPermission = status.hasWriteSecureSettingsPermission,
+            developerOptionsEnabled = status.usbDebuggingState.developerOptionsEnabled,
+            hasSuBinary = status.isRootBinaryDetected,
+            isShizukuInstalled = status.isShizukuInstalled
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -179,8 +211,9 @@ fun QuickSettingsTilesScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Setup & WRITE_SECURE_SETTINGS Status Card
+            // 1. Quick Setup Permission & Add Tiles Card
             item(key = "setup-card", contentType = "setup") {
+                val showFullSetup = !status.hasWriteSecureSettingsPermission || showSetupDetailsWhenReady
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
@@ -196,7 +229,7 @@ fun QuickSettingsTilesScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "System Permission & Tile Setup",
+                                text = "Quick Setup & Tile Permission",
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.weight(1f)
                             )
@@ -207,107 +240,315 @@ fun QuickSettingsTilesScreen(
                             )
                         }
 
-                        Text(
-                            text = if (status.hasWriteSecureSettingsPermission) {
-                                "WRITE_SECURE_SETTINGS is granted. Both Quick Settings tiles can read and modify Android Private DNS and USB Debugging directly."
-                            } else {
-                                "Android restricts modifying Private DNS and USB Debugging from third-party apps unless WRITE_SECURE_SETTINGS is granted once over ADB (no root required)."
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                        if (status.hasWriteSecureSettingsPermission && !showSetupDetailsWhenReady) {
                             Text(
-                                text = adbCommand,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = {
-                                    copyToClipboard(context, "AdShield ADB command", adbCommand)
-                                    onFeedback("Copied ADB permission command.")
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Copy Command")
-                            }
-                            Button(
-                                onClick = onRefreshStatus,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = if (status.hasWriteSecureSettingsPermission) Icons.Default.CheckCircle else Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Verify")
-                            }
-                        }
-
-                        HorizontalDivider()
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            Text(
-                                text = "Add Tiles to Quick Settings Panel",
-                                style = MaterialTheme.typography.labelLarge
+                                text = "WRITE_SECURE_SETTINGS is active. Both Quick Settings tiles can toggle Private DNS and USB Debugging directly.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        requestAddSystemTile(
-                                            context = context,
-                                            serviceClass = PrivateDnsTileService::class.java,
-                                            labelRes = R.string.tile_private_dns_label,
-                                            iconRes = R.drawable.ic_tile_private_dns,
-                                            onMessage = onFeedback
-                                        )
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Add Private DNS")
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        requestAddSystemTile(
-                                            context = context,
-                                            serviceClass = UsbDebuggingTileService::class.java,
-                                            labelRes = R.string.tile_usb_debugging_label,
-                                            iconRes = R.drawable.ic_tile_usb_debugging,
-                                            onMessage = onFeedback
-                                        )
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Add USB Debug")
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            requestAddSystemTile(
+                                                context = context,
+                                                serviceClass = PrivateDnsTileService::class.java,
+                                                labelRes = R.string.tile_private_dns_label,
+                                                iconRes = R.drawable.ic_tile_private_dns,
+                                                onMessage = onFeedback
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Add Private DNS")
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            requestAddSystemTile(
+                                                context = context,
+                                                serviceClass = UsbDebuggingTileService::class.java,
+                                                labelRes = R.string.tile_usb_debugging_label,
+                                                iconRes = R.drawable.ic_tile_usb_debugging,
+                                                onMessage = onFeedback
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Add USB Debug")
+                                    }
                                 }
                             }
-                        } else {
-                            Text(
-                                text = "To add the tiles: pull down Quick Settings, tap Edit (pencil icon), and drag Private DNS and USB Debugging into your active tiles.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            TextButton(onClick = { showSetupDetailsWhenReady = true }) {
+                                Text("Show permission commands & setup steps")
+                            }
+                        }
+
+                        if (showFullSetup) {
+                            if (status.hasWriteSecureSettingsPermission) {
+                                TextButton(onClick = { showSetupDetailsWhenReady = false }) {
+                                    Text("Collapse setup steps")
+                                }
+                            } else {
+                                Text(
+                                    text = "Complete these quick steps once to let AdShield Pro toggle system Private DNS and USB Debugging (auto-checks every 2s):",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // Step 1: Developer Options
+                            QuickSetupStepSurface(
+                                stepNumber = "1",
+                                title = "Developer Options",
+                                done = checklist.developerOptionsReady,
+                                detail = if (checklist.developerOptionsReady) {
+                                    "Developer Options is enabled on this device."
+                                } else {
+                                    "Open About Phone and tap Build number 7 times to unlock Developer Options."
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    if (!checklist.developerOptionsReady) {
+                                        OutlinedButton(
+                                            onClick = { openAboutPhoneSettings(context, onFeedback) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Open About Phone")
+                                        }
+                                    }
+                                    OutlinedButton(
+                                        onClick = { openDeveloperOptionsSettings(context, onFeedback) },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Developer Options")
+                                    }
+                                }
+                            }
+
+                            // Step 2: Grant WRITE_SECURE_SETTINGS
+                            QuickSetupStepSurface(
+                                stepNumber = "2",
+                                title = "Grant WRITE_SECURE_SETTINGS",
+                                done = checklist.permissionGranted,
+                                detail = if (checklist.permissionGranted) {
+                                    "Permission granted and verified."
+                                } else {
+                                    "Choose your fastest method: 1-tap Root (if rooted), on-phone Wireless Debugging (LADB / Shizuku / Termux), or PC ADB."
+                                }
+                            ) {
+                                if (checklist.rootQuickGrantAvailable) {
+                                    Button(
+                                        onClick = onTryGrantWithRoot,
+                                        enabled = !isAttemptingRootGrant,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(if (isAttemptingRootGrant) "Requesting Root Grant..." else "1-Tap Grant via Root (su)")
+                                    }
+                                }
+
+                                Text(
+                                    text = "On-Phone (No PC) Shell Command:",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = localShellCommand,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            copyToClipboard(context, "AdShield pm grant command", localShellCommand)
+                                            onFeedback("Copied shell command (for LADB / Termux / Shizuku).")
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Copy Shell")
+                                    }
+                                    if (status.isShizukuInstalled) {
+                                        OutlinedButton(
+                                            onClick = { launchHelperApp(context, SystemPreferencesController.PKG_SHIZUKU, "Shizuku", onFeedback) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Open Shizuku")
+                                        }
+                                    } else if (status.isLadbInstalled) {
+                                        OutlinedButton(
+                                            onClick = { launchHelperApp(context, SystemPreferencesController.PKG_LADB, "LADB", onFeedback) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Open LADB")
+                                        }
+                                    } else {
+                                        OutlinedButton(
+                                            onClick = { showWirelessGuide = !showWirelessGuide },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (showWirelessGuide) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("No-PC Guide")
+                                        }
+                                    }
+                                }
+
+                                if (status.isShizukuInstalled || status.isLadbInstalled) {
+                                    TextButton(onClick = { showWirelessGuide = !showWirelessGuide }) {
+                                        Text(if (showWirelessGuide) "Hide Wireless Debugging steps" else "How to run via Wireless Debugging (No PC)")
+                                    }
+                                }
+
+                                if (showWirelessGuide) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = CyberCyan.copy(alpha = 0.10f),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text("On-Device Wireless Debugging (Android 11+):", style = MaterialTheme.typography.labelLarge)
+                                            Text("1. Tap Developer Options above and enable Wireless debugging.", style = MaterialTheme.typography.bodySmall)
+                                            Text("2. Tap Wireless debugging -> Pair device with pairing code.", style = MaterialTheme.typography.bodySmall)
+                                            Text("3. Pair in LADB (or start Shizuku and open Termux/aShell), then paste the copied shell command.", style = MaterialTheme.typography.bodySmall)
+                                            Text("4. Return here — AdShield detects the grant automatically.", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+
+                                Text(
+                                    text = "From PC / Mac (USB ADB):",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = adbCommand,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            copyToClipboard(context, "AdShield ADB command", adbCommand)
+                                            onFeedback("Copied ADB permission command.")
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Copy ADB")
+                                    }
+                                    Button(
+                                        onClick = onRefreshStatus,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (status.hasWriteSecureSettingsPermission) Icons.Default.CheckCircle else Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(if (status.hasWriteSecureSettingsPermission) "Verified" else "Verify Now")
+                                    }
+                                }
+                            }
+
+                            // Step 3: Add Tiles to Quick Settings Panel
+                            QuickSetupStepSurface(
+                                stepNumber = "3",
+                                title = "Add Tiles to Quick Settings",
+                                done = false,
+                                detail = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    "Tap below to pin each tile directly into your Android Quick Settings shade."
+                                } else {
+                                    "Pull down Quick Settings, tap Edit (pencil icon), and drag Private DNS & USB Debugging into active tiles."
+                                }
+                            ) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                requestAddSystemTile(
+                                                    context = context,
+                                                    serviceClass = PrivateDnsTileService::class.java,
+                                                    labelRes = R.string.tile_private_dns_label,
+                                                    iconRes = R.drawable.ic_tile_private_dns,
+                                                    onMessage = onFeedback
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Add Private DNS")
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                requestAddSystemTile(
+                                                    context = context,
+                                                    serviceClass = UsbDebuggingTileService::class.java,
+                                                    labelRes = R.string.tile_usb_debugging_label,
+                                                    iconRes = R.drawable.ic_tile_usb_debugging,
+                                                    onMessage = onFeedback
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Add USB Debug")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -932,6 +1173,94 @@ private fun formatDetailedCountdown(remainingMs: Long): String {
         hours > 0L -> "${hours}h ${minutes}m"
         minutes > 0L -> "${minutes}m ${seconds}s"
         else -> "${seconds}s"
+    }
+}
+
+@Composable
+private fun QuickSetupStepSurface(
+    stepNumber: String,
+    title: String,
+    done: Boolean,
+    detail: String,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (done) {
+            EmeraldPrimary.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Step $stepNumber · $title",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                if (done) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Completed",
+                        tint = EmeraldPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            content()
+        }
+    }
+}
+
+private fun openDeveloperOptionsSettings(context: Context, onFeedback: (String) -> Unit) {
+    val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val fallback = Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(devIntent) }.onFailure {
+        runCatching { context.startActivity(fallback) }.onFailure {
+            onFeedback("Open Android Settings -> Developer Options.")
+        }
+    }
+}
+
+private fun openAboutPhoneSettings(context: Context, onFeedback: (String) -> Unit) {
+    val infoIntent = Intent(Settings.ACTION_DEVICE_INFO_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    val fallback = Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(infoIntent) }.onFailure {
+        runCatching { context.startActivity(fallback) }.onFailure {
+            onFeedback("Open Android Settings -> About Phone and tap Build number 7 times.")
+        }
+    }
+}
+
+private fun launchHelperApp(
+    context: Context,
+    packageName: String,
+    appName: String,
+    onFeedback: (String) -> Unit
+) {
+    val launch = context.packageManager.getLaunchIntentForPackage(packageName)
+    if (launch != null) {
+        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(launch) }.onFailure {
+            onFeedback("Unable to open $appName.")
+        }
+    } else {
+        onFeedback("$appName is not installed on this device.")
     }
 }
 

@@ -60,6 +60,7 @@ import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.ui.components.CompactStatusChip
+import com.adshield.pro.ui.components.StatusPill
 import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
@@ -76,6 +77,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
     onCloseAbout: () -> Unit,
     onOpenQuickTiles: () -> Unit = {},
+    hasQuickTilePermission: Boolean = false,
     settings: AppSettingsState,
     installedApps: List<AppExclusionInfo>,
     onUpdateResolverConfig: (DnsResolverConfig) -> Unit,
@@ -632,9 +634,22 @@ fun SettingsScreen(
                     Icon(Icons.Default.Tune, contentDescription = null, tint = CyberCyan)
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Quick Settings Tiles", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("Quick Settings Tiles", style = MaterialTheme.typography.titleMedium)
+                            StatusPill(
+                                text = if (hasQuickTilePermission) "Ready" else "Quick Setup",
+                                color = if (hasQuickTilePermission) EmeraldPrimary else WarningAmber
+                            )
+                        }
                         Text(
-                            "Private DNS ($cycleCount cycle steps) & USB Debugging ($usbAutoRevertSummary)",
+                            if (hasQuickTilePermission) {
+                                "Private DNS ($cycleCount cycle steps) & USB Debugging ($usbAutoRevertSummary)"
+                            } else {
+                                "Tap for quick permission setup (Wireless ADB / PC / Root) & add tiles"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
