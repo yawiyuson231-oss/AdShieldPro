@@ -30,7 +30,7 @@ object BaselineReferenceStore {
         val lat: Double,
         val lon: Double,
         val population: Long,
-        val popYear: Int
+        val popYear: Int = 2026
     )
 
     @Serializable

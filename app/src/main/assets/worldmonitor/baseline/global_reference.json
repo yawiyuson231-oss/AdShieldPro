@@ -31,7 +31,9 @@
       "capital": "Mariehamn",
       "lat": 60.0973,
       "lon": 19.9348,
-      "population": 30500
+      "population": 30500,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "AL",
@@ -84,7 +86,9 @@
       "capital": "The Valley",
       "lat": 18.217,
       "lon": -63.0578,
-      "population": 15900
+      "population": 15900,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "AQ",
@@ -93,7 +97,9 @@
       "capital": "McMurdo Station",
       "lat": -77.8419,
       "lon": 166.6863,
-      "population": 1250
+      "population": 1250,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "AG",
@@ -135,7 +141,9 @@
       "capital": "Oranjestad",
       "lat": 12.5092,
       "lon": -70.0086,
-      "population": 106500
+      "population": 106500,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "AU",
@@ -265,7 +273,9 @@
       "capital": "Hamilton",
       "lat": 32.2949,
       "lon": -64.783,
-      "population": 64000
+      "population": 64000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "BT",
@@ -329,7 +339,9 @@
       "capital": "Road Town",
       "lat": 18.4286,
       "lon": -64.6185,
-      "population": 31500
+      "population": 31500,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "BN",
@@ -426,7 +438,9 @@
       "capital": "Kralendijk",
       "lat": 12.1443,
       "lon": -68.2655,
-      "population": 27700
+      "population": 27700,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "KY",
@@ -435,7 +449,9 @@
       "capital": "George Town",
       "lat": 19.2866,
       "lon": -81.3744,
-      "population": 69300
+      "population": 69300,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "CF",
@@ -488,7 +504,9 @@
       "capital": "Flying Fish Cove",
       "lat": -10.4207,
       "lon": 105.6791,
-      "population": 1690
+      "population": 1690,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "CO",
@@ -519,7 +537,9 @@
       "capital": "Avarua",
       "lat": -21.207,
       "lon": -159.775,
-      "population": 17000
+      "population": 17000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "CR",
@@ -572,7 +592,9 @@
       "capital": "Willemstad",
       "lat": 12.1084,
       "lon": -68.9335,
-      "population": 192000
+      "population": 192000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "CY",
@@ -746,7 +768,9 @@
       "capital": "Stanley",
       "lat": -51.6977,
       "lon": -57.8517,
-      "population": 3780
+      "population": 3780,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "FO",
@@ -755,7 +779,9 @@
       "capital": "Torshavn",
       "lat": 62.0079,
       "lon": -6.79,
-      "population": 54000
+      "population": 54000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "FJ",
@@ -797,7 +823,9 @@
       "capital": "Cayenne",
       "lat": 4.9224,
       "lon": -52.3135,
-      "population": 312000
+      "population": 312000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "PF",
@@ -872,7 +900,9 @@
       "capital": "Gibraltar",
       "lat": 36.1408,
       "lon": -5.3536,
-      "population": 32700
+      "population": 32700,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "GR",
@@ -914,7 +944,9 @@
       "capital": "Basse-Terre",
       "lat": 15.9985,
       "lon": -61.7255,
-      "population": 396000
+      "population": 396000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "GU",
@@ -945,7 +977,9 @@
       "capital": "Saint Peter Port",
       "lat": 49.4554,
       "lon": -2.5369,
-      "population": 64000
+      "population": 64000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "GN",
@@ -1097,7 +1131,9 @@
       "capital": "Douglas",
       "lat": 54.1523,
       "lon": -4.4861,
-      "population": 84700
+      "population": 84700,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "IL",
@@ -1150,7 +1186,9 @@
       "capital": "Saint Helier",
       "lat": 49.1868,
       "lon": -2.1066,
-      "population": 103600
+      "population": 103600,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "JO",
@@ -1423,7 +1461,9 @@
       "capital": "Fort-de-France",
       "lat": 14.6161,
       "lon": -61.0588,
-      "population": 367000
+      "population": 367000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "MR",
@@ -1454,7 +1494,9 @@
       "capital": "Mamoudzou",
       "lat": -12.7806,
       "lon": 45.2278,
-      "population": 326000
+      "population": 326000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "MX",
@@ -1529,7 +1571,9 @@
       "capital": "Brades",
       "lat": 16.7918,
       "lon": -62.2106,
-      "population": 4400
+      "population": 4400,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "MA",
@@ -1659,7 +1703,9 @@
       "capital": "Alofi",
       "lat": -19.0544,
       "lon": -169.9187,
-      "population": 1940
+      "population": 1940,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "KP",
@@ -1690,7 +1736,9 @@
       "capital": "Saipan",
       "lat": 15.1778,
       "lon": 145.751,
-      "population": 49800
+      "population": 49800,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "NO",
@@ -1853,7 +1901,9 @@
       "capital": "Saint-Denis",
       "lat": -20.8823,
       "lon": 55.4504,
-      "population": 981000
+      "population": 981000,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "RO",
@@ -1895,7 +1945,9 @@
       "capital": "Jamestown",
       "lat": -15.9244,
       "lon": -5.7181,
-      "population": 5300
+      "population": 5300,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "KN",
@@ -1926,7 +1978,9 @@
       "capital": "Saint-Pierre",
       "lat": 46.7778,
       "lon": -56.1778,
-      "population": 5840
+      "population": 5840,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "VC",
@@ -2045,7 +2099,9 @@
       "capital": "Philipsburg",
       "lat": 18.026,
       "lon": -63.0458,
-      "population": 44200
+      "population": 44200,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "SK",
@@ -2175,7 +2231,9 @@
       "capital": "Longyearbyen",
       "lat": 78.2232,
       "lon": 15.6267,
-      "population": 2940
+      "population": 2940,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "SE",
@@ -2338,7 +2396,9 @@
       "capital": "Cockburn Town",
       "lat": 21.4612,
       "lon": -71.1419,
-      "population": 46100
+      "population": 46100,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "VI",
@@ -2347,7 +2407,9 @@
       "capital": "Charlotte Amalie",
       "lat": 18.3419,
       "lon": -64.9307,
-      "population": 98700
+      "population": 98700,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "UG",
@@ -2477,7 +2539,9 @@
       "capital": "Mata-Utu",
       "lat": -13.2816,
       "lon": -176.1745,
-      "population": 11500
+      "population": 11500,
+      "num": "",
+      "popYear": 2026
     },
     {
       "iso2": "YE",
