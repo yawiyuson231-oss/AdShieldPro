@@ -931,6 +931,54 @@ object CapabilityRegistry {
                 "Requires device unlock to toggle by default; auto-revert timing via WorkManager and setAndAllowWhileIdle is approximate"
             ),
             "SystemTilesTestSuite.testUsbDebuggingAutoRevertArmsOnEnableAndClearsOnDisable and SystemTilesTestSuite.testTilePresentationsReflectPermissionAndRealSystemState"
+        ),
+        cap(
+            "worldmonitor-3d-earth", "Interactive 3D Digital Earth (CesiumJS WebGL, terrain, projections, split-date GIBS)",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/worldmonitor/WorldMonitorScreen.kt", listOf(PERM_INTERNET),
+            listOf("Bundled CesiumJS 1.147.0, Natural Earth 110m borders, Esri/OSM/CARTO/NASA GIBS/AWS Terrarium tiles, Nominatim & Overpass 3D"),
+            listOf("Street-level satellite tiles and Overpass 3D buildings require network access until cached in the 120 MB tile cache"),
+            "WorldMonitorTestSuite.testJsBridgeAndTileServerSecurityValidation"
+        ),
+        cap(
+            "worldmonitor-multi-domain-feeds", "8-domain live global OSINT feeds (Aviation, Maritime, Space, Disaster, Weather, Cyber, News, Infra)",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/worldmonitor/WorldMonitorNormalizers.kt", listOf(PERM_INTERNET),
+            listOf("OpenSky, ADSB-lol, OurAirports, Digitraffic AIS, NOAA NDBC/SWPC/NWS, CelesTrak, USGS, EMSC, NASA EONET, GDACS, Open-Meteo, RainViewer, CISA KEV, IODA, RIPEstat, GDELT, UN News"),
+            listOf("Anonymous OpenSky/Overpass tiers enforce rate limits; NASA FIRMS raw CSV requires a free user MAP_KEY; aged offline records decay to DELAYED/HISTORICAL"),
+            "WorldMonitorTestSuite.testNormalizersAcrossAllEightIntelligenceDomains and testDynamicFreshnessDecayOnCachedEntities"
+        ),
+        cap(
+            "worldmonitor-correlation-engine", "Deterministic cross-domain Global Event Correlation Engine",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/worldmonitor/EventCorrelationEngine.kt", emptyList(),
+            listOf("Normalized multi-provider WorldEntity records with Haversine distance and event-time delta"),
+            listOf("Reports spatio-temporal coincidence across independent providers with explicit non-causation caveats; never links same-provider or simulated items"),
+            "WorldMonitorTestSuite.testEventCorrelationEngineNeverInventsSelfLinks"
+        ),
+        cap(
+            "worldmonitor-digital-twin-analyst", "Regional Digital Twin & on-device Evidence RAG Global Analyst",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/worldmonitor/WorldMonitorAiAnalyst.kt", listOf(PERM_INTERNET),
+            listOf("World Bank population dataset + bundled UN/World Bank baseline, Open-Meteo elevation/weather/GloFAS, cached WorldEntity records"),
+            listOf("100% local deterministic retrieval-augmented synthesis separating verified facts, data gaps, and hypotheses without cloud LLMs"),
+            "WorldMonitorTestSuite.testDigitalTwinAndAiAnalystEpistemicSeparation"
+        ),
+        cap(
+            "worldmonitor-simulation-watchtower", "Experimental Simulation Lab & Watchtower geofence notifications",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/worldmonitor/SimulationLabEngine.kt", listOf(PERM_INTERNET, PERM_NOTIF),
+            listOf("User-defined geofences evaluated via WorkManager against synced feeds; geometric plume, surge, and exposure screening"),
+            listOf("All simulation outputs are stamped SIMULATED / EXPERIMENTAL_SIMULATION; background Watchtower polling uses 60-minute WorkManager scheduling"),
+            "WorldMonitorTestSuite.testSimulationLabStampsExperimentalMetadata and testWatchtowerGeofenceMatchingAndDeduplication"
+        ),
+        cap(
+            "worldmonitor-commercial-ais-satellite-video", "Global commercial satellite-AIS stream & live orbital video",
+            CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.UNAVAILABLE, "", emptyList(),
+            listOf("Digitraffic coastal AIS and NOAA NDBC buoys are supported; commercial global AIS requires external WebSocket/API licensing"),
+            listOf("Global satellite AIS requires a licensed backend or user AISStream WebSocket proxy; live real-time satellite video of arbitrary Earth locations does not publicly exist"),
+            "n/a — commercial backend / physical sensor restriction"
         )
     )
 

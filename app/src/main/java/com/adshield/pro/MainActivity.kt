@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Monitor
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
@@ -101,14 +102,17 @@ import com.adshield.pro.ui.viewmodel.AdShieldViewModel
 import com.adshield.pro.ui.viewmodel.ConnectorViewModel
 import com.adshield.pro.ui.model.ConnectorUiState
 import com.adshield.pro.ui.screens.connectors.ConnectorRegistryScreen
+import com.adshield.pro.ui.screens.worldmonitor.WorldMonitorScreen
 import com.adshield.pro.ui.viewmodel.CloudStorageViewModel
 import com.adshield.pro.ui.viewmodel.DownloaderViewModel
 import com.adshield.pro.ui.viewmodel.FileManagerViewModel
 import com.adshield.pro.ui.viewmodel.IntelligenceMapViewModel
+import com.adshield.pro.ui.viewmodel.WorldMonitorViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 enum class MainNavDestination(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
+    WORLD_MONITOR("World", Icons.Default.Public),
     AD_BLOCKER("Ad Blocker", Icons.Default.Shield),
     LIVE("Live", Icons.Default.Monitor),
     INTELLIGENCE("Intel", Icons.Default.Hub),
@@ -129,6 +133,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val quickTilesLaunchTrigger = mutableIntStateOf(if (isQuickTilesIntent(intent)) 1 else 0)
+        val openWorldMonitorOnLaunch = intent?.getBooleanExtra("open_world_monitor", false) == true
         addOnNewIntentListener { newIntent ->
             if (isQuickTilesIntent(newIntent)) {
                 setIntent(newIntent)
@@ -141,7 +146,8 @@ class MainActivity : ComponentActivity() {
             AdShieldProTheme(themePreference = settings.darkThemeMode) {
                 AdShieldMainApp(
                     viewModel = viewModel,
-                    openQuickTilesTrigger = quickTilesLaunchTrigger.intValue
+                    openQuickTilesTrigger = quickTilesLaunchTrigger.intValue,
+                    initialOpenWorldMonitor = openWorldMonitorOnLaunch
                 )
             }
         }
@@ -161,7 +167,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AdShieldMainApp(
     viewModel: AdShieldViewModel,
-    openQuickTilesTrigger: Int = 0
+    openQuickTilesTrigger: Int = 0,
+    initialOpenWorldMonitor: Boolean = false
 ) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
@@ -169,6 +176,7 @@ fun AdShieldMainApp(
     var showQuickTilesScreen by rememberSaveable { mutableStateOf(false) }
     var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
+    var worldMonitorOpen by rememberSaveable { mutableStateOf(initialOpenWorldMonitor) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
     val connectorViewModel: ConnectorViewModel = hiltViewModel()
     val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
@@ -179,16 +187,19 @@ fun AdShieldMainApp(
         if (openQuickTilesTrigger > handledQuickTilesTrigger) {
             handledQuickTilesTrigger = openQuickTilesTrigger
             connectorsOpen = false
+            worldMonitorOpen = false
             showAboutScreen = false
             currentTab = MainNavDestination.SETTINGS
             showQuickTilesScreen = true
         }
     }
 
-    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || connectorsOpen) {
+    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR) {
         when {
             connectorsOpen -> connectorsOpen = false
             showQuickTilesScreen -> showQuickTilesScreen = false
+            worldMonitorOpen -> worldMonitorOpen = false
+            currentTab == MainNavDestination.WORLD_MONITOR -> currentTab = MainNavDestination.HOME
             else -> showAboutScreen = false
         }
     }
@@ -281,7 +292,7 @@ fun AdShieldMainApp(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen && !showQuickTilesScreen && !connectorsOpen) {
+            if (!showAboutScreen && !showQuickTilesScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -298,10 +309,18 @@ fun AdShieldMainApp(
                     onOpenOptimizer = { currentTab = MainNavDestination.OPTIMIZER },
                     onOpenLive = { currentTab = MainNavDestination.LIVE },
                     onOpenStatistics = { currentTab = MainNavDestination.STATISTICS },
-                    onOpenStatus = { currentTab = MainNavDestination.STATUS }
+                    onOpenStatus = { currentTab = MainNavDestination.STATUS },
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
+                )
+                MainNavDestination.WORLD_MONITOR -> WorldMonitorDestination(
+                    onBack = { currentTab = MainNavDestination.HOME }
                 )
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
-                MainNavDestination.LIVE -> LiveDestination(viewModel)
+                MainNavDestination.LIVE -> LiveDestination(
+                    viewModel = viewModel,
+                    onToggleProtection = handleToggleVpn,
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
+                )
                 MainNavDestination.INTELLIGENCE -> IntelligenceDestination(
                     adShieldViewModel = viewModel,
                     connectorState = connectorState,
@@ -310,7 +329,8 @@ fun AdShieldMainApp(
                     onOpenConnectors = { module ->
                         connectorViewModel.setModuleFilter(module)
                         connectorsOpen = true
-                    }
+                    },
+                    onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
                 )
                 MainNavDestination.SECURITY -> SecurityDestination(viewModel)
                 MainNavDestination.FILES -> FilesDestination()
@@ -346,8 +366,23 @@ fun AdShieldMainApp(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+
+            if (worldMonitorOpen) {
+                WorldMonitorDestination(onBack = { worldMonitorOpen = false })
+            }
         }
     }
+}
+
+@Composable
+private fun WorldMonitorDestination(
+    onBack: () -> Unit,
+    worldMonitorViewModel: WorldMonitorViewModel = hiltViewModel()
+) {
+    WorldMonitorScreen(
+        viewModel = worldMonitorViewModel,
+        onBack = onBack
+    )
 }
 
 @Composable
@@ -396,7 +431,8 @@ private fun HomeDestination(
     onOpenOptimizer: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenStatistics: () -> Unit,
-    onOpenStatus: () -> Unit
+    onOpenStatus: () -> Unit,
+    onOpenWorldMonitor: () -> Unit = {}
 ) {
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
     val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
@@ -436,7 +472,8 @@ private fun HomeDestination(
         onOpenOptimizerTab = onOpenOptimizer,
         onOpenLiveTab = onOpenLive,
         onOpenStatisticsTab = onOpenStatistics,
-        onOpenStatusTab = onOpenStatus
+        onOpenStatusTab = onOpenStatus,
+        onOpenWorldMonitor = onOpenWorldMonitor
     )
 }
 
@@ -481,9 +518,17 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
 }
 
 @Composable
-private fun LiveDestination(viewModel: AdShieldViewModel) {
+private fun LiveDestination(
+    viewModel: AdShieldViewModel,
+    onToggleProtection: (Boolean) -> Unit,
+    onOpenWorldMonitor: () -> Unit
+) {
     val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
-    LiveNetworkScreen(snapshot = liveNetwork)
+    LiveNetworkScreen(
+        snapshot = liveNetwork,
+        onToggleProtection = { onToggleProtection(!liveNetwork.vpnConnected) },
+        onOpenWorldMonitor = onOpenWorldMonitor
+    )
 }
 
 /** Maps an intelligence module to the app screen that owns its data and controls. */
@@ -512,6 +557,7 @@ private fun IntelligenceDestination(
     onToggleProtection: (Boolean) -> Unit,
     onNavigate: (MainNavDestination) -> Unit,
     onOpenConnectors: (IntelligenceModule?) -> Unit,
+    onOpenWorldMonitor: () -> Unit = {},
     mapViewModel: IntelligenceMapViewModel = hiltViewModel()
 ) {
     val mapState by mapViewModel.uiState.collectAsStateWithLifecycle()
@@ -550,7 +596,8 @@ private fun IntelligenceDestination(
         },
         onOpenModule = { module -> onNavigate(navDestinationForModule(module)) },
         connectorSummaryFor = { module -> connectorState.summaryFor(module) },
-        onOpenConnectors = onOpenConnectors
+        onOpenConnectors = onOpenConnectors,
+        onOpenWorldMonitor = onOpenWorldMonitor
     )
 }
 
