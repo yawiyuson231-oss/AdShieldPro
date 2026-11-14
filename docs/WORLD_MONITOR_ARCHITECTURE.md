@@ -130,12 +130,24 @@ The 3D globe shows a marker per story, which is not how anyone reads news. The d
 - outlets that returned nothing are listed by name with their runtime status and error message, so
   a blocked network never looks like "there is no news today".
 
+That last point needed a second fix below the UI. A provider that answered **HTTP 200** with a
+consent wall, a captcha or changed markup was recorded as `OK` with zero items, which is
+indistinguishable from a quiet news day. `WorldMonitorSyncEngine` now inspects the body when
+nothing parsed: an HTML page, an empty body, or a document that is not RSS/Atom/RDF is stored as an
+error with the reason ("Outlet answered with an HTML page instead of a feed"), while a genuine
+feed that happens to have no current items still counts as a successful sync.
+
 ### 5.5 Why the country matcher changed
 
 The previous matcher returned the first country in the baseline whose name appeared in the text.
 With a 234-entry list ordered by name, "Nigeria" matched before "Niger", "Sudan" before "South
-Sudan", and "Congo" before "DR Congo" — misplacing stories by thousands of kilometres. Matching is
-now longest-name-first, so the most specific candidate wins.
+Sudan", and "Congo" before "DR Congo" — misplacing stories by thousands of kilometres. It also
+skipped every country whose name is shorter than four characters, so a story about Chad, Cuba,
+Fiji, Iran, Iraq, Laos, Mali, Oman, Peru or Togo could never be placed anywhere but the dateline.
+
+Matching is now word-bounded and longest-name-first, so the most specific candidate wins and a
+name only counts as a whole word. The capital fallback ("Manila summit opens") runs only when the
+item names no country at all — a story that says "Japan envoy visits Manila" belongs to Japan.
 
 ### 5.6 Verification
 
@@ -144,7 +156,8 @@ now longest-name-first, so the most specific candidate wins.
 | Feed structure, entities, images, dates, junk documents | `WorldMonitorTestSuite.testNewsFeedParserReadsRssRdfAndAtom`, `…DecodesEntitiesAndRejectsInventedDates` |
 | Time-zone strictness (Manila `+0800`, `GMT`, `Z`, ambiguous rejection) | `WorldMonitorTestSuite.testNewsParserKeepsTimezonesStrictInsteadOfGuessing` |
 | Every outlet is HTTPS, keyless, implemented, routed to `news-rss` | `WorldMonitorTestSuite.testEveryNewsProviderDeclaresAReachableKeylessEndpoint` |
-| Consent pages never become headlines | `WorldMonitorTestSuite.testNewsParsingFailsHonestlyWhenTheFeedIsNotANewsDocument` |
+| Consent pages never become headlines, and are reported instead of counted as success | `WorldMonitorTestSuite.testNewsParsingFailsHonestlyWhenTheFeedIsNotANewsDocument`, `…testAnOutletThatAnswersWithAPageIsReportedNotShownAsActive` |
+| Short country names match; names match as words, not substrings | `WorldMonitorTestSuite.testNormalizersAcrossAllEightIntelligenceDomains` |
 | Registry / normalizer / globe / UI wiring, and the retired GDELT endpoint staying out | `tests/unit/worldmonitor_news.test.mjs` (runs in the ordinary web CI job) |
 | Endpoint reachability | `tools/probe_intel_endpoints.py` module `NEWS`, recorded in `docs/INTEL_LIVE_SOURCES.md` |
 
@@ -153,3 +166,8 @@ text is not fetched or republished), placement is a country centroid or the outl
 item whose feed omits a timestamp is tagged `HISTORICAL` rather than being presented as fresh, and
 an outlet that blocks this network shows a named error in the Global News tab instead of silently
 disappearing.
+
+Reading does not require leaving the app: each row carries the full headline, the full summary the
+outlet published, the outlet, its own publication time and its placement basis. "Read at source"
+is an optional extra for the full article, and is only offered for HTTPS URLs that pass
+`WorldMonitorJsBridge.isAllowedHttpsSourceUrl`.
