@@ -461,7 +461,7 @@ class WorldMonitorViewModel @Inject constructor(
     fun syncAllEnabled(force: Boolean = true) {
         if (_uiState.value.isSyncing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing 47 global & regional live feeds…") }
+            _uiState.update { it.copy(isSyncing = true, statusBanner = "Synchronizing ${WorldMonitorProviderRegistry.providers.size} global & regional live feeds…") }
             val vp = _uiState.value.viewport
             val okCount = repository.syncEnabledProviders(
                 categories = _uiState.value.layerStates.filterValues { it.visible }.keys,

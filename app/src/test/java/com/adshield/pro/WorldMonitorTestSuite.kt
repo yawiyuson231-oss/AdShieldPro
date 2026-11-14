@@ -28,6 +28,7 @@ import com.adshield.pro.engine.worldmonitor.WorldMonitorAiAnalyst
 import com.adshield.pro.engine.worldmonitor.WorldMonitorAssetAndTileServer
 import com.adshield.pro.engine.worldmonitor.WorldMonitorJsBridge
 import com.adshield.pro.engine.worldmonitor.WorldMonitorNormalizers
+import com.adshield.pro.engine.worldmonitor.WorldMonitorSyncEngine
 import com.adshield.pro.engine.worldmonitor.WorldMonitorProviderRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -158,14 +159,18 @@ class WorldMonitorTestSuite {
         assertEquals(1, kev.size)
 
         // G. News: every outlet goes through the structural RSS reader.
+        //
+        // BBC World really ships titles in CDATA and *no* <description>. RDF/DW really uses
+        // <dc:date>, not <pubDate>. An item with no usable date must not borrow "now". These three
+        // properties are what the old document-wide regex reader got wrong, so they are asserted
+        // on documents shaped like the live feeds rather than on a convenient fixture.
         val bbcRss = """
             <?xml version="1.0" encoding="UTF-8"?>
-            <rss version="2.0"><channel>
+            <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel>
               <title>BBC News - World</title>
               <item>
-                <title>Quake shakes Mindanao</title>
-                <description><![CDATA[<p>A magnitude 6.1 quake struck the southern Philippines.</p>]]></description>
-                <link>https://www.bbc.co.uk/news/world-1</link>
+                <title><![CDATA[Quake shakes Mindanao]]></title>
+                <link>https://www.bbc.co.uk/news/world-1?at_medium=RSS&amp;at_campaign=rss</link>
                 <pubDate>Sat, 08 Nov 2026 11:00:00 GMT</pubDate>
                 <category>Asia</category>
                 <media:thumbnail url="https://ichef.bbci.co.uk/thumb.jpg"/>
@@ -180,18 +185,46 @@ class WorldMonitorTestSuite {
         assertEquals(2, news.size)
         assertEquals(WorldIntelCategory.NEWS, news[0].category)
         assertEquals("Quake shakes Mindanao", news[0].title)
-        assertEquals("https://www.bbc.co.uk/news/world-1", news[0].sourceUrl)
+        assertEquals("https://www.bbc.co.uk/news/world-1?at_medium=RSS&at_campaign=rss", news[0].sourceUrl)
+        assertEquals("the channel <title> must never become an item title", false, news[0].title.contains("BBC News - World"))
         assertEquals(GeoAccuracy.ADMIN_CENTROID, news[0].geoAccuracy)
-        assertEquals(0, news[0].countryCode.compareTo("PH", ignoreCase = true))
-        assertTrue("HTML must be stripped from the summary", !news[0].summary.contains("<p>"))
+        assertEquals("PH", news[0].countryCode?.uppercase())
+        assertEquals("a feed-supplied image must be kept for inline reading",
+            "https://ichef.bbci.co.uk/thumb.jpg", news[0].metricsMap["Image"])
         assertTrue("summary must say how the point was derived", news[0].summary.contains("centroid"))
         assertNotNull("the feed date must be preserved", news[0].eventTimeEpochMs)
+        assertTrue("stale items must expire", news[0].expiresAtEpochMs > news[0].eventTimeEpochMs)
 
-        // The feed date is trusted: an item with no pubDate is HISTORICAL + SOURCE_DESK, never "now".
+        // No <pubDate>: HISTORICAL + the newsroom's own dateline, never "now" and never a guess.
         assertEquals(FreshnessClass.HISTORICAL, news[1].freshness)
         assertEquals(GeoAccuracy.SOURCE_DESK, news[1].geoAccuracy)
-        // An older item must not be reported as breaking news.
-        assertTrue("stale items must expire", news[0].expiresAtEpochMs > news[0].eventTimeEpochMs)
+
+        // RDF / RSS 1.0 with dc:date, as DW publishes it.
+        val dwRdf = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/"
+                     xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <channel rdf:about="https://rss.dw.com/rdf/rss-en-world">
+                <title>DW.com - World</title>
+                <link>https://www.dw.com/en/</link>
+              </channel>
+              <item rdf:about="https://www.dw.com/en/quake/a-1">
+                <title>Strong quake hits off Japan</title>
+                <link>https://www.dw.com/en/quake/a-1</link>
+                <description>Buildings swayed in Tokyo.</description>
+                <dc:date>2026-11-08T10:30:00Z</dc:date>
+              </item>
+            </rdf:RDF>
+        """.trimIndent()
+        val dwNews = WorldMonitorNormalizers.normalize(spec("wm.news.dw.world"), dwRdf, fixedNowMs)
+        assertEquals(1, dwNews.size)
+        assertEquals("DW's dc:date must be read as the publication time",
+            1_794_133_800_000L, dwNews[0].eventTimeEpochMs)
+        assertEquals("JP", dwNews[0].countryCode)
+
+        // A newsroom that answers with an HTML page must produce nothing rather than a fake story.
+        val consentPage = "<!DOCTYPE html><html><body><h1>Before you continue</h1></body></html>"
+        assertTrue(WorldMonitorNormalizers.normalize(spec("wm.news.un"), consentPage, fixedNowMs).isEmpty())
 
         // H. Infrastructure: Baseline + Overpass 3D Buildings
         val baseline = BaselineReferenceStore.buildBaselineEntities(fixedNowMs)
@@ -593,7 +626,7 @@ class WorldMonitorTestSuite {
     @Test
     fun testExpandedFreeKeylessProvidersAndNewNormalizers() {
         val providers = WorldMonitorProviderRegistry.providers
-        assertTrue("Expected >= 39 providers, got ${providers.size}", providers.size >= 39)
+        assertTrue("Expected >= 49 providers, got ${providers.size}", providers.size >= 49)
         providers.filter { it.endpoint.isNotBlank() }.forEach { s ->
             assertTrue("Non-HTTPS endpoint in ${s.providerId}", s.endpoint.startsWith("https://"))
         }
@@ -708,9 +741,10 @@ class WorldMonitorTestSuite {
         assertTrue("Offline search for Clark CRK must succeed", BaselineReferenceStore.searchOffline("CRK").isNotEmpty())
         assertEquals("IS", BaselineReferenceStore.nearestCountry(64.1466, -21.9426)?.iso2)
 
-        // 2. Verify 47 providers & zero retired HTTP 410 URLs
+        // 2. Every non-news provider still avoids the retired HTTP 410 URLs. The exact count is
+        // asserted once, in testExpandedFreeKeylessProvidersAndNewNormalizers.
         val providers = WorldMonitorProviderRegistry.providers
-        assertEquals(47, providers.size)
+        assertEquals(WorldMonitorProviderRegistry.providers.map { it.providerId }.distinct().size, providers.size)
         providers.forEach { p ->
             assertFalse("Retired ReliefWeb v1 URL must not appear", p.endpoint.contains("api.reliefweb.int/v1"))
             assertFalse("Retired URLhaus CSV URL must not appear", p.endpoint.contains("urlhaus.abuse.ch/downloads/csv_recent"))
@@ -886,6 +920,35 @@ class WorldMonitorTestSuite {
             "an HTML error page must not become a headline",
             WorldMonitorNormalizers.normalize(spec("wm.news.dw.world"), consentPage, fixedNowMs).isNotEmpty()
         )
+    }
+
+    @Test
+    fun testAnOutletThatAnswersWithAPageIsReportedNotShownAsActive() {
+        // A 200 with a consent wall used to be recorded as OK with 0 items, which the Global News
+        // desk could only show as an unexplained empty list. The sync engine now inspects the body:
+        // the note must be produced for an HTML page and must stay silent for a real feed (an outlet
+        // is allowed to have zero current items).
+        val spec = spec("wm.news.bbc.world")
+        val noteFor = { body: String -> WorldMonitorSyncEngine.unreadableBodyNote(spec, body) }
+
+        assertNotNull("an HTML consent wall must be explained",
+            noteFor("<!DOCTYPE html><html><body>Before you continue</body></html>"))
+        assertTrue("the explanation must name the cause",
+            noteFor("<html><body>captcha</body></html>")!!.contains("HTML page"))
+        assertNotNull("a non-feed body on a news provider must be explained",
+            noteFor("Service temporarily unavailable"))
+        assertEquals("an empty body must be explained", true, noteFor("   ")!!.contains("Empty response"))
+        assertEquals("a real RSS document must not be flagged", null,
+            noteFor("<?xml version=\"1.0\"?><rss version=\"2.0\"><channel><title>x</title></channel></rss>"))
+        assertEquals("an RDF document must not be flagged", null,
+            noteFor("<rdf:RDF xmlns:rdf=\"x\"><channel><title>x</title></channel></rdf:RDF>"))
+        // A JSON document from a JSON provider is normal and never flagged...
+        val jsonSpec = spec("wm.disaster.usgs.day")
+        assertEquals("a JSON provider must not be flagged", null,
+            WorldMonitorSyncEngine.unreadableBodyNote(jsonSpec, "{\"features\":[]}"))
+        // ...but a news outlet that answers in JSON has no headline in it, so it is explained.
+        assertNotNull("JSON from a news outlet must still be explained",
+            noteFor("{\"ok\":true}"))
     }
 
     @Test

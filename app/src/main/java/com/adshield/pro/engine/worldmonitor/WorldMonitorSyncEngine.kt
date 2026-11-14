@@ -304,14 +304,20 @@ class WorldMonitorSyncEngine @Inject constructor(
                 }
 
                 val count = if (spec.providerId == "wm.weather.rainviewer") rainFrames.size else entities.size
+                // HTTP 200 with a body this feed cannot be parsed from is a failure the user can see,
+                // not a success. A news outlet that answers with a consent wall, an error page or a
+                // changed markup used to be recorded as OK/0 items, which in the Global News desk is
+                // indistinguishable from "there is no news today". The body is inspected for the
+                // formats this provider class must be able to read, and anything else is reported.
+                val unreadable = if (count == 0) unreadableBodyNote(spec, bodyText) else null
                 saveProviderState(
                     spec.providerId,
                     existingState,
-                    ProviderSyncStatus.OK,
+                    if (unreadable == null) ProviderSyncStatus.OK else ProviderSyncStatus.ERROR,
                     code,
                     count,
                     latency,
-                    null,
+                    unreadable,
                     nowEpochMs,
                     etag = response.header("ETag"),
                     lastMod = response.header("Last-Modified")
@@ -621,6 +627,33 @@ class WorldMonitorSyncEngine @Inject constructor(
     }
 
     companion object {
+        /**
+         * Explain an HTTP 200 that yielded nothing. Returns null when the body is a document this
+         * provider is expected to parse (an outlet may legitimately have zero current items), so
+         * only genuinely unreadable answers are flagged.
+         */
+        internal fun unreadableBodyNote(spec: WorldProviderSpec, body: String): String? {
+            val trimmed = body.trimStart()
+            if (trimmed.isEmpty()) return "Empty response body (HTTP 200, 0 bytes)"
+            val looksLikeFeed = trimmed.startsWith("<?xml") || trimmed.startsWith("<rss") ||
+                trimmed.startsWith("<feed") || trimmed.startsWith("<rdf") ||
+                trimmed.contains("<rss ", ignoreCase = true) ||
+                trimmed.contains("<rdf:RDF", ignoreCase = true) ||
+                trimmed.contains("<feed ", ignoreCase = true) ||
+                trimmed.contains("<channel>", ignoreCase = true)
+            val looksLikeJson = trimmed.startsWith("{") || trimmed.startsWith("[")
+            val looksLikeHtml = trimmed.startsWith("<!doctype", ignoreCase = true) ||
+                trimmed.startsWith("<html", ignoreCase = true)
+            return when {
+                looksLikeHtml -> "Outlet answered with an HTML page instead of a feed (consent wall, " +
+                    "captcha or error page). Nothing was stored."
+                spec.normalizerId == "news-rss" && !looksLikeFeed ->
+                    "Response is not an RSS/Atom/RDF document, so no headline could be read from it."
+                looksLikeFeed || looksLikeJson -> null
+                else -> null
+            }
+        }
+
         private const val USER_AGENT = "OmniShieldX-WorldMonitor/2035.1 (Android; Passive-OSINT-Earth-Viewer)"
         private const val MAX_BODY_BYTES = 8 * 1024 * 1024
 

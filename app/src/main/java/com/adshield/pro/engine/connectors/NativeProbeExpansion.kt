@@ -308,7 +308,13 @@ class NativeProbeExpansion @Inject constructor(
         // UserManager.userCount needs MANAGE_USERS (privileged, non-grantable) and the no-argument
         // isManagedProfile flag only exists from Android 11, so both are handled explicitly instead
         // of being assumed.
+        //
+        // The flag is annotated @SystemApi and lint keeps reporting it as API 30 even behind an
+        // SDK_INT guard (it cannot see that the guard makes the call unreachable below R), so the
+        // suppression is scoped to the single call. It is not a style waiver: on API 29 the branch
+        // is not taken at all.
         val managed: Boolean? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            @Suppress("NewApi")
             runCatching { manager.isManagedProfile }.getOrNull()
         } else {
             null
