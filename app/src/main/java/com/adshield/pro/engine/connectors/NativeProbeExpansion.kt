@@ -302,20 +302,19 @@ class NativeProbeExpansion @Inject constructor(
         )
     }
 
+    /** Android 11+ only; the caller checks Build.VERSION.SDK_INT before calling. */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.R)
+    private fun isManagedProfile(manager: UserManager): Boolean = manager.isManagedProfile
+
     suspend fun workProfile(): ProbeResult {
         val manager = context.getSystemService(Context.USER_SERVICE) as? UserManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "UserManager unavailable")
         // UserManager.userCount needs MANAGE_USERS (privileged, non-grantable) and the no-argument
         // isManagedProfile flag only exists from Android 11, so both are handled explicitly instead
-        // of being assumed.
-        //
-        // The flag is annotated @SystemApi and lint keeps reporting it as API 30 even behind an
-        // SDK_INT guard (it cannot see that the guard makes the call unreachable below R), so the
-        // suppression is scoped to the single call. It is not a style waiver: on API 29 the branch
-        // is not taken at all.
+        // of being assumed. The call itself lives in a @RequiresApi helper: the annotation states
+        // the requirement in a way lint can verify, where @Suppress on an expression it did not read.
         val managed: Boolean? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            @Suppress("NewApi")
-            runCatching { manager.isManagedProfile }.getOrNull()
+            runCatching { isManagedProfile(manager) }.getOrNull()
         } else {
             null
         }

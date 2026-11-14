@@ -1400,7 +1400,7 @@ object WorldMonitorNormalizers {
             }.take(300)
 
             out += WorldEntity(
-                id = "news:${spec.providerId.substringAfterLast('.')}:${item.link.hashCode()}",
+                id = "news:${newsProviderSlug(spec.providerId)}:${item.link.hashCode()}",
                 providerId = spec.providerId,
                 providerName = spec.attribution,
                 category = WorldIntelCategory.NEWS,
@@ -1485,14 +1485,40 @@ object WorldMonitorNormalizers {
         val text = "${item.title} ${item.summary}"
         if (text.isBlank()) return null
         val lower = text.lowercase(Locale.US)
+
+        // Word-bounded, longest name first: "South Sudan" must beat "Sudan", "Nigeria" must beat
+        // "Niger", and a bare "Chad" must still be findable — an earlier minimum-length filter
+        // silently made every country with a short name unmatchable.
+        fun containsWord(needle: String): Boolean {
+            if (needle.isBlank()) return false
+            val pattern = Regex("(?<![\\p{L}])" + Regex.escape(needle) + "(?![\\p{L}])")
+            return pattern.containsMatchIn(lower)
+        }
+
+        val byName = countries
+            .asSequence()
+            .filter { it.name.none { ch -> ch == '(' } }
+            .sortedByDescending { it.name.length }
+            .firstOrNull { containsWord(it.name.lowercase(Locale.US)) }
+        if (byName != null) return byName
+
+        // Only if the item names no country at all: fall back to capitals, which are weaker
+        // evidence ("a London-based aid group" is not a story about the United Kingdom).
         return countries
             .asSequence()
-            .filter { it.name.length >= 4 && it.name.none { ch -> ch == '(' } }
-            .sortedByDescending { it.name.length }
-            .firstOrNull { c ->
-                val needle = c.name.lowercase(Locale.US)
-                lower.contains(needle) || (c.capital.length >= 5 && lower.contains(c.capital.lowercase(Locale.US)))
-            }
+            .filter { it.capital.length >= 5 }
+            .sortedByDescending { it.capital.length }
+            .firstOrNull { containsWord(it.capital.lowercase(Locale.US)) }
+    }
+
+    /** Stable short id segment per outlet, so an id reads as news:bbc:… rather than news:world:…. */
+    private fun newsProviderSlug(providerId: String): String = when (providerId) {
+        "wm.news.bbc.world" -> "bbc"
+        "wm.news.aljazeera" -> "aljazeera"
+        "wm.news.dw.world" -> "dw"
+        "wm.news.un" -> "un"
+        "wm.news.rappler" -> "rappler"
+        else -> providerId.substringAfterLast('.')
     }
 
     private data class NewsDesk(val label: String, val lat: Double, val lon: Double)

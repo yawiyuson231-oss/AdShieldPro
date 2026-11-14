@@ -33,6 +33,7 @@ import com.adshield.pro.engine.worldmonitor.WorldMonitorProviderRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -169,7 +170,7 @@ class WorldMonitorTestSuite {
             <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel>
               <title>BBC News - World</title>
               <item>
-                <title><![CDATA[Quake shakes Mindanao]]></title>
+                <title><![CDATA[Philippines quake shakes Mindanao]]></title>
                 <link>https://www.bbc.co.uk/news/world-1?at_medium=RSS&amp;at_campaign=rss</link>
                 <pubDate>Sat, 08 Nov 2026 11:00:00 GMT</pubDate>
                 <category>Asia</category>
@@ -179,14 +180,22 @@ class WorldMonitorTestSuite {
                 <title>Niger and Mali sign border accord</title>
                 <link>https://www.bbc.co.uk/news/world-2</link>
               </item>
+              <item>
+                <title>Markets rally as bond yields ease</title>
+                <link>https://www.bbc.co.uk/news/world-3</link>
+                <pubDate>Sat, 08 Nov 2026 12:00:00 GMT</pubDate>
+              </item>
             </channel></rss>
         """.trimIndent()
         val news = WorldMonitorNormalizers.normalize(spec("wm.news.bbc.world"), bbcRss, fixedNowMs)
-        assertEquals(2, news.size)
+        assertEquals(3, news.size)
         assertEquals(WorldIntelCategory.NEWS, news[0].category)
-        assertEquals("Quake shakes Mindanao", news[0].title)
+        assertEquals("Philippines quake shakes Mindanao", news[0].title)
         assertEquals("https://www.bbc.co.uk/news/world-1?at_medium=RSS&at_campaign=rss", news[0].sourceUrl)
         assertEquals("the channel <title> must never become an item title", false, news[0].title.contains("BBC News - World"))
+        assertTrue("every item needs a stable id", news.all { it.id.startsWith("news:bbc:") })
+
+        // Placement path 1: the headline names a country -> that country's centroid.
         assertEquals(GeoAccuracy.ADMIN_CENTROID, news[0].geoAccuracy)
         assertEquals("PH", news[0].countryCode?.uppercase())
         assertEquals("a feed-supplied image must be kept for inline reading",
@@ -195,9 +204,17 @@ class WorldMonitorTestSuite {
         assertNotNull("the feed date must be preserved", news[0].eventTimeEpochMs)
         assertTrue("stale items must expire", news[0].expiresAtEpochMs > news[0].eventTimeEpochMs)
 
-        // No <pubDate>: HISTORICAL + the newsroom's own dateline, never "now" and never a guess.
+        // Placement path 2: no date -> HISTORICAL, never "now". Niger is named, and must not be
+        // widened into Nigeria by a substring match.
         assertEquals(FreshnessClass.HISTORICAL, news[1].freshness)
-        assertEquals(GeoAccuracy.SOURCE_DESK, news[1].geoAccuracy)
+        assertEquals("NE", news[1].countryCode)
+        assertEquals(GeoAccuracy.ADMIN_CENTROID, news[1].geoAccuracy)
+
+        // Placement path 3: nothing placeable -> the newsroom's own dateline, stated in words.
+        assertEquals(GeoAccuracy.SOURCE_DESK, news[2].geoAccuracy)
+        assertNull(news[2].countryCode)
+        assertTrue("a dateline placement must be disclosed",
+            news[2].summary.contains("dateline", ignoreCase = true))
 
         // RDF / RSS 1.0 with dc:date, as DW publishes it.
         val dwRdf = """
@@ -812,7 +829,7 @@ class WorldMonitorTestSuite {
         // 8. Verify BBC World News RSS does not collide with UN News RSS
         val bbcRss = """
             <rss version="2.0"><channel>
-              <item><title>Iceland volcanic fissure monitored near Grindavik</title><description>Scientists in Iceland monitor seismic swarm.</description><link>https://www.bbc.com/news/world-europe-1001</link></item>
+              <item><title>Iceland volcanic fissure monitored near Grindavik</title><description>Scientists in Iceland monitor seismic swarm; Reykjavik remains unaffected.</description><link>https://www.bbc.com/news/world-europe-1001</link></item>
             </channel></rss>
         """.trimIndent()
         val bbcEnts = WorldMonitorNormalizers.normalize(spec("wm.news.bbc.world"), bbcRss, fixedNowMs)
