@@ -117,13 +117,14 @@ class AndroidTelegramFileIo @Inject constructor(
         TelegramHashResult(total, digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) })
     }
 
-    override suspend fun delete(path: String) = withContext(Dispatchers.IO) {
+    override suspend fun delete(path: String): Unit = withContext(Dispatchers.IO) {
         if (path.isBlank()) return@withContext
         runCatching {
             val file = File(path)
             file.delete()
             file.parentFile?.takeIf { it.name != TelegramLimits.STAGED_DIRECTORY }?.delete()
         }
+        Unit
     }
 
     /**
