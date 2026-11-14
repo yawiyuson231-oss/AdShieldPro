@@ -2,52 +2,44 @@ To honour the JVM settings for this build a single-use Daemon process will be fo
 Daemon will be stopped at the end of the build 
 
 > Configure project :app
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:184:31: 'fun RegisteringDomainObjectDelegateProviderWithAction<out TaskContainer, Task>.provideDelegate(receiver: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<TaskProvider<Task>>' is deprecated. Use 'val task = tasks.register(name) { }' instead. See the Gradle 9.6 upgrading guide.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:184:31: 'fun <T : Any, C : NamedDomainObjectContainer<T>> C.registering(action: T.() -> Unit): RegisteringDomainObjectDelegateProviderWithAction<out C, T>' is deprecated. Use 'val element = register(name) { }' instead. See the Gradle 9.6 upgrading guide.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:184:31: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:209:31: Unresolved reference 'security'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:218:69: Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:229:35: Unresolved reference 'net'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:233:41: Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:233:41: Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:233:47: Cannot infer type for type parameter 'T'. Specify it explicitly.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:189:31: 'fun RegisteringDomainObjectDelegateProviderWithAction<out TaskContainer, Task>.provideDelegate(receiver: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<TaskProvider<Task>>' is deprecated. Use 'val task = tasks.register(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:189:31: 'fun <T : Any, C : NamedDomainObjectContainer<T>> C.registering(action: T.() -> Unit): RegisteringDomainObjectDelegateProviderWithAction<out C, T>' is deprecated. Use 'val element = register(name) { }' instead. See the Gradle 9.6 upgrading guide.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:189:31: 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:246:26: Argument type mismatch: actual type is '(??? (Unknown lambda parameter type)) -> ??? (Unknown lambda return type)', but '(Closure<Any>..Closure<*>)' was expected.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:246:28: Cannot infer type for value parameter 'details'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:247:29: Unresolved reference 'path'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts:247:44: Unresolved reference 'path'.
 
 FAILURE: Build failed with an exception.
 
 * Where:
-Build file '/home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts' line: 184
+Build file '/home/runner/work/AdShieldPro/AdShieldPro/app/build.gradle.kts' line: 189
 
 * What went wrong:
 Script compilation errors:
 
-  Line 184: val fetchTdlibNative by tasks.registering {
+  Line 189: val fetchTdlibNative by tasks.registering {
                                           ^ 'fun RegisteringDomainObjectDelegateProviderWithAction<out TaskContainer, Task>.provideDelegate(receiver: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<TaskProvider<Task>>' is deprecated. Use 'val task = tasks.register(name) { }' instead. See the Gradle 9.6 upgrading guide.
 
-  Line 184: val fetchTdlibNative by tasks.registering {
+  Line 189: val fetchTdlibNative by tasks.registering {
                                           ^ 'fun <T : Any, C : NamedDomainObjectContainer<T>> C.registering(action: T.() -> Unit): RegisteringDomainObjectDelegateProviderWithAction<out C, T>' is deprecated. Use 'val element = register(name) { }' instead. See the Gradle 9.6 upgrading guide.
 
-  Line 184: val fetchTdlibNative by tasks.registering {
+  Line 189: val fetchTdlibNative by tasks.registering {
                                           ^ 'fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide.
 
-  Line 209:             val digest = java.security.MessageDigest.getInstance("SHA-256")
-                                          ^ Unresolved reference 'security'.
+  Line 246:                 eachFile { details ->
+                                     ^ Argument type mismatch: actual type is '(??? (Unknown lambda parameter type)) -> ??? (Unknown lambda return type)', but '(Closure<Any>..Closure<*>)' was expected.
 
-  Line 218:             return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
-                                                                                ^ Unresolved reference 'it'.
+  Line 246:                 eachFile { details ->
+                                       ^ Cannot infer type for value parameter 'details'. Specify it explicitly.
 
-  Line 229:             val connection = java.net.URI(archiveUrl).toURL().openConnection()
-                                              ^ Unresolved reference 'net'.
+  Line 247:                     details.path = details.path.substringAfter("/src/main/jniLibs/")
+                                        ^ Unresolved reference 'path'.
 
-  Line 233:             connection.getInputStream().use { input ->
-                                                    ^ Cannot infer type for type parameter 'T'. Specify it explicitly.
+  Line 247:                     details.path = details.path.substringAfter("/src/main/jniLibs/")
+                                                       ^ Unresolved reference 'path'.
 
-  Line 233:             connection.getInputStream().use { input ->
-                                                    ^ Cannot infer type for type parameter 'R'. Specify it explicitly.
-
-  Line 233:             connection.getInputStream().use { input ->
-                                                          ^ Cannot infer type for type parameter 'T'. Specify it explicitly.
-
-9 errors
+7 errors
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -55,7 +47,7 @@ Script compilation errors:
 > Get more help at https://help.gradle.org.
 
 * Exception is:
-ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(message='fun RegisteringDomainObjectDelegateProviderWithAction<out TaskContainer, Task>.provideDelegate(receiver: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<TaskProvider<Task>>' is deprecated. Use 'val task = tasks.register(name) { }' instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (184:31)), ScriptCompilationError(message='fun <T : Any, C : NamedDomainObjectContainer<T>> C.registering(action: T.() -> Unit): RegisteringDomainObjectDelegateProviderWithAction<out C, T>' is deprecated. Use 'val element = register(name) { }' instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (184:31)), ScriptCompilationError(message='fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (184:31)), ScriptCompilationError(message=Unresolved reference 'security'., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (209:31)), ScriptCompilationError(message=Unresolved reference 'it'., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (218:69)), ScriptCompilationError(message=Unresolved reference 'net'., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (229:35)), ScriptCompilationError(message=Cannot infer type for type parameter 'T'. Specify it explicitly., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (233:41)), ScriptCompilationError(message=Cannot infer type for type parameter 'R'. Specify it explicitly., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (233:41)), ScriptCompilationError(message=Cannot infer type for type parameter 'T'. Specify it explicitly., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-2393531016418915262.tmp/build.gradle.kts (233:47))])
+ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(message='fun RegisteringDomainObjectDelegateProviderWithAction<out TaskContainer, Task>.provideDelegate(receiver: Any?, property: KProperty<*>): ExistingDomainObjectDelegate<TaskProvider<Task>>' is deprecated. Use 'val task = tasks.register(name) { }' instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (189:31)), ScriptCompilationError(message='fun <T : Any, C : NamedDomainObjectContainer<T>> C.registering(action: T.() -> Unit): RegisteringDomainObjectDelegateProviderWithAction<out C, T>' is deprecated. Use 'val element = register(name) { }' instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (189:31)), ScriptCompilationError(message='fun <T> ExistingDomainObjectDelegate<out T>.getValue(receiver: Any?, property: KProperty<*>): T' is deprecated. Use the named() API instead. See the Gradle 9.6 upgrading guide., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (189:31)), ScriptCompilationError(message=Argument type mismatch: actual type is '(??? (Unknown lambda parameter type)) -> ??? (Unknown lambda return type)', but '(Closure<Any>..Closure<*>)' was expected., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (246:26)), ScriptCompilationError(message=Cannot infer type for value parameter 'details'. Specify it explicitly., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (246:28)), ScriptCompilationError(message=Unresolved reference 'path'., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (247:29)), ScriptCompilationError(message=Unresolved reference 'path'., location=/home/runner/.gradle/.tmp/gradle-kotlin-dsl-17717955307265141298.tmp/build.gradle.kts (247:44))])
 	at org.gradle.kotlin.dsl.support.KotlinCompilerKt.reportToMessageCollectorAndThrowOnErrors(KotlinCompiler.kt:211)
 	at org.gradle.kotlin.dsl.support.KotlinCompilerKt.compileKotlinScriptModuleTo(KotlinCompiler.kt:180)
 	at org.gradle.kotlin.dsl.support.KotlinCompilerKt.compileKotlinScriptToDirectory(KotlinCompiler.kt:134)
@@ -352,4 +344,4 @@ ScriptCompilationException(scriptCompilationErrors=[ScriptCompilationError(messa
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 
 
-BUILD FAILED in 41s
+BUILD FAILED in 34s
