@@ -1,5 +1,6 @@
 package com.adshield.pro.engine.connectors
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AlarmManager
 import android.app.NotificationManager
@@ -302,6 +303,10 @@ class NativeProbeExpansion @Inject constructor(
         )
     }
 
+    // The API-30 UserManager.isManagedProfile call is explicitly guarded by SDK_INT >= R below;
+    // lint does not carry that guard through the inline runCatching lambda, so suppress the
+    // false positive on this function only.
+    @SuppressLint("NewApi")
     suspend fun workProfile(): ProbeResult {
         val manager = context.getSystemService(Context.USER_SERVICE) as? UserManager
             ?: return ProbeResult(false, ConnectorStatus.DEGRADED, "UserManager unavailable")

@@ -43,6 +43,10 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
 
+private fun sha256(bytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes)
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+
 /**
  * Telegram Cloud Storage verification without a device, an emulator, libtdjni or a Telegram
  * account. [ScriptedTdlibPort] answers the *real* TdApi request objects with *real* TdApi
@@ -341,10 +345,6 @@ class TelegramCloudTestSuite {
         files.staged[uri] = bytes
         return uri
     }
-
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes)
-            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
     /** Complete the official auth flow (phone → code → password → ready). */
     private suspend fun Fixture.connectFully(target: TelegramTargetKind = TelegramTargetKind.SAVED_MESSAGES) {
