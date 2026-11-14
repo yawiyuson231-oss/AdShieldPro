@@ -121,6 +121,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // libtdjni.so declares libsslx.so and libcryptox.so as DT_NEEDED. Extracting the
+            // libraries keeps those dependencies resolvable on every supported Android version.
+            useLegacyPackaging = true
+        }
     }
 
     testOptions {
@@ -161,8 +166,97 @@ ksp {
     arg("room.incremental", "true")
 }
 
+// ---------------------------------------------------------------------------------------------
+// Official TDLib native runtime.
+//
+// app/src/main/java/org/drinkless/tdlib/{Client,TdApi}.java are the generated official TDLib
+// Java bindings (Boost 1.0). The matching libtdjni.so + OpenSSL libraries are NOT committed:
+// they are downloaded at build time from a pinned commit of a verbatim mirror of the Telegram X
+// TDLib prebuilt distribution, and every .so is checked against tdlib/native-checksums.sha256
+// before it can be packaged. See tdlib/README.md and docs/TELEGRAM_CLOUD_STORAGE.md.
+// ---------------------------------------------------------------------------------------------
+val tdlibCommit = "7dede3f1a716b7398caf79acd413ad9d5331f079"
+val tdlibArchiveUrl = "https://codeload.github.com/capullo-tech/lib-tdlib-android/tar.gz/$tdlibCommit"
+val tdlibJniLibsDir = layout.projectDirectory.dir("src/main/jniLibs")
+val tdlibChecksumsFile = rootProject.layout.projectDirectory.file("tdlib/native-checksums.sha256")
+val tdlibCacheDir = layout.buildDirectory.dir("tdlib-native")
+
+val fetchTdlibNative by tasks.registering {
+    group = "telegram"
+    description = "Fetch and verify the pinned official TDLib Android native libraries"
+    val jniLibsDir = tdlibJniLibsDir
+    val checksumsFile = tdlibChecksumsFile
+    val archiveUrl = tdlibArchiveUrl
+    val cacheDir = tdlibCacheDir
+    val pinnedCommit = tdlibCommit
+    inputs.file(checksumsFile)
+    outputs.dir(jniLibsDir)
+    // Always re-verify: a partially deleted jniLibs directory must never pass as up-to-date.
+    outputs.upToDateWhen { false }
+    doLast {
+        val expected = checksumsFile.asFile.readLines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
+            .associate { line ->
+                val parts = line.split(Regex("\\s+"), limit = 2)
+                require(parts.size == 2) { "Invalid TDLib checksum line: $line" }
+                parts[1].trim() to parts[0].trim().lowercase()
+            }
+        require(expected.size == 12) { "Expected 12 pinned TDLib libraries, found ${expected.size}" }
+        val destination = jniLibsDir.asFile
+        fun sha256(file: File): String? {
+            if (!file.isFile) return null
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(128 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    if (read > 0) digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        }
+        val missing = expected.filter { (path, hash) -> sha256(File(destination, path)) != hash }
+        if (missing.isEmpty()) {
+            logger.lifecycle("TDLib native runtime: ${expected.size} checksum-verified libraries present")
+            return@doLast
+        }
+        val cache = cacheDir.get().asFile.apply { mkdirs() }
+        val archive = File(cache, "tdlib-$pinnedCommit.tar.gz")
+        if (!archive.isFile || archive.length() < 1_000_000L) {
+            logger.lifecycle("Fetching pinned TDLib native runtime ($pinnedCommit) from GitHub")
+            val connection = java.net.URI(archiveUrl).toURL().openConnection()
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 180_000
+            connection.setRequestProperty("User-Agent", "AdShieldPro-gradle")
+            connection.getInputStream().use { input ->
+                archive.outputStream().use { output -> input.copyTo(output, 128 * 1024) }
+            }
+        }
+        destination.mkdirs()
+        project.copy {
+            from(project.tarTree(project.resources.gzip(archive))) {
+                include("**/src/main/jniLibs/**/*.so")
+                eachFile { path = path.substringAfter("/src/main/jniLibs/") }
+                includeEmptyDirs = false
+            }
+            into(destination)
+        }
+        val bad = expected.filter { (path, hash) -> sha256(File(destination, path)) != hash }
+        require(bad.isEmpty()) {
+            "TDLib native checksum mismatch for ${bad.keys}. " +
+                "See docs/TELEGRAM_CLOUD_STORAGE.md (do not ship unverified native code)."
+        }
+        logger.lifecycle("TDLib native runtime: ${expected.size} libraries verified and installed")
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchTdlibNative) }
+
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.annotation)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

@@ -66,6 +66,14 @@ The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 
 HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
 
+`TelegramCloudTestSuite` verifies the Telegram provider's official-TDLib request objects,
+authorization state machine, SHA-256 deduplication, upload/download progress, interrupted-transfer
+recovery, encrypted session storage and complete disconnect wipe without an emulator or a Telegram
+account. Live-account sign-in, MTProto transfers and the universal APK's four TDLib ABIs require the
+manual checklist in [`TELEGRAM_CLOUD_STORAGE.md`](TELEGRAM_CLOUD_STORAGE.md#8-testing). The
+`:app:fetchTdlibNative` task (a `preBuild` dependency) downloads and SHA-256-verifies the pinned
+TDLib native libraries on every build.
+
 `AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
 device-independent engine code directly, which is where all DNS, filtering and scoring
 logic lives. `AetherCoreTest`, `BatteryIntelligenceTestSuite`, `DashboardPresentationTest`,

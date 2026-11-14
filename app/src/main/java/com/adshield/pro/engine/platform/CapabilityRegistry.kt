@@ -629,6 +629,19 @@ object CapabilityRegistry {
             "InfinityCoreTestSuite.testWebDavXml_parsesOnlyHttpsNextcloudShareLinks plus manual Nextcloud share test"
         ),
         cap(
+            "telegram-tdlib-storage", "Telegram Cloud Storage via official TDLib, Keystore session and real transfers", CapabilityArea.CLOUD_STORAGE,
+            CapabilityStatus.PARTIAL, "data/telegram/TelegramStorageRepository.kt", listOf(PERM_INTERNET),
+            listOf(
+                "Official org.drinkless.tdlib.Client/TdApi JNI requests and Telegram MTProto updates (updateFile, updateAuthorizationState)",
+                "Android Keystore AES-256-GCM encrypted session/index/transfer records and SAF document streams"
+            ),
+            listOf(
+                "Requires the user's own api_id/api_hash from my.telegram.org and a real Telegram account; live-account sign-in and network transfers need manual device verification",
+                "2 GB per-file ceiling; Telegram publishes no quota or permanent-backup guarantee; only the designated Saved Messages/private channel is read"
+            ),
+            "TelegramCloudTestSuite.testOfficialAuthorizationFlowUsesRealTdlibRequestsAndNeverPersistsSecrets plus manual device smoke test (docs/TELEGRAM_CLOUD_STORAGE.md)"
+        ),
+        cap(
             "nextcloud-server-infrastructure", "Open-source Nextcloud/PostgreSQL backend deployment manifests", CapabilityArea.CLOUD_STORAGE,
             CapabilityStatus.PARTIAL, "infra/docker-compose.yml", listOf(PERM_INTERNET),
             listOf("Operator-supplied Nextcloud Community, PostgreSQL, HTTPS reverse proxy and persistent volumes"),
