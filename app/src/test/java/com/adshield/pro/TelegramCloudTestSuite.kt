@@ -196,7 +196,14 @@ class TelegramCloudTestSuite {
                     (historyMessages.firstOrNull { it.id == query.messageId }
                         ?: TdApi.Message().apply { id = query.messageId; content = TdApi.MessageDocument() }) as T
                 }
-                is TdApi.GetFile -> file(query.fileId) as T
+                is TdApi.GetFile -> {
+                    // TDLib's GetFile reports the current local download offset. The scripted
+                    // port must reflect a resumed/interrupted local file just as TDLib does.
+                    val state = file(query.fileId)
+                    state.local?.downloadOffset = downloadOffset
+                    state.local?.downloadedSize = downloadOffset
+                    state as T
+                }
                 is TdApi.DownloadFile -> {
                     failDownloadWith?.let { throw it }
                     downloadOffset = query.offset
@@ -376,12 +383,13 @@ class TelegramCloudTestSuite {
         assertEquals(params.filesDirectory, tdApi.filesDirectory)
         assertEquals(false, tdApi.useSecretChats)
 
+        f.repo.submitPhoneNumber("+639171234567")
         val phoneQuery = f.port.sent.filterIsInstance<TdApi.SetAuthenticationPhoneNumber>().single()
         assertEquals("+639171234567", phoneQuery.phoneNumber)
         assertFalse(phoneQuery.settings.allowFlashCall)
         assertFalse(phoneQuery.settings.allowSmsRetrieverApi)
-        f.repo.submitPhoneNumber("+639171234567")
         f.repo.submitCode("99887")
+        f.repo.submitPassword("correct horse battery staple")
         val passwordQuery = f.port.sent.filterIsInstance<TdApi.CheckAuthenticationPassword>().single()
         assertEquals("correct horse battery staple", passwordQuery.password)
 
