@@ -186,7 +186,7 @@ val tdlibJniLibsDir = layout.projectDirectory.dir("src/main/jniLibs")
 val tdlibChecksumsFile = rootProject.layout.projectDirectory.file("tdlib/native-checksums.sha256")
 val tdlibCacheDir = layout.buildDirectory.dir("tdlib-native")
 
-val fetchTdlibNative by tasks.registering {
+val fetchTdlibNative = tasks.register("fetchTdlibNative") {
     group = "telegram"
     description = "Fetch and verify the pinned official TDLib Android native libraries"
     val jniLibsDir = tdlibJniLibsDir
@@ -240,15 +240,25 @@ val fetchTdlibNative by tasks.registering {
             }
         }
         destination.mkdirs()
-        project.copy {
-            from(project.tarTree(project.resources.gzip(archive))) {
-                include("**/src/main/jniLibs/**/*.so")
-                eachFile { details ->
-                    details.path = details.path.substringAfter("/src/main/jniLibs/")
-                }
-                includeEmptyDirs = false
-            }
-            into(destination)
+        // Extract with the system tar (available on Linux/macOS/Windows build agents with Git
+        // Bash) and copy the pinned paths explicitly. Avoids Gradle CopySpec/Groovy Closure
+        // overloads and keeps the archive layout out of the build script's type inference.
+        val extractDir = File(cache, "extracted-$pinnedCommit")
+        if (!extractDir.isDirectory) extractDir.mkdirs()
+        val process = ProcessBuilder(
+            "tar", "-xzf", archive.absolutePath, "-C", extractDir.absolutePath
+        ).redirectErrorStream(true).start()
+        val tarOutput = process.inputStream.bufferedReader().readText()
+        require(process.waitFor() == 0) { "Could not unpack TDLib archive: $tarOutput" }
+        val sourceRoot = File(
+            extractDir,
+            "lib-tdlib-android-$pinnedCommit/src/main/jniLibs"
+        )
+        expected.keys.forEach { relative ->
+            val source = File(sourceRoot, relative)
+            require(source.isFile) { "TDLib archive is missing $relative" }
+            val target = File(destination, relative).apply { parentFile.mkdirs() }
+            source.copyTo(target, overwrite = true)
         }
         val bad = expected.filter { (path, hash) -> sha256(File(destination, path)) != hash }
         require(bad.isEmpty()) {
