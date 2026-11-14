@@ -72,7 +72,8 @@ recovery, encrypted session storage and complete disconnect wipe without an emul
 account. Live-account sign-in, MTProto transfers and the universal APK's four TDLib ABIs require the
 manual checklist in [`TELEGRAM_CLOUD_STORAGE.md`](TELEGRAM_CLOUD_STORAGE.md#8-testing). The
 `:app:fetchTdlibNative` task (a `preBuild` dependency) downloads and SHA-256-verifies the pinned
-TDLib native libraries on every build.
+TDLib native libraries on every build, and the Android build workflow asserts that the debug APK
+contains all twelve libraries across the four supported ABIs.
 
 `AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
 device-independent engine code directly, which is where all DNS, filtering and scoring

@@ -246,6 +246,12 @@ I/O double. It covers:
 
 Run: `./gradlew :app:testDebugUnitTest` (or `tools/gradle-ci.sh .ci/test.log :app:testDebugUnitTest`).
 
+The Android build workflow additionally compiles Kotlin/Java, assembles both debug and
+R8-minified release APKs, runs the universal-build gate, executes all JVM tests, runs Android
+lint, and asserts that the debug APK packages `libtdjni.so`, `libsslx.so` and `libcryptox.so` for
+`arm64-v8a`, `armeabi-v7a`, `x86` and `x86_64`. Those twelve libraries are downloaded and
+SHA-256-verified by `:app:fetchTdlibNative` on every build; a mismatch fails the build.
+
 ### Manual on-device checklist (real account, real network)
 
 | # | Step | Expected |
