@@ -1,3 +1,8 @@
+// The Gradle Kotlin DSL exposes `java` as the Java plugin extension, so JDK packages used by
+// the TDLib verification task need explicit imports.
+import java.net.URI
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     // AGP 9 compiles Kotlin itself; org.jetbrains.kotlin.android must not be applied.
@@ -206,7 +211,7 @@ val fetchTdlibNative by tasks.registering {
         val destination = jniLibsDir.asFile
         fun sha256(file: File): String? {
             if (!file.isFile) return null
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val digest = MessageDigest.getInstance("SHA-256")
             file.inputStream().use { input ->
                 val buffer = ByteArray(128 * 1024)
                 while (true) {
@@ -226,7 +231,7 @@ val fetchTdlibNative by tasks.registering {
         val archive = File(cache, "tdlib-$pinnedCommit.tar.gz")
         if (!archive.isFile || archive.length() < 1_000_000L) {
             logger.lifecycle("Fetching pinned TDLib native runtime ($pinnedCommit) from GitHub")
-            val connection = java.net.URI(archiveUrl).toURL().openConnection()
+            val connection = URI(archiveUrl).toURL().openConnection()
             connection.connectTimeout = 30_000
             connection.readTimeout = 180_000
             connection.setRequestProperty("User-Agent", "AdShieldPro-gradle")
@@ -238,7 +243,9 @@ val fetchTdlibNative by tasks.registering {
         project.copy {
             from(project.tarTree(project.resources.gzip(archive))) {
                 include("**/src/main/jniLibs/**/*.so")
-                eachFile { path = path.substringAfter("/src/main/jniLibs/") }
+                eachFile { details ->
+                    details.path = details.path.substringAfter("/src/main/jniLibs/")
+                }
                 includeEmptyDirs = false
             }
             into(destination)
