@@ -103,18 +103,18 @@ object ProtectionStatusEvaluator {
             !connected -> PipelineStage("upstream", "Upstream resolver", "${config.protocol.label} · ${config.preset.displayName}", StageState.STANDBY)
             circuitOpen -> PipelineStage(
                 "upstream", "Upstream resolver",
-                "${config.preset.displayName} circuit open — using the next provider you selected",
+                "${config.preset.displayName} is unavailable — check your resolver and failover settings",
                 StageState.DEGRADED
             )
             vpn.averageLatencyMs > 0 -> PipelineStage(
                 "upstream", "Upstream resolver",
-                "${config.protocol.label} · ${config.preset.displayName} · ${vpn.averageLatencyMs} ms measured",
+                "${config.protocol.label} · ${config.preset.displayName} configured · ${vpn.averageLatencyMs} ms average",
                 StageState.ACTIVE
             )
             else -> PipelineStage(
                 "upstream", "Upstream resolver",
                 "${config.protocol.label} · ${config.preset.displayName} · awaiting first query",
-                if (connected) StageState.ACTIVE else StageState.STANDBY
+                StageState.STANDBY
             )
         }
 
@@ -132,6 +132,7 @@ object ProtectionStatusEvaluator {
         val transports = policy.protectedTransports
         val transportRestricted = transports.isNotEmpty() && transports.size < NetworkTransportPolicy.entries.size
         val policyStage = when {
+            !connected -> PipelineStage("policy", "Policy", "Applied when protection is on", StageState.STANDBY)
             emergency -> PipelineStage(
                 "policy", "Policy", "Emergency allowlist-only: only explicit allows resolve", StageState.ATTENTION
             )
@@ -158,7 +159,7 @@ object ProtectionStatusEvaluator {
         val stages = listOf(tunnelStage, filterStage, upstreamStage, integrityStage, policyStage, cacheStage)
         val overall = when {
             vpn.status == VpnStatus.ERROR || vpn.status == VpnStatus.DISCONNECTED -> StageState.OFFLINE
-            vpn.status == VpnStatus.PAUSED || emergency -> StageState.ATTENTION
+            vpn.status == VpnStatus.PAUSED || (connected && emergency) -> StageState.ATTENTION
             stages.any { it.state == StageState.DEGRADED } -> StageState.DEGRADED
             vpn.status != VpnStatus.CONNECTED -> StageState.STANDBY
             else -> StageState.ACTIVE
@@ -189,7 +190,7 @@ object ProtectionStatusEvaluator {
         val headline = when (overall) {
             StageState.ACTIVE -> if (isLive) "PROTECTED · WORKING" else "PROTECTED · IDLE"
             StageState.DEGRADED -> "PROTECTED · DEGRADED"
-            StageState.ATTENTION -> if (emergency) "EMERGENCY LOCKDOWN" else "FILTERING PAUSED"
+            StageState.ATTENTION -> if (vpn.status == VpnStatus.PAUSED) "FILTERING PAUSED" else "EMERGENCY LOCKDOWN"
             StageState.STANDBY -> when (vpn.status) {
                 VpnStatus.STARTING -> "STARTING"
                 VpnStatus.RECONNECTING -> "RECONNECTING"
@@ -200,18 +201,18 @@ object ProtectionStatusEvaluator {
 
         val summary = when (overall) {
             StageState.ACTIVE -> if (isLive) {
-                "Filtering live traffic through ${config.protocol.label} · ${config.preset.displayName}"
+                "DNS queries handled this session · ${config.protocol.label} · ${config.preset.displayName} configured"
             } else {
                 "Tunnel is up and waiting for DNS traffic"
             }
-            StageState.DEGRADED -> "Protection is on, but one stage reported a problem — see the pipeline below"
-            StageState.ATTENTION -> if (emergency) {
+            StageState.DEGRADED -> "Protection is on, but needs attention. Check protection details on Home."
+            StageState.ATTENTION -> if (vpn.status != VpnStatus.PAUSED && emergency) {
                 "Only user allowlist and built-in safety entries resolve"
             } else {
                 "The tunnel is up but DNS is passing through unfiltered"
             }
             StageState.STANDBY -> stages.first { it.state == StageState.STANDBY }.detail
-            StageState.OFFLINE -> vpn.lastError ?: "Turn on protection to start filtering DNS"
+            StageState.OFFLINE -> if (vpn.status == VpnStatus.ERROR) vpn.lastError ?: "The tunnel could not start" else "Turn on protection to start filtering DNS"
         }
 
         return ProtectionPipelineStatus(
@@ -245,6 +246,7 @@ object ProtectionStatusEvaluator {
         val upstream = when {
             vpn.status != VpnStatus.CONNECTED -> 0
             stages.first { it.id == "upstream" }.state == StageState.DEGRADED -> 10
+            stages.first { it.id == "upstream" }.state == StageState.STANDBY -> 0
             else -> 25
         }
         val policy = if (vpn.status == VpnStatus.CONNECTED) (if (emergency) 5 else 10) else 0

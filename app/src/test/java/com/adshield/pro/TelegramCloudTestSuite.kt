@@ -23,6 +23,7 @@ import com.adshield.pro.data.telegram.TelegramTdlibPort
 import com.adshield.pro.data.telegram.TelegramTransferKind
 import com.adshield.pro.data.telegram.TelegramTransferState
 import com.adshield.pro.data.telegram.mapAuthorizationState
+import com.adshield.pro.data.telegram.initializeTdlibParameters
 import com.adshield.pro.data.telegram.toTdApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -159,6 +160,7 @@ class TelegramCloudTestSuite {
         var historyMessages: MutableList<TdApi.Message> = mutableListOf()
         var searchResults: MutableList<TdApi.Message> = mutableListOf()
         var startThrows: TelegramTdlibException? = null
+        var codeThrows: TelegramTdlibException? = null
         var failDownloadWith: TelegramTdlibException? = null
         var autoCompleteDownload = true
 
@@ -172,6 +174,7 @@ class TelegramCloudTestSuite {
                     TdApi.Ok() as T
                 }
                 is TdApi.CheckAuthenticationCode -> {
+                    codeThrows?.let { throw it }
                     authState.value = TelegramAuthStep.WAIT_PASSWORD
                     TdApi.Ok() as T
                 }
@@ -410,6 +413,84 @@ class TelegramCloudTestSuite {
         assertEquals(123456, loaded.apiId)
         assertEquals("0123456789abcdef0123456789abcdef", loaded.apiHash)
         assertTrue(loaded.isComplete)
+    }
+
+    @Test
+    fun testTdlibParametersHandleEarlyUpdateErrorsAndTimeout() = runBlocking {
+        val auth = MutableStateFlow(TelegramAuthStep.WAIT_TDLIB_PARAMETERS)
+        var sent = 0
+        initializeTdlibParameters(auth, timeoutMs = 1_000) { sent++ }
+        assertEquals(1, sent)
+
+        try {
+            initializeTdlibParameters(auth, timeoutMs = 1_000) {
+                throw TelegramTdlibException(400, "Invalid API credentials")
+            }
+            fail("parameter errors must reach the sign-in flow")
+        } catch (failure: TelegramTdlibException) {
+            assertEquals(400, failure.code)
+        }
+
+        auth.value = TelegramAuthStep.INITIALIZING
+        try {
+            initializeTdlibParameters(auth, timeoutMs = 20) { sent++ }
+            fail("waiting for parameters must time out")
+        } catch (failure: TelegramTdlibException) {
+            assertTrue(failure.message!!.contains("timed out"))
+        }
+        assertEquals(1, sent)
+    }
+
+    @Test
+    fun testFailedStartupShowsErrorAndAllowsAnotherLoginAttempt() = runBlocking {
+        val f = Fixture()
+        f.port.startThrows = TelegramTdlibException(400, "Invalid API credentials")
+        try {
+            f.repo.connect(123456, "0123456789abcdef0123456789abcdef", TelegramTargetKind.SAVED_MESSAGES)
+            fail("startup failure should be reported")
+        } catch (failure: TelegramTdlibException) {
+            assertEquals(400, failure.code)
+        }
+        assertEquals(TelegramAuthStep.DISCONNECTED, f.repo.status.value.step)
+        assertTrue(f.repo.status.value.error!!.contains("Invalid API credentials"))
+        assertFalse(f.repo.status.value.connected)
+        f.port.startThrows = null
+        f.repo.connect(123456, "0123456789abcdef0123456789abcdef", TelegramTargetKind.SAVED_MESSAGES)
+        assertEquals(TelegramAuthStep.WAIT_PHONE_NUMBER, f.repo.status.value.step)
+    }
+
+    @Test
+    fun testWrongCodeCanBeCorrectedWithoutRestartingLogin() = runBlocking {
+        val f = Fixture()
+        f.repo.connect(123456, "0123456789abcdef0123456789abcdef", TelegramTargetKind.SAVED_MESSAGES)
+        f.repo.submitPhoneNumber("+639171234567")
+        f.port.codeThrows = TelegramTdlibException(400, "Invalid login code")
+        try {
+            f.repo.submitCode("wrong")
+            fail("an invalid code must be rejected")
+        } catch (failure: TelegramTdlibException) {
+            assertEquals(400, failure.code)
+        }
+        assertEquals(TelegramAuthStep.WAIT_CODE, f.repo.status.value.step)
+        assertFalse(f.repo.status.value.connected)
+        f.port.codeThrows = null
+        f.repo.submitCode("12345")
+        f.repo.submitPassword("password")
+        assertTrue(f.repo.status.value.connected)
+    }
+
+    @Test
+    fun testCheckingAfterExternalConfirmationFinishesLoginOnce() = runBlocking {
+        val f = Fixture()
+        f.repo.connect(123456, "0123456789abcdef0123456789abcdef", TelegramTargetKind.PRIVATE_CHANNEL)
+        f.port.authState.value = TelegramAuthStep.WAIT_OTHER_DEVICE_CONFIRMATION
+        f.repo.checkAuthorization()
+        assertEquals(TelegramAuthStep.WAIT_OTHER_DEVICE_CONFIRMATION, f.repo.status.value.step)
+        f.port.authState.value = TelegramAuthStep.READY
+        f.repo.checkAuthorization()
+        assertTrue(f.repo.status.value.connected)
+        f.repo.checkAuthorization()
+        assertEquals(1, f.port.sent.filterIsInstance<TdApi.CreateNewSupergroupChat>().size)
     }
 
     @Test

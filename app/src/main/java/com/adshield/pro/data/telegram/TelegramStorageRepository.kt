@@ -127,10 +127,10 @@ class TelegramStorageRepository @Inject constructor(
                     error = "TDLib rejected the local database key; the session was cleared. Connect again."
                 )
             } else {
-                applyStatus(port.authState.value, saved, failure.message)
+                applyStatus(TelegramAuthStep.UNSUPPORTED, saved, failure.message)
             }
         } catch (failure: Exception) {
-            applyStatus(port.authState.value, saved, failure.message)
+            applyStatus(TelegramAuthStep.UNSUPPORTED, saved, failure.message ?: "Could not start Telegram. Try signing in again.")
         }
     }
 
@@ -196,7 +196,13 @@ class TelegramStorageRepository @Inject constructor(
         )
         session = created
         store.saveSession(created)
-        startClient(created)
+        try {
+            startClient(created)
+        } catch (failure: Exception) {
+            runCatching { port.close() }
+            applyStatus(TelegramAuthStep.DISCONNECTED, created, failure.message ?: "Could not start Telegram. Try again.")
+            throw failure
+        }
         val step = withTimeoutOrNull(30_000L) {
             port.authState.first {
                 it != TelegramAuthStep.INITIALIZING && it != TelegramAuthStep.WAIT_TDLIB_PARAMETERS
@@ -233,6 +239,17 @@ class TelegramStorageRepository @Inject constructor(
         }
         port.send(TdApi.CheckAuthenticationPassword().apply { this.password = passwordInput })
         advanceAuthState(TelegramAuthStep.WAIT_PASSWORD)
+    }
+
+    /** Re-read TDLib after an external confirmation or a delayed authorization update. */
+    suspend fun checkAuthorization() {
+        val current = session ?: return
+        val step = port.authState.value
+        if (step == TelegramAuthStep.READY && !current.isComplete) {
+            finalizeAuthorization(current)
+        } else {
+            applyStatus(step, current)
+        }
     }
 
     private suspend fun advanceAuthState(from: TelegramAuthStep) {

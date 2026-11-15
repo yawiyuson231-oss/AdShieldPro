@@ -4,15 +4,11 @@ import android.content.Context
 import android.os.Build
 import com.adshield.pro.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import org.drinkless.tdlib.Client
@@ -66,7 +62,6 @@ class AndroidTdlibPort @Inject constructor(
     private val pathsFactory: AndroidTdlibParametersFactory
 ) : TelegramTdlibPort {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _authState = MutableStateFlow(TelegramAuthStep.DISCONNECTED)
     override val authState: StateFlow<TelegramAuthStep> = _authState
     private val _connectionState = MutableStateFlow(TelegramConnectionState.OFFLINE)
@@ -80,7 +75,7 @@ class AndroidTdlibPort @Inject constructor(
     private var client: Client? = null
 
     @Volatile
-    private var parameters: TdApi.SetTdlibParameters? = null
+    private var generation: Long = 0
 
     override suspend fun <T : TdApi.Object> send(query: TdApi.Function<T>): T = suspendCancellableCoroutine { cont ->
         val active = client
@@ -114,15 +109,20 @@ class AndroidTdlibPort @Inject constructor(
         // Verbosity 1 = errors only, and no persistent log file: session data never lands on disk
         // through TDLib logging. Nothing about TdApi objects, phone numbers or tokens is logged.
         runCatching { Client.execute(TdApi.SetLogVerbosityLevel(1)) }
-        parameters = params.toTdApi()
         _authState.value = TelegramAuthStep.INITIALIZING
+        val currentGeneration = ++generation
         client = Client.create(
             object : Client.ResultHandler {
-                override fun onResult(update: TdApi.Object) = dispatch(update)
+                override fun onResult(update: TdApi.Object) {
+                    if (generation == currentGeneration) dispatch(update)
+                }
             },
             NOOP_EXCEPTION_HANDLER,
             NOOP_EXCEPTION_HANDLER
         )
+        // The first update can arrive before Client.create returns. Wait for it here, after
+        // assigning client, and observe the parameter request result instead of dropping errors.
+        initializeTdlibParameters(authState) { send(params.toTdApi()) }
     }
 
     private fun dispatch(update: TdApi.Object) {
@@ -130,16 +130,6 @@ class AndroidTdlibPort @Inject constructor(
             is TdApi.UpdateAuthorizationState -> {
                 val step = mapAuthorizationState(update.authorizationState)
                 _authState.value = step
-                if (update.authorizationState is TdApi.AuthorizationStateWaitTdlibParameters) {
-                    val query = parameters
-                    val active = client
-                    if (query != null && active != null) {
-                        // TDLib's receiver thread must never block on a coroutine.
-                        scope.launch {
-                            runCatching { active.send(query, null, NOOP_EXCEPTION_HANDLER) }
-                        }
-                    }
-                }
                 _updates.tryEmit(update)
             }
             is TdApi.UpdateFile -> {
@@ -190,8 +180,10 @@ class AndroidTdlibPort @Inject constructor(
             // Close is fire-and-forget; the native client releases itself after the update.
             runCatching { active.send(TdApi.Close(), null, NOOP_EXCEPTION_HANDLER) }
         }
-        if (client === active) client = null
-        parameters = null
+        if (client === active) {
+            client = null
+            generation++ // Ignore late updates from the client being closed.
+        }
         _fileStates.value = emptyMap()
         _authState.value = TelegramAuthStep.DISCONNECTED
         _connectionState.value = TelegramConnectionState.OFFLINE

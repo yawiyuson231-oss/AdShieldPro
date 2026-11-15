@@ -54,7 +54,7 @@ class ProtectionStatusTest {
         assertEquals(100, status.healthScore)
         assertEquals(6, status.stages.size)
         assertEquals(StageState.ACTIVE, status.stages.first { it.id == "tunnel" }.state)
-        assertTrue(status.stages.first { it.id == "upstream" }.detail.contains("38 ms measured"))
+        assertTrue(status.stages.first { it.id == "upstream" }.detail.contains("38 ms average"))
         assertEquals("25%", status.metrics.first { it.label == "Blocked" }.value)
         assertEquals("20%", status.metrics.first { it.label == "Cache" }.value)
     }
@@ -70,6 +70,8 @@ class ProtectionStatusTest {
         assertEquals(StageState.ACTIVE, status.overall)
         assertEquals("PROTECTED · IDLE", status.headline)
         assertFalse(status.isLive)
+        assertEquals(StageState.STANDBY, status.stages.first { it.id == "upstream" }.state)
+        assertEquals(75, status.healthScore)
         assertEquals("—", status.metrics.first { it.label == "Latency" }.value)
     }
 
@@ -87,7 +89,7 @@ class ProtectionStatusTest {
         assertEquals(StageState.DEGRADED, status.overall)
         assertEquals("PROTECTED · DEGRADED", status.headline)
         assertEquals(85, status.healthScore)
-        assertTrue(status.stages.first { it.id == "upstream" }.detail.contains("circuit open"))
+        assertTrue(status.stages.first { it.id == "upstream" }.detail.contains("check your resolver"))
     }
 
     @Test
@@ -156,4 +158,22 @@ class ProtectionStatusTest {
         assertTrue(status.badges.contains("Network: Wi-Fi"))
         assertTrue(status.stages.first { it.id == "integrity" }.detail.contains("Strict"))
     }
+    @Test
+    fun pausedOrStartingWithEmergencyModeDoesNotClaimLockdownIsActive() {
+        val settings = AppSettingsState(dnsFirewallPolicy = DnsFirewallPolicy(emergencyAllowlistOnly = true))
+        val paused = ProtectionStatusEvaluator.evaluate(connected().copy(status = VpnStatus.PAUSED), settings, emptyList(), now)
+        assertEquals("FILTERING PAUSED", paused.headline)
+        assertEquals(StageState.STANDBY, paused.stages.first { it.id == "policy" }.state)
+        val starting = ProtectionStatusEvaluator.evaluate(connected().copy(status = VpnStatus.STARTING), settings, emptyList(), now)
+        assertEquals(StageState.STANDBY, starting.overall)
+        assertEquals("STARTING", starting.headline)
+    }
+
+    @Test
+    fun disconnectedDoesNotShowAStaleError() {
+        val status = ProtectionStatusEvaluator.evaluate(VpnRuntimeState(lastError = "old error"), AppSettingsState(), emptyList(), now)
+        assertEquals("Turn on protection to start filtering DNS", status.summary)
+        assertEquals(StageState.STANDBY, status.stages.first { it.id == "policy" }.state)
+    }
+
 }

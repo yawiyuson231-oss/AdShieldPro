@@ -1,6 +1,7 @@
 package com.adshield.pro.ui.screens.cloud
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -93,6 +94,7 @@ fun TelegramCloudScreen(
 ) {
     val context = LocalContext.current
     val status by viewModel.status.collectAsStateWithLifecycle()
+    val authBusy by viewModel.authBusy.collectAsStateWithLifecycle()
     val files by viewModel.files.collectAsStateWithLifecycle()
     val allFiles by viewModel.allFiles.collectAsStateWithLifecycle()
     val transfers by viewModel.transfers.collectAsStateWithLifecycle()
@@ -149,7 +151,7 @@ fun TelegramCloudScreen(
                 }
             }
             item(key = "telegram-status") {
-                TelegramStatusCard(status = status, viewModel = viewModel, onDisconnect = { showDisconnect = true })
+                TelegramStatusCard(status = status, viewModel = viewModel, authBusy = authBusy, onDisconnect = { showDisconnect = true })
             }
             item(key = "telegram-sections") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -375,8 +377,11 @@ fun TelegramCloudScreen(
 private fun TelegramStatusCard(
     status: TelegramAccountStatus,
     viewModel: TelegramCloudViewModel,
+    authBusy: Boolean,
     onDisconnect: () -> Unit
 ) {
+    val context = LocalContext.current
+    var showLogin by remember { mutableStateOf(false) }
     var apiId by remember { mutableStateOf("") }
     var apiHash by remember { mutableStateOf("") }
     var target by remember { mutableStateOf(TelegramTargetKind.SAVED_MESSAGES) }
@@ -412,6 +417,7 @@ private fun TelegramStatusCard(
                 )
             }
             status.error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            if (authBusy) Text("Please wait…", style = MaterialTheme.typography.bodySmall)
 
             if (status.connected) {
                 OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) {
@@ -421,36 +427,47 @@ private fun TelegramStatusCard(
                 }
             } else {
                 if (status.step == TelegramAuthStep.DISCONNECTED || status.step == TelegramAuthStep.CLOSED) {
-                    OutlinedTextField(
-                        apiId, { apiId = it }, label = { Text("api_id (from my.telegram.org)") },
-                        singleLine = true, modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        apiHash, { apiHash = it }, label = { Text("api_hash (from my.telegram.org)") },
-                        singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        TelegramTargetKind.entries.forEach { value ->
-                            FilterChip(
-                                selected = target == value,
-                                onClick = { target = value },
-                                label = { Text(if (value == TelegramTargetKind.SAVED_MESSAGES) "Saved Messages" else "Private channel", style = MaterialTheme.typography.labelSmall) }
-                            )
+                    if (!showLogin) {
+                        Button(onClick = { showLogin = true }, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+                            Text("Log in to Telegram")
                         }
+                    } else {
+                        Text("First, enter your Telegram API credentials. Then sign in with your phone number and code.", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://my.telegram.org"))) }
+                                .onFailure { Toast.makeText(context, "Could not open my.telegram.org", Toast.LENGTH_SHORT).show() }
+                        }) { Text("Get API credentials at my.telegram.org") }
+                        OutlinedTextField(
+                            apiId, { apiId = it }, label = { Text("api_id (from my.telegram.org)") },
+                            singleLine = true, modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            apiHash, { apiHash = it }, label = { Text("api_hash (from my.telegram.org)") },
+                            singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TelegramTargetKind.entries.forEach { value ->
+                                FilterChip(
+                                    selected = target == value,
+                                    onClick = { target = value },
+                                    label = { Text(if (value == TelegramTargetKind.SAVED_MESSAGES) "Saved Messages" else "Private channel", style = MaterialTheme.typography.labelSmall) }
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { viewModel.connect(apiId, apiHash, target) },
+                            enabled = !authBusy && apiId.isNotBlank() && apiHash.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Continue to phone number") }
                     }
-                    Button(
-                        onClick = { viewModel.connect(apiId, apiHash, target) },
-                        enabled = apiId.isNotBlank() && apiHash.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text("Connect Telegram account") }
                 }
                 if (status.step == TelegramAuthStep.WAIT_PHONE_NUMBER) {
                     OutlinedTextField(
                         phone, { phone = it }, label = { Text("Phone number (international format)") },
                         singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
-                    Button(onClick = { viewModel.submitPhoneNumber(phone) }, enabled = phone.isNotBlank()) {
+                    Button(onClick = { viewModel.submitPhoneNumber(phone) }, enabled = !authBusy && phone.isNotBlank()) {
                         Text("Send login code")
                     }
                 }
@@ -459,7 +476,7 @@ private fun TelegramStatusCard(
                         code, { code = it }, label = { Text("Telegram login code") },
                         singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
-                    Button(onClick = { viewModel.submitCode(code) }, enabled = code.isNotBlank()) { Text("Verify code") }
+                    Button(onClick = { viewModel.submitCode(code) }, enabled = !authBusy && code.isNotBlank()) { Text("Verify code") }
                 }
                 if (status.step == TelegramAuthStep.WAIT_PASSWORD) {
                     OutlinedTextField(
@@ -467,9 +484,15 @@ private fun TelegramStatusCard(
                         singleLine = true, visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Button(onClick = { viewModel.submitPassword(password); password = "" }, enabled = password.isNotBlank()) {
+                    Button(onClick = { viewModel.submitPassword(password); password = "" }, enabled = !authBusy && password.isNotBlank()) {
                         Text("Submit to TDLib")
                     }
+                }
+                if (status.step != TelegramAuthStep.DISCONNECTED && status.step != TelegramAuthStep.CLOSED) {
+                    OutlinedButton(onClick = viewModel::checkAuthorization, enabled = !authBusy, modifier = Modifier.fillMaxWidth()) {
+                        Text("Check sign-in status")
+                    }
+                    TextButton(onClick = onDisconnect, enabled = !authBusy) { Text("Cancel sign-in / start over") }
                 }
                 Text(
                     "Authorization uses TDLib's official flow. Your api_id/api_hash are encrypted with " +
