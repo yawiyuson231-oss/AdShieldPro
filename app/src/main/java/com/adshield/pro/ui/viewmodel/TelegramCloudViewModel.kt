@@ -10,6 +10,7 @@ import com.adshield.pro.data.telegram.TelegramStoredFile
 import com.adshield.pro.data.telegram.TelegramTargetKind
 import com.adshield.pro.data.telegram.TelegramTransfer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,8 @@ class TelegramCloudViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 repository.initialize()
+            } catch (failure: CancellationException) {
+                throw failure
             } catch (failure: Exception) {
                 repository.reportError(failure.message ?: "Could not restore Telegram session")
             } finally {
@@ -137,6 +140,8 @@ class TelegramCloudViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 block()
+            } catch (failure: CancellationException) {
+                throw failure
             } catch (failure: Exception) {
                 repository.reportError(failure.message ?: "Telegram sign-in failed")
             } finally {
@@ -147,7 +152,11 @@ class TelegramCloudViewModel @Inject constructor(
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch {
-            runCatching { block() }.onFailure { failure ->
+            try {
+                block()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
                 repository.reportError(failure.message ?: "Telegram operation failed")
             }
         }

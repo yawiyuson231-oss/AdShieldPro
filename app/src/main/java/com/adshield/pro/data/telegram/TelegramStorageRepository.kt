@@ -1,5 +1,6 @@
 package com.adshield.pro.data.telegram
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -117,6 +118,8 @@ class TelegramStorageRepository @Inject constructor(
             } else {
                 applyStatus(step, saved)
             }
+        } catch (failure: CancellationException) {
+            throw failure
         } catch (failure: TelegramTdlibException) {
             if (failure.code == 401) {
                 runCatching { port.close() }
