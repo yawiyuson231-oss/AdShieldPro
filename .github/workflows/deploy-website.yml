@@ -9,13 +9,27 @@ name: Deploy website
 # subdirectory works unchanged (its service worker scope is /app/).
 # Runs on every change to docs/ or the web platform, and can be triggered by hand.
 # Safe to re-run: the job is idempotent and only needs the default token.
+#
+# REQUIRED REPOSITORY SETTING: Settings -> Pages -> Source = "GitHub Actions".
+# With "Deploy from a branch" GitHub also runs its own build of the raw repository on
+# every push to main and publishes it *after* this job, replacing this layout: the
+# homepage becomes the web platform, the marketing site moves to /docs/ and /app/ is a
+# 404. The "Check the Pages source" step below reports that state, and the workflow_run
+# trigger republishes the real site after each such build so the damage lasts about a
+# minute instead of until the next manual deploy. That is a safety net, not the fix.
+#
+# Only main deploys. The github-pages environment rejects every other branch, so a
+# branch trigger can only ever produce a failed run (and, if it were allowed, would
+# publish unreviewed work to the live site). Branches are covered by ci.yml, which
+# assembles the same tree without publishing it.
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-      - 'arena/**'
+    # Keep in step with APP_ROOT_FILES / APP_DIRS in scripts/stage-site.mjs
+    # (tests/unit/site.test.mjs fails if a published path is missing here).
     paths:
       - 'docs/**'
       - 'index.html'
@@ -28,8 +42,18 @@ on:
       - 'dns/**'
       - 'aether/**'
       - 'security/**'
+      - 'guard/**'
       - 'omnishield-x-extension.zip'
+      - 'scripts/stage-site.mjs'
       - '.github/workflows/deploy-website.yml'
+  # Safety net for the wrong Pages source (see REQUIRED REPOSITORY SETTING above). When
+  # GitHub's own branch build ("pages-build-deployment") finishes on main it has just
+  # replaced the site with the raw repository, so publish the real site again right after
+  # it. With the source set to "GitHub Actions" that build never runs and neither does this.
+  workflow_run:
+    workflows: ['pages-build-deployment']
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -42,6 +66,8 @@ permissions:
 
 jobs:
   deploy:
+    # A failed branch build published nothing, so there is nothing to put back.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -59,20 +85,29 @@ jobs:
           test -s app.js
           ls -l docs/index.html docs/PRIVACY_POLICY.md
 
-      # Pages must be turned on once with build_type=workflow. A repository admin can do that
-      # in Settings -> Pages; the default token cannot, so report it instead of failing silently.
-      - name: Report GitHub Pages state
-        # Informational only. `actions/configure-pages` below is the authoritative check: it fails
-        # with an actionable message when Pages is genuinely unavailable. The REST preflight used to
-        # `exit 1` here, which aborted every deploy even though Pages was enabled and correctly set
-        # to "GitHub Actions" — a token/permission quirk on the read was treated as a site outage.
+      # Informational only — it never fails the job. `actions/configure-pages` below is the
+      # authoritative check that Pages is available. What it cannot see is the *source*: with
+      # "Deploy from a branch" this job still goes green, and seconds later GitHub's own build
+      # of the raw repository replaces what it published. That looked like a healthy deploy
+      # while the live site was the wrong tree, so say it out loud.
+      - name: Check the Pages source
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if OUT="$(gh api "repos/${GITHUB_REPOSITORY}/pages" 2>&1)"; then
-            echo "Pages is enabled: $(echo "$OUT" | head -c 300)"
-          else
+          if ! OUT="$(gh api "repos/${GITHUB_REPOSITORY}/pages" 2>&1)"; then
             echo "::warning::Could not read the Pages settings with this token (continuing; configure-pages decides): $(echo "$OUT" | head -c 300)"
+            exit 0
+          fi
+          BUILD_TYPE="$(echo "$OUT" | jq -r '.build_type // "unknown"' 2>/dev/null || echo unknown)"
+          echo "Pages is enabled, source: ${BUILD_TYPE}"
+          if [ "$BUILD_TYPE" = "legacy" ]; then
+            MSG='GitHub Pages is set to "Deploy from a branch". GitHub will publish the raw repository over this deployment (homepage becomes the web platform, /app/ returns 404). Fix: Settings -> Pages -> Build and deployment -> Source -> "GitHub Actions", then re-run this workflow.'
+            echo "::error title=Pages source is not GitHub Actions::${MSG}"
+            {
+              echo "### :warning: This deployment will be overwritten"
+              echo
+              echo "${MSG}"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Configure Pages

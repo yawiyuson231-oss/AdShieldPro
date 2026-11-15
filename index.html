@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="dark">
 <title>OmniShield X — AETHER AI Evolution</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡</text></svg>">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
 <style>
   :root {
     --bg: #050b16; --surface: #0a1426; --surface2: #101f3a; --surface3: #16294a;
@@ -33,26 +33,29 @@
   h1, h2, h3, h4 { line-height: 1.25; }
   code, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--cyan); font-size: .92em; }
 
+  /* The title bar and the tab bar stick as one unit. They used to be two sticky
+     elements with a hard-coded 77px offset between them, which only matched one
+     header height: whenever the header wrapped, the tabs slid underneath it. */
+  .chrome { position: sticky; top: 0; z-index: 20; }
   header.top {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     padding: 18px clamp(14px, 4vw, 40px);
     border-bottom: 1px solid var(--line-soft);
     background: linear-gradient(180deg, #091428, #050b16);
-    position: sticky; top: 0; z-index: 20; backdrop-filter: blur(8px);
   }
   .shield {
     width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center;
     background: radial-gradient(circle at 30% 25%, var(--glow), var(--blue));
     font-size: 22px; box-shadow: 0 0 28px #2e7dff44; flex: none;
   }
-  h1 { font-size: 19px; letter-spacing: .3px; }
+  .shield svg { width: 60%; height: 60%; display: block; }
+  h1 { font-size: 19px; letter-spacing: .3px; flex: 1 1 0; min-width: 0; }
   h1 small { display: block; color: var(--dim); font-weight: 400; font-size: 12px; letter-spacing: .2px; }
-  .top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 
   nav.tabs {
     display: flex; gap: 6px; flex-wrap: wrap; padding: 10px clamp(14px, 4vw, 40px);
-    border-bottom: 1px solid var(--line-soft); background: #071020cc;
-    position: sticky; top: 77px; z-index: 19; backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line-soft); background: #071020;
   }
   nav.tabs button {
     background: none; border: 1px solid transparent; color: var(--dim);
@@ -63,7 +66,9 @@
   nav.tabs button.active { color: #fff; border-color: var(--blue); background: #2e7dff22; }
 
   main { padding: clamp(14px, 3.5vw, 34px); max-width: 1180px; margin: 0 auto; }
-  .page { display: grid; gap: 16px; }
+  /* minmax(0, 1fr): a grid track's default minimum is its content width, so one
+     wide table or unbreakable line would otherwise widen the whole page. */
+  .page { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
   .page[hidden] { display: none; }
 
   .card {
@@ -80,9 +85,11 @@
   .tiny { font-size: 11.5px; }
 
   .grid { display: grid; gap: 14px; }
-  .grid.k4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-  .grid.k3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .grid.k2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .grid > * { min-width: 0; }
+  /* min(…, 100%) keeps a column from being wider than a narrow phone screen. */
+  .grid.k4 { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
+  .grid.k3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+  .grid.k2 { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
 
   .kpi {
     background: linear-gradient(180deg, #0c1930, #081120);
@@ -209,8 +216,27 @@
   details[open] summary { margin-bottom: 8px; }
 
   @media (max-width: 700px) {
+    /* Phones: the title bar scrolls away and only a single-row, swipeable tab bar
+       stays pinned. Previously both stayed pinned and the ten tabs wrapped onto
+       four rows, covering about 40% of the screen. */
+    .chrome { display: contents; }
+    header.top { padding: 12px 14px; gap: 10px 12px; }
+    .shield { width: 38px; height: 38px; border-radius: 11px; font-size: 19px; }
     h1 { font-size: 16px; }
-    nav.tabs { top: 69px; }
+    h1 small { font-size: 11.5px; }
+    .top-actions { margin-left: 0; flex-basis: 100%; justify-content: flex-start; }
+    nav.tabs {
+      position: sticky; top: 0; z-index: 20;
+      flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain;
+      padding: 8px 14px; scrollbar-width: none;
+    }
+    nav.tabs::-webkit-scrollbar { display: none; }
+    nav.tabs button { flex: none; }
+    main { padding: 12px; }
+    .card { padding: 15px 14px; }
+    .grid.k4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .kpi { padding: 12px 13px; }
+    .kpi b { font-size: 21px; }
     .bar-row { grid-template-columns: 100px 1fr 46px; font-size: 11.5px; }
     .kv { grid-template-columns: 1fr; }
     .kv dt { margin-top: 6px; }
@@ -219,8 +245,14 @@
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
+<div class="chrome">
 <header class="top">
-  <div class="shield" aria-hidden="true">🛡</div>
+  <div class="shield" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2.5 20 5.6v6c0 4.9-3.4 8.2-8 9.9-4.6-1.7-8-5-8-9.9v-6l8-3.1Z" fill="#ffffff22"/>
+      <path d="m8.6 12.2 2.4 2.4 4.6-5.2"/>
+    </svg>
+  </div>
   <h1>OmniShield X <small>AETHER AI Evolution · v5.0.2 · local-first DNS security platform</small></h1>
   <div class="top-actions">
     <span class="pill info" id="boot-status" role="status" aria-live="polite"><span class="dot"></span> starting</span>
@@ -240,6 +272,7 @@
   <button type="button" data-page="extension">Extension</button>
   <button type="button" data-page="status">Capabilities</button>
 </nav>
+</div>
 
 <main id="main" tabindex="-1">
   <section class="page" id="page-dashboard" aria-label="Dashboard" tabindex="-1">
