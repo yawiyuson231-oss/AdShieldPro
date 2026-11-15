@@ -1,0 +1,84 @@
+name: Verify published APK installation
+
+# Check the exact public release asset, not only the APK in the build workspace.
+# Runs automatically when this workflow changes on an Arena branch and can also
+# be dispatched after it is merged into the default branch.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'arena/**'
+    paths:
+      - '.github/workflows/verify-published-apk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Android ${{ matrix.api }} fresh install and upgrade
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download published APKs and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/adshield-apk/current /tmp/adshield-apk/previous
+          gh release download v2.10.10 --pattern 'AdShieldPro-2.10.10-release.apk*' --dir /tmp/adshield-apk/current
+          gh release download v2.10.9 --pattern 'AdShieldPro-2.10.9-release.apk' --dir /tmp/adshield-apk/previous
+          cd /tmp/adshield-apk/current
+          echo "$(cat AdShieldPro-2.10.10-release.apk.sha256)  AdShieldPro-2.10.10-release.apk" | sha256sum --check
+          unzip -tq AdShieldPro-2.10.10-release.apk
+
+      - name: Verify manifest, APK signature, and upgrade signing identity
+        run: |
+          set -euo pipefail
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMGR" --install 'build-tools;36.0.0' 'platform-tools'
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          CURRENT=/tmp/adshield-apk/current/AdShieldPro-2.10.10-release.apk
+          PREVIOUS=/tmp/adshield-apk/previous/AdShieldPro-2.10.9-release.apk
+          "$TOOLS/apksigner" verify --verbose --print-certs "$CURRENT" | tee /tmp/current-cert.txt
+          "$TOOLS/apksigner" verify --verbose --print-certs "$PREVIOUS" | tee /tmp/previous-cert.txt
+          CURRENT_CERT="$(grep -i 'certificate SHA-256 digest' /tmp/current-cert.txt | head -1 | awk '{print $NF}')"
+          PREVIOUS_CERT="$(grep -i 'certificate SHA-256 digest' /tmp/previous-cert.txt | head -1 | awk '{print $NF}')"
+          test -n "$CURRENT_CERT" && test "$CURRENT_CERT" = "$PREVIOUS_CERT"
+          "$TOOLS/aapt" dump badging "$CURRENT" | tee /tmp/current-badging.txt
+          grep -q "package: name='com.adshield.pro' versionCode='21010' versionName='2.10.10'" /tmp/current-badging.txt
+          grep -q "sdkVersion:'29'" /tmp/current-badging.txt
+          python3 tools/check_universal_release.py "$CURRENT"
+
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install the downloaded APK on an Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            CURRENT=/tmp/adshield-apk/current/AdShieldPro-2.10.10-release.apk
+            PREVIOUS=/tmp/adshield-apk/previous/AdShieldPro-2.10.9-release.apk
+            echo 'Checking a fresh installation of the exact published APK'
+            adb install "$CURRENT"
+            adb shell dumpsys package com.adshield.pro | grep -E 'versionCode=|versionName='
+            adb uninstall com.adshield.pro
+            echo 'Checking an in-place upgrade from the previous published release'
+            adb install "$PREVIOUS"
+            adb install -r "$CURRENT"
+            adb shell dumpsys package com.adshield.pro | grep -E 'versionCode=21010|versionName=2.10.10'
