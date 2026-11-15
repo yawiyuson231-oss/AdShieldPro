@@ -25,8 +25,9 @@ git tag v2.3.1 && git push origin v2.3.1
 ```
 
 The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
-publishes it to GitHub Releases with a SHA-256 checksum, uploads `adshield-release.keystore` for
-future upgrade installs, and refreshes the GitHub Pages site. Re-running it for an existing tag
+publishes it to GitHub Releases with a SHA-256 checksum and refreshes the GitHub Pages site.
+The workflow no longer attaches the signing keystore to new releases. Earlier releases did expose
+it; treat that key as compromised and review signing-key security before publishing an update. Re-running it for an existing tag
 replaces that release's APK assets instead of failing or creating a duplicate release.
 To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
 `ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
@@ -59,7 +60,7 @@ Design guarantees, enforced by the workflow itself:
   link resolve — keeps pointing at the shipped version. A final step asserts this and fails if the
   test build ever became *Latest*.
 - **Tags must start with `test-`**, so the build cannot match the `v*` tag trigger of the release
-  pipeline. The keystore is never attached to a test release; only real releases carry it.
+  pipeline. The keystore is never attached to a test release or a new production release.
 
 Once the test build is verified, publish for real with the **Release APK** workflow above.
 

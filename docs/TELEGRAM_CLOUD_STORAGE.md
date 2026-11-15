@@ -63,6 +63,13 @@ section" card.
 
 ## 3. Authorization (direct user account)
 
+In the app, open **Cloud → Open Telegram / Log in → Log in to Telegram**. Enter your own
+`api_id` and `api_hash`, then continue with your phone number, login code and (if enabled)
+2-step password. The Cloud service's separate account is not required. If Telegram asks for
+confirmation on another device, complete it there and tap **Check sign-in status**. If sign-in
+gets stuck, use **Cancel sign-in / start over**; the confirmation explains whether the remote
+Telegram session is also logged out.
+
 `AndroidTdlibPort.start()` loads `libtdjni.so`, sets TDLib verbosity to **errors only** with no
 log file, and creates `org.drinkless.tdlib.Client`. On `authorizationStateWaitTdlibParameters` it
 sends a real `SetTdlibParameters` request:

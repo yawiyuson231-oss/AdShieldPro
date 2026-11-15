@@ -1,8 +1,8 @@
 package com.adshield.pro.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,22 +17,28 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.engine.platform.Capability
-import com.adshield.pro.engine.platform.CapabilityArea
 import com.adshield.pro.engine.platform.CapabilityRegistry
 import com.adshield.pro.engine.platform.CapabilityStatus
 import com.adshield.pro.engine.platform.DeviceProfile
 import com.adshield.pro.ui.components.CompactStatusChip
 import com.adshield.pro.ui.model.ProtectionPipelineStatus
+import com.adshield.pro.ui.model.CapabilityStatusFilter
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
 
@@ -40,36 +46,35 @@ private val CardSurface = Color(0xFF101C2C)
 private val MutedText = Color(0xFF9FB6B8)
 private val StatusBlue = Color(0xFF2E7DFF)
 
-/**
- * AdShield Pro — Status screen.
- *
- * Renders [CapabilityRegistry] verbatim: what works, what is partial, what is planned and what
- * Android simply does not allow. This screen is the app's own honesty contract — it is generated
- * from the same list a unit test validates.
- */
+/** The catalogue describes what this build supports, not a live test of each feature. */
 @Composable
 fun CapabilitiesScreen(
     deviceProfile: DeviceProfile? = null,
     protectionStatus: ProtectionPipelineStatus? = null
 ) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedStatus by rememberSaveable { mutableStateOf("ALL") }
+    val filter = CapabilityStatus.entries.firstOrNull { it.name == selectedStatus }
+    val results = CapabilityStatusFilter.filter(CapabilityRegistry.capabilities, query, filter)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        item {
+            Text("Status", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        }
         if (protectionStatus != null) {
             item {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Live protection status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(protectionStatus.summary, fontSize = 11.sp, color = MutedText, maxLines = 2)
+                Surface(color = CardSurface, shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text("Protection now", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        CompactStatusChip(protectionStatus)
+                        Spacer(Modifier.height(8.dp))
+                        Text(protectionStatus.summary, fontSize = 13.sp, color = MutedText)
                     }
-                    Spacer(Modifier.width(8.dp))
-                    CompactStatusChip(protectionStatus)
                 }
             }
         }
@@ -77,38 +82,44 @@ fun CapabilitiesScreen(
             item { DeviceProfileCard(deviceProfile) }
         }
         item {
-            Surface(color = CardSurface, shape = RoundedCornerShape(16.dp)) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Capability status", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(CapabilityRegistry.summary(), fontSize = 13.sp, color = EmeraldPrimary)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Every row below is checked against the shipping code. A capability is only marked " +
-                            "implemented when its code path exists in this build and is covered by the on-device " +
-                            "or JVM test suite. Anything Android does not expose is listed as unavailable rather " +
-                            "than faked.",
-                        fontSize = 12.sp,
-                        color = MutedText
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        CountPill("Implemented", CapabilityRegistry.count(CapabilityStatus.IMPLEMENTED), EmeraldPrimary)
-                        CountPill("Partial", CapabilityRegistry.count(CapabilityStatus.PARTIAL), WarningAmber)
-                        CountPill("Planned", CapabilityRegistry.count(CapabilityStatus.PLANNED), StatusBlue)
-                        CountPill("Unavailable", CapabilityRegistry.count(CapabilityStatus.UNAVAILABLE), MutedText)
-                    }
+            Text("Features in this app", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            Text(
+                "Browse what is available and its limits. These labels describe the build, not a live check of your device.",
+                fontSize = 13.sp, color = MutedText
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Search features") },
+                singleLine = true
+            )
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(selected = filter == null, onClick = { selectedStatus = "ALL" },
+                    label = { Text("All (${CapabilityRegistry.capabilities.size})") })
+                CapabilityStatus.entries.forEach { status ->
+                    FilterChip(selected = filter == status, onClick = { selectedStatus = status.name },
+                        label = { Text("${statusLabel(status)} (${CapabilityRegistry.count(status)})") })
                 }
             }
         }
-        CapabilityRegistry.byArea().forEach { (area, caps) ->
+        item {
+            Text("${results.size} feature${if (results.size == 1) "" else "s"} shown · Use Show details for more information", fontSize = 12.sp, color = MutedText)
+        }
+        if (results.isEmpty()) {
+            item { Text("No features match. Try another search or choose All.", modifier = Modifier.padding(vertical = 16.dp), color = MutedText) }
+        }
+        results.groupBy { it.area }.forEach { (area, caps) ->
             item(key = "header-${area.name}") {
-                Text(
-                    area.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
-                )
+                Text(area.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
             }
             items(caps, key = { it.id }, contentType = { "capability" }) { capability ->
                 CapabilityCard(capability)
@@ -117,56 +128,50 @@ fun CapabilitiesScreen(
     }
 }
 
-@Composable
-private fun CountPill(label: String, count: Int, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .background(color.copy(alpha = 0.15f), RoundedCornerShape(50))
-                .padding(horizontal = 10.dp, vertical = 3.dp)
-        ) {
-            Text("$count", color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-        Text(label, fontSize = 9.sp, color = MutedText)
-    }
+private fun statusLabel(status: CapabilityStatus): String = when (status) {
+    CapabilityStatus.IMPLEMENTED -> "Available"
+    CapabilityStatus.PARTIAL -> "Limited"
+    CapabilityStatus.PLANNED -> "Planned"
+    CapabilityStatus.UNAVAILABLE -> "Unavailable"
 }
 
 @Composable
 private fun CapabilityCard(capability: Capability) {
-    val (statusColor, statusText) = when (capability.status) {
-        CapabilityStatus.IMPLEMENTED -> EmeraldPrimary to "IMPLEMENTED"
-        CapabilityStatus.PARTIAL -> WarningAmber to "PARTIAL"
-        CapabilityStatus.PLANNED -> StatusBlue to "PLANNED"
-        CapabilityStatus.UNAVAILABLE -> MutedText to "UNAVAILABLE"
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val statusColor = when (capability.status) {
+        CapabilityStatus.IMPLEMENTED -> EmeraldPrimary
+        CapabilityStatus.PARTIAL -> WarningAmber
+        CapabilityStatus.PLANNED -> StatusBlue
+        CapabilityStatus.UNAVAILABLE -> MutedText
     }
     Card(colors = CardDefaults.cardColors(containerColor = CardSurface), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(capability.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(statusText, fontSize = 9.sp, color = statusColor, fontWeight = FontWeight.Bold)
+            Text(capability.name, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(statusLabel(capability.status), fontSize = 12.sp, color = statusColor, fontWeight = FontWeight.Bold)
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(if (expanded) "Hide details" else "Show details")
+            }
+            if (expanded) {
+                if (capability.limitations.isNotEmpty()) {
+                    Text("What to know", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    capability.limitations.forEach { Text("• $it", fontSize = 12.sp, color = MutedText) }
                 }
-            }
-            if (capability.code.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(capability.code, fontSize = 10.sp, color = MutedText)
-            }
-            if (capability.permissions.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Permissions: " + capability.permissions.joinToString { it.substringAfterLast('.') },
-                    fontSize = 10.sp,
-                    color = MutedText
-                )
-            }
-            if (capability.limitations.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                capability.limitations.forEach {
-                    Text("• $it", fontSize = 11.sp, color = MutedText.copy(alpha = 0.9f))
+                if (capability.permissions.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Permissions: " + capability.permissions.joinToString { it.substringAfterLast('.') }, fontSize = 11.sp, color = MutedText)
+                }
+                if (capability.dataSources.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Data sources: " + capability.dataSources.joinToString(), fontSize = 11.sp, color = MutedText)
+                }
+                if (capability.code.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Code: ${capability.code}", fontSize = 11.sp, color = MutedText)
+                }
+                if (capability.verification.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Verification: ${capability.verification}", fontSize = 11.sp, color = MutedText)
                 }
             }
         }
@@ -176,6 +181,7 @@ private fun CapabilityCard(capability: Capability) {
 /** Everything this particular phone/tablet reports about itself, at a glance. */
 @Composable
 private fun DeviceProfileCard(profile: DeviceProfile) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Card(colors = CardDefaults.cardColors(containerColor = CardSurface), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text("This device", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -186,50 +192,55 @@ private fun DeviceProfileCard(profile: DeviceProfile) {
                 color = Color.White
             )
             Text(
-                "CPU: ${profile.cpuArchitectures.joinToString(", ").ifEmpty { "not reported" }} — the same universal APK runs on every architecture",
-                fontSize = 11.sp,
-                color = MutedText
-            )
-            Text(
                 "Platform support: ${if (profile.supportedPlatform) "within the tested range" else "outside the tested range (API ${profile.sdkInt})"}",
                 fontSize = 11.sp,
                 color = if (profile.supportedPlatform) EmeraldPrimary else WarningAmber
             )
-            val radios = buildList {
-                if (profile.hasWifi) add("Wi-Fi")
-                if (profile.hasTelephony) add("Mobile data")
-                if (profile.hasBluetooth) add("Bluetooth")
-                if (profile.hasNfc) add("NFC")
-                if (profile.hasGps) add("GPS")
-                if (profile.hasTouchscreen) add("Touch")
+            TextButton(onClick = { expanded = !expanded }) {
+                Text(if (expanded) "Hide device details" else "Show device details")
             }
-            if (radios.isNotEmpty()) {
-                Text("Hardware: ${radios.joinToString(", ")}", fontSize = 11.sp, color = MutedText)
-            }
-            Text("Notifications: ${profile.notificationPermission}", fontSize = 11.sp, color = MutedText)
-
-            Spacer(Modifier.height(10.dp))
-            Text("Battery hardware on this device", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            profile.batteryChecks.forEach { row ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                    Text(
-                        if (row.supported) "✓" else "—",
-                        color = if (row.supported) EmeraldPrimary else MutedText,
-                        fontSize = 11.sp,
-                        modifier = Modifier.width(18.dp)
-                    )
-                    Text(row.label, fontSize = 11.sp, color = Color.White, modifier = Modifier.weight(1f))
-                    Text(row.value, fontSize = 11.sp, color = if (row.supported) Color.White else MutedText)
+            if (expanded) {
+                Text(
+                    "CPU: ${profile.cpuArchitectures.joinToString(", ").ifEmpty { "not reported" }}",
+                    fontSize = 11.sp,
+                    color = MutedText
+                )
+                val radios = buildList {
+                    if (profile.hasWifi) add("Wi-Fi")
+                    if (profile.hasTelephony) add("Mobile data")
+                    if (profile.hasBluetooth) add("Bluetooth")
+                    if (profile.hasNfc) add("NFC")
+                    if (profile.hasGps) add("GPS")
+                    if (profile.hasTouchscreen) add("Touch")
                 }
+                if (radios.isNotEmpty()) {
+                    Text("Hardware: ${radios.joinToString(", ")}", fontSize = 11.sp, color = MutedText)
+                }
+                Text("Notifications: ${profile.notificationPermission}", fontSize = 11.sp, color = MutedText)
+
+                Spacer(Modifier.height(10.dp))
+                Text("Battery hardware on this device", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                profile.batteryChecks.forEach { row ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Text(
+                            if (row.supported) "✓" else "—",
+                            color = if (row.supported) EmeraldPrimary else MutedText,
+                            fontSize = 11.sp,
+                            modifier = Modifier.width(18.dp)
+                        )
+                        Text(row.label, fontSize = 11.sp, color = Color.White, modifier = Modifier.weight(1f))
+                        Text(row.value, fontSize = 11.sp, color = if (row.supported) Color.White else MutedText)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Rows marked — are values this device's firmware does not publish to apps. They are shown as " +
+                        "unavailable in the app rather than estimated.",
+                    fontSize = 10.sp,
+                    color = MutedText
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Rows marked — are values this device's firmware does not publish to apps. They are shown as " +
-                    "unavailable in the app rather than estimated.",
-                fontSize = 10.sp,
-                color = MutedText
-            )
         }
     }
 }

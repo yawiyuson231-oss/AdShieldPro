@@ -2,6 +2,8 @@ package com.adshield.pro.data.telegram
 
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.TdApi
 
 /**
@@ -33,6 +35,23 @@ interface TelegramTdlibPort {
     suspend fun logout(): Boolean
 
     suspend fun close()
+}
+
+/**
+ * Wait for TDLib's parameter request after the client is assigned. StateFlow keeps an update
+ * delivered before the wait begins, and a rejected request must reach the caller.
+ */
+internal suspend fun initializeTdlibParameters(
+    authState: StateFlow<TelegramAuthStep>,
+    timeoutMs: Long = 30_000L,
+    sendParameters: suspend () -> Unit
+) {
+    val completed = withTimeoutOrNull(timeoutMs) {
+        authState.first { it == TelegramAuthStep.WAIT_TDLIB_PARAMETERS }
+        sendParameters()
+        true
+    } ?: false
+    if (!completed) throw TelegramTdlibException(0, "Telegram startup timed out. Check your connection and try again.")
 }
 
 /** Builds setTdlibParameters; the Android implementation supplies real device identification. */

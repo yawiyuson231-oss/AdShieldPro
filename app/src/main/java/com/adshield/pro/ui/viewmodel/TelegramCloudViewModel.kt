@@ -10,6 +10,7 @@ import com.adshield.pro.data.telegram.TelegramStoredFile
 import com.adshield.pro.data.telegram.TelegramTargetKind
 import com.adshield.pro.data.telegram.TelegramTransfer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,8 @@ class TelegramCloudViewModel @Inject constructor(
     val message = repository.message
     val error = repository.error
     val busy = repository.busy
+    private val _authBusy = MutableStateFlow(true)
+    val authBusy: StateFlow<Boolean> = _authBusy
 
     private val _section = MutableStateFlow(TelegramCloudSection.FILES)
     val section: StateFlow<TelegramCloudSection> = _section
@@ -67,7 +70,17 @@ class TelegramCloudViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        viewModelScope.launch { runCatching { repository.initialize() } }
+        viewModelScope.launch {
+            try {
+                repository.initialize()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                repository.reportError(failure.message ?: "Could not restore Telegram session")
+            } finally {
+                _authBusy.value = false
+            }
+        }
     }
 
     fun setSection(section: TelegramCloudSection) { _section.value = section }
@@ -77,17 +90,18 @@ class TelegramCloudViewModel @Inject constructor(
     fun clearError() = repository.clearError()
     fun dismissDuplicate() { _duplicate.value = null; pendingUpload = null }
 
-    fun connect(apiIdText: String, apiHash: String, target: TelegramTargetKind) = launch {
+    fun connect(apiIdText: String, apiHash: String, target: TelegramTargetKind) = authAction {
         val apiId = apiIdText.trim().toIntOrNull()
-            ?: return@launch repository.reportError("api_id must be the numeric id from my.telegram.org")
+            ?: return@authAction repository.reportError("api_id must be the numeric id from my.telegram.org")
         repository.connect(apiId, apiHash, target)
     }
 
-    fun submitPhoneNumber(phone: String) = launch { repository.submitPhoneNumber(phone) }
-    fun submitCode(code: String) = launch { repository.submitCode(code) }
-    fun submitPassword(password: String) = launch { repository.submitPassword(password) }
+    fun submitPhoneNumber(phone: String) = authAction { repository.submitPhoneNumber(phone) }
+    fun submitCode(code: String) = authAction { repository.submitCode(code) }
+    fun submitPassword(password: String) = authAction { repository.submitPassword(password) }
+    fun checkAuthorization() = authAction { repository.checkAuthorization() }
 
-    fun disconnect(logOutRemotely: Boolean = true) = launch {
+    fun disconnect(logOutRemotely: Boolean = true) = authAction {
         repository.disconnect(logOutRemotely)
     }
 
@@ -120,9 +134,29 @@ class TelegramCloudViewModel @Inject constructor(
     fun delete(file: TelegramStoredFile) = launch { repository.delete(file) }
     fun clearLocalCache() = launch { repository.clearLocalCache() }
 
+    private fun authAction(block: suspend () -> Unit) {
+        if (_authBusy.value) return
+        _authBusy.value = true
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                repository.reportError(failure.message ?: "Telegram sign-in failed")
+            } finally {
+                _authBusy.value = false
+            }
+        }
+    }
+
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch {
-            runCatching { block() }.onFailure { failure ->
+            try {
+                block()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
                 repository.reportError(failure.message ?: "Telegram operation failed")
             }
         }
