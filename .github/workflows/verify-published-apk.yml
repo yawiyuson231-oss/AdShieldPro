@@ -71,14 +71,28 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            set -euo pipefail
+            set -eu
             CURRENT=/tmp/adshield-apk/current/AdShieldPro-2.10.10-release.apk
             PREVIOUS=/tmp/adshield-apk/previous/AdShieldPro-2.10.9-release.apk
             echo 'Checking a fresh installation of the exact published APK'
-            adb install "$CURRENT"
+            if ! adb install "$CURRENT" > /tmp/install-result.txt 2>&1; then
+              cat /tmp/install-result.txt
+              echo "::error::Fresh install failed: $(cat /tmp/install-result.txt)"
+              exit 1
+            fi
+            cat /tmp/install-result.txt
             adb shell dumpsys package com.adshield.pro | grep -E 'versionCode=|versionName='
             adb uninstall com.adshield.pro
             echo 'Checking an in-place upgrade from the previous published release'
-            adb install "$PREVIOUS"
-            adb install -r "$CURRENT"
+            if ! adb install "$PREVIOUS" > /tmp/install-result.txt 2>&1; then
+              cat /tmp/install-result.txt
+              echo "::error::Previous version install failed: $(cat /tmp/install-result.txt)"
+              exit 1
+            fi
+            if ! adb install -r "$CURRENT" > /tmp/install-result.txt 2>&1; then
+              cat /tmp/install-result.txt
+              echo "::error::Upgrade failed: $(cat /tmp/install-result.txt)"
+              exit 1
+            fi
+            cat /tmp/install-result.txt
             adb shell dumpsys package com.adshield.pro | grep -E 'versionCode=21010|versionName=2.10.10'
