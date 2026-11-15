@@ -356,6 +356,19 @@ const PAGE_RENDERERS = {
   status: renderStatus
 };
 
+/**
+ * On phones the tab bar is a single swipeable row, so the active tab can be off
+ * screen (deep link to #status, or keyboard navigation). Centre it by scrolling
+ * the bar itself — never the page.
+ */
+function revealTab(button) {
+  const bar = button.parentElement;
+  if (!bar || bar.scrollWidth <= bar.clientWidth) return;
+  const tab = button.getBoundingClientRect();
+  const frame = bar.getBoundingClientRect();
+  bar.scrollLeft += (tab.left + tab.width / 2) - (frame.left + frame.width / 2);
+}
+
 function navigate(page) {
   const focusOnNavigate = state.booted && state.currentPage !== page;
   state.currentPage = page;
@@ -367,6 +380,7 @@ function navigate(page) {
     // conveys nothing to assistive technology.
     if (active) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
+    if (active) revealTab(button);
   }
   const section = document.getElementById(`page-${page}`);
   if (section) {

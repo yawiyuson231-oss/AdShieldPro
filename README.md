@@ -6,9 +6,12 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
 ## Website and downloads
 
 - **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
-  [docs/](docs), deployed by [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
-  One-time setup: repository **Settings → Pages → Source: GitHub Actions** (a repository admin has
-  to click it once; the deploy workflow reports it if it is still off).
+  [docs/](docs), with the browser platform at [`/app/`](https://yawiyuson231-oss.github.io/AdShieldPro/app/).
+  Deployed from `main` by [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
+  Required setting: repository **Settings → Pages → Source: GitHub Actions**. With *Deploy from a
+  branch*, GitHub also publishes the raw repository after every push to `main` and replaces the
+  site (the homepage turns into the browser platform and `/app/` returns 404); the deploy workflow
+  flags that state in its run summary and republishes the real site about a minute later.
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 

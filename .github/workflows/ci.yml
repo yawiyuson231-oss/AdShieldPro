@@ -42,6 +42,11 @@ jobs:
       - name: Integration tests (the real UI in jsdom)
         run: npm run test:integration
 
+      # The deploy workflow only runs on main, so prove on every branch and pull request
+      # that the site still assembles (marketing site at /, web platform at /app/).
+      - name: Assemble the website exactly as the deploy does (not published)
+        run: node scripts/stage-site.mjs --out _site
+
       - name: Check the extension archive is inside Chrome's static-rule limit
         run: node scripts/build-extension.mjs --check
 
