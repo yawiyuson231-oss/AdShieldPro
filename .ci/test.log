@@ -33,8 +33,8 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:preDebugUnitTestBuild
 > Task :app:processDebugJavaRes UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest FROM-CACHE
-> Task :app:bundleDebugClassesToCompileJar
 > Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
 
 > Task :app:compileDebugUnitTestKotlin
@@ -336,6 +336,10 @@ DashboardPresentationTest > overview_recomputesAllowedWhenReportedCounterContrad
 
 DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
 
+DnsCacheBudgetTest > testEvictionDropsTheLeastRecentlyUsedEntryFirst PASSED
+
+DnsCacheBudgetTest > testCacheStaysInsideItsByteBudget PASSED
+
 DnsClientSubnetPolicyTest > testClientSubnetOptionIsRemovedAndOtherOptionsSurvive PASSED
 
 DnsClientSubnetPolicyTest > testClientSubnetIsForwardedOnlyForOptedInStreamingHosts PASSED
@@ -353,6 +357,17 @@ DnsCnameGuardTest > testReturnsEmptyListWhenAnswerHasNoCname PASSED
 DnsCnameGuardTest > testRejectsMalformedAndNonResponseMessages PASSED
 
 DnsCnameGuardTest > testGuardBlocksOnlyBlockedHopsAndRespectsHopCap PASSED
+
+DnsNegativeCacheTtlTest > testNodataUsesTheSoaLifetimeToo FAILED
+    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:29
+
+DnsNegativeCacheTtlTest > testNothingNegativeIsCachedLongerThanThePositiveCeiling FAILED
+    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:23
+
+DnsNegativeCacheTtlTest > testNxdomainUsesTheSmallerOfSoaTtlAndMinimum FAILED
+    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:17
+
+DnsNegativeCacheTtlTest > testNegativeAnswersWithoutSoaFallBackToAShortLifetime PASSED
 
 DnsQueryCoalescingTest > testABurstOfIdenticalLookupsCostsOneUpstreamQuery PASSED
 
@@ -676,8 +691,7 @@ VideoAdNetworkCatalogTest > testNoCatalogueZoneCanBePlaybackInfrastructure PASSE
 
 VideoAdNetworkCatalogTest > testMatchingRespectsLabelBoundariesAndNormalisesInput PASSED
 
-VideoAdNetworkCatalogTest > testSafeAdInfrastructureIsBlockedInEveryMode FAILED
-    java.lang.AssertionError at VideoAdNetworkCatalogTest.kt:33
+VideoAdNetworkCatalogTest > testSafeAdInfrastructureIsBlockedInEveryMode PASSED
 
 VideoAdNetworkCatalogTest > testConditionalTierNeedsTheAggressiveModes PASSED
 
@@ -721,7 +735,7 @@ WorldMonitorTestSuite > testNewsParserKeepsTimezonesStrictInsteadOfGuessing PASS
 
 WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
-335 tests completed, 1 failed
+341 tests completed, 3 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -883,5 +897,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 47s
+BUILD FAILED in 37s
 34 actionable tasks: 9 executed, 1 from cache, 24 up-to-date
