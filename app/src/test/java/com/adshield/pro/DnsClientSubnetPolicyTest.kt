@@ -84,11 +84,16 @@ class DnsClientSubnetPolicyTest {
         u16(DnsPacketCodec.CLASS_IN)
 
         val options = ByteArrayOutputStream()
+        // Option fields belong to the OPT RDATA, never to the message itself.
+        fun opt16(value: Int) {
+            options.write((value ushr 8) and 0xFF)
+            options.write(value and 0xFF)
+        }
         if (includeClientSubnet) {
             // RFC 7871: family 1 (IPv4), source prefix 24, scope 0, three address bytes.
-            u16(DnsPacketCodec.EDNS_OPTION_CLIENT_SUBNET)
-            u16(7) // option length: family(2) + source(1) + scope(1) + 3 address bytes
-            u16(1) // address family: IPv4
+            opt16(DnsPacketCodec.EDNS_OPTION_CLIENT_SUBNET)
+            opt16(7) // option length: family(2) + source(1) + scope(1) + 3 address bytes
+            opt16(1) // address family: IPv4
             options.write(24)  // source prefix length
             options.write(0)   // scope prefix length
             options.write(203)
@@ -96,8 +101,8 @@ class DnsClientSubnetPolicyTest {
             options.write(113)
         }
         if (cookie != null) {
-            u16(10) // COOKIE option code
-            u16(cookie.size)
+            opt16(10) // COOKIE option code
+            opt16(cookie.size)
             options.write(cookie)
         }
         val optionBytes = options.toByteArray()
