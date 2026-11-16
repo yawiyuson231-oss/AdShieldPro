@@ -120,6 +120,31 @@ class UpstreamDnsResolver @Inject constructor(
         }
     }
 
+    /**
+     * The stale answer for [cacheKey], or null when there is none inside the grace window.
+     *
+     * RFC 8767: when the upstream is unreachable, an answer that expired a moment ago is far more
+     * useful than SERVFAIL, and its lifetime is reported as [STALE_TTL_SECONDS] so it is retried
+     * promptly once the resolver comes back.
+     */
+    internal fun resolveStale(
+        cacheKey: String,
+        query: DnsPacketCodec.ParsedDnsQuery,
+        nowMs: Long = System.currentTimeMillis()
+    ): UpstreamResult? {
+        val entry = synchronized(dnsCache) { dnsCache[cacheKey] } ?: return null
+        val overdueBy = nowMs - entry.expiresAtEpochMs
+        if (overdueBy < 0L || overdueBy > STALE_GRACE_MS) return null
+        val aged = DnsPacketCodec.rewriteResponseTtls(entry.wireResponse, STALE_TTL_SECONDS)
+            ?: entry.wireResponse
+        return UpstreamResult(
+            responseBytes = DnsPacketCodec.rewriteTransactionId(aged, query.transactionId),
+            protocolUsed = "${entry.protocolOrigin} (Stale after upstream failure)",
+            fromCache = true,
+            latencyMs = 0
+        )
+    }
+
     /** Wire bytes currently held by the cache. */
     fun getCacheBytes(): Int = synchronized(dnsCache) { dnsCache.values.sumOf { it.wireResponse.size } }
 
@@ -129,15 +154,18 @@ class UpstreamDnsResolver @Inject constructor(
         }
     }
 
-    fun trimExpiredAndExcessCache(targetSize: Int = 128): Int {
+    fun trimExpiredAndExcessCache(targetSize: Int = 128, nowMs: Long = System.currentTimeMillis()): Int {
         synchronized(dnsCache) {
             val before = dnsCache.size
-            val now = System.currentTimeMillis()
+            val now = nowMs
             val snapshot = dnsCache.entries.toList()
             for (mapEntry in snapshot) {
                 val key = mapEntry.key
                 val entry = mapEntry.value
-                if (now >= entry.expiresAtEpochMs) {
+                // Recently expired entries are kept for [STALE_GRACE_MS]: they can still rescue a
+                // lookup while the upstream is unreachable (RFC 8767), and they no longer count as
+                // fresh answers.
+                if (now >= entry.expiresAtEpochMs + STALE_GRACE_MS) {
                     dnsCache.remove(key)
                 }
             }
@@ -245,7 +273,6 @@ class UpstreamDnsResolver @Inject constructor(
                     latencyMs = 0
                 )
             }
-            synchronized(dnsCache) { dnsCache.remove(cacheKey) }
         }
 
         // Single-flight: the first caller resolves, everyone asking the same question while that
@@ -435,6 +462,9 @@ class UpstreamDnsResolver @Inject constructor(
         }
 
         if (resolved != null) return@withContext resolved as UpstreamResult
+
+        // A recently expired answer beats SERVFAIL when the upstream is down.
+        resolveStale(cacheKey, query)?.let { return@withContext it }
 
         // Fail closed at the DNS protocol layer: return SERVFAIL, never an unvalidated response
         // and never an implicit plaintext downgrade.
@@ -722,6 +752,12 @@ class UpstreamDnsResolver @Inject constructor(
 
         /** Default payload ceiling: 2 MiB of cached wire answers. */
         internal const val DEFAULT_CACHE_BYTE_BUDGET = 2 * 1024 * 1024
+
+        /** How long an expired answer stays available as a stale fallback (RFC 8767). */
+        internal const val STALE_GRACE_MS = 5 * 60 * 1000L
+
+        /** Lifetime reported on a stale answer, so the client retries soon after recovery. */
+        internal const val STALE_TTL_SECONDS = 30
 
         /**
          * How long a coalesced follower waits for the leader's answer before resolving on its own.

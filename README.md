@@ -338,6 +338,7 @@ while filtering is active. Those platform strings cannot be renamed by the app.
   - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
   - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
   - **RFC 2308 Negative Caching** honours the authority SOA lifetime for NXDOMAIN and NODATA answers (`min(SOA TTL, SOA MINIMUM)`, clamped 15–1800 s, 30 s fallback), so a "no such name" answer is believed exactly as long as the zone published.
+- **Stale-While-Recovering Fallback** (RFC 8767): when every upstream in the plan fails, an answer that expired less than five minutes ago is served with a 30 s lifetime instead of SERVFAIL, so a flaky network does not take the whole device offline.
 - **Bounded Answer Cache** with two limits at once — 1024 entries and 2 MiB of payload — evicting least recently used first, so a burst of large answers cannot grow the cache into device memory.
 - **Single-Flight Lookups** collapse a burst of identical queries into one upstream round trip; followers wait with a 5 s bound and then resolve on their own, and the shared answer is rewritten to their transaction ID.
 - **DNS Rebinding Guard** (Strict and Custom) refuses a public name that answers with a private, loopback, link-local, CGNAT or unique-local address, closing the path a web page uses to reach your router or an intranet service. Local names and unwalkable packets are left alone, and the reply is SERVFAIL because the name itself does exist.

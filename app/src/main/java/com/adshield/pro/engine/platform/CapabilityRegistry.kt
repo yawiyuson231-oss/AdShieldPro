@@ -113,6 +113,17 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-stale-fallback", "A recently expired answer rescues a failed upstream (RFC 8767)", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("The absolute expiry recorded with every cache entry and the five-minute grace window"),
+            listOf(
+                "Used only after every provider in the validated plan has failed, never in place of a fresh answer",
+                "Handed out with a 30 s lifetime so the client retries promptly once the resolver recovers",
+                "An entry is purged once its grace window passes, so stale answers cannot accumulate"
+            ),
+            "DnsStaleFallbackTest.testOnlyAnExpiredAnswerInsideTheGraceWindowIsStaleServeable and DnsStaleFallbackTest.testExpiredEntriesSurviveTrimmingOnlyWhileTheyCanStillHelp"
+        ),
+        cap(
             "dns-rebinding-guard", "Public names that resolve into private address space are refused", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsRebindingGuard.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The A and AAAA record data of every answer, walked by DnsPacketCodec.extractAddressAnswers"),

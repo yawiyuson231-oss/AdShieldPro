@@ -127,6 +127,7 @@ JVM tests in `app/src/test/java/com/adshield/pro/CybersecurityPlatformTestSuite.
 | `DnsNegativeCacheTtlTest` (4 tests) | SOA-based negative lifetime, ceiling clamp, NODATA, SOA-less fallback |
 | `DnsCacheBudgetTest` (2 tests) | payload budget, LRU eviction order |
 | `DnsRebindingGuardTest` (6 tests) | RFC 1918/loopback/link-local/CGNAT/ULA detection, public answers, local-name exemptions, mode gating |
+| `DnsStaleFallbackTest` (2 tests) | stale window bounds, 30 s reported lifetime, transaction-ID rewrite, grace-window trimming |
 | `fileScannerFlagsEncodedPowerShellDropper` | scanner verdict is driven by a real dropper-pattern match |
 
 CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, assembled the
@@ -171,6 +172,7 @@ prove it understood the packet hands the packet on unchanged rather than half-re
 | Cache hit | `UpstreamDnsResolver.resolve` + `DnsPacketCodec.rewriteResponseTtls` | Answers are rewritten to the lifetime the entry has left (ceiling division, so a live entry never reports 0 s). EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags. A message the codec cannot walk is served from the stored bytes untouched. |
 | Client subnet | `DnsPacketCodec.stripEdnsClientSubnet` | The EDNS Client Subnet option is removed from every outgoing query, so a CDN cannot use a forwarded subnet to correlate unrelated lookups. Cookies, padding, the UDP payload size and the DO bit are preserved. The subnet is kept only for streaming hosts when geo-accurate media DNS is enabled (`UpstreamDnsResolver.forwardsClientSubnet`). |
 | Plaintext question binding | `UpstreamDnsResolver.isValidDnsResponseForQuery(ByteArray, ByteArray)` | UDP/TCP answers must echo the exact question (name case-folded, QTYPE, QCLASS) that was sent. A question-less error response is accepted; a question-less NOERROR answer is not. |
+| Stale fallback | `UpstreamDnsResolver.resolveStale` | When every provider in the plan fails, an answer that expired less than five minutes ago is served with a 30 s lifetime (RFC 8767) instead of SERVFAIL. Fresh answers are never replaced by stale ones. |
 | Single-flight | `UpstreamDnsResolver.resolve` | Concurrent lookups for one cache key share a single upstream query. Followers wait at most 5 s, then resolve on their own; the shared answer is rewritten to the follower's transaction ID. |
 | Rebinding guard | `DnsRebindingGuard` + `DnsPacketCodec.extractAddressAnswers` | In Strict and Custom, a public name that answers with a private, loopback, link-local, CGNAT or unique-local address is refused with SERVFAIL. Local names are exempt and an unwalkable message is never judged. |
 | CNAME cloaking | `DnsCnameGuard` + `DnsPacketCodec.extractCnameTargets` | Strict and Custom modes block a first-party name that resolves through a blocked tracker, up to 8 hops. Per-app "allow all" bypasses the guard, and a response the parser cannot walk is never decided on. |
