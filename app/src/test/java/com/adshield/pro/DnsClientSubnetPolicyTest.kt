@@ -29,8 +29,8 @@ class DnsClientSubnetPolicyTest {
         // Header flags stay identical, and the OPT record keeps its UDP payload size (1232) and
         // its DNSSEC OK bit; only the client-subnet option is gone.
         assertTrue(query[2] == stripped[2] && query[3] == stripped[3])
-        assertTrue(stripped[38].toInt() == 0x04 && stripped[39].toInt() == 0xD0)
-        assertTrue(stripped[42].toInt() == 0x80)
+        assertTrue((stripped[38].toInt() and 0xFF) == 0x04 && (stripped[39].toInt() and 0xFF) == 0xD0)
+        assertTrue((stripped[42].toInt() and 0xFF) == 0x80)
         assertTrue(stripped.size < query.size)
     }
 
