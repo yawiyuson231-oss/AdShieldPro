@@ -7,7 +7,7 @@ TDLib native runtime: 12 libraries verified and installed
 
 > Task :app:preBuild
 > Task :app:preDebugBuild
-> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugBuildConfig FROM-CACHE
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
 > Task :app:processDebugNavigationResources
@@ -16,12 +16,12 @@ TDLib native runtime: 12 libraries verified and installed
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:144:48 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:181:50 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:380:52 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:561:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:680:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:724:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:758:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:182:50 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:392:52 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:573:46 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:692:71 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:736:64 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:770:67 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudApi.kt:118:37 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudBackup.kt:272:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/cloud/CloudUploadEngine.kt:490:42 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
@@ -42,8 +42,8 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:455:32 'fun release(): Unit' is deprecated. Deprecated in Java.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:542:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Long'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/connectors/NativeProbeExpansion.kt:543:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Long'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:336:59 Cast is redundant.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:375:38 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:359:59 Cast is redundant.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:399:38 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/intelligence/IntelligenceAggregator.kt:701:59 Unnecessary safe call on a non-null receiver of type 'BatteryTelemetry'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/onion/OnionRoutingManager.kt:108:30 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/onion/OnionRoutingManager.kt:148:39 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
@@ -60,9 +60,9 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:302:80 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:303:35 'val Icons.Filled.InsertDriveFile: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.InsertDriveFile.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudComponents.kt:442:47 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:92:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/TelegramCloudScreen.kt:91:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/TelegramCloudScreen.kt:523:44 'val Icons.Filled.Label: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Label.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/CloudScreen.kt:93:33 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/TelegramCloudScreen.kt:92:41 'fun <reified VM : ViewModel> hiltViewModel(viewModelStoreOwner: ViewModelStoreOwner = ..., key: String? = ...): VM' is deprecated. Moved to package: androidx.hilt.lifecycle.viewmodel.compose.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/cloud/TelegramCloudScreen.kt:546:44 'val Icons.Filled.Label: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Label.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/connectors/ConnectorRegistryScreen.kt:97:36 'val Icons.Filled.ArrowBack: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowBack.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/NativeGlobeTileStreamer.kt:206:46 Unnecessary safe call on a non-null receiver of type 'ResponseBody'.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/screens/worldmonitor/WorldMonitorScreen.kt:384:26 'val LocalLifecycleOwner: ProvidableCompositionLocal<LifecycleOwner>' is deprecated. Moved to lifecycle-runtime-compose library in androidx.lifecycle.compose package.
@@ -74,6 +74,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 3m 5s
-9 actionable tasks: 9 executed
+BUILD SUCCESSFUL in 1m 40s
+9 actionable tasks: 8 executed, 1 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

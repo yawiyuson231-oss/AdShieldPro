@@ -32,14 +32,14 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:transformDebugClassesWithAsm UP-TO-DATE
 > Task :app:preDebugUnitTestBuild
 > Task :app:processDebugJavaRes UP-TO-DATE
-> Task :app:javaPreCompileDebugUnitTest
+> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
 > Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:bundleDebugClassesToCompileJar
 > Task :app:kspDebugUnitTestKotlin
 
 > Task :app:compileDebugUnitTestKotlin
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/ScanJournalTest.kt:156:23 Redundant creation of Json format. Creating instances for each use can be slow.
-w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/TelegramCloudTestSuite.kt:520:91 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/TelegramCloudTestSuite.kt:601:91 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
 
 > Task :app:processDebugUnitTestJavaRes
 > Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
@@ -80,12 +80,13 @@ AdShieldEngineTestSuite > testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkhol
 
 AdShieldEngineTestSuite > testFilterValidation_rejectsMalformedDomainsHtmlAndBroadWildcards PASSED
 
+AdShieldEngineTestSuite > testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked PASSED
+
 AdShieldEngineTestSuite > testRegression_malformedDnsPacketsAndCompressionLoopsRejectedSafely PASSED
 
 AdShieldEngineTestSuite > testUdpPayloadCapacityMatchesIpVersionHeaders PASSED
 
-AdShieldEngineTestSuite > videoSafetyExemptionAppliesOnlyToTheMediaDomainRuleNotToAdHosts FAILED
-    org.junit.ComparisonFailure at AdShieldEngineTestSuite.kt:439
+AdShieldEngineTestSuite > videoSafetyExemptionAppliesOnlyToTheMediaDomainRuleNotToAdHosts PASSED
 
 AdShieldEngineTestSuite > testIpv4AndIpv6_udpAndTcpFramingAndChecksums PASSED
 
@@ -197,6 +198,14 @@ CapabilityRegistryTest > testImplementedCapabilitiesPointAtRealCode PASSED
 
 CapabilityRegistryTest > testUnavailableCapabilitiesClaimNoCode PASSED
 
+CapabilityStatusFilterTest > eachStatusFilterMatchesTheRegistry PASSED
+
+CapabilityStatusFilterTest > searchMatchesAreaAndLimitations PASSED
+
+CapabilityStatusFilterTest > searchIsCaseInsensitiveAndCombinesWithStatus PASSED
+
+CapabilityStatusFilterTest > emptySearchShowsEveryFeature PASSED
+
 CloudPlatformTestSuite > backupCodecRoundTripsAndRefusesATamperedPayload PASSED
 
 CloudPlatformTestSuite > cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage PASSED
@@ -289,8 +298,7 @@ CybersecurityPlatformTestSuite > strictDnssecFailsClosedWithServfailInsteadOfAnU
 
 CybersecurityPlatformTestSuite > resolverServesTtlCacheWithoutRequeryingUpstream PASSED
 
-CybersecurityPlatformTestSuite > resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade FAILED
-    java.lang.AssertionError at CybersecurityPlatformTestSuite.kt:121
+CybersecurityPlatformTestSuite > resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade PASSED
 
 CybersecurityPlatformTestSuite > appNetworkAndEmergencyPoliciesAreDeterministic PASSED
 
@@ -327,6 +335,33 @@ DashboardPresentationTest > overview_clampsImpossibleBlockedCounters PASSED
 DashboardPresentationTest > overview_recomputesAllowedWhenReportedCounterContradictsTotal PASSED
 
 DashboardPresentationTest > overview_negativeInputsAreSanitized PASSED
+
+DnsClientSubnetPolicyTest > testClientSubnetOptionIsRemovedAndOtherOptionsSurvive FAILED
+    java.lang.IllegalStateException at DnsClientSubnetPolicyTest.kt:26
+
+DnsClientSubnetPolicyTest > testClientSubnetIsForwardedOnlyForOptedInStreamingHosts PASSED
+
+DnsClientSubnetPolicyTest > testQueryWithoutClientSubnetIsReturnedUntouched PASSED
+
+DnsClientSubnetPolicyTest > testMalformedQueryIsRejectedInsteadOfHalfRewritten PASSED
+
+DnsCnameGuardTest > testOnlyAggressiveModesEnforceCloaking PASSED
+
+DnsCnameGuardTest > testExtractsCnameTargetsFromWireResponse PASSED
+
+DnsCnameGuardTest > testReturnsEmptyListWhenAnswerHasNoCname PASSED
+
+DnsCnameGuardTest > testRejectsMalformedAndNonResponseMessages PASSED
+
+DnsCnameGuardTest > testGuardBlocksOnlyBlockedHopsAndRespectsHopCap PASSED
+
+DnsResponseCacheTest > testCachedTtlsAreRewrittenToRemainingLifetime PASSED
+
+DnsResponseCacheTest > testOptRecordTtlIsLeftAlone PASSED
+
+DnsResponseCacheTest > testTtlIsClampedToAtLeastOneSecond PASSED
+
+DnsResponseCacheTest > testRewriterRejectsMalformedMessages PASSED
 
 InfinityCoreTestSuite > testWebDavPaths_rejectTraversalAndBuildSafeChildren PASSED
 
@@ -466,6 +501,14 @@ PrivateSearchTest > searchUrl_keepsUnreservedCharactersReadable PASSED
 
 PrivateSearchTest > emptyInputGoesToSelectedProviderHome PASSED
 
+ProtectionExplainerTest > testAllExplainerTextIsNonBlank PASSED
+
+ProtectionExplainerTest > testExplainerNeverClaimsIpMasking PASSED
+
+ProtectionExplainerTest > testRoutesNeverIncludeADefaultRoute PASSED
+
+ProtectionExplainerTest > testEveryProtectionModeAndProtocolIsExplained PASSED
+
 ProtectionStatusTest > missingRulesAreDegradedRatherThanSilentlyHealthy PASSED
 
 ProtectionStatusTest > aWorkingTunnelReportsActiveWithAFullHealthScore PASSED
@@ -474,9 +517,13 @@ ProtectionStatusTest > pausedAndOfflineStatesNeverClaimProtection PASSED
 
 ProtectionStatusTest > policiesAndDnssecModeAreReflectedInBadgesAndStages PASSED
 
+ProtectionStatusTest > pausedOrStartingWithEmergencyModeDoesNotClaimLockdownIsActive PASSED
+
 ProtectionStatusTest > emergencyLockdownIsAttentionNotAHealthFault PASSED
 
 ProtectionStatusTest > anIdleTunnelIsNeverDescribedAsWorking PASSED
+
+ProtectionStatusTest > disconnectedDoesNotShowAStaleError PASSED
 
 ProtectionStatusTest > anOpenProviderCircuitIsReportedAsDegradedAndCostsHealth PASSED
 
@@ -572,6 +619,8 @@ SystemTilesTestSuite > testPrivateDnsHostnameValidationAcceptsDoTHostsAndRejects
 
 TelegramCloudTestSuite > testDuplicateSha256IsRejectedBeforeAnyUploadRequest PASSED
 
+TelegramCloudTestSuite > testFailedStartupShowsErrorAndAllowsAnotherLoginAttempt PASSED
+
 TelegramCloudTestSuite > testDownloadProgressResumeAndHashVerification PASSED
 
 TelegramCloudTestSuite > testWrongDatabaseEncryptionKeyClearsSessionInsteadOfLooping PASSED
@@ -581,6 +630,8 @@ TelegramCloudTestSuite > testOfficialAuthorizationFlowUsesRealTdlibRequestsAndNe
 TelegramCloudTestSuite > testUnsupportedAuthorizationStatesAreReportedNeverSimulated PASSED
 
 TelegramCloudTestSuite > testHashStreamIsExactSha256AndSize PASSED
+
+TelegramCloudTestSuite > testCheckingAfterExternalConfirmationFinishesLoginOnce PASSED
 
 TelegramCloudTestSuite > testDisconnectLogsOutWipesEncryptedSessionKeyAndAllLocalSessionData PASSED
 
@@ -598,7 +649,11 @@ TelegramCloudTestSuite > testUploadSendsRealDocumentRecordsMetadataAndProgress P
 
 TelegramCloudTestSuite > testAppRestartMarksRunningTransferInterruptedInsteadOfFakingCompletion PASSED
 
+TelegramCloudTestSuite > testTdlibParametersHandleEarlyUpdateErrorsAndTimeout PASSED
+
 TelegramCloudTestSuite > testInterruptedUploadIsPersistedAndRetryReusesUploadedFileId PASSED
+
+TelegramCloudTestSuite > testWrongCodeCanBeCorrectedWithoutRestartingLogin PASSED
 
 TelegramCloudTestSuite > testFailedDownloadCanRetryFromRecordedOffset PASSED
 
@@ -648,7 +703,7 @@ WorldMonitorTestSuite > testNewsParserKeepsTimezonesStrictInsteadOfGuessing PASS
 
 WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
-298 tests completed, 2 failed
+326 tests completed, 1 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -810,5 +865,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 46s
-34 actionable tasks: 10 executed, 24 up-to-date
+BUILD FAILED in 32s
+34 actionable tasks: 9 executed, 1 from cache, 24 up-to-date
