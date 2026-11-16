@@ -902,7 +902,8 @@ private fun StatisticsDestination(viewModel: AdShieldViewModel) {
                 matchType = RuleMatchType.SUBDOMAIN,
                 comment = "Added from Activity Log"
             )
-        }
+        },
+        onTemporaryAllow = viewModel::temporarilyAllowDomain
     )
 }
 

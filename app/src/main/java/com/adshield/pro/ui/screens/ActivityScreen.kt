@@ -92,7 +92,8 @@ fun ActivityScreen(
     onToggleDetailedLogging: (Boolean) -> Unit,
     onChangeRetentionDays: (Int) -> Unit,
     onClearHistory: () -> Unit,
-    onQuickRuleFromLog: (String, RuleType) -> Unit
+    onQuickRuleFromLog: (String, RuleType) -> Unit,
+    onTemporaryAllow: (String) -> Unit = {}
 ) {
     var logFilterIndex by remember { mutableIntStateOf(0) } // 0 = All, 1 = Blocked, 2 = Allowed
     var explainRecord by remember { mutableStateOf<DnsActivityRecord?>(null) }
@@ -119,12 +120,24 @@ fun ActivityScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    val targetType = if (record.isBlocked) RuleType.ALLOW else RuleType.BLOCK
-                    onQuickRuleFromLog(record.domain, targetType)
-                    explainRecord = null
-                }) {
-                    Text(if (record.isBlocked) "Allow this domain" else "Block this domain", color = EmeraldPrimary)
+                Row {
+                    if (record.isBlocked) {
+                        // Bounded escape hatch: the lease ends by itself, so a stalled app is fixed
+                        // without leaving a permanent hole in the filtering.
+                        TextButton(onClick = {
+                            onTemporaryAllow(record.domain)
+                            explainRecord = null
+                        }) {
+                            Text("Allow 15 min", color = CyberCyan)
+                        }
+                    }
+                    TextButton(onClick = {
+                        val targetType = if (record.isBlocked) RuleType.ALLOW else RuleType.BLOCK
+                        onQuickRuleFromLog(record.domain, targetType)
+                        explainRecord = null
+                    }) {
+                        Text(if (record.isBlocked) "Allow always" else "Block this domain", color = EmeraldPrimary)
+                    }
                 }
             },
             dismissButton = {

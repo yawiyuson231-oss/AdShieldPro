@@ -71,6 +71,13 @@ object BlockReasonExplainer {
                 action = "Change the app policy in Settings.",
                 isBlock = true
             )
+            "Temporary allow" -> Explanation(
+                title = "Allowed by a temporary lease",
+                body = "You granted this name a bounded pass-through because an app stalled. The lease ends " +
+                    "on its own; nothing was added to your rules.${rule?.let { " It overrode: $it." } ?: ""}",
+                action = "Nothing to do. Start protection again or wait for the lease to end.",
+                isBlock = false
+            )
             "System Safety Allowlist" -> Explanation(
                 title = "Allowed by the built-in safety list",
                 body = "Logins, captchas, single sign-on, payments and connectivity checks are never blocked, " +

@@ -65,6 +65,7 @@ import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.engine.dns.runDiagnostics
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.TemporaryAllowlist
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
 import com.adshield.pro.engine.security.AppRiskAuditor
@@ -119,6 +120,7 @@ class AdShieldViewModel @Inject constructor(
     private val preferencesRepository: UserPreferencesRepository,
     private val filterRuleEngine: FilterRuleEngine,
     private val upstreamDnsResolver: UpstreamDnsResolver,
+    private val temporaryAllowlist: TemporaryAllowlist,
     val browserContentBlocker: BrowserContentBlocker,
     private val optimizerEngine: SystemOptimizerEngine,
     private val securityEngine: SecurityEngine,
@@ -803,6 +805,21 @@ class AdShieldViewModel @Inject constructor(
                 else "Built-in video-ad baseline paused: only your filter lists block adverts now."
             )
         }
+    }
+
+    /**
+     * Grants [domain] a bounded pass-through when an app stalls, so the user does not have to
+     * disable protection. Nothing is persisted: the lease dies with the process.
+     */
+    fun temporarilyAllowDomain(domain: String) {
+        val grant = temporaryAllowlist.grant(domain)
+        if (grant == null) {
+            showFeedback("Cannot allow '$domain' temporarily: it is not a single site name.")
+            return
+        }
+        upstreamDnsResolver.clearCache()
+        val minutes = (grant.expiresAtEpochMs - System.currentTimeMillis()) / 60_000L
+        showFeedback("$domain is allowed for ${minutes.coerceAtLeast(1)} min. Protection stays on, and the lease ends by itself.")
     }
 
     fun setVideoAdConditionalTierEnabled(enabled: Boolean) {

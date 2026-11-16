@@ -26,7 +26,8 @@ class BlockReasonExplainerTest {
             "Per-App DNS Filter Bypass" to "allow all DNS",
             "Paused (Passthrough)" to "paused",
             "Network Policy Passthrough (Wi-Fi)" to "passthrough",
-            "User Blocklist" to "blocklist"
+            "User Blocklist" to "blocklist",
+            "Temporary allow" to "temporary lease"
         )
         cases.forEach { (source, expected) ->
             val explanation = BlockReasonExplainer.explain(
@@ -77,6 +78,20 @@ class BlockReasonExplainerTest {
             assertFalse("$source must not claim a block", explanation.isBlock)
             assertTrue(explanation.action.isNotBlank())
         }
+    }
+
+    @Test
+    fun testATemporaryAllowIsNeverDescribedAsABlock() {
+        val explanation = BlockReasonExplainer.explain(
+            sourceName = "Temporary allow",
+            matchedRule = "doubleclick.net (temporary allow, 14m left)",
+            category = null,
+            isBlocked = false
+        )
+        assertFalse("a lease is not a block", explanation.isBlock)
+        assertTrue(explanation.body.contains("bounded"))
+        assertTrue("the overridden rule must survive", explanation.body.contains("doubleclick.net"))
+        assertTrue("the lease must be described as self-ending", explanation.body.contains("ends"))
     }
 
     @Test

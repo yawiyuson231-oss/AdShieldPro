@@ -31,6 +31,7 @@ import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.TemporaryAllowlist
 import com.adshield.pro.engine.filter.VideoAdNetworkCatalog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,7 @@ class AdShieldDnsService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var temporaryAllowlist: TemporaryAllowlist
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var tunInterface: ParcelFileDescriptor? = null
@@ -394,7 +396,13 @@ class AdShieldDnsService : VpnService() {
             policy = currentSettings.dnsFirewallPolicy
         )
 
-        if (decision.isBlocked) {
+        // A temporary allow is the user's escape hatch when an app stalls on an advert step. It
+        // outranks the lists, the baseline and the CNAME guard, because that is precisely what the
+        // user asked for. It never outranks the rebinding guard: an answer that points at a private
+        // address is a security problem, not an advert.
+        val temporaryGrant = temporaryAllowlist.match(query.questionDomain)
+
+        if (decision.isBlocked && temporaryGrant == null) {
             val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
             val blockedBytes = DnsPacketCodec.buildBlockedResponse(
                 query = query,
@@ -422,6 +430,7 @@ class AdShieldDnsService : VpnService() {
         // allowlist, per-app bypass and unprotected transports keep their say.
         val enforcementMode = filterRuleEngine.getCurrentSnapshot().protectionMode
         val videoAdMatch = if (
+            temporaryGrant == null &&
             currentSettings.dnsFirewallPolicy.videoAdBaselineEnabled &&
             !decision.bypassDomainFilters &&
             evaluation.sourceName != "User Allowlist" &&
@@ -497,7 +506,7 @@ class AdShieldDnsService : VpnService() {
         // data the codec could not fully walk.
         // A per-app "allow all" or an unprotected transport already said "do not filter this
         // lookup", so the guard must not overrule that decision.
-        if (cloakMode.enforceCnameCloaking && !decision.bypassDomainFilters) {
+        if (cloakMode.enforceCnameCloaking && !decision.bypassDomainFilters && temporaryGrant == null) {
             val cloakTarget = DnsCnameGuard.firstBlockedTarget(upstreamResult.responseBytes) { target ->
                 filterRuleEngine.evaluate(target).isBlocked
             }
@@ -525,13 +534,20 @@ class AdShieldDnsService : VpnService() {
             }
         }
 
+        val remainingMinutes = temporaryGrant?.let { grant ->
+            ((grant.expiresAtEpochMs - System.currentTimeMillis()).coerceAtLeast(0L) / 60_000L) + 1
+        }
         repository.recordDnsQueryEvent(
             domain = query.questionDomain,
             queryType = query.qTypeName,
             isBlocked = false,
             category = null,
-            matchedRule = decision.matchedRule,
-            sourceList = decision.sourceName,
+            matchedRule = when {
+                temporaryGrant != null && decision.isBlocked ->
+                    "${decision.matchedRule ?: decision.sourceName} (temporary allow, ${remainingMinutes}m left)"
+                else -> decision.matchedRule
+            },
+            sourceList = if (temporaryGrant != null) "Temporary allow" else decision.sourceName,
             latencyMs = upstreamResult.latencyMs,
             protocolUsed = upstreamResult.protocolUsed,
             fromCache = upstreamResult.fromCache,

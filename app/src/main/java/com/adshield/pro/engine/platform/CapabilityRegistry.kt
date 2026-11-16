@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "temporary-allow", "Bounded \"allow for 15 minutes\" lease when an app stalls", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/TemporaryAllowlist.kt", emptyList(),
+            listOf("An in-memory lease keyed by the normalized name, held by the DNS service and the Activity log quick action"),
+            listOf("Lives in memory only: restarting the process drops every lease", "Refuses single-label names, wildcards and URLs, clamps to 1-60 minutes, keeps at most 32 leases and evicts the soonest-expiring one", "The lease outranks lists, the baseline and the CNAME guard, but never the rebinding guard"),
+            "TemporaryAllowlistTest.testAGrantCoversTheNameAndItsSubdomainsOnly and TemporaryAllowlistTest.testAGrantExpiresAndDisappearsFromTheActiveList and TemporaryAllowlistTest.testAPublicSuffixOrGarbageIsRefused and TemporaryAllowlistTest.testTheSoonestExpiringGrantIsEvictedWhenFull"
+        ),
+        cap(
             "playback-safety-report", "A filter list trimmed for playback safety says so in its status", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/FilterSourceStatus.kt", emptyList(),
             listOf("The rejectedVideoUnsafeRules, duplicateCount and totalValidRules counters of each parsed list"),
