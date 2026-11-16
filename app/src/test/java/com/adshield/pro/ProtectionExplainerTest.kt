@@ -145,6 +145,19 @@ class ProtectionExplainerTest {
             ProtectionExplainer.CLIENT_SUBNET_NOTE.contains("EDNS Client Subnet")
         )
         assertTrue(
+            "resilience must be described as behaviour, not a promise",
+            ProtectionExplainer.RESILIENCE_POINTS.size >= 3 &&
+                ProtectionExplainer.RESILIENCE_POINTS.all { it.detail.isNotBlank() }
+        )
+        assertTrue(
+            "the resilience note must name the fallback instead of hiding it",
+            ProtectionExplainer.RESILIENCE_NOTE.contains("stale", ignoreCase = true)
+        )
+        assertTrue(
+            "the rebinding note must name the modes that enforce it",
+            ProtectionExplainer.REBINDING_NOTE.contains("Strict and Custom")
+        )
+        assertTrue(
             "the video-ad note must state the in-host limitation",
             ProtectionExplainer.VIDEO_ADS_NOTE.contains("YouTube") &&
                 ProtectionExplainer.VIDEO_ADS_NOTE.contains("no DNS filter")

@@ -192,6 +192,41 @@ object ProtectionExplainer {
             "video (YouTube, TikTok, Instagram) performs no lookup, so no DNS filter can separate it from " +
             "the content. Strict and Custom also block ad servers that ship player code."
 
+    /**
+     * What happens when the resolver itself is the problem. These are the behaviours a user can
+     * feel: a burst of lookups, a flap in connectivity, an upstream that goes away for a minute.
+     */
+    val RESILIENCE_POINTS: List<ExplainerPoint> = listOf(
+        ExplainerPoint(
+            title = "One upstream query per burst",
+            detail = "Lookups for the same name that arrive together share a single upstream query, and each " +
+                "client still receives an answer stamped with its own transaction ID."
+        ),
+        ExplainerPoint(
+            title = "A flaky upstream does not black-hole the device",
+            detail = "If every configured provider fails, an answer that expired less than five minutes ago is " +
+                "served with a 30 second lifetime instead of SERVFAIL, so pages keep loading while you recover."
+        ),
+        ExplainerPoint(
+            title = "Negative answers expire with the zone",
+            detail = "NXDOMAIN and \"no record of this type\" answers live exactly as long as the zone's SOA " +
+                "record allows, between 15 seconds and 30 minutes, and never longer."
+        )
+    )
+
+    const val RESILIENCE_NOTE =
+        "These behaviours are measured in the app's own resolver: no external service is consulted and no " +
+            "answer is invented. A stale answer is always reported with a short lifetime so it is retried soon."
+
+    /**
+     * DNS rebinding: a public name that answers with a private address is how a page reaches the
+     * router without any exploit. Enforced in the aggressive modes only.
+     */
+    const val REBINDING_NOTE =
+        "Strict and Custom also refuse a public name that answers with a private, loopback or link-local " +
+            "address (DNS rebinding), the trick a malicious page uses to talk to your router or an intranet " +
+            "host. Intranet names (single-label hosts, .local, .lan, .internal) are left alone."
+
     const val UPSTREAM_NOTE =
         "If the encrypted upstream fails, AdShield returns SERVFAIL rather than quietly " +
             "downgrading to plaintext. Opt-in failover only moves between providers you selected."

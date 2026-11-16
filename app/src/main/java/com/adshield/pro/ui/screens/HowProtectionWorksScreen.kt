@@ -94,6 +94,13 @@ fun HowProtectionWorksScreen(onBack: () -> Unit) {
             item { SectionTitle("Video adverts") }
             item { NoteCard(ProtectionExplainer.VIDEO_ADS_NOTE) }
 
+            item { SectionTitle("When the resolver struggles") }
+            item { PointsCard(ProtectionExplainer.RESILIENCE_POINTS) }
+            item { NoteCard(ProtectionExplainer.RESILIENCE_NOTE) }
+
+            item { SectionTitle("Private answers to public names") }
+            item { NoteCard(ProtectionExplainer.REBINDING_NOTE) }
+
             item { SectionTitle("Upstream transports") }
             item { PointsCard(ProtectionExplainer.UPSTREAM_MODES) }
             item { NoteCard(ProtectionExplainer.UPSTREAM_NOTE) }
