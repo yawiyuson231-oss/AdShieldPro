@@ -186,8 +186,11 @@ object CapabilityRegistry {
             "dns-response-validation", "Strict upstream response validation before caching or answering", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResponseValidator.kt", emptyList(),
             listOf("Full resource-record walk of the upstream wire response (DnsPacketCodec.inspectResponseRecordTypes)"),
-            listOf("Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes"),
-            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData"
+            listOf(
+                "Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes",
+                "Plaintext UDP/TCP answers are additionally matched to the exact question that was sent; an error response may omit the question, a NOERROR answer may not"
+            ),
+            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData and AdShieldEngineTestSuite.testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked"
         ),
         cap(
             "dnssec-evidence", "Upstream DNSSEC evidence reporting and strict AD mode", CapabilityArea.DNS_PROTECTION,

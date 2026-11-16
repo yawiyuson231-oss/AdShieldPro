@@ -497,7 +497,6 @@ class UpstreamDnsResolver @Inject constructor(
     }
 
     private fun querySingleUdpServer(rawDnsQuery: ByteArray, serverIp: String): ByteArray {
-        val expectedTransactionId = transactionIdOf(rawDnsQuery)
         DatagramSocket().use { socket ->
             currentDatagramProtector?.invoke(socket)
             socket.soTimeout = UDP_TIMEOUT_MS
@@ -521,7 +520,7 @@ class UpstreamDnsResolver @Inject constructor(
                 val candidate = receiveBuf.copyOfRange(0, responsePacket.length)
                 val fromQueriedServer = responsePacket.port == 53 &&
                     responsePacket.address == address
-                if (fromQueriedServer && isValidDnsResponseForQuery(expectedTransactionId, candidate)) {
+                if (fromQueriedServer && isValidDnsResponseForQuery(rawDnsQuery, candidate)) {
                     return candidate
                 }
             }
@@ -542,7 +541,7 @@ class UpstreamDnsResolver @Inject constructor(
             if (len < 12) throw IllegalStateException("Short TCP DNS response: $len")
             val buf = ByteArray(len)
             input.readFully(buf)
-            if (!isValidDnsResponseForQuery(transactionIdOf(rawDnsQuery), buf)) {
+            if (!isValidDnsResponseForQuery(rawDnsQuery, buf)) {
                 throw IllegalStateException("Upstream TCP DNS response did not match the query")
             }
             return buf
@@ -634,6 +633,24 @@ class UpstreamDnsResolver @Inject constructor(
          * True when [response] is a well-formed DNS *response* that echoes [transactionId].
          * Guards against cross-talk, truncated garbage and forged datagrams.
          */
+        /**
+         * Strict form used by the plaintext UDP/TCP transports: the answer must also echo the
+         * question we asked (name, type, class). A datagram that merely repeats our transaction
+         * ID can still be a forged answer for a different name, and accepting it would poison the
+         * cache for every app on the device. An error response is allowed to omit the question
+         * (some servers do), but a NOERROR answer without a question is never trusted.
+         */
+        fun isValidDnsResponseForQuery(query: ByteArray, response: ByteArray): Boolean {
+            if (!isValidDnsResponseForQuery(transactionIdOf(query), response)) return false
+            val asked = DnsPacketCodec.firstQuestion(query) ?: return false
+            val answered = DnsPacketCodec.firstQuestion(response)
+            if (answered == null) {
+                val rcode = response[3].toInt() and 0x0F
+                return rcode != 0
+            }
+            return asked == answered
+        }
+
         fun isValidDnsResponseForQuery(transactionId: Int, response: ByteArray): Boolean {
             if (response.size < 12 || transactionId < 0) return false
             if (transactionIdOf(response) != transactionId) return false

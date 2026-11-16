@@ -531,6 +531,26 @@ object DnsPacketCodec {
         return if (removed) kept.toByteArray() else null
     }
 
+    /** First question of any message, query or response, with the case folded away. */
+    data class WireQuestion(val domain: String, val qType: Int, val qClass: Int)
+
+    /**
+     * Reads the first question of a message regardless of the QR bit, so a response can be
+     * compared with the question that was actually asked.
+     */
+    fun firstQuestion(message: ByteArray): WireQuestion? {
+        if (message.size < 12) return null
+        if (u16At(message, 4) < 1) return null
+        val name = readDomainName(message, 0, 12, message.size) ?: return null
+        val typeOffset = name.nextOffset
+        if (typeOffset + 4 > message.size) return null
+        return WireQuestion(
+            domain = name.domain.lowercase().trimEnd('.'),
+            qType = u16At(message, typeOffset),
+            qClass = u16At(message, typeOffset + 2)
+        )
+    }
+
     private data class WireRecord(
         val start: Int,
         val nameEnd: Int,

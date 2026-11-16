@@ -535,6 +535,30 @@ class AdShieldEngineTestSuite {
     }
 
     @Test
+    fun testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked() {
+        val askedQuery = buildRawDnsQueryPacket(txId = 0x2222, domain = "safe.example.com")
+        val parsed = DnsPacketCodec.parseQuery(askedQuery) ?: error("query should parse")
+        val answer = DnsPacketCodec.buildBlockedResponse(parsed, sinkholeZeroIp = false)
+        assertTrue(UpstreamDnsResolver.isValidDnsResponseForQuery(askedQuery, answer))
+
+        // Same transaction ID, different question: a forged datagram, not an answer.
+        val otherQuery = buildRawDnsQueryPacket(txId = 0x2222, domain = "evil.example.net")
+        assertFalse(UpstreamDnsResolver.isValidDnsResponseForQuery(otherQuery, answer))
+
+        // An error response may omit the question (some servers do).
+        val refusal = ByteArray(12)
+        refusal[0] = 0x22
+        refusal[1] = 0x22
+        refusal[2] = 0x81.toByte()
+        refusal[3] = 0x05 // QR = 1, RCODE = REFUSED
+        assertTrue(UpstreamDnsResolver.isValidDnsResponseForQuery(askedQuery, refusal))
+
+        // A NOERROR answer that echoes no question at all is never trusted.
+        refusal[3] = 0x00
+        assertFalse(UpstreamDnsResolver.isValidDnsResponseForQuery(askedQuery, refusal))
+    }
+
+    @Test
     fun testUpstreamResponsesMustEchoTheTransactionIdAndBeResponses() {
         val rawQuery = buildRawDnsQueryPacket(txId = 0x1234)
         val query = DnsPacketCodec.parseQuery(rawQuery)!!
