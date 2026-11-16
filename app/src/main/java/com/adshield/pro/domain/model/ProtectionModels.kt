@@ -309,5 +309,13 @@ data class DnsFirewallPolicy(
         NetworkTransportPolicy.ETHERNET,
         NetworkTransportPolicy.OTHER
     ),
-    val emergencyAllowlistOnly: Boolean = false
+    val emergencyAllowlistOnly: Boolean = false,
+    /**
+     * Whether the built-in video-advert baseline runs.
+     *
+     * On by default: the catalogue only contains ad, verification and measurement zones, so it
+     * removes adverts without touching playback. Turning it off leaves the feed rules and every
+     * other guard in place, which is what a user wants when one specific streaming app misbehaves.
+     */
+    val videoAdBaselineEnabled: Boolean = true
 )

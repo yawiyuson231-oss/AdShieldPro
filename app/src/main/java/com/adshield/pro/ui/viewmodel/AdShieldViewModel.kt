@@ -794,6 +794,17 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun setVideoAdBaselineEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(videoAdBaselineEnabled = enabled))
+            showFeedback(
+                if (enabled) "Built-in video-ad baseline enabled: ad server, verification and measurement zones are blocked."
+                else "Built-in video-ad baseline paused: only your filter lists block adverts now."
+            )
+        }
+    }
+
     fun setEmergencyAllowlistOnly(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsState.value.dnsFirewallPolicy

@@ -96,6 +96,7 @@ data class BackupSource(
 @Serializable
 data class BackupFirewall(
     val emergencyAllowlistOnly: Boolean = false,
+    val videoAdBaselineEnabled: Boolean = true,
     val transports: List<String> = listOf("WIFI", "CELLULAR", "ETHERNET", "OTHER"),
     val appPolicies: List<BackupAppPolicy> = emptyList()
 )
@@ -213,6 +214,7 @@ class CloudBackupManager @Inject constructor(
             sources = sources,
             firewall = BackupFirewall(
                 emergencyAllowlistOnly = settings.dnsFirewallPolicy.emergencyAllowlistOnly,
+                videoAdBaselineEnabled = settings.dnsFirewallPolicy.videoAdBaselineEnabled,
                 transports = settings.dnsFirewallPolicy.protectedTransports.map { it.name },
                 appPolicies = settings.dnsFirewallPolicy.appPolicies.map { (pkg, policy) ->
                     BackupAppPolicy(pkg, policy.name)
@@ -352,7 +354,8 @@ class CloudBackupManager @Inject constructor(
             DnsFirewallPolicy(
                 appPolicies = policies,
                 protectedTransports = transports,
-                emergencyAllowlistOnly = payload.firewall.emergencyAllowlistOnly
+                emergencyAllowlistOnly = payload.firewall.emergencyAllowlistOnly,
+                videoAdBaselineEnabled = payload.firewall.videoAdBaselineEnabled
             )
         )
         applied += "per-app firewall"

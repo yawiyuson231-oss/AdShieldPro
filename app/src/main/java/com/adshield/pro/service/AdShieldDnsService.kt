@@ -422,6 +422,7 @@ class AdShieldDnsService : VpnService() {
         // allowlist, per-app bypass and unprotected transports keep their say.
         val enforcementMode = filterRuleEngine.getCurrentSnapshot().protectionMode
         val videoAdMatch = if (
+            currentSettings.dnsFirewallPolicy.videoAdBaselineEnabled &&
             !decision.bypassDomainFilters &&
             evaluation.sourceName != "User Allowlist" &&
             evaluation.sourceName != "System Safety Allowlist"

@@ -91,6 +91,7 @@ fun SettingsScreen(
     onSetTransportProtected: (NetworkTransportPolicy, Boolean) -> Unit,
     protectionStatus: ProtectionPipelineStatus? = null,
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
+    onSetVideoAdBaseline: (Boolean) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
@@ -479,6 +480,20 @@ fun SettingsScreen(
                                 onCheckedChange = { onSetTransportProtected(transport, it) }
                             )
                         }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Built-in video-ad baseline", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "Blocks ad server, verification and measurement zones (DoubleClick, 2mdn, Moat, IAS, " +
+                                    "Criteo, Taboola, …) even with no list loaded. Playback zones are never included.",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Switch(
+                            checked = settings.dnsFirewallPolicy.videoAdBaselineEnabled,
+                            onCheckedChange = onSetVideoAdBaseline
+                        )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {

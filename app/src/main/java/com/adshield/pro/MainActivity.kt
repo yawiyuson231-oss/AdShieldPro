@@ -973,6 +973,7 @@ private fun SettingsDestination(
         onSetTransportProtected = viewModel::setTransportProtected,
         protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
+        onSetVideoAdBaseline = viewModel::setVideoAdBaselineEnabled,
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,

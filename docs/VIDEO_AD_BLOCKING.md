@@ -27,6 +27,10 @@ Two risk tiers, enforced differently:
 | `SAFE` | Ad serving and programmatic exchanges (`doubleclick.net`, `2mdn.net`, `googlesyndication.com`, `adsrvr.org`, `rubiconproject.com`, `pubmatic.com`, `adnxs.com`, `smartadserver.com`, video SSPs such as `spotxchange.com` and `tremorhub.com`, `teads.tv`), native recommendation adverts (`taboola.com`, `outbrain.com`), and verification/measurement (`moatads.com`, `adsafeprotected.com`, `doubleverify.com`, `imrworldwide.com`, `scorecardresearch.com`, `quantserve.com`) | Every filtering mode |
 | `CONDITIONAL` | Hosts that also ship player or rewarded-ad code: `fwmrm.net`, `freewheel.tv`, rewarded-video networks (`unityads.unity3d.com`, `applovin.com`, `vungle.com`, `adcolony.com`, `chartboost.com`, `ironsrc.com`, `inmobi.com`) | Strict and Custom only (`ProtectionMode.enforceConditionalVideoAds`) |
 
+The whole baseline can be paused from **Settings → Network & Emergency DNS Policies → Built-in
+video-ad baseline** without changing the protection mode (`DnsFirewallPolicy.videoAdBaselineEnabled`,
+on by default, carried by the encrypted settings backup).
+
 A failed fetch of a `SAFE` host is ignored by players, which is why it is safe to block in every
 mode. A failed fetch of a `CONDITIONAL` host can surface as a stalled "loading advert" step in a
 few apps, which is why the balanced modes leave it alone.

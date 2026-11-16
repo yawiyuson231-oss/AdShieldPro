@@ -116,118 +116,70 @@ object CapabilityRegistry {
             "dns-stale-fallback", "A recently expired answer rescues a failed upstream (RFC 8767)", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The absolute expiry recorded with every cache entry and the five-minute grace window"),
-            listOf(
-                "Used only after every provider in the validated plan has failed, never in place of a fresh answer",
-                "Handed out with a 30 s lifetime so the client retries promptly once the resolver recovers",
-                "An entry is purged once its grace window passes, so stale answers cannot accumulate"
-            ),
+            listOf("Used only after every provider in the validated plan has failed, never in place of a fresh answer", "Handed out with a 30 s lifetime so the client retries promptly once the resolver recovers", "An entry is purged once its grace window passes, so stale answers cannot accumulate"),
             "DnsStaleFallbackTest.testOnlyAnExpiredAnswerInsideTheGraceWindowIsStaleServeable and DnsStaleFallbackTest.testExpiredEntriesSurviveTrimmingOnlyWhileTheyCanStillHelp"
         ),
         cap(
             "dns-rebinding-guard", "Public names that resolve into private address space are refused", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsRebindingGuard.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The A and AAAA record data of every answer, walked by DnsPacketCodec.extractAddressAnswers"),
-            listOf(
-                "Strict and Custom only: split-horizon corporate DNS legitimately answers intranet names with RFC 1918 addresses",
-                "Local names are exempt: single-label hosts and .local/.lan/.home.arpa/.internal/.arpa",
-                "Only address records are judged; HTTPS/SVCB hint addresses are not inspected",
-                "A message the codec cannot walk is never judged, and the reply is SERVFAIL because the name itself exists"
-            ),
+            listOf("Strict and Custom only: split-horizon corporate DNS legitimately answers intranet names with RFC 1918 addresses", "Local names are exempt: single-label hosts and .local/.lan/.home.arpa/.internal/.arpa", "Only address records are judged; HTTPS/SVCB hint addresses are not inspected", "A message the codec cannot walk is never judged, and the reply is SERVFAIL because the name itself exists"),
             "DnsRebindingGuardTest.testPrivateIpv4AnswersAreDetected and DnsRebindingGuardTest.testPrivateIpv6AnswersAreDetected and DnsRebindingGuardTest.testLocalNamesAreExempt"
         ),
         cap(
             "login-safety-allowlist", "Logins, captchas, SSO and payments can never be blocked", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/LoginSafetyAllowlist.kt", emptyList(),
             listOf("A curated set of identity, captcha, SSO and payment zones merged into the built-in safety allowlist"),
-            listOf(
-                "Protects the named zones only; a host an app invents for itself is not covered",
-                "Applies before feed rules and the video-ad baseline, but a user block rule and a per-app BLOCK_ALL still win",
-                "An app that resolves through its own encrypted resolver never reaches the tunnel and is unaffected"
-            ),
+            listOf("Protects the named zones only; a host an app invents for itself is not covered", "Applies before feed rules and the video-ad baseline, but a user block rule and a per-app BLOCK_ALL still win", "An app that resolves through its own encrypted resolver never reaches the tunnel and is unaffected"),
             "LoginSafetyAllowlistTest.testAggressiveRulesCannotBreakLoginsPaymentsOrCaptchas and LoginSafetyAllowlistTest.testCaptivePortalChecksStayAllowed and LoginSafetyAllowlistTest.testLoginCriticalMatchingRespectsLabelBoundaries"
         ),
         cap(
             "dns-negative-caching", "RFC 2308 negative caching from the authority SOA", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The authority SOA record of NXDOMAIN and NODATA answers, including its MINIMUM field"),
-            listOf(
-                "Only the lifetime rule is implemented: the resolver caches the negative answer, it does not re-derive the zone's cut",
-                "A negative answer without a usable SOA falls back to 30 s rather than guessing",
-                "Lifetimes stay inside the same 15 s to 1800 s bounds as a positive answer"
-            ),
+            listOf("Only the lifetime rule is implemented: the resolver caches the negative answer, it does not re-derive the zone's cut", "A negative answer without a usable SOA falls back to 30 s rather than guessing", "Lifetimes stay inside the same 15 s to 1800 s bounds as a positive answer"),
             "DnsNegativeCacheTtlTest.testNxdomainUsesTheSmallerOfSoaTtlAndMinimum and DnsNegativeCacheTtlTest.testNodataUsesTheSoaLifetimeToo and DnsNegativeCacheTtlTest.testNegativeAnswersWithoutSoaFallBackToAShortLifetime"
         ),
         cap(
             "dns-cache-memory-budget", "Answer cache bounded by payload bytes, not only by entry count", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Wire size of every cached answer and the recency order of the cache"),
-            listOf(
-                "Two bounds apply at once: 1024 entries and 2 MiB of payload",
-                "Eviction is least-recently-used, so the answer a client just asked for is not the first to go",
-                "The cache is per-process: it does not survive a service restart"
-            ),
+            listOf("Two bounds apply at once: 1024 entries and 2 MiB of payload", "Eviction is least-recently-used, so the answer a client just asked for is not the first to go", "The cache is per-process: it does not survive a service restart"),
             "DnsCacheBudgetTest.testCacheStaysInsideItsByteBudget and DnsCacheBudgetTest.testEvictionDropsTheLeastRecentlyUsedEntryFirst"
         ),
         cap(
             "dns-query-coalescing", "Concurrent lookups for one name share a single upstream query", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The cache key: protocol and endpoint, failover plan, DNSSEC mode, CD bit, domain:qtype:qclass"),
-            listOf(
-                "Only lookups with an identical cache key are shared; a different question still goes upstream",
-                "A follower waits at most 5 s for the leader and then resolves on its own, so a stalled leader cannot hang a client",
-                "The shared answer is rewritten for the follower's transaction ID before it is returned",
-                "In-process only: queries made through another resolver instance are not deduplicated"
-            ),
+            listOf("Only lookups with an identical cache key are shared; a different question still goes upstream", "A follower waits at most 5 s for the leader and then resolves on its own, so a stalled leader cannot hang a client", "The shared answer is rewritten for the follower's transaction ID before it is returned", "In-process only: queries made through another resolver instance are not deduplicated"),
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
             "video-ad-baseline", "Built-in video-advert baseline that cannot remove playback", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/VideoAdNetworkCatalog.kt", emptyList(),
             listOf("A curated zone list of video ad serving, exchange, verification and measurement infrastructure, enforced before the upstream lookup"),
-            listOf(
-                "Two tiers: SAFE hosts (ad or measurement only) are blocked in every mode, CONDITIONAL hosts (player or rewarded-ad code) only in Strict and Custom",
-                "Cannot block an advert served from the media host itself: YouTube, TikTok and Instagram feed adverts never perform a separate DNS lookup",
-                "The user allowlist, per-app bypass and unprotected transports keep precedence over the baseline"
-            ),
-            "VideoAdNetworkCatalogTest.testSafeAdInfrastructureIsBlockedInEveryMode and VideoAdNetworkCatalogTest.testConditionalTierNeedsTheAggressiveModes and VideoAdNetworkCatalogTest.testNoCatalogueZoneCanBePlaybackInfrastructure"
+            listOf("Two tiers: SAFE hosts (ad or measurement only) are blocked in every mode, CONDITIONAL hosts (player or rewarded-ad code) only in Strict and Custom", "Cannot block an advert served from the media host itself: YouTube, TikTok and Instagram feed adverts never perform a separate DNS lookup", "The user allowlist, per-app bypass and unprotected transports keep precedence over the baseline", "Can be switched off in Settings (DnsFirewallPolicy.videoAdBaselineEnabled) without changing the protection mode, and the switch is carried by encrypted settings backup"),
+            "VideoAdNetworkCatalogTest.testSafeAdInfrastructureIsBlockedInEveryMode and VideoAdNetworkCatalogTest.testConditionalTierNeedsTheAggressiveModes and VideoAdNetworkCatalogTest.testNoCatalogueZoneCanBePlaybackInfrastructure and DnsFirewallPolicySerializationTest.testSettingsWrittenBeforeTheFieldExistedStillDecode"
         ),
         cap(
             "dns-client-subnet-privacy", "Client subnet is forwarded only for opted-in streaming hosts", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
-            listOf(
-                "Outgoing query wire format, including the EDNS0 OPT record and its options",
-                "The streaming host allowlist that geo-accurate media DNS was already scoped to"
-            ),
-            listOf(
-                "Only the EDNS Client Subnet option (code 8) is removed; cookies, padding and the DO bit are preserved",
-                "A query the codec cannot walk is forwarded unchanged rather than half-rewritten",
-                "Geo-accurate media answers still need a client subnet, so the option is kept for those hosts when the user left that preference on"
-            ),
+            listOf("Outgoing query wire format, including the EDNS0 OPT record and its options", "The streaming host allowlist that geo-accurate media DNS was already scoped to"),
+            listOf("Only the EDNS Client Subnet option (code 8) is removed; cookies, padding and the DO bit are preserved", "A query the codec cannot walk is forwarded unchanged rather than half-rewritten", "Geo-accurate media answers still need a client subnet, so the option is kept for those hosts when the user left that preference on"),
             "DnsClientSubnetPolicyTest.testClientSubnetOptionIsRemovedAndOtherOptionsSurvive and DnsClientSubnetPolicyTest.testClientSubnetIsForwardedOnlyForOptedInStreamingHosts and DnsClientSubnetPolicyTest.testMalformedQueryIsRejectedInsteadOfHalfRewritten"
         ),
         cap(
             "dns-cache-ttl-aging", "Cache hits report the TTL the entry has left", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
-            listOf(
-                "Stored wire responses and their absolute expiry in the 1024-entry LRU cache",
-                "EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags"
-            ),
-            listOf(
-                "Only TTL fields are rewritten: record data, names and message size are unchanged",
-                "A message the codec cannot fully walk is never half-rewritten; the stored bytes are served instead"
-            ),
+            listOf("Stored wire responses and their absolute expiry in the 1024-entry LRU cache", "EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags"),
+            listOf("Only TTL fields are rewritten: record data, names and message size are unchanged", "A message the codec cannot fully walk is never half-rewritten; the stored bytes are served instead"),
             "DnsResponseCacheTest.testCachedTtlsAreRewrittenToRemainingLifetime and DnsResponseCacheTest.testOptRecordTtlIsLeftAlone and DnsResponseCacheTest.testRewriterRejectsMalformedMessages"
         ),
         cap(
             "cname-cloak-enforcement", "CNAME-cloaking enforcement (Strict and Custom modes)", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsCnameGuard.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
-            listOf(
-                "The CNAME chain of an otherwise-allowed answer, walked with RFC 1035 compression-pointer bounds"
-            ),
-            listOf(
-                "Enforced only in Strict and Custom modes: refusing a first-party name that points at a blocked third party can break sites that genuinely depend on it",
-                "At most 8 hops are inspected, and no decision is made on wire data the codec cannot fully walk"
-            ),
+            listOf("The CNAME chain of an otherwise-allowed answer, walked with RFC 1035 compression-pointer bounds"),
+            listOf("Enforced only in Strict and Custom modes: refusing a first-party name that points at a blocked third party can break sites that genuinely depend on it", "At most 8 hops are inspected, and no decision is made on wire data the codec cannot fully walk"),
             "DnsCnameGuardTest.testGuardBlocksOnlyBlockedHopsAndRespectsHopCap and DnsCnameGuardTest.testOnlyAggressiveModesEnforceCloaking and DnsCnameGuardTest.testRejectsMalformedAndNonResponseMessages"
         ),
         cap(
@@ -255,40 +207,28 @@ object CapabilityRegistry {
             "dns-provider-failover", "Opt-in provider failover with measured health", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
             listOf("Real per-query success/failure counts, EWMA latency and circuit-breaker cooldowns from DnsProviderHealthMonitor"),
-            listOf(
-                "Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53",
-                "Health is per-process: it is reset when the DNS service is restarted"
-            ),
+            listOf("Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53", "Health is per-process: it is reset when the DNS service is restarted"),
             "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt"
         ),
         cap(
             "dns-response-validation", "Strict upstream response validation before caching or answering", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResponseValidator.kt", emptyList(),
             listOf("Full resource-record walk of the upstream wire response (DnsPacketCodec.inspectResponseRecordTypes)"),
-            listOf(
-                "Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes",
-                "Plaintext UDP/TCP answers are additionally matched to the exact question that was sent; an error response may omit the question, a NOERROR answer may not"
-            ),
+            listOf("Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes", "Plaintext UDP/TCP answers are additionally matched to the exact question that was sent; an error response may omit the question, a NOERROR answer may not"),
             "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData and AdShieldEngineTestSuite.testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked"
         ),
         cap(
             "dnssec-evidence", "Upstream DNSSEC evidence reporting and strict AD mode", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.PARTIAL, "engine/dns/DnsResponseValidator.kt", emptyList(),
             listOf("Upstream Authenticated Data (AD) flag and RRSIG presence in the returned records"),
-            listOf(
-                "Reports and optionally enforces upstream evidence only; it is not local DNSSEC chain validation",
-                "Strict mode rejects unsigned positive answers, so unsigned domains stop resolving by design"
-            ),
+            listOf("Reports and optionally enforces upstream evidence only; it is not local DNSSEC chain validation", "Strict mode rejects unsigned positive answers, so unsigned domains stop resolving by design"),
             "CybersecurityPlatformTestSuite.dnssecModeReportsUpstreamAdAndStrictModeRejectsUnsignedPositiveAnswers"
         ),
         cap(
             "dns-policy-per-app", "Per-app, per-network and emergency DNS policy", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFirewallPolicyDecider.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Query owner package from VpnService, active transport from ConnectivityManager, user policy from DataStore"),
-            listOf(
-                "DNS decisions only: non-DNS sockets are not inspected because the tunnel routes DNS addresses exclusively",
-                "Emergency allowlist-only mode blocks every DNS answer that is not an explicit user or built-in safety allow"
-            ),
+            listOf("DNS decisions only: non-DNS sockets are not inspected because the tunnel routes DNS addresses exclusively", "Emergency allowlist-only mode blocks every DNS answer that is not an explicit user or built-in safety allow"),
             "CybersecurityPlatformTestSuite.appNetworkAndEmergencyPoliciesAreDeterministic"
         ),
         cap(
@@ -682,14 +622,8 @@ object CapabilityRegistry {
         cap(
             "protection-explainer", "In-app explainer of the local DNS-filter design and its limits", CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "ui/screens/HowProtectionWorksScreen.kt", emptyList(),
-            listOf(
-                "Tunnel routes and DNS port from ProtectionArchitecture (the same constants the VpnService builder reads)",
-                "Protection modes from ProtectionMode and upstream transports from DnsProtocol"
-            ),
-            listOf(
-                "Describes the shipped design only: it does not test the tunnel or probe for DNS leaks",
-                "Text derived from the tunnel constants, so it cannot advertise a route the app does not install"
-            ),
+            listOf("Tunnel routes and DNS port from ProtectionArchitecture (the same constants the VpnService builder reads)", "Protection modes from ProtectionMode and upstream transports from DnsProtocol"),
+            listOf("Describes the shipped design only: it does not test the tunnel or probe for DNS leaks", "Text derived from the tunnel constants, so it cannot advertise a route the app does not install"),
             "ProtectionExplainerTest.testRoutesNeverIncludeADefaultRoute and ProtectionExplainerTest.testEveryProtectionModeAndProtocolIsExplained and ProtectionExplainerTest.testExplainerNeverClaimsIpMasking"
         ),
         cap(
@@ -765,14 +699,8 @@ object CapabilityRegistry {
         cap(
             "telegram-tdlib-storage", "Telegram Cloud Storage via official TDLib, Keystore session and real transfers", CapabilityArea.CLOUD_STORAGE,
             CapabilityStatus.PARTIAL, "data/telegram/TelegramStorageRepository.kt", listOf(PERM_INTERNET),
-            listOf(
-                "Official org.drinkless.tdlib.Client/TdApi JNI requests and Telegram MTProto updates (updateFile, updateAuthorizationState)",
-                "Android Keystore AES-256-GCM encrypted session/index/transfer records and SAF document streams"
-            ),
-            listOf(
-                "Requires the user's own api_id/api_hash from my.telegram.org and a real Telegram account; live-account sign-in and network transfers need manual device verification",
-                "2 GB per-file ceiling; Telegram publishes no quota or permanent-backup guarantee; only the designated Saved Messages/private channel is read"
-            ),
+            listOf("Official org.drinkless.tdlib.Client/TdApi JNI requests and Telegram MTProto updates (updateFile, updateAuthorizationState)", "Android Keystore AES-256-GCM encrypted session/index/transfer records and SAF document streams"),
+            listOf("Requires the user's own api_id/api_hash from my.telegram.org and a real Telegram account; live-account sign-in and network transfers need manual device verification", "2 GB per-file ceiling; Telegram publishes no quota or permanent-backup guarantee; only the designated Saved Messages/private channel is read"),
             "TelegramCloudTestSuite.testOfficialAuthorizationFlowUsesRealTdlibRequestsAndNeverPersistsSecrets plus manual device smoke test (docs/TELEGRAM_CLOUD_STORAGE.md)"
         ),
         cap(
@@ -947,30 +875,21 @@ object CapabilityRegistry {
             "scan-journal", "Persistent scan history with exportable threat reports", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/ScanJournal.kt", emptyList(),
             listOf("Real file/URL/APK/app-audit results persisted in a dedicated DataStore journal"),
-            listOf(
-                "Most recent 200 records are retained",
-                "An empty journal is reported as 'no scan performed', never as a clean device"
-            ),
+            listOf("Most recent 200 records are retained", "An empty journal is reported as 'no scan performed', never as a clean device"),
             "ScanJournalTest (unique ids, retention, round-trip, honest empty report)"
         ),
         cap(
             "quarantine", "Quarantine with SHA-256 integrity verification", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/QuarantineManager.kt", emptyList(),
             listOf("User-selected file content, SHA-256 computed on ingest and re-checked on restore"),
-            listOf(
-                "Isolated copies live in app-private storage; they are not additionally encrypted at rest",
-                "Android often refuses to delete an original this app does not own — that outcome is reported, not assumed"
-            ),
+            listOf("Isolated copies live in app-private storage; they are not additionally encrypted at rest", "Android often refuses to delete an original this app does not own — that outcome is reported, not assumed"),
             "ScanJournalTest naming/traversal cases; manual device restore/delete check"
         ),
         cap(
             "scheduled-scan", "Scheduled on-device security scan", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "worker/ScheduledScanWorker.kt", listOf(PERM_NOTIF),
             listOf("WorkManager periodic job, PackageManager app audit, quarantine hash re-verification"),
-            listOf(
-                "Audits installed apps and quarantine only; shared storage is not scanned without a user grant",
-                "WorkManager timing is approximate and deferrable by the OS to save battery"
-            ),
+            listOf("Audits installed apps and quarantine only; shared storage is not scanned without a user grant", "WorkManager timing is approximate and deferrable by the OS to save battery"),
             "Manual device check; ScanJournalTest covers record/report shape"
         ),
         cap(
@@ -985,34 +904,18 @@ object CapabilityRegistry {
             CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "data/repository/IntelligenceRepository.kt",
             emptyList(),
-            listOf(
-                "Room intelligence_events table fed by DNS blocks, scan journal records, DNS status transitions, " +
-                    "battery threshold crossings, settings changes and WorkManager results",
-                "Per-type de-duplication cooldowns from IntelligenceDedupePolicy"
-            ),
-            listOf(
-                "Keeps at most 800 rows and 14 days; older evidence is deleted",
-                "Only security-relevant DNS blocks (malware/phishing categories) become events; routine ad/tracker " +
-                    "blocks stay as counters so the feed is not flooded",
-                "Events are only stored while the process is alive; Android cannot run this observer while the app is stopped"
-            ),
+            listOf("Room intelligence_events table fed by DNS blocks, scan journal records, DNS status transitions, battery threshold crossings, settings changes and WorkManager results", "Per-type de-duplication cooldowns from IntelligenceDedupePolicy"),
+            listOf("Keeps at most 800 rows and 14 days; older evidence is deleted", "Only security-relevant DNS blocks (malware/phishing categories) become events; routine ad and tracker blocks stay as counters so the feed is not flooded", "Events are only stored while the process is alive; Android cannot run this observer while the app is stopped"),
             "IntelligenceMapTestSuite.testSanitizerRejectsEventWithoutEvidence and " +
-                "testRepositoryRoundtripPersistsSanitizedEvents"
+                "testRepositoryRoundTripPersistsSanitizedEvents"
         ),
         cap(
             "intel-live-map", "Interactive live intelligence map with camera, nodes and event pulses",
             CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "ui/screens/intelligence/IntelligenceMapScreen.kt",
             emptyList(),
-            listOf(
-                "Real module snapshots from DNS runtime, preferences, scan journal, quarantine index and battery telemetry",
-                "Stored intelligence events for the event feed, timeline and map pulses"
-            ),
-            listOf(
-                "This is an internal system map, not a geographic or network-topology map",
-                "Pausing visual updates freezes the rendering only; DNS protection and scheduled jobs keep running",
-                "The pulse animation runs only while a real event is in flight; an idle map performs no frame work"
-            ),
+            listOf("Real module snapshots from DNS runtime, preferences, scan journal, quarantine index and battery telemetry", "Stored intelligence events for the event feed, timeline and map pulses"),
+            listOf("This is an internal system map, not a geographic or network-topology map", "Pausing visual updates freezes the rendering only; DNS protection and scheduled jobs keep running", "The pulse animation runs only while a real event is in flight; an idle map performs no frame work"),
             "IntelligenceMapTestSuite.testGeometryPinchZoomKeepsFocalPointStable and " +
                 "testAggregatorBuildsOnlyFromRealInputs"
         ),
@@ -1021,16 +924,8 @@ object CapabilityRegistry {
             CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "engine/intelligence/IntelligenceEventFactory.kt",
             emptyList(),
-            listOf(
-                "Malware/phishing DNS blocks observed by AdShieldDnsService",
-                "Security scan journal records (APK, file, URL, installed-app audit)",
-                "Measured battery temperature/health thresholds",
-                "DNS status transitions and WorkManager job results"
-            ),
-            listOf(
-                "Payment-link attribution uses deterministic URL/finding tokens; it is classification, not reputation",
-                "A factory that cannot attach real evidence returns null, so nothing is written"
-            ),
+            listOf("Malware/phishing DNS blocks observed by AdShieldDnsService", "Security scan journal records (APK, file, URL, installed-app audit)", "Measured battery temperature/health thresholds", "DNS status transitions and WorkManager job results"),
+            listOf("Payment-link attribution uses deterministic URL/finding tokens; it is classification, not reputation", "A factory that cannot attach real evidence returns null, so nothing is written"),
             "IntelligenceMapTestSuite.testFactoryNeverEmitsWithoutRealEvidence and " +
                 "testScanRecordRoutesToCyberFinancialAndPrivacy"
         ),
@@ -1039,13 +934,8 @@ object CapabilityRegistry {
             CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "engine/intelligence/IntelligenceAggregator.kt",
             emptyList(),
-            listOf(
-                "600 stored events, 8 nodes, active module/severity/range/query filters"
-            ),
-            listOf(
-                "The budget is measured on the CI JVM, not on a device; on-device frame timing still needs a manual check",
-                "The UI draws at most 8 nodes, 7 connectors, 7 markers and 12 concurrent pulses; pulses are pruned when expired"
-            ),
+            listOf("600 stored events, 8 nodes, active module/severity/range/query filters"),
+            listOf("The budget is measured on the CI JVM, not on a device; on-device frame timing still needs a manual check", "The UI draws at most 8 nodes, 7 connectors, 7 markers and 12 concurrent pulses; pulses are pruned when expired"),
             "IntelligenceMapTestSuite.testAggregatorPerformanceBudget"
         ),
         cap(
@@ -1053,15 +943,8 @@ object CapabilityRegistry {
             CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "service/PrivateDnsTileService.kt",
             listOf("android.permission.WRITE_SECURE_SETTINGS", "android.permission.BIND_QUICK_SETTINGS_TILE"),
-            listOf(
-                "Settings.Global private_dns_mode and private_dns_specifier read-back",
-                "User-configured cycle steps and custom DNS-over-TLS hostnames in DataStore"
-            ),
-            listOf(
-                "Requires a one-time grant of WRITE_SECURE_SETTINGS via Wireless/USB ADB, Shizuku/LADB shell, or optional root; without it the tile opens quick setup",
-                "Some OEM or managed enterprise builds reject Settings.Global writes; read-back verification detects and reports rejections",
-                "Optional auto-revert relies on WorkManager and inexact AlarmManager so OS battery optimization can delay execution slightly"
-            ),
+            listOf("Settings.Global private_dns_mode and private_dns_specifier read-back", "User-configured cycle steps and custom DNS-over-TLS hostnames in DataStore"),
+            listOf("Requires a one-time grant of WRITE_SECURE_SETTINGS via Wireless/USB ADB, Shizuku/LADB shell, or optional root; without it the tile opens quick setup", "Some OEM or managed enterprise builds reject Settings.Global writes; read-back verification detects and reports rejections", "Optional auto-revert relies on WorkManager and inexact AlarmManager so OS battery optimization can delay execution slightly"),
             "SystemTilesTestSuite.testPrivateDnsCycleAdvancesAndWrapsCorrectly and SystemTilesTestSuite.testPrivateDnsAutoRevertPreservesOriginalTargetAcrossMultipleTapsAndCancelsOnReturn and SystemTilesTestSuite.testQuickSetupCommandFormattingAndChecklistEvaluation"
         ),
         cap(
@@ -1069,14 +952,8 @@ object CapabilityRegistry {
             CapabilityArea.PLATFORM,
             CapabilityStatus.IMPLEMENTED, "service/UsbDebuggingTileService.kt",
             listOf("android.permission.WRITE_SECURE_SETTINGS", "android.permission.BIND_QUICK_SETTINGS_TILE"),
-            listOf(
-                "Settings.Global.ADB_ENABLED and Settings.Global.DEVELOPMENT_SETTINGS_ENABLED read-back",
-                "User-configured auto-revert delay and lock-screen guard in DataStore"
-            ),
-            listOf(
-                "Requires a one-time ADB grant of WRITE_SECURE_SETTINGS and Developer Options to be enabled on Android",
-                "Requires device unlock to toggle by default; auto-revert timing via WorkManager and setAndAllowWhileIdle is approximate"
-            ),
+            listOf("Settings.Global.ADB_ENABLED and Settings.Global.DEVELOPMENT_SETTINGS_ENABLED read-back", "User-configured auto-revert delay and lock-screen guard in DataStore"),
+            listOf("Requires a one-time ADB grant of WRITE_SECURE_SETTINGS and Developer Options to be enabled on Android", "Requires device unlock to toggle by default; auto-revert timing via WorkManager and setAndAllowWhileIdle is approximate"),
             "SystemTilesTestSuite.testUsbDebuggingAutoRevertArmsOnEnableAndClearsOnDisable and SystemTilesTestSuite.testTilePresentationsReflectPermissionAndRealSystemState"
         ),
         cap(
