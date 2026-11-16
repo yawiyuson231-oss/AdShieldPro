@@ -8,7 +8,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceMetricSource
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.intelligence.IntelligenceSeverity
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.battery.BatteryHealthStatus
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.security.QuarantinedItem
@@ -21,7 +21,7 @@ import kotlin.math.roundToInt
  * Translates real observations into structured intelligence events.
  *
  * Every function here requires an actual observation (a DNS log row, a stored scan record, a
- * battery reading, a VPN status transition, a WorkManager result). There is no timer, no random
+ * battery reading, a DNS status transition, a WorkManager result). There is no timer, no random
  * generator and no "demo" entry point: if a module produced nothing, no event exists.
  */
 object IntelligenceEventFactory {
@@ -75,24 +75,24 @@ object IntelligenceEventFactory {
         )
     }
 
-    fun vpnTransition(
-        previous: VpnStatus,
-        current: VpnStatus,
+    fun dnsTransition(
+        previous: DnsStatus,
+        current: DnsStatus,
         error: String?,
         ruleCount: Int,
         timestampEpochMs: Long
     ): IntelligenceEvent? {
         if (previous == current) return null
         val type = when (current) {
-            VpnStatus.CONNECTED -> IntelligenceEventType.NETWORK_PROTECTION_STARTED
-            VpnStatus.DISCONNECTED -> if (previous == VpnStatus.ERROR) {
+            DnsStatus.CONNECTED -> IntelligenceEventType.NETWORK_PROTECTION_STARTED
+            DnsStatus.DISCONNECTED -> if (previous == DnsStatus.ERROR) {
                 IntelligenceEventType.NETWORK_PROTECTION_STOPPED
             } else {
                 IntelligenceEventType.NETWORK_PROTECTION_STOPPED
             }
-            VpnStatus.PAUSED -> IntelligenceEventType.NETWORK_FILTERING_PAUSED
-            VpnStatus.ERROR -> IntelligenceEventType.NETWORK_RESOLVER_ERROR
-            VpnStatus.STARTING, VpnStatus.RECONNECTING -> return null
+            DnsStatus.PAUSED -> IntelligenceEventType.NETWORK_FILTERING_PAUSED
+            DnsStatus.ERROR -> IntelligenceEventType.NETWORK_RESOLVER_ERROR
+            DnsStatus.STARTING, DnsStatus.RECONNECTING -> return null
         }
         val severity = when (type) {
             IntelligenceEventType.NETWORK_RESOLVER_ERROR -> IntelligenceSeverity.CRITICAL
@@ -122,12 +122,12 @@ object IntelligenceEventFactory {
                 IntelligenceEventType.NETWORK_PROTECTION_STOPPED ->
                     "The local DNS firewall is not running, so DNS filtering is not protecting this device."
                 IntelligenceEventType.NETWORK_FILTERING_PAUSED ->
-                    "The tunnel is up but DNS requests are passing through unfiltered."
+                    "DNS filtering is paused; queries pass through unfiltered."
                 else -> "The resolver reported a failure; queries may fall back or fail."
             },
             evidence = evidence,
-            evidenceRef = "vpn:${current.name}",
-            relatedObjectIds = listOf("vpn"),
+            evidenceRef = "protection:${current.name}",
+            relatedObjectIds = listOf("protection"),
             actions = actionsFor(IntelligenceModule.NETWORK_DEFENSE),
             metrics = listOf(
                 IntelligenceMetric("State", current.name, IntelligenceMetricSource.MEASURED),

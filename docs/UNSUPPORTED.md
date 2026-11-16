@@ -48,6 +48,12 @@ under **Capabilities**.
   hostname resolves through an off-site link that the filter blocks or that AETHER scores
   ≥ 45/100, the DNS lab reports **CNAME cloaking** and names the target and the rule. This is
   advisory evidence, not enforcement, and it never blocks the queried name.
+- **Android enforcement:** the app's DNS service *does* enforce the blocked-hop case in
+  **Strict** and **Custom** modes (`engine/dns/DnsCnameGuard.kt`): when an allowed answer's CNAME
+  chain contains a hop the filter blocks, the original query is answered locally instead. Balanced
+  modes (Standard, Privacy) keep the advisory behaviour, because a legitimate first-party host can
+  depend on a blocked third party. At most 8 hops are inspected and unparseable answers are never
+  used to block anything.
 
 ## 3c. Android DNS enforcement limits
 

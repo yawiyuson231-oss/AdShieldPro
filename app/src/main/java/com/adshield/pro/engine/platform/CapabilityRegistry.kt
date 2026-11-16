@@ -59,7 +59,7 @@ data class Capability(
 object CapabilityRegistry {
 
     private const val PERM_INTERNET = "android.permission.INTERNET"
-    private const val PERM_VPN = "android.permission.BIND_VPN_SERVICE"
+    private const val PERM_DNS_TUNNEL = "android.permission.BIND_VPN_SERVICE"
     private const val PERM_NOTIF = "android.permission.POST_NOTIFICATIONS"
     private const val PERM_BATTERY_STATS = "android.permission.BATTERY_STATS"
 
@@ -72,28 +72,28 @@ object CapabilityRegistry {
         // ---------------------------------------------------------------- DNS
         cap(
             "dns-wire-engine", "Wire-format DNS parsing and synthesis", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
             listOf("UDP/TCP DNS packets read from the VpnService TUN file descriptor"),
             listOf("Handles A/AAAA/CNAME/HTTPS/SVCB/TXT/MX; no DNSSEC validation"),
             "AdShieldEngineTestSuite.testDnsPacketParser_parsesStandardIpv4AAndIpv6AaaaQueries"
         ),
         cap(
             "dns-udp-tcp", "UDP and TCP DNS with correct framing/checksums", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/IpPacketFraming.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/IpPacketFraming.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Raw IPv4/IPv6 packets including RFC 1071/8200 checksums"),
             listOf("No packet fragmentation beyond MTU-aware truncation"),
             "AdShieldEngineTestSuite.testIpv4AndIpv6_udpAndTcpFramingAndChecksums"
         ),
         cap(
             "dns-doh-dot", "Encrypted upstreams (DoH/DoT) with plaintext refused as fallback", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_INTERNET, PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
             listOf("RFC 8484 DoH POST, RFC 7858 DoT, plain UDP/TCP 53 as an explicit choice"),
             listOf("DoH bootstrap uses a hardcoded host list; no ECS support"),
             "AdShieldEngineTestSuite.testUpstreamResponsesMustEchoTheTransactionIdAndBeResponses"
         ),
         cap(
             "dns-cache", "TTL-aware LRU DNS cache", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Upstream answers + parsed TTLs"),
             listOf("1024 entries, in-memory only, cleared on service restart"),
             "AdShieldEngineTestSuite.testOnlyNoerrorAndNxdomainAnswersAreCacheable"
@@ -113,33 +113,45 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
-            "vpn-dns-only", "DNS-only TUN routing (other traffic untouched)", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "service/AdShieldVpnService.kt", listOf(PERM_VPN),
-            listOf("VpnService.Builder routes only 10.215.173.2/32 and fd00:ad5:1e1d::2/128"),
+            "cname-cloak-enforcement", "CNAME-cloaking enforcement (Strict and Custom modes)", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsCnameGuard.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
+            listOf(
+                "The CNAME chain of an otherwise-allowed answer, walked with RFC 1035 compression-pointer bounds"
+            ),
+            listOf(
+                "Enforced only in Strict and Custom modes: refusing a first-party name that points at a blocked third party can break sites that genuinely depend on it",
+                "At most 8 hops are inspected, and no decision is made on wire data the codec cannot fully walk"
+            ),
+            "DnsCnameGuardTest.testGuardBlocksOnlyBlockedHopsAndRespectsHopCap and DnsCnameGuardTest.testOnlyAggressiveModesEnforceCloaking and DnsCnameGuardTest.testRejectsMalformedAndNonResponseMessages"
+        ),
+        cap(
+            "dns-only-routing", "DNS-only TUN routing (other traffic untouched)", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "service/AdShieldDnsService.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("The tunnel builder routes only 10.215.173.2/32 and fd00:ad5:1e1d::2/128"),
             listOf("Apps that bypass DNS (hardcoded IPs) are not filtered"),
             "Manual device smoke test (docs/TESTING.md)"
         ),
         cap(
-            "vpn-split-tunnel", "Per-app split tunneling / exclusions", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "service/AdShieldVpnService.kt", listOf(PERM_VPN),
+            "dns-split-tunnel", "Per-app split tunneling / exclusions", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "service/AdShieldDnsService.kt", listOf(PERM_DNS_TUNNEL),
             listOf("PackageManager installed-app list"),
             listOf("Excluded apps bypass filtering completely"),
             "Manual device smoke test"
         ),
         cap(
-            "vpn-boot-restore", "Protection restored after reboot and network switch", CapabilityArea.DNS_PROTECTION,
+            "dns-boot-restore", "Protection restored after reboot and network switch", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "service/BootCompletedReceiver.kt", listOf("android.permission.RECEIVE_BOOT_COMPLETED"),
             listOf("BOOT_COMPLETED broadcast, ConnectivityManager callbacks"),
-            listOf("Android may delay boot receivers; VpnService needs user consent once"),
+            listOf("Android may delay boot receivers; the VPN permission is granted once"),
             "Manual device smoke test"
         ),
         cap(
             "dns-provider-failover", "Opt-in provider failover with measured health", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
             listOf("Real per-query success/failure counts, EWMA latency and circuit-breaker cooldowns from DnsProviderHealthMonitor"),
             listOf(
                 "Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53",
-                "Health is per-process: it is reset when the VPN service is restarted"
+                "Health is per-process: it is reset when the DNS service is restarted"
             ),
             "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt"
         ),
@@ -162,7 +174,7 @@ object CapabilityRegistry {
         ),
         cap(
             "dns-policy-per-app", "Per-app, per-network and emergency DNS policy", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFirewallPolicyDecider.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFirewallPolicyDecider.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Query owner package from VpnService, active transport from ConnectivityManager, user policy from DataStore"),
             listOf(
                 "DNS decisions only: non-DNS sockets are not inspected because the tunnel routes DNS addresses exclusively",
@@ -172,7 +184,7 @@ object CapabilityRegistry {
         ),
         cap(
             "dns-diagnostics", "Real resolver diagnostics against the configured upstream", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsDiagnostics.kt", listOf(PERM_INTERNET, PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsDiagnostics.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
             listOf("A genuine A query with EDNS0 DO bit, measured latency, RCODE, answer count and provider health"),
             listOf("Validates the configured resolver path; it is not an external DNS leak test and no third-party echo service is contacted"),
             "CybersecurityPlatformTestSuite.diagnosticQueryUsesEdns0AndNormalisesCase"
@@ -187,7 +199,7 @@ object CapabilityRegistry {
         cap(
             "dns-anomaly", "Per-domain anomaly scoring", CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.PLANNED, "",
-            listOf(PERM_VPN), listOf("Would use the dns_logs table"),
+            listOf(PERM_DNS_TUNNEL), listOf("Would use the dns_logs table"),
             listOf("No validated model; shipping an unvalidated score would violate the no-fabrication rule"),
             "n/a — architecture only"
         ),
@@ -195,7 +207,7 @@ object CapabilityRegistry {
         // ------------------------------------------------------------ FILTERING
         cap(
             "filter-engine", "Rule engine: exact, suffix, wildcard, allowlist", CapabilityArea.FILTERING,
-            CapabilityStatus.IMPLEMENTED, "engine/filter/FilterRuleEngine.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/filter/FilterRuleEngine.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Bundled lists, custom rules, user allow rules"),
             listOf("ABP syntax subset: no regex rules, no cosmetic-only list sections outside the browser"),
             "AdShieldEngineTestSuite.testFilterRuleEngine_precedenceModesWildcardsAndConflictDetection"
@@ -205,7 +217,7 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "data/repository/AdShieldRepository.kt", emptyList(),
             listOf("AtomicReference snapshot swap"),
             listOf("Snapshot rebuild is O(rules); 367k bundled rules take a moment on first launch"),
-            "Manual: toggle a list and confirm blocking changes without restarting the VPN"
+            "Manual: toggle a list and confirm blocking changes without restarting protection"
         ),
         cap(
             "filter-validation", "Custom rule validation (rejects malformed/wild-host rules)", CapabilityArea.FILTERING,
@@ -331,8 +343,8 @@ object CapabilityRegistry {
             "SecurityCenterTestSuite.testAppAuditor_flagsAccessibilitySmsTrojanProfile"
         ),
         cap(
-            "scan-realtime-vpn", "Block malware/phishing domains at DNS time", CapabilityArea.THREAT_SCANNING,
-            CapabilityStatus.IMPLEMENTED, "engine/filter/FilterRuleEngine.kt", listOf(PERM_VPN),
+            "scan-realtime-dns", "Block malware/phishing domains at DNS time", CapabilityArea.THREAT_SCANNING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/FilterRuleEngine.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Threat list categories answered with NXDOMAIN/0.0.0.0"),
             listOf("Domain-level only; a compromised legitimate domain is not detected"),
             "AdShieldEngineTestSuite.testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkholeResponses"
@@ -493,7 +505,7 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "data/repository/AdShieldRepository.kt", emptyList(),
             listOf("Engine snapshot rollback, list cache .bak restore"),
             listOf("Covers rule/engine state, not process crashes"),
-            "Manual: kill the VPN service mid-sync and confirm protection returns"
+            "Manual: kill the DNS service mid-sync and confirm protection returns"
         ),
         cap(
             "regression-suite", "Automated JVM regression suite in CI", CapabilityArea.PLATFORM,
@@ -518,7 +530,7 @@ object CapabilityRegistry {
         ),
         cap(
             "aether-decision-core", "Aether AI evidence-based verdicts (VERIFIED / SUSPECTED / UNKNOWN)", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherCore.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherCore.kt", listOf(PERM_DNS_TUNNEL),
             listOf("Filter-engine matches, user rules, domain heuristics, app audit signals"),
             listOf("Rule-based, explainable decision table — no ML model and no cloud call; heuristics alone can never verify a threat"),
             "AetherCoreTest.testHeuristicsAlone_canNeverVerifyOrBlock and related cases"
@@ -539,7 +551,7 @@ object CapabilityRegistry {
         ),
         cap(
             "live-network-dashboard", "Live DNS traffic dashboard with real event feed", CapabilityArea.DNS_PROTECTION,
-            CapabilityStatus.IMPLEMENTED, "engine/aether/LiveNetworkModel.kt", listOf(PERM_VPN),
+            CapabilityStatus.IMPLEMENTED, "engine/aether/LiveNetworkModel.kt", listOf(PERM_DNS_TUNNEL),
             listOf("AdShield DNS log, session counters, resolver config, per-UID attribution"),
             listOf("Shows only logged traffic; there is no simulation mode, so an idle tunnel renders an explicit empty state"),
             "AetherCoreTest.testLiveSnapshot_isBuiltOnlyFromRealLogs"
@@ -557,6 +569,19 @@ object CapabilityRegistry {
             listOf("LocalConfiguration screen width, lazy scrollable NavigationBar row"),
             listOf("Twelve destinations scroll on narrow phones and the selected item auto-centers; wider screens show more at once"),
             "BatteryIntelligenceTestSuite.testNavigationFitsEveryScreenWidth"
+        ),
+        cap(
+            "protection-explainer", "In-app explainer of the local DNS-filter design and its limits", CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/HowProtectionWorksScreen.kt", emptyList(),
+            listOf(
+                "Tunnel routes and DNS port from ProtectionArchitecture (the same constants the VpnService builder reads)",
+                "Protection modes from ProtectionMode and upstream transports from DnsProtocol"
+            ),
+            listOf(
+                "Describes the shipped design only: it does not test the tunnel or probe for DNS leaks",
+                "Text derived from the tunnel constants, so it cannot advertise a route the app does not install"
+            ),
+            "ProtectionExplainerTest.testRoutesNeverIncludeADefaultRoute and ProtectionExplainerTest.testEveryProtectionModeAndProtocolIsExplained and ProtectionExplainerTest.testExplainerNeverClaimsIpMasking"
         ),
         cap(
             "cyber-dashboard", "Cyber-console Home dashboard with real device counters", CapabilityArea.PLATFORM,
@@ -852,7 +877,7 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "data/repository/IntelligenceRepository.kt",
             emptyList(),
             listOf(
-                "Room intelligence_events table fed by DNS blocks, scan journal records, VPN transitions, " +
+                "Room intelligence_events table fed by DNS blocks, scan journal records, DNS status transitions, " +
                     "battery threshold crossings, settings changes and WorkManager results",
                 "Per-type de-duplication cooldowns from IntelligenceDedupePolicy"
             ),
@@ -871,7 +896,7 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "ui/screens/intelligence/IntelligenceMapScreen.kt",
             emptyList(),
             listOf(
-                "Real module snapshots from VPN runtime, preferences, scan journal, quarantine index and battery telemetry",
+                "Real module snapshots from DNS runtime, preferences, scan journal, quarantine index and battery telemetry",
                 "Stored intelligence events for the event feed, timeline and map pulses"
             ),
             listOf(
@@ -888,10 +913,10 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "engine/intelligence/IntelligenceEventFactory.kt",
             emptyList(),
             listOf(
-                "Malware/phishing DNS blocks observed by AdShieldVpnService",
+                "Malware/phishing DNS blocks observed by AdShieldDnsService",
                 "Security scan journal records (APK, file, URL, installed-app audit)",
                 "Measured battery temperature/health thresholds",
-                "VPN state transitions and WorkManager job results"
+                "DNS status transitions and WorkManager job results"
             ),
             listOf(
                 "Payment-link attribution uses deterministic URL/finding tokens; it is classification, not reputation",

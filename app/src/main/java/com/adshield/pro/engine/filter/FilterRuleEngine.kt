@@ -66,7 +66,7 @@ class FilterRuleEngine @Inject constructor() {
     fun getCurrentSnapshot(): FilterSnapshot = snapshotRef.get()
 
     /**
-     * Atomically updates the active protection mode without rebuilding the filter lists or restarting the VPN.
+     * Atomically updates the active protection mode without rebuilding the filter lists or restarting protection.
      */
     fun updateProtectionMode(mode: ProtectionMode) {
         snapshotRef.updateAndGet { current ->

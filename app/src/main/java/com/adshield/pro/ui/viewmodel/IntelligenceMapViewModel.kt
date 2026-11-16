@@ -17,7 +17,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceSystemState
 import com.adshield.pro.domain.intelligence.IntelligenceTimeRange
 import com.adshield.pro.domain.intelligence.NodePosition
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.intelligence.IntelligenceAggregator
 import com.adshield.pro.engine.security.QuarantinedItem
 import com.adshield.pro.engine.security.SecurityScanRecord
@@ -51,10 +51,10 @@ private data class MapControls(
 )
 
 private data class RuntimeSignals(
-    val vpnStatus: VpnStatus,
+    val dnsStatus: DnsStatus,
     val protectionExpected: Boolean,
     val connectedSinceEpochMs: Long?,
-    val vpnLastError: String?,
+    val dnsLastError: String?,
     val loadedRuleCount: Int,
     val sessionQueries: Long,
     val sessionBlocked: Long,
@@ -112,21 +112,21 @@ class IntelligenceMapViewModel @Inject constructor(
         )
 
     private val runtimeSignals = combine(
-        adShieldRepository.vpnRuntimeState,
+        adShieldRepository.dnsRuntimeState,
         settings,
         adShieldRepository.malwareBlocksFlow
-    ) { vpn, currentSettings, malwareBlocks ->
+    ) { dns, currentSettings, malwareBlocks ->
         RuntimeSignals(
-            vpnStatus = vpn.status,
-            protectionExpected = currentSettings.vpnShouldRemainActive,
-            connectedSinceEpochMs = vpn.connectedSinceEpochMs,
-            vpnLastError = vpn.lastError,
-            loadedRuleCount = vpn.loadedRuleCount,
-            sessionQueries = vpn.sessionTotalQueries,
-            sessionBlocked = vpn.sessionBlockedQueries,
-            averageLatency = vpn.averageLatencyMs,
-            resolverLabel = vpn.resolverConfig.preset.displayName,
-            protocolLabel = vpn.resolverConfig.protocol.label,
+            dnsStatus = dns.status,
+            protectionExpected = currentSettings.protectionShouldRemainActive,
+            connectedSinceEpochMs = dns.connectedSinceEpochMs,
+            dnsLastError = dns.lastError,
+            loadedRuleCount = dns.loadedRuleCount,
+            sessionQueries = dns.sessionTotalQueries,
+            sessionBlocked = dns.sessionBlockedQueries,
+            averageLatency = dns.averageLatencyMs,
+            resolverLabel = dns.resolverConfig.preset.displayName,
+            protocolLabel = dns.resolverConfig.protocol.label,
             emergencyLockdown = currentSettings.dnsFirewallPolicy.emergencyAllowlistOnly,
             autoUpdateFilters = currentSettings.autoUpdateFiltersEnabled,
             lastFilterUpdateEpochMs = currentSettings.lastFilterUpdateEpochMs,
@@ -174,10 +174,10 @@ class IntelligenceMapViewModel @Inject constructor(
         val (evidence, telemetry) = rest
         val inputs = IntelligenceInputs(
             nowEpochMs = System.currentTimeMillis(),
-            vpnStatus = runtime.vpnStatus,
+            dnsStatus = runtime.dnsStatus,
             protectionExpected = runtime.protectionExpected,
             connectedSinceEpochMs = runtime.connectedSinceEpochMs,
-            vpnLastError = runtime.vpnLastError,
+            dnsLastError = runtime.dnsLastError,
             loadedRuleCount = runtime.loadedRuleCount,
             sessionTotalQueries = runtime.sessionQueries,
             sessionBlockedQueries = runtime.sessionBlocked,

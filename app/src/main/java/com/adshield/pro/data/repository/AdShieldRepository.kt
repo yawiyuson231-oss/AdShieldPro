@@ -28,8 +28,8 @@ import com.adshield.pro.domain.model.RuleType
 import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -99,8 +99,8 @@ class AdShieldRepository @Inject constructor(
         encodeDefaults = true
     }
 
-    private val _vpnRuntimeState = MutableStateFlow(VpnRuntimeState())
-    val vpnRuntimeState: StateFlow<VpnRuntimeState> = _vpnRuntimeState.asStateFlow()
+    private val _dnsRuntimeState = MutableStateFlow(DnsRuntimeState())
+    val dnsRuntimeState: StateFlow<DnsRuntimeState> = _dnsRuntimeState.asStateFlow()
 
     private val _liveTopApps = MutableStateFlow<Map<String, AppDnsActivity>>(emptyMap())
     val liveTopAppsFlow: Flow<List<AppDnsActivity>> = _liveTopApps.map { apps ->
@@ -211,18 +211,18 @@ class AdShieldRepository @Inject constructor(
         }
     }
 
-    // --- VPN Runtime State Synchronization ---
+    // --- DNS Runtime State Synchronization ---
 
-    fun updateVpnStatus(
-        status: VpnStatus,
+    fun updateDnsStatus(
+        status: DnsStatus,
         networkLabel: String? = null,
         error: String? = null
     ) {
-        val previousStatus = _vpnRuntimeState.value.status
-        _vpnRuntimeState.update { current ->
+        val previousStatus = _dnsRuntimeState.value.status
+        _dnsRuntimeState.update { current ->
             val nowConnectedSince = when {
-                status == VpnStatus.CONNECTED && current.connectedSinceEpochMs == null -> System.currentTimeMillis()
-                status == VpnStatus.DISCONNECTED || status == VpnStatus.ERROR -> null
+                status == DnsStatus.CONNECTED && current.connectedSinceEpochMs == null -> System.currentTimeMillis()
+                status == DnsStatus.DISCONNECTED || status == DnsStatus.ERROR -> null
                 else -> current.connectedSinceEpochMs
             }
             current.copy(
@@ -235,7 +235,7 @@ class AdShieldRepository @Inject constructor(
         }
         if (status != previousStatus) {
             // Real tunnel transition → one intelligence event (deduplicated by the recorder).
-            IntelligenceEventFactory.vpnTransition(
+            IntelligenceEventFactory.dnsTransition(
                 previous = previousStatus,
                 current = status,
                 error = error,
@@ -246,7 +246,7 @@ class AdShieldRepository @Inject constructor(
     }
 
     fun syncRuntimeModeAndResolver(mode: ProtectionMode, settings: AppSettingsState) {
-        _vpnRuntimeState.update { current ->
+        _dnsRuntimeState.update { current ->
             current.copy(
                 activeMode = mode,
                 resolverConfig = settings.resolverConfig,
@@ -256,13 +256,13 @@ class AdShieldRepository @Inject constructor(
     }
 
     private fun refreshRuntimeRuleCount() {
-        _vpnRuntimeState.update { current ->
+        _dnsRuntimeState.update { current ->
             current.copy(loadedRuleCount = filterEngine.getCurrentSnapshot().totalLoadedRules)
         }
     }
 
     /**
-     * Records a real DNS query event from [com.adshield.pro.service.AdShieldVpnService].
+     * Records a real DNS query event from [com.adshield.pro.service.AdShieldDnsService].
      * Never fabricates numbers; updates both live session counters, daily aggregate counters,
      * and (if enabled by the user) local detailed DNS logs.
      */
@@ -292,7 +292,7 @@ class AdShieldRepository @Inject constructor(
         }
 
         // 1. Update live session state
-        _vpnRuntimeState.update { state ->
+        _dnsRuntimeState.update { state ->
             val newTotal = state.sessionTotalQueries + 1
             val newBlocked = state.sessionBlockedQueries + if (isBlocked) 1 else 0
             val newAllowed = state.sessionAllowedQueries + if (isBlocked) 0 else 1
@@ -436,7 +436,7 @@ class AdShieldRepository @Inject constructor(
             dao.clearAllDailyStats()
         }
         _liveTopApps.value = emptyMap()
-        _vpnRuntimeState.update {
+        _dnsRuntimeState.update {
             it.copy(
                 sessionTotalQueries = 0L,
                 sessionBlockedQueries = 0L,
@@ -453,12 +453,12 @@ class AdShieldRepository @Inject constructor(
         dao.pruneLogsOlderThan(cutoffMs)
     }
 
-    // --- Protection Mode & Custom Rules Management (Zero VPN Restart Required) ---
+    // --- Protection Mode & Custom Rules Management (Zero Restart Required) ---
 
     suspend fun selectProtectionMode(mode: ProtectionMode) {
         prefs.setProtectionMode(mode)
         filterEngine.updateProtectionMode(mode)
-        _vpnRuntimeState.update { it.copy(activeMode = mode) }
+        _dnsRuntimeState.update { it.copy(activeMode = mode) }
     }
 
     suspend fun addCustomRule(
@@ -940,7 +940,7 @@ class AdShieldRepository @Inject constructor(
         }
     }
 
-    // --- Installed Apps & Per-App VPN Exclusions ---
+    // --- Installed Apps & Per-App DNS Exclusions ---
 
     suspend fun getInstalledApps(excludedPackages: Set<String>, dnsPolicies: Map<String, AppDnsPolicy> = emptyMap()): List<AppExclusionInfo> = withContext(Dispatchers.IO) {
         val pm = context.packageManager
@@ -967,14 +967,14 @@ class AdShieldRepository @Inject constructor(
                     packageName = appInfo.packageName,
                     appName = label,
                     isSystemApp = isSystem,
-                    isExcludedFromVpn = excludedPackages.contains(appInfo.packageName),
+                    isExcludedFromFiltering = excludedPackages.contains(appInfo.packageName),
                     dnsPolicy = dnsPolicies[appInfo.packageName] ?: AppDnsPolicy.DEFAULT,
                     usesFirstPartyMultiplexedAds = isFirstPartyMux,
                     compatibilityNote = note
                 )
             }
             .sortedWith(
-                compareByDescending<AppExclusionInfo> { it.isExcludedFromVpn }
+                compareByDescending<AppExclusionInfo> { it.isExcludedFromFiltering }
                     .thenByDescending { it.usesFirstPartyMultiplexedAds }
                     .thenBy { it.appName.lowercase() }
             )

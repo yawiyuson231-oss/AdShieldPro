@@ -46,10 +46,10 @@ import com.adshield.pro.domain.model.StorageMetrics
 import com.adshield.pro.domain.model.SystemPreferenceWriteResult
 import com.adshield.pro.domain.model.SystemTilesLiveStatus
 import com.adshield.pro.domain.model.TimeBucketStat
-import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.DnsRuntimeState
 import com.adshield.pro.ui.model.ProtectionPipelineStatus
 import com.adshield.pro.ui.model.ProtectionStatusEvaluator
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.data.repository.BatteryIntelligenceRepository
 import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnostics
@@ -81,7 +81,7 @@ import com.adshield.pro.engine.security.SecurityLevel
 import com.adshield.pro.engine.security.SecurityPosture
 import com.adshield.pro.engine.security.SecurityScanRecord
 import com.adshield.pro.engine.security.UrlThreatScanner
-import com.adshield.pro.service.AdShieldVpnService
+import com.adshield.pro.service.AdShieldDnsService
 import com.adshield.pro.ui.UpdatePromptActivity
 import com.adshield.pro.update.GitHubReleaseClient
 import com.adshield.pro.worker.FilterUpdateWorker
@@ -130,7 +130,7 @@ class AdShieldViewModel @Inject constructor(
     private val systemPreferencesController: SystemPreferencesController
 ) : ViewModel() {
 
-    val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
+    val dnsState: StateFlow<DnsRuntimeState> = repository.dnsRuntimeState
 
     val settingsState: StateFlow<AppSettingsState> = repository.settingsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppSettingsState())
@@ -188,9 +188,9 @@ class AdShieldViewModel @Inject constructor(
      */
     private val _statusTick = MutableStateFlow(0L)
 
-    val protectionStatus: StateFlow<ProtectionPipelineStatus> = combine(vpnState, settingsState, _statusTick) { vpn, settings, _ ->
+    val protectionStatus: StateFlow<ProtectionPipelineStatus> = combine(dnsState, settingsState, _statusTick) { dns, settings, _ ->
         ProtectionStatusEvaluator.evaluate(
-            vpn = vpn,
+            dns = dns,
             settings = settings,
             health = upstreamDnsResolver.providerHealthSnapshots(),
             nowMs = System.currentTimeMillis()
@@ -198,7 +198,7 @@ class AdShieldViewModel @Inject constructor(
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        ProtectionStatusEvaluator.evaluate(VpnRuntimeState(), AppSettingsState(), emptyList(), System.currentTimeMillis())
+        ProtectionStatusEvaluator.evaluate(DnsRuntimeState(), AppSettingsState(), emptyList(), System.currentTimeMillis())
     )
 
     private val _isUpdatingFilters = MutableStateFlow(false)
@@ -500,30 +500,30 @@ class AdShieldViewModel @Inject constructor(
 
     // --- VPN Lifecycle Controls ---
 
-    fun startVpnService() {
-        val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-            action = AdShieldVpnService.ACTION_START_VPN
+    fun startProtection() {
+        val intent = Intent(appContext, AdShieldDnsService::class.java).apply {
+            action = AdShieldDnsService.ACTION_START_PROTECTION
         }
         ContextCompat.startForegroundService(appContext, intent)
     }
 
-    fun stopVpnService() {
-        val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-            action = AdShieldVpnService.ACTION_STOP_VPN
+    fun stopProtection() {
+        val intent = Intent(appContext, AdShieldDnsService::class.java).apply {
+            action = AdShieldDnsService.ACTION_STOP_PROTECTION
         }
         appContext.startService(intent)
     }
 
-    fun pauseVpnService() {
-        val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-            action = AdShieldVpnService.ACTION_PAUSE_VPN
+    fun pauseProtection() {
+        val intent = Intent(appContext, AdShieldDnsService::class.java).apply {
+            action = AdShieldDnsService.ACTION_PAUSE_PROTECTION
         }
         appContext.startService(intent)
     }
 
-    fun resumeVpnService() {
-        val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-            action = AdShieldVpnService.ACTION_RESUME_VPN
+    fun resumeProtection() {
+        val intent = Intent(appContext, AdShieldDnsService::class.java).apply {
+            action = AdShieldDnsService.ACTION_RESUME_PROTECTION
         }
         appContext.startService(intent)
     }
@@ -534,7 +534,7 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             repository.selectProtectionMode(mode)
             upstreamDnsResolver.clearCache()
-            showFeedback("Switched to ${mode.title} (applied immediately without VPN restart)")
+            showFeedback("Switched to ${mode.title} (applied immediately, no restart)")
         }
     }
 
@@ -764,8 +764,8 @@ class AdShieldViewModel @Inject constructor(
             loadInstalledApps()
             reloadTunnelIfConnected()
             showFeedback(
-                if (excluded) "Excluded $packageName from VPN tunnel."
-                else "Included $packageName in VPN protection."
+                if (excluded) "Excluded $packageName from DNS filtering."
+                else "Included $packageName in DNS protection."
             )
         }
     }
@@ -933,12 +933,12 @@ class AdShieldViewModel @Inject constructor(
     }
 
     private fun reloadTunnelIfConnected() {
-        val currentStatus = vpnState.value.status
-        if (currentStatus == com.adshield.pro.domain.model.VpnStatus.CONNECTED ||
-            currentStatus == com.adshield.pro.domain.model.VpnStatus.PAUSED
+        val currentStatus = dnsState.value.status
+        if (currentStatus == com.adshield.pro.domain.model.DnsStatus.CONNECTED ||
+            currentStatus == com.adshield.pro.domain.model.DnsStatus.PAUSED
         ) {
-            val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-                action = AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG
+            val intent = Intent(appContext, AdShieldDnsService::class.java).apply {
+                action = AdShieldDnsService.ACTION_RELOAD_TUNNEL_CONFIG
             }
             appContext.startService(intent)
         }
@@ -1213,12 +1213,12 @@ class AdShieldViewModel @Inject constructor(
 
     fun refreshSecurityPosture(highRisk: Int? = null) {
         val riskApps = highRisk ?: _securityPosture.value.highRiskApps
-        val vpnActive = repository.vpnRuntimeState.value.status == VpnStatus.CONNECTED
+        val dnsActive = repository.dnsRuntimeState.value.status == DnsStatus.CONNECTED
         val signatures = securityEngine.activeThreatSignatureCount()
         _securityPosture.value = SecurityEngine.buildSecurityPosture(
             highRiskApps = riskApps,
             threatSignatures = signatures,
-            vpnActive = vpnActive
+            dnsActive = dnsActive
         )
     }
 
@@ -1333,7 +1333,7 @@ class AdShieldViewModel @Inject constructor(
      * dashboard can only ever show traffic that actually happened.
      */
     val liveNetwork: StateFlow<LiveNetworkModel.NetworkSnapshot> = combine(
-        repository.vpnRuntimeState,
+        repository.dnsRuntimeState,
         recentLogs,
         liveTopApps,
         topBlockedDomains
@@ -1343,7 +1343,7 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         LiveNetworkModel.snapshot(
-            repository.vpnRuntimeState.value,
+            repository.dnsRuntimeState.value,
             emptyList(),
             emptyList(),
             emptyList()

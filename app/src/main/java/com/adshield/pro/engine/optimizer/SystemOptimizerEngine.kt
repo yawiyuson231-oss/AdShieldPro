@@ -356,8 +356,8 @@ class SystemOptimizerEngine @Inject constructor(
             recs.add("Battery temperature (${String.format(Locale.US, "%.1f°C", tempCelsius)}) and voltage (${voltageMv} mV) are within normal operating limits.")
         }
 
-        val vpnState = repository.vpnRuntimeState.value
-        val adShieldImpact = "Event-driven TUN DNS loop • 0 polling wakeups • Avg lookup ${vpnState.averageLatencyMs} ms"
+        val dnsState = repository.dnsRuntimeState.value
+        val adShieldImpact = "Event-driven TUN DNS loop • 0 polling wakeups • Avg lookup ${dnsState.averageLatencyMs} ms"
 
         return BatteryThermalSnapshot(
             batteryPercent = batteryPct,
@@ -655,7 +655,7 @@ class SystemOptimizerEngine @Inject constructor(
         val before = readRamSnapshot()
         val actions = mutableListOf<String>()
 
-        // 1. Trim expired & excess DNS LRU cache entries (safe for active VPN)
+        // 1. Trim expired & excess DNS LRU cache entries (safe while filtering is active)
         val releasedCacheCount = upstreamDnsResolver.trimExpiredAndExcessCache(targetSize = 96)
         if (releasedCacheCount > 0) {
             actions.add("Released $releasedCacheCount cached DNS response buffers.")
@@ -687,7 +687,7 @@ class SystemOptimizerEngine @Inject constructor(
                 add("Switch to Standard or Privacy filter lists if your device has less than 4 GB of physical RAM.")
             }
             if (isEmpty()) {
-                add("AdShield Pro memory footprint is healthy (${RuleBasedOptimizationPredictor.formatBytes(after.adShieldJavaHeapUsedBytes)} Java heap). Active VPN protection was preserved without interruption.")
+                add("AdShield Pro memory footprint is healthy (${RuleBasedOptimizationPredictor.formatBytes(after.adShieldJavaHeapUsedBytes)} Java heap). Active DNS protection was preserved without interruption.")
             }
         }
 
@@ -878,7 +878,7 @@ class SystemOptimizerEngine @Inject constructor(
         if (trimmed > 0) {
             actions.add("Trimmed $trimmed expired DNS cache entries to reduce background memory retention.")
         }
-        actions.add("Active VPN ad-blocking tunnel was preserved without interruption.")
+        actions.add("Active DNS ad blocking was preserved without interruption.")
         actions
     }
 
@@ -923,7 +923,7 @@ class SystemOptimizerEngine @Inject constructor(
                 filesCleanedCount = 0,
                 actionsCompleted = listOf(
                     "Optimization unnecessary — device was optimized ${secondsSinceLastBoost}s ago and is running cleanly.",
-                    "Active VPN & DNS ad-blocking rules remain untouched."
+                    "Active DNS ad-blocking rules remain untouched."
                 ),
                 pendingUserApprovalActions = if (scanReport.confirmationRequiredBytes > 0L) {
                     listOf("${RuleBasedOptimizationPredictor.formatBytes(scanReport.confirmationRequiredBytes)} in large/duplicate/APK files available for review in Junk Cleaner.")

@@ -5,8 +5,8 @@ import com.adshield.pro.engine.dns.DnsProviderHealth
 import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -63,35 +63,35 @@ data class ProtectionPipelineStatus(
 object ProtectionStatusEvaluator {
 
     fun evaluate(
-        vpn: VpnRuntimeState,
+        dns: DnsRuntimeState,
         settings: AppSettingsState,
         health: List<DnsProviderHealth>,
         nowMs: Long
     ): ProtectionPipelineStatus {
-        val config = vpn.resolverConfig
+        val config = dns.resolverConfig
         val policy = settings.dnsFirewallPolicy
         val emergency = policy.emergencyAllowlistOnly
-        val connected = vpn.status == VpnStatus.CONNECTED
-        val isLive = connected && vpn.sessionTotalQueries > 0L
+        val connected = dns.status == DnsStatus.CONNECTED
+        val isLive = connected && dns.sessionTotalQueries > 0L
 
-        val tunnelStage = when (vpn.status) {
-            VpnStatus.CONNECTED -> PipelineStage(
-                "tunnel", "DNS tunnel",
-                "Capturing DNS on ${vpn.activeNetworkLabel} · up ${formatDuration(nowMs - (vpn.connectedSinceEpochMs ?: nowMs))}",
+        val tunnelStage = when (dns.status) {
+            DnsStatus.CONNECTED -> PipelineStage(
+                "tunnel", "DNS filter",
+                "Capturing DNS on ${dns.activeNetworkLabel} · up ${formatDuration(nowMs - (dns.connectedSinceEpochMs ?: nowMs))}",
                 StageState.ACTIVE
             )
-            VpnStatus.STARTING -> PipelineStage("tunnel", "DNS tunnel", "Starting the local tunnel…", StageState.STANDBY)
-            VpnStatus.RECONNECTING -> PipelineStage("tunnel", "DNS tunnel", "Re-establishing after a network change…", StageState.STANDBY)
-            VpnStatus.PAUSED -> PipelineStage("tunnel", "DNS tunnel", "Paused — DNS is not being filtered", StageState.ATTENTION)
-            VpnStatus.ERROR -> PipelineStage("tunnel", "DNS tunnel", vpn.lastError ?: "The tunnel could not start", StageState.OFFLINE)
-            VpnStatus.DISCONNECTED -> PipelineStage("tunnel", "DNS tunnel", "Not running — tap Protect device to start", StageState.OFFLINE)
+            DnsStatus.STARTING -> PipelineStage("tunnel", "DNS filter", "Starting the local filter…", StageState.STANDBY)
+            DnsStatus.RECONNECTING -> PipelineStage("tunnel", "DNS filter", "Re-establishing after a network change…", StageState.STANDBY)
+            DnsStatus.PAUSED -> PipelineStage("tunnel", "DNS filter", "Paused — DNS is not being filtered", StageState.ATTENTION)
+            DnsStatus.ERROR -> PipelineStage("tunnel", "DNS filter", dns.lastError ?: "DNS protection could not start", StageState.OFFLINE)
+            DnsStatus.DISCONNECTED -> PipelineStage("tunnel", "DNS filter", "Not running — tap Protect device to start", StageState.OFFLINE)
         }
 
         val filterStage = when {
-            !connected -> PipelineStage("filter", "Rule engine", "${vpn.loadedRuleCount} rules ready", StageState.STANDBY)
-            vpn.loadedRuleCount > 0 -> PipelineStage(
+            !connected -> PipelineStage("filter", "Rule engine", "${dns.loadedRuleCount} rules ready", StageState.STANDBY)
+            dns.loadedRuleCount > 0 -> PipelineStage(
                 "filter", "Rule engine",
-                "${vpn.loadedRuleCount} rules · ${vpn.activeMode.title}",
+                "${dns.loadedRuleCount} rules · ${dns.activeMode.title}",
                 StageState.ACTIVE
             )
             else -> PipelineStage("filter", "Rule engine", "No rules loaded — sync your filter lists", StageState.DEGRADED)
@@ -106,9 +106,9 @@ object ProtectionStatusEvaluator {
                 "${config.preset.displayName} is unavailable — check your resolver and failover settings",
                 StageState.DEGRADED
             )
-            vpn.averageLatencyMs > 0 -> PipelineStage(
+            dns.averageLatencyMs > 0 -> PipelineStage(
                 "upstream", "Upstream resolver",
-                "${config.protocol.label} · ${config.preset.displayName} configured · ${vpn.averageLatencyMs} ms average",
+                "${config.protocol.label} · ${config.preset.displayName} configured · ${dns.averageLatencyMs} ms average",
                 StageState.ACTIVE
             )
             else -> PipelineStage(
@@ -147,32 +147,32 @@ object ProtectionStatusEvaluator {
             else -> PipelineStage("policy", "Policy", "Global protection on every network", StageState.ACTIVE)
         }
 
-        val cachePercent = if (vpn.sessionTotalQueries > 0L) {
-            (vpn.sessionCachedQueries.toFloat() / vpn.sessionTotalQueries.toFloat()) * 100f
+        val cachePercent = if (dns.sessionTotalQueries > 0L) {
+            (dns.sessionCachedQueries.toFloat() / dns.sessionTotalQueries.toFloat()) * 100f
         } else 0f
         val cacheStage = PipelineStage(
             "cache", "Cache",
-            if (vpn.sessionTotalQueries > 0L) "${cachePercent.roundToInt()}% answered from cache this session" else "No queries yet this session",
+            if (dns.sessionTotalQueries > 0L) "${cachePercent.roundToInt()}% answered from cache this session" else "No queries yet this session",
             if (isLive) StageState.ACTIVE else StageState.STANDBY
         )
 
         val stages = listOf(tunnelStage, filterStage, upstreamStage, integrityStage, policyStage, cacheStage)
         val overall = when {
-            vpn.status == VpnStatus.ERROR || vpn.status == VpnStatus.DISCONNECTED -> StageState.OFFLINE
-            vpn.status == VpnStatus.PAUSED || (connected && emergency) -> StageState.ATTENTION
+            dns.status == DnsStatus.ERROR || dns.status == DnsStatus.DISCONNECTED -> StageState.OFFLINE
+            dns.status == DnsStatus.PAUSED || (connected && emergency) -> StageState.ATTENTION
             stages.any { it.state == StageState.DEGRADED } -> StageState.DEGRADED
-            vpn.status != VpnStatus.CONNECTED -> StageState.STANDBY
+            dns.status != DnsStatus.CONNECTED -> StageState.STANDBY
             else -> StageState.ACTIVE
         }
 
-        val healthScore = computeHealthScore(vpn, stages, emergency)
+        val healthScore = computeHealthScore(dns, stages, emergency)
 
         val metrics = listOf(
-            StatusMetric("Session", formatCount(vpn.sessionTotalQueries), emphasis = isLive),
-            StatusMetric("Blocked", if (vpn.sessionTotalQueries > 0L) "${vpn.blockingPercentage.roundToInt()}%" else "—"),
-            StatusMetric("Latency", if (vpn.averageLatencyMs > 0) "${vpn.averageLatencyMs} ms" else "—"),
-            StatusMetric("Rules", formatCount(vpn.loadedRuleCount.toLong())),
-            StatusMetric("Cache", if (vpn.sessionTotalQueries > 0L) "${cachePercent.roundToInt()}%" else "—"),
+            StatusMetric("Session", formatCount(dns.sessionTotalQueries), emphasis = isLive),
+            StatusMetric("Blocked", if (dns.sessionTotalQueries > 0L) "${dns.blockingPercentage.roundToInt()}%" else "—"),
+            StatusMetric("Latency", if (dns.averageLatencyMs > 0) "${dns.averageLatencyMs} ms" else "—"),
+            StatusMetric("Rules", formatCount(dns.loadedRuleCount.toLong())),
+            StatusMetric("Cache", if (dns.sessionTotalQueries > 0L) "${cachePercent.roundToInt()}%" else "—"),
             StatusMetric("Health", "$healthScore/100", emphasis = true)
         )
 
@@ -184,19 +184,19 @@ object ProtectionStatusEvaluator {
             if (emergency) add("Emergency mode")
             if (appPolicyCount > 0) add("$appPolicyCount app rule${if (appPolicyCount == 1) "" else "s"}")
             if (transportRestricted) add("Network: ${transports.joinToString("/") { it.label }}")
-            if (vpn.activeNetworkLabel.isNotBlank()) add(vpn.activeNetworkLabel)
+            if (dns.activeNetworkLabel.isNotBlank()) add(dns.activeNetworkLabel)
         }
 
         val headline = when (overall) {
             StageState.ACTIVE -> if (isLive) "PROTECTED · WORKING" else "PROTECTED · IDLE"
             StageState.DEGRADED -> "PROTECTED · DEGRADED"
-            StageState.ATTENTION -> if (vpn.status == VpnStatus.PAUSED) "FILTERING PAUSED" else "EMERGENCY LOCKDOWN"
-            StageState.STANDBY -> when (vpn.status) {
-                VpnStatus.STARTING -> "STARTING"
-                VpnStatus.RECONNECTING -> "RECONNECTING"
+            StageState.ATTENTION -> if (dns.status == DnsStatus.PAUSED) "FILTERING PAUSED" else "EMERGENCY LOCKDOWN"
+            StageState.STANDBY -> when (dns.status) {
+                DnsStatus.STARTING -> "STARTING"
+                DnsStatus.RECONNECTING -> "RECONNECTING"
                 else -> "STARTING"
             }
-            StageState.OFFLINE -> if (vpn.status == VpnStatus.ERROR) "NEEDS ATTENTION" else "PROTECTION OFF"
+            StageState.OFFLINE -> if (dns.status == DnsStatus.ERROR) "NEEDS ATTENTION" else "PROTECTION OFF"
         }
 
         val summary = when (overall) {
@@ -206,13 +206,13 @@ object ProtectionStatusEvaluator {
                 "Tunnel is up and waiting for DNS traffic"
             }
             StageState.DEGRADED -> "Protection is on, but needs attention. Check protection details on Home."
-            StageState.ATTENTION -> if (vpn.status != VpnStatus.PAUSED && emergency) {
+            StageState.ATTENTION -> if (dns.status != DnsStatus.PAUSED && emergency) {
                 "Only user allowlist and built-in safety entries resolve"
             } else {
-                "The tunnel is up but DNS is passing through unfiltered"
+                "DNS filtering is paused; queries pass through unfiltered"
             }
             StageState.STANDBY -> stages.first { it.state == StageState.STANDBY }.detail
-            StageState.OFFLINE -> if (vpn.status == VpnStatus.ERROR) vpn.lastError ?: "The tunnel could not start" else "Turn on protection to start filtering DNS"
+            StageState.OFFLINE -> if (dns.status == DnsStatus.ERROR) dns.lastError ?: "DNS protection could not start" else "Turn on protection to start filtering DNS"
         }
 
         return ProtectionPipelineStatus(
@@ -233,23 +233,23 @@ object ProtectionStatusEvaluator {
      * costs the policy slice rather than being reported as a fault.
      */
     private fun computeHealthScore(
-        vpn: VpnRuntimeState,
+        dns: DnsRuntimeState,
         stages: List<PipelineStage>,
         emergency: Boolean
     ): Int {
-        val tunnel = when (vpn.status) {
-            VpnStatus.CONNECTED -> 40
-            VpnStatus.STARTING, VpnStatus.RECONNECTING -> 15
+        val tunnel = when (dns.status) {
+            DnsStatus.CONNECTED -> 40
+            DnsStatus.STARTING, DnsStatus.RECONNECTING -> 15
             else -> 0
         }
-        val rules = if (vpn.status == VpnStatus.CONNECTED && vpn.loadedRuleCount > 0) 25 else 0
+        val rules = if (dns.status == DnsStatus.CONNECTED && dns.loadedRuleCount > 0) 25 else 0
         val upstream = when {
-            vpn.status != VpnStatus.CONNECTED -> 0
+            dns.status != DnsStatus.CONNECTED -> 0
             stages.first { it.id == "upstream" }.state == StageState.DEGRADED -> 10
             stages.first { it.id == "upstream" }.state == StageState.STANDBY -> 0
             else -> 25
         }
-        val policy = if (vpn.status == VpnStatus.CONNECTED) (if (emergency) 5 else 10) else 0
+        val policy = if (dns.status == DnsStatus.CONNECTED) (if (emergency) 5 else 10) else 0
         return (tunnel + rules + upstream + policy).coerceIn(0, 100)
     }
 

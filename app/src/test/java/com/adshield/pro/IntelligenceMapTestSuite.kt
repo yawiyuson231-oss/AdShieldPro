@@ -21,7 +21,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceTimeRange
 import com.adshield.pro.domain.intelligence.NodePosition
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.battery.BatteryHealthStatus
 import com.adshield.pro.engine.battery.BatteryReading
 import com.adshield.pro.engine.battery.BatteryTelemetry
@@ -250,9 +250,9 @@ class IntelligenceMapTestSuite {
             )
         )
         assertNull(
-            IntelligenceEventFactory.vpnTransition(
-                previous = VpnStatus.CONNECTED,
-                current = VpnStatus.CONNECTED,
+            IntelligenceEventFactory.dnsTransition(
+                previous = DnsStatus.CONNECTED,
+                current = DnsStatus.CONNECTED,
                 error = null,
                 ruleCount = 10,
                 timestampEpochMs = now
@@ -389,7 +389,7 @@ class IntelligenceMapTestSuite {
     @Test
     fun testNetworkStateFollowsRealTunnelState() {
         val paused = IntelligenceAggregator.buildState(
-            healthyInputs().copy(vpnStatus = VpnStatus.PAUSED, nowEpochMs = now),
+            healthyInputs().copy(dnsStatus = DnsStatus.PAUSED, nowEpochMs = now),
             emptyList(),
             IntelligenceFilters.DEFAULT,
             0
@@ -401,7 +401,7 @@ class IntelligenceMapTestSuite {
 
         val disabled = IntelligenceAggregator.buildState(
             healthyInputs().copy(
-                vpnStatus = VpnStatus.DISCONNECTED,
+                dnsStatus = DnsStatus.DISCONNECTED,
                 protectionExpected = false,
                 nowEpochMs = now
             ),
@@ -416,8 +416,8 @@ class IntelligenceMapTestSuite {
 
         val error = IntelligenceAggregator.buildState(
             healthyInputs().copy(
-                vpnStatus = VpnStatus.ERROR,
-                vpnLastError = "tun open failed",
+                dnsStatus = DnsStatus.ERROR,
+                dnsLastError = "tun open failed",
                 nowEpochMs = now
             ),
             emptyList(),
@@ -763,7 +763,7 @@ class IntelligenceMapTestSuite {
 
     private fun healthyInputs(): IntelligenceInputs = IntelligenceInputs(
         nowEpochMs = now,
-        vpnStatus = VpnStatus.CONNECTED,
+        dnsStatus = DnsStatus.CONNECTED,
         protectionExpected = true,
         connectedSinceEpochMs = now - 3_600_000L,
         protectionMode = ProtectionMode.STANDARD,

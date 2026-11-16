@@ -20,9 +20,11 @@ import com.adshield.pro.MainActivity
 import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.ProtectionArchitecture
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsPacketCodec
+import com.adshield.pro.engine.dns.DnsCnameGuard
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
@@ -56,7 +58,7 @@ import javax.inject.Inject
  * - Dynamically applies rule edits and protection mode changes in memory without restarting the tunnel.
  */
 @AndroidEntryPoint
-class AdShieldVpnService : VpnService() {
+class AdShieldDnsService : VpnService() {
 
     @Inject lateinit var repository: AdShieldRepository
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
@@ -64,7 +66,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var vpnInterface: ParcelFileDescriptor? = null
+    private var tunInterface: ParcelFileDescriptor? = null
     private var tunnelJob: Job? = null
     private val tunWriteLock = Any()
     private data class AppAttribution(val packageName: String, val label: String)
@@ -80,7 +82,7 @@ class AdShieldVpnService : VpnService() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        upstreamDnsResolver.bindVpnSocketProtectors(
+        upstreamDnsResolver.bindSocketProtectors(
             protectTcp = { socket -> protect(socket) },
             protectUdp = { datagramSocket -> protect(datagramSocket) }
         )
@@ -89,77 +91,78 @@ class AdShieldVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP_VPN -> {
+            ACTION_STOP_PROTECTION -> {
                 // The user explicitly turned protection off: this must be durable before
                 // stopSelf() tears down the service scope, otherwise the pending DataStore
                 // write is cancelled and protection would silently come back after a reboot.
                 runCatching {
                     runBlocking {
                         withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
-                            preferencesRepository.setVpnShouldRemainActive(false)
+                            preferencesRepository.setProtectionShouldRemainActive(false)
                         }
                     }
                 }
-                stopVpnTunnel()
+                stopTunnel()
                 stopSelf()
                 return START_NOT_STICKY
             }
-            ACTION_PAUSE_VPN -> {
+            ACTION_PAUSE_PROTECTION -> {
                 isPaused = true
-                repository.updateVpnStatus(VpnStatus.PAUSED)
+                repository.updateDnsStatus(DnsStatus.PAUSED)
                 updateForegroundNotification()
                 return START_STICKY
             }
-            ACTION_RESUME_VPN -> {
+            ACTION_RESUME_PROTECTION -> {
                 isPaused = false
-                if (vpnInterface != null && tunnelJob?.isActive == true) {
-                    repository.updateVpnStatus(VpnStatus.CONNECTED)
+                if (tunInterface != null && tunnelJob?.isActive == true) {
+                    repository.updateDnsStatus(DnsStatus.CONNECTED)
                     updateForegroundNotification()
                 } else {
-                    startVpnTunnel()
+                    startTunnel()
                 }
                 return START_STICKY
             }
             ACTION_RELOAD_TUNNEL_CONFIG -> {
                 // Used only when per-app VPN exclusions or IPv6 interface routing changes
-                if (vpnInterface != null) {
-                    startVpnTunnel()
+                if (tunInterface != null) {
+                    startTunnel()
                 }
                 return START_STICKY
             }
             else -> {
                 startForegroundWithNotification()
-                startVpnTunnel()
+                startTunnel()
                 return START_STICKY
             }
         }
     }
 
-    private fun startVpnTunnel() {
+    private fun startTunnel() {
         tunnelJob?.cancel()
         closeTunInterface()
 
-        repository.updateVpnStatus(VpnStatus.STARTING)
+        repository.updateDnsStatus(DnsStatus.STARTING)
 
         tunnelJob = serviceScope.launch {
             try {
                 val settings = preferencesRepository.getSettingsSnapshot()
-                preferencesRepository.setVpnShouldRemainActive(true)
+                preferencesRepository.setProtectionShouldRemainActive(true)
                 filterRuleEngine.updateProtectionMode(settings.protectionMode)
                 repository.syncRuntimeModeAndResolver(settings.protectionMode, settings)
 
                 val builder = Builder()
-                    .setSession(getString(R.string.vpn_session_name))
-                    .setMtu(VPN_MTU)
+                    .setSession(getString(R.string.dns_session_name))
+                    .setMtu(TUNNEL_MTU)
                     .setBlocking(true)
-                    // IPv4 Virtual Tunnel & DNS Sinkhole Router
-                    .addAddress(VIRTUAL_IPV4_CLIENT, 30)
-                    .addRoute(VIRTUAL_IPV4_DNS, 32)
+                    // IPv4 Virtual Tunnel & DNS Sinkhole Router. The addresses live in
+                    // ProtectionArchitecture so the in-app explainer renders the same routes.
+                    .addAddress(VIRTUAL_IPV4_CLIENT, ProtectionArchitecture.IPV4_CLIENT_PREFIX)
+                    .addRoute(VIRTUAL_IPV4_DNS, ProtectionArchitecture.IPV4_DNS_PREFIX)
                     .addDnsServer(VIRTUAL_IPV4_DNS)
 
                 if (settings.resolverConfig.enableIpv6) {
-                    builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
-                    builder.addRoute(VIRTUAL_IPV6_DNS, 128)
+                    builder.addAddress(VIRTUAL_IPV6_CLIENT, ProtectionArchitecture.IPV6_CLIENT_PREFIX)
+                    builder.addRoute(VIRTUAL_IPV6_DNS, ProtectionArchitecture.IPV6_DNS_PREFIX)
                     builder.addDnsServer(VIRTUAL_IPV6_DNS)
                 }
 
@@ -174,36 +177,36 @@ class AdShieldVpnService : VpnService() {
                 }
 
                 val configureIntent = PendingIntent.getActivity(
-                    this@AdShieldVpnService,
+                    this@AdShieldDnsService,
                     0,
-                    Intent(this@AdShieldVpnService, MainActivity::class.java),
+                    Intent(this@AdShieldDnsService, MainActivity::class.java),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
                 builder.setConfigureIntent(configureIntent)
 
                 val establishedPfd = builder.establish()
                 if (establishedPfd == null) {
-                    repository.updateVpnStatus(
-                        status = VpnStatus.ERROR,
-                        error = "VPN permission not granted or another Always-On VPN is blocking tunnel creation."
+                    repository.updateDnsStatus(
+                        status = DnsStatus.ERROR,
+                        error = "Android's VPN permission was not granted, or another Always-On VPN is blocking tunnel creation."
                     )
                     stopSelf()
                     return@launch
                 }
 
-                vpnInterface = establishedPfd
+                tunInterface = establishedPfd
                 isPaused = false
-                repository.updateVpnStatus(
-                    status = VpnStatus.CONNECTED,
+                repository.updateDnsStatus(
+                    status = DnsStatus.CONNECTED,
                     networkLabel = detectCurrentNetworkLabel()
                 )
                 updateForegroundNotification()
 
                 runPacketLoop(establishedPfd)
             } catch (t: Throwable) {
-                repository.updateVpnStatus(
-                    status = VpnStatus.ERROR,
-                    error = "VPN Engine Error: ${t.message ?: t.javaClass.simpleName}"
+                repository.updateDnsStatus(
+                    status = DnsStatus.ERROR,
+                    error = "DNS engine error: ${t.message ?: t.javaClass.simpleName}"
                 )
                 stopSelf()
             }
@@ -216,7 +219,7 @@ class AdShieldVpnService : VpnService() {
         val packetBuffer = ByteArray(MAX_PACKET_SIZE)
 
         try {
-            while (serviceScope.isActive && vpnInterface != null) {
+            while (serviceScope.isActive && tunInterface != null) {
                 val length = try {
                     inputStream.read(packetBuffer)
                 } catch (_: InterruptedIOException) {
@@ -263,7 +266,7 @@ class AdShieldVpnService : VpnService() {
         // Encrypted upstream transports can return answers far larger than the tunnel MTU.
         // Anything that does not fit is replaced by a TC=1 answer so the stub resolver retries
         // over TCP (handled below) instead of the client silently timing out.
-        val udpCapacity = IpPacketFraming.udpPayloadCapacity(udpPacket.ipVersion, VPN_MTU)
+        val udpCapacity = IpPacketFraming.udpPayloadCapacity(udpPacket.ipVersion, TUNNEL_MTU)
         val udpSafeResponse = DnsPacketCodec.fitResponseToUdpLimit(dnsQuery, dnsResponseBytes, udpCapacity)
         val responseIpPacket = IpPacketFraming.buildUdpResponsePacket(udpPacket, udpSafeResponse)
         writeToTunSafe(outputStream, responseIpPacket)
@@ -313,7 +316,7 @@ class AdShieldVpnService : VpnService() {
                         startSeqNum = tcpPacket.acknowledgmentNumber,
                         ackNum = (tcpPacket.sequenceNumber + tcpPacket.payload.size) and 0xFFFFFFFFL,
                         tcpPayload = tcpDnsPayload,
-                        maxSegmentPayloadBytes = IpPacketFraming.tcpPayloadCapacity(tcpPacket.ipVersion, VPN_MTU)
+                        maxSegmentPayloadBytes = IpPacketFraming.tcpPayloadCapacity(tcpPacket.ipVersion, TUNNEL_MTU)
                     )
                     segments.forEach { segment -> writeToTunSafe(outputStream, segment) }
                 }
@@ -413,6 +416,39 @@ class AdShieldVpnService : VpnService() {
 
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
+
+        // CNAME cloaking: the queried name is allowed, but the chain can still land on a blocked
+        // tracker. Enforced only in modes that accept the compatibility risk, and never on wire
+        // data the codec could not fully walk.
+        val cloakMode = filterRuleEngine.getCurrentSnapshot().protectionMode
+        if (cloakMode.enforceCnameCloaking) {
+            val cloakTarget = DnsCnameGuard.firstBlockedTarget(upstreamResult.responseBytes) { target ->
+                filterRuleEngine.evaluate(target).isBlocked
+            }
+            if (cloakTarget != null) {
+                val targetEvaluation = filterRuleEngine.evaluate(cloakTarget)
+                val cloakedBytes = DnsPacketCodec.buildBlockedResponse(
+                    query = query,
+                    sinkholeZeroIp = cloakMode.blockSinkholeZeroIp
+                )
+                repository.recordDnsQueryEvent(
+                    domain = query.questionDomain,
+                    queryType = query.qTypeName,
+                    isBlocked = true,
+                    category = targetEvaluation.matchedCategory,
+                    matchedRule = cloakTarget,
+                    sourceList = "CNAME cloaking guard",
+                    latencyMs = upstreamResult.latencyMs,
+                    protocolUsed = upstreamResult.protocolUsed,
+                    fromCache = upstreamResult.fromCache,
+                    appPackageName = app?.packageName,
+                    appName = app?.label
+                )
+                maybeRefreshNotificationCounter()
+                return cloakedBytes
+            }
+        }
+
         repository.recordDnsQueryEvent(
             domain = query.questionDomain,
             queryType = query.qTypeName,
@@ -449,22 +485,22 @@ class AdShieldVpnService : VpnService() {
                 runCatching { setUnderlyingNetworks(arrayOf(network)) }
                 currentTransport = detectCurrentTransport()
                 val label = detectCurrentNetworkLabel()
-                if (vpnInterface != null && !isPaused) {
-                    repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
+                if (tunInterface != null && !isPaused) {
+                    repository.updateDnsStatus(DnsStatus.CONNECTED, networkLabel = label)
                 }
             }
 
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                 val label = detectCurrentNetworkLabel()
-                if (vpnInterface != null && !isPaused) {
-                    repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
+                if (tunInterface != null && !isPaused) {
+                    repository.updateDnsStatus(DnsStatus.CONNECTED, networkLabel = label)
                 }
             }
 
             override fun onLost(network: Network) {
                 val label = detectCurrentNetworkLabel()
-                if (vpnInterface != null && !isPaused) {
-                    repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
+                if (tunInterface != null && !isPaused) {
+                    repository.updateDnsStatus(DnsStatus.CONNECTED, networkLabel = label)
                 }
             }
         }
@@ -534,7 +570,7 @@ class AdShieldVpnService : VpnService() {
     }
 
     private fun buildStatusNotification(): Notification {
-        val state = repository.vpnRuntimeState.value
+        val state = repository.dnsRuntimeState.value
         val openAppIntent = PendingIntent.getActivity(
             this,
             1,
@@ -545,7 +581,7 @@ class AdShieldVpnService : VpnService() {
         val stopIntent = PendingIntent.getService(
             this,
             2,
-            Intent(this, AdShieldVpnService::class.java).apply { action = ACTION_STOP_VPN },
+            Intent(this, AdShieldDnsService::class.java).apply { action = ACTION_STOP_PROTECTION },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -553,7 +589,7 @@ class AdShieldVpnService : VpnService() {
             val resumePending = PendingIntent.getService(
                 this,
                 3,
-                Intent(this, AdShieldVpnService::class.java).apply { action = ACTION_RESUME_VPN },
+                Intent(this, AdShieldDnsService::class.java).apply { action = ACTION_RESUME_PROTECTION },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             NotificationCompat.Action.Builder(0, "Resume", resumePending).build()
@@ -561,7 +597,7 @@ class AdShieldVpnService : VpnService() {
             val pausePending = PendingIntent.getService(
                 this,
                 3,
-                Intent(this, AdShieldVpnService::class.java).apply { action = ACTION_PAUSE_VPN },
+                Intent(this, AdShieldDnsService::class.java).apply { action = ACTION_PAUSE_PROTECTION },
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             NotificationCompat.Action.Builder(0, "Pause", pausePending).build()
@@ -593,10 +629,10 @@ class AdShieldVpnService : VpnService() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
-            getString(R.string.vpn_notification_channel_name),
+            getString(R.string.dns_notification_channel_name),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = getString(R.string.vpn_notification_channel_desc)
+            description = getString(R.string.dns_notification_channel_desc)
             setShowBadge(false)
         }
         nm.createNotificationChannel(channel)
@@ -605,31 +641,31 @@ class AdShieldVpnService : VpnService() {
     override fun onRevoke() {
         // Triggered when the user or another VPN application revokes our VPN permission
         serviceScope.launch {
-            preferencesRepository.setVpnShouldRemainActive(false)
+            preferencesRepository.setProtectionShouldRemainActive(false)
         }
-        stopVpnTunnel(reason = "VPN permission was revoked or superseded by another VPN app.")
+        stopTunnel(reason = "Android revoked the VPN permission; another VPN app may have taken over.")
         stopSelf()
         super.onRevoke()
     }
 
-    private fun stopVpnTunnel(reason: String? = null) {
+    private fun stopTunnel(reason: String? = null) {
         tunnelJob?.cancel()
         tunnelJob = null
         closeTunInterface()
-        repository.updateVpnStatus(VpnStatus.DISCONNECTED, error = reason)
+        repository.updateDnsStatus(DnsStatus.DISCONNECTED, error = reason)
     }
 
     private fun closeTunInterface() {
-        runCatching { vpnInterface?.close() }
-        vpnInterface = null
+        runCatching { tunInterface?.close() }
+        tunInterface = null
     }
 
     override fun onDestroy() {
         networkCallback?.let { cb ->
             runCatching { connectivityManager?.unregisterNetworkCallback(cb) }
         }
-        upstreamDnsResolver.bindVpnSocketProtectors(null, null)
-        stopVpnTunnel()
+        upstreamDnsResolver.bindSocketProtectors(null, null)
+        stopTunnel()
         // The daily counter is batched in memory; write the tail before the scope
         // dies so the last second of activity is never lost.
         runCatching { runBlocking { withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) { repository.flushDailyStats() } } }
@@ -638,22 +674,22 @@ class AdShieldVpnService : VpnService() {
     }
 
     companion object {
-        const val ACTION_START_VPN = "com.adshield.pro.action.START_VPN"
-        const val ACTION_STOP_VPN = "com.adshield.pro.action.STOP_VPN"
-        const val ACTION_PAUSE_VPN = "com.adshield.pro.action.PAUSE_VPN"
-        const val ACTION_RESUME_VPN = "com.adshield.pro.action.RESUME_VPN"
+        const val ACTION_START_PROTECTION = "com.adshield.pro.action.START_DNS_PROTECTION"
+        const val ACTION_STOP_PROTECTION = "com.adshield.pro.action.STOP_DNS_PROTECTION"
+        const val ACTION_PAUSE_PROTECTION = "com.adshield.pro.action.PAUSE_DNS_PROTECTION"
+        const val ACTION_RESUME_PROTECTION = "com.adshield.pro.action.RESUME_DNS_PROTECTION"
         const val ACTION_RELOAD_TUNNEL_CONFIG = "com.adshield.pro.action.RELOAD_TUNNEL_CONFIG"
 
         private const val NOTIFICATION_CHANNEL_ID = "adshield_vpn_channel"
         private const val NOTIFICATION_ID = 2001
 
-        private const val VPN_MTU = 1500
+        private const val TUNNEL_MTU = 1500
         private const val SHUTDOWN_PERSIST_TIMEOUT_MS = 1_500L
         private const val MAX_PACKET_SIZE = 32767
 
-        const val VIRTUAL_IPV4_CLIENT = "10.215.173.1"
-        const val VIRTUAL_IPV4_DNS = "10.215.173.2"
-        const val VIRTUAL_IPV6_CLIENT = "fd00:ad5:1e1d::1"
-        const val VIRTUAL_IPV6_DNS = "fd00:ad5:1e1d::2"
+        const val VIRTUAL_IPV4_CLIENT = ProtectionArchitecture.IPV4_CLIENT_ADDRESS
+        const val VIRTUAL_IPV4_DNS = ProtectionArchitecture.IPV4_DNS_ADDRESS
+        const val VIRTUAL_IPV6_CLIENT = ProtectionArchitecture.IPV6_CLIENT_ADDRESS
+        const val VIRTUAL_IPV6_DNS = ProtectionArchitecture.IPV6_DNS_ADDRESS
     }
 }

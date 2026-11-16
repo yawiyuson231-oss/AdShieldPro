@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -76,6 +77,9 @@ fun SettingsScreen(
     showAboutScreen: Boolean,
     onOpenAbout: () -> Unit,
     onCloseAbout: () -> Unit,
+    showProtectionExplainer: Boolean = false,
+    onOpenProtectionExplainer: () -> Unit = {},
+    onCloseProtectionExplainer: () -> Unit = {},
     onOpenQuickTiles: () -> Unit = {},
     hasQuickTilePermission: Boolean = false,
     settings: AppSettingsState,
@@ -97,6 +101,10 @@ fun SettingsScreen(
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
+        return
+    }
+    if (showProtectionExplainer) {
+        HowProtectionWorksScreen(onBack = onCloseProtectionExplainer)
         return
     }
 
@@ -138,7 +146,7 @@ fun SettingsScreen(
                 }
             }
             Text(
-                text = "Configure Encrypted DNS, Per-App VPN Exclusions, and Backup/Restore",
+                text = "Configure encrypted DNS, per-app exclusions, and backup/restore",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -459,7 +467,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Network & Emergency DNS Policies", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "These policies govern DNS queries only. Non-DNS traffic bypasses the local tunnel. Passthrough still uses the configured upstream resolver.",
+                        "These policies govern DNS queries only. Non-DNS traffic bypasses the local DNS filter. Passthrough still uses the configured upstream resolver.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -501,11 +509,11 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Per-App VPN Controls (Split Tunneling)",
+                                text = "Per-App DNS Controls",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "${settings.excludedAppPackages.size} app(s) currently excluded from VPN filtering",
+                                text = "${settings.excludedAppPackages.size} app(s) currently excluded from DNS filtering",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -527,7 +535,7 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Manage Per-App VPN & DNS Policies")
+                        Text("Manage Per-App DNS Policies")
                     }
                 }
             }
@@ -563,7 +571,7 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.titleMedium
                                 )
                                 Text(
-                                    text = "Automatically resumes foreground VPN after device restart",
+                                    text = "Automatically resumes DNS protection after device restart",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -700,6 +708,31 @@ fun SettingsScreen(
 
         item {
             Card(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenProtectionExplainer),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.VpnKey, contentDescription = null, tint = CyberCyan)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("How protection works", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "What the local DNS filter does, and what it cannot do",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Open How protection works", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenAbout),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -736,7 +769,7 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showAppExclusionDialog = false },
-            title = { Text("Per-App VPN & DNS Policies") },
+            title = { Text("Per-App DNS Policies") },
             text = {
                 Column(modifier = Modifier.height(420.dp)) {
                     OutlinedTextField(
@@ -772,7 +805,7 @@ fun SettingsScreen(
                                             )
                                         }
                                         Switch(
-                                            checked = app.isExcludedFromVpn,
+                                            checked = app.isExcludedFromFiltering,
                                             onCheckedChange = { excluded ->
                                                 onToggleAppExclusion(app.packageName, excluded)
                                             }
@@ -890,7 +923,7 @@ fun SettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "1. Local-Only VpnService Processing: AdShield Pro uses Android VpnService exclusively to create a local on-device DNS firewall. Non-DNS application traffic bypasses the TUN interface directly.",
+                        text = "1. Local-Only Processing: AdShield Pro uses Android's VPN permission exclusively to create an on-device DNS firewall. Non-DNS application traffic bypasses the tunnel interface directly, and no traffic is routed to a remote server.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(

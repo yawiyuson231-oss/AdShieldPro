@@ -73,8 +73,8 @@ import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.domain.model.SmartBoostResult
 import com.adshield.pro.domain.model.TimeBucketStat
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.ui.components.BarRow
@@ -105,7 +105,7 @@ import java.util.Locale
 
 @Composable
 fun HomeScreen(
-    vpnState: VpnRuntimeState,
+    dnsState: DnsRuntimeState,
     settings: AppSettingsState,
     protectionStatus: ProtectionPipelineStatus,
     allTimeTotal: Long,
@@ -120,8 +120,8 @@ fun HomeScreen(
     isRunningSmartBoost: Boolean,
     isCheckingForUpdates: Boolean,
     onCheckForUpdates: () -> Unit,
-    onToggleVpn: (Boolean) -> Unit,
-    onPauseResumeVpn: () -> Unit,
+    onToggleProtection: (Boolean) -> Unit,
+    onPauseResumeProtection: () -> Unit,
     onSelectProtectionMode: (ProtectionMode) -> Unit,
     onTriggerFilterSync: () -> Unit,
     onRunOptimizeNow: () -> Unit,
@@ -133,13 +133,13 @@ fun HomeScreen(
 ) {
     val listState = rememberLazyListState()
     val screenWidth = LocalConfiguration.current.screenWidthDp
-    val isConnected = vpnState.status == VpnStatus.CONNECTED
-    val isPaused = vpnState.status == VpnStatus.PAUSED
+    val isConnected = dnsState.status == DnsStatus.CONNECTED
+    val isPaused = dnsState.status == DnsStatus.PAUSED
     val isActiveOrPaused = isConnected || isPaused
-    val overview = remember(allTimeTotal, allTimeBlocked, allTimeAllowed, vpnState.sessionTotalQueries, vpnState.sessionBlockedQueries, vpnState.sessionAllowedQueries, malwareBlocks, liveNetwork.threatsBlocked) {
+    val overview = remember(allTimeTotal, allTimeBlocked, allTimeAllowed, dnsState.sessionTotalQueries, dnsState.sessionBlockedQueries, dnsState.sessionAllowedQueries, malwareBlocks, liveNetwork.threatsBlocked) {
         DashboardPresentation.overview(
             allTimeTotal, allTimeBlocked, allTimeAllowed,
-            vpnState.sessionTotalQueries, vpnState.sessionBlockedQueries, vpnState.sessionAllowedQueries,
+            dnsState.sessionTotalQueries, dnsState.sessionBlockedQueries, dnsState.sessionAllowedQueries,
             malwareBlocks, liveNetwork.threatsBlocked
         )
     }
@@ -149,20 +149,20 @@ fun HomeScreen(
         }
     }
     val recentBlocked = blockedSegments.sumOf { it.value }
-    val statusColor = when (vpnState.status) {
-        VpnStatus.CONNECTED -> EmeraldPrimary
-        VpnStatus.PAUSED -> WarningAmber
-        VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
-        VpnStatus.ERROR -> AlertRed
-        VpnStatus.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
+    val statusColor = when (dnsState.status) {
+        DnsStatus.CONNECTED -> EmeraldPrimary
+        DnsStatus.PAUSED -> WarningAmber
+        DnsStatus.STARTING, DnsStatus.RECONNECTING -> CyberCyan
+        DnsStatus.ERROR -> AlertRed
+        DnsStatus.DISCONNECTED -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val statusLabel = when (vpnState.status) {
-        VpnStatus.CONNECTED -> "SYSTEM PROTECTED"
-        VpnStatus.PAUSED -> "FILTERING PAUSED"
-        VpnStatus.STARTING -> "STARTING PROTECTION"
-        VpnStatus.RECONNECTING -> "RECONNECTING"
-        VpnStatus.ERROR -> "NEEDS ATTENTION"
-        VpnStatus.DISCONNECTED -> "PROTECTION OFF"
+    val statusLabel = when (dnsState.status) {
+        DnsStatus.CONNECTED -> "SYSTEM PROTECTED"
+        DnsStatus.PAUSED -> "FILTERING PAUSED"
+        DnsStatus.STARTING -> "STARTING PROTECTION"
+        DnsStatus.RECONNECTING -> "RECONNECTING"
+        DnsStatus.ERROR -> "NEEDS ATTENTION"
+        DnsStatus.DISCONNECTED -> "PROTECTION OFF"
     }
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.US) }
 
@@ -229,23 +229,23 @@ fun HomeScreen(
             item(key = "shield") {
                 CyberPanel(
                     title = "Local threat shield",
-                    subtitle = "On-device DNS · ${settings.resolverConfig.protocol.label} · ${vpnState.activeNetworkLabel}",
+                    subtitle = "On-device DNS · ${settings.resolverConfig.protocol.label} · ${dnsState.activeNetworkLabel}",
                     trailing = { StatusPill(if (isConnected) "LIVE" else "IDLE", statusColor) }
                 ) {
                     ProtectionShield(
-                        status = vpnState.status,
+                        status = dnsState.status,
                         hasTraffic = liveNetwork.hasData,
                         threatSignals = liveNetwork.threatsBlocked.toInt(),
-                        onClick = { onToggleVpn(!isActiveOrPaused) },
+                        onClick = { onToggleProtection(!isActiveOrPaused) },
                         modifier = Modifier.fillMaxWidth().height(250.dp)
                     )
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(statusLabel, color = if (isConnected) EmeraldPrimary else statusColor, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 14.sp)
                         Text(
-                            text = when (vpnState.status) {
-                                VpnStatus.CONNECTED -> "DNS filtering active · ${formatInteger(vpnState.loadedRuleCount)} rules loaded"
-                                VpnStatus.PAUSED -> "Tunnel is paused. Resume to keep filtering."
-                                VpnStatus.ERROR -> vpnState.lastError ?: "The tunnel could not start."
+                            text = when (dnsState.status) {
+                                DnsStatus.CONNECTED -> "DNS filtering active · ${formatInteger(dnsState.loadedRuleCount)} rules loaded"
+                                DnsStatus.PAUSED -> "DNS filtering is paused. Resume to keep blocking."
+                                DnsStatus.ERROR -> dnsState.lastError ?: "DNS protection could not start."
                                 else -> "Tap the shield or the button to start non-root DNS protection."
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -254,7 +254,7 @@ fun HomeScreen(
                         )
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
-                                onClick = { onToggleVpn(!isActiveOrPaused) },
+                                onClick = { onToggleProtection(!isActiveOrPaused) },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = if (isActiveOrPaused) AlertRed.copy(alpha = 0.85f) else ElectricBlue)
                             ) {
@@ -262,7 +262,7 @@ fun HomeScreen(
                                 Spacer(Modifier.width(6.dp))
                                 Text(if (isActiveOrPaused) "Turn off" else "Protect device", maxLines = 1)
                             }
-                            OutlinedButton(onClick = onPauseResumeVpn, enabled = isActiveOrPaused, modifier = Modifier.weight(1f)) {
+                            OutlinedButton(onClick = onPauseResumeProtection, enabled = isActiveOrPaused, modifier = Modifier.weight(1f)) {
                                 Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text(if (isPaused) "Resume" else "Pause", maxLines = 1)
@@ -349,7 +349,7 @@ fun HomeScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             DetectionRow("DNS filter", if (isConnected) "Active" else "Standby", isConnected)
-                            DetectionRow("Threat lists", if (vpnState.loadedRuleCount > 0) "Loaded" else "Loading", vpnState.loadedRuleCount > 0)
+                            DetectionRow("Threat lists", if (dnsState.loadedRuleCount > 0) "Loaded" else "Loading", dnsState.loadedRuleCount > 0)
                             DetectionRow("Browser shield", if (settings.browserCosmeticFilteringEnabled) "Enabled" else "Off", settings.browserCosmeticFilteringEnabled)
                             DetectionRow("Offline baseline", "Bundled", true)
                         }
@@ -405,9 +405,9 @@ fun HomeScreen(
                 ResponsiveMetrics(
                     columns = 3,
                     metrics = listOf(
-                        MetricSpec("DNS tunnel", if (isConnected) "Active" else if (isPaused) "Paused" else "Off", vpnState.activeNetworkLabel, if (isConnected) EmeraldPrimary else WarningAmber),
-                        MetricSpec("Filter core", formatInteger(vpnState.loadedRuleCount), "rules in memory", SkyBlueGlow),
-                        MetricSpec("Resolver", if (vpnState.averageLatencyMs > 0) "${vpnState.averageLatencyMs} ms" else "—", settings.resolverConfig.protocol.label, CyberCyan)
+                        MetricSpec("DNS filter", if (isConnected) "Active" else if (isPaused) "Paused" else "Off", dnsState.activeNetworkLabel, if (isConnected) EmeraldPrimary else WarningAmber),
+                        MetricSpec("Filter core", formatInteger(dnsState.loadedRuleCount), "rules in memory", SkyBlueGlow),
+                        MetricSpec("Resolver", if (dnsState.averageLatencyMs > 0) "${dnsState.averageLatencyMs} ms" else "—", settings.resolverConfig.protocol.label, CyberCyan)
                     )
                 )
             }
@@ -418,7 +418,7 @@ fun HomeScreen(
                         PrivacyBadge("Local only", Icons.Default.Lock, true, Modifier.weight(1f))
                         PrivacyBadge("No root", Icons.Default.Shield, true, Modifier.weight(1f))
                         PrivacyBadge("No MITM", Icons.Default.Https, true, Modifier.weight(1f))
-                        PrivacyBadge("Offline rules", Icons.Default.OfflineBolt, vpnState.loadedRuleCount > 0, Modifier.weight(1f))
+                        PrivacyBadge("Offline rules", Icons.Default.OfflineBolt, dnsState.loadedRuleCount > 0, Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(onClick = onOpenStatusTab, modifier = Modifier.fillMaxWidth()) {

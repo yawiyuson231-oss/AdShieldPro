@@ -17,7 +17,15 @@ enum class ProtectionMode(
     val subtitle: String,
     val warningNote: String?,
     val activeCategories: Set<RuleCategory>,
-    val blockSinkholeZeroIp: Boolean
+    val blockSinkholeZeroIp: Boolean,
+    /**
+     * Whether a first-party host that resolves through a blocked tracker is blocked as well.
+     *
+     * Off for the balanced modes: the lookup is legal, and refusing it can break a site that
+     * genuinely relies on the third party. On for the aggressive modes, which already warn about
+     * compatibility risk.
+     */
+    val enforceCnameCloaking: Boolean = false
 ) {
     STANDARD(
         title = "Standard Mode",
@@ -37,7 +45,8 @@ enum class ProtectionMode(
             RuleCategory.STRICT_TELEMETRY,
             RuleCategory.CUSTOM
         ),
-        blockSinkholeZeroIp = true
+        blockSinkholeZeroIp = true,
+        enforceCnameCloaking = true
     ),
     PRIVACY(
         title = "Privacy Mode",
@@ -57,7 +66,8 @@ enum class ProtectionMode(
             RuleCategory.STRICT_TELEMETRY,
             RuleCategory.CUSTOM
         ),
-        blockSinkholeZeroIp = true
+        blockSinkholeZeroIp = true,
+        enforceCnameCloaking = true
     )
 }
 
@@ -267,7 +277,7 @@ enum class NetworkTransportPolicy(val label: String) {
     WIFI("Wi-Fi"),
     CELLULAR("Mobile data"),
     ETHERNET("Ethernet"),
-    OTHER("Other / VPN")
+    OTHER("Other networks")
 }
 
 @Serializable

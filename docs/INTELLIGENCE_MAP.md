@@ -13,7 +13,7 @@ Shipped in **AdShield Pro 2.9.0** (schema v4). Open it from the **Intel** tab in
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Module services (real observations only)                            │
-│  AdShieldVpnService ─┐                                               │
+│  AdShieldDnsService ─┐                                               │
 │  ScanJournalStore   ─┤   IntelligenceEventFactory                    │
 │  BatteryTelemetry   ─┼──► (evidence required, or no event)           │
 │  WorkManager jobs   ─┤                                               │
@@ -60,7 +60,7 @@ live state flow → map UI**.
 | Cyber Defense | `SecurityEngine`, `ScanJournalStore` (FILE/APK/non-payment URL scans), `QuarantineManager` | A scan verdict < 24 h: SUSPICIOUS → WARNING, DANGEROUS → CRITICAL |
 | Financial Defense | `UrlThreatScanner` results for links the user scanned, attributed by `FinancialTargetClassifier` | Risky payment link < 24 h |
 | Privacy Defense | Installed-app audits (`ScanKind.APP_AUDIT`), browser privacy toggles, per-app DNS rules, tracker blocks from the DNS log | Elevation findings < 24 h; DISABLED when both browser shields are off |
-| Network Defense | `VpnRuntimeState`, loaded rule count, resolver config, session counters, malware/phishing DNS blocks | Tunnel error → CRITICAL, paused/zero rules → WARNING, user-off → DISABLED |
+| Network Defense | `DnsRuntimeState`, loaded rule count, resolver config, session counters, malware/phishing DNS blocks | Tunnel error → CRITICAL, paused/zero rules → WARNING, user-off → DISABLED |
 | Device Intelligence | `BatteryIntelligenceRepository` (real `ACTION_BATTERY_CHANGED` readings) | Temperature ≥ configured threshold → WARNING, +3 °C or hardware health fault → CRITICAL; OFFLINE when the sensor is unsupported |
 | Emergency Intelligence | VPN state, rule count, resolver config, `emergencyAllowlistOnly` policy | Lockdown without a tunnel → CRITICAL; lockdown active or readiness < 100 % → WARNING |
 | Automation Core | WorkManager results (filter sync, scheduled scan, smart maintenance, cloud backup, retention) + automation settings | One failure in 24 h → WARNING, two or more → CRITICAL; all automations off → DISABLED |

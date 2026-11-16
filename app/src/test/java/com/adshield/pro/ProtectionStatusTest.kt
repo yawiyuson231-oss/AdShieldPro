@@ -9,8 +9,8 @@ import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.domain.model.ProtectionMode
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.dns.DnsProviderHealth
 import com.adshield.pro.ui.model.ProtectionStatusEvaluator
 import com.adshield.pro.ui.model.StageState
@@ -31,8 +31,8 @@ class ProtectionStatusTest {
         sessionCached: Long = 100L,
         latency: Int = 38,
         config: DnsResolverConfig = DnsResolverConfig(preset = DnsProviderPreset.CLOUDFLARE, protocol = DnsProtocol.DOH)
-    ) = VpnRuntimeState(
-        status = VpnStatus.CONNECTED,
+    ) = DnsRuntimeState(
+        status = DnsStatus.CONNECTED,
         connectedSinceEpochMs = now - 125_000L,
         activeMode = ProtectionMode.STANDARD,
         resolverConfig = config,
@@ -103,24 +103,24 @@ class ProtectionStatusTest {
     @Test
     fun pausedAndOfflineStatesNeverClaimProtection() {
         val paused = ProtectionStatusEvaluator.evaluate(
-            connected().copy(status = VpnStatus.PAUSED), AppSettingsState(), emptyList(), now
+            connected().copy(status = DnsStatus.PAUSED), AppSettingsState(), emptyList(), now
         )
         assertEquals(StageState.ATTENTION, paused.overall)
         assertEquals("FILTERING PAUSED", paused.headline)
         assertEquals(0, paused.healthScore)
         assertFalse(paused.isLive)
 
-        val off = ProtectionStatusEvaluator.evaluate(VpnRuntimeState(), AppSettingsState(), emptyList(), now)
+        val off = ProtectionStatusEvaluator.evaluate(DnsRuntimeState(), AppSettingsState(), emptyList(), now)
         assertEquals(StageState.OFFLINE, off.overall)
         assertEquals("PROTECTION OFF", off.headline)
         assertEquals(0, off.healthScore)
 
         val error = ProtectionStatusEvaluator.evaluate(
-            VpnRuntimeState(status = VpnStatus.ERROR, lastError = "VPN consent revoked"),
+            DnsRuntimeState(status = DnsStatus.ERROR, lastError = "DNS consent revoked"),
             AppSettingsState(), emptyList(), now
         )
         assertEquals("NEEDS ATTENTION", error.headline)
-        assertTrue(error.stages.first { it.id == "tunnel" }.detail.contains("VPN consent revoked"))
+        assertTrue(error.stages.first { it.id == "tunnel" }.detail.contains("DNS consent revoked"))
     }
 
     @Test
@@ -161,17 +161,17 @@ class ProtectionStatusTest {
     @Test
     fun pausedOrStartingWithEmergencyModeDoesNotClaimLockdownIsActive() {
         val settings = AppSettingsState(dnsFirewallPolicy = DnsFirewallPolicy(emergencyAllowlistOnly = true))
-        val paused = ProtectionStatusEvaluator.evaluate(connected().copy(status = VpnStatus.PAUSED), settings, emptyList(), now)
+        val paused = ProtectionStatusEvaluator.evaluate(connected().copy(status = DnsStatus.PAUSED), settings, emptyList(), now)
         assertEquals("FILTERING PAUSED", paused.headline)
         assertEquals(StageState.STANDBY, paused.stages.first { it.id == "policy" }.state)
-        val starting = ProtectionStatusEvaluator.evaluate(connected().copy(status = VpnStatus.STARTING), settings, emptyList(), now)
+        val starting = ProtectionStatusEvaluator.evaluate(connected().copy(status = DnsStatus.STARTING), settings, emptyList(), now)
         assertEquals(StageState.STANDBY, starting.overall)
         assertEquals("STARTING", starting.headline)
     }
 
     @Test
     fun disconnectedDoesNotShowAStaleError() {
-        val status = ProtectionStatusEvaluator.evaluate(VpnRuntimeState(lastError = "old error"), AppSettingsState(), emptyList(), now)
+        val status = ProtectionStatusEvaluator.evaluate(DnsRuntimeState(lastError = "old error"), AppSettingsState(), emptyList(), now)
         assertEquals("Turn on protection to start filtering DNS", status.summary)
         assertEquals(StageState.STANDBY, status.stages.first { it.id == "policy" }.state)
     }

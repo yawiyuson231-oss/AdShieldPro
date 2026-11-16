@@ -11,7 +11,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceModuleState
 import com.adshield.pro.domain.intelligence.IntelligenceSeverity
 import com.adshield.pro.domain.intelligence.IntelligenceSystemState
 import com.adshield.pro.domain.intelligence.ModuleSnapshot
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.battery.BatteryHealthStatus
 import com.adshield.pro.engine.battery.BatteryReadingSource
 import com.adshield.pro.engine.security.ScanKind
@@ -22,7 +22,7 @@ import kotlin.math.roundToInt
  * Pure derivation of the whole map state from real inputs + stored events.
  *
  * The aggregator never invents an event. When a module has no stored event it may still be in
- * WARNING/CRITICAL because a *live measured reading* says so (battery temperature, VPN state,
+ * WARNING/CRITICAL because a *live measured reading* says so (battery temperature, DNS status,
  * missing rules). Those cases are surfaced as derived incidents, which is why the command panel
  * and the node can never disagree.
  */
@@ -283,18 +283,18 @@ object IntelligenceAggregator {
         val state: IntelligenceModuleState
         val detail: String
         val unavailable: String?
-        when (inputs.vpnStatus) {
-            VpnStatus.ERROR -> {
+        when (inputs.dnsStatus) {
+            DnsStatus.ERROR -> {
                 state = IntelligenceModuleState.CRITICAL
-                detail = inputs.vpnLastError?.take(140) ?: "The local DNS tunnel reported an error"
+                detail = inputs.dnsLastError?.take(140) ?: "The local DNS tunnel reported an error"
                 unavailable = null
             }
-            VpnStatus.PAUSED -> {
+            DnsStatus.PAUSED -> {
                 state = IntelligenceModuleState.WARNING
                 detail = "Tunnel up, DNS passing through unfiltered"
                 unavailable = null
             }
-            VpnStatus.DISCONNECTED -> {
+            DnsStatus.DISCONNECTED -> {
                 if (inputs.protectionExpected) {
                     state = IntelligenceModuleState.CRITICAL
                     detail = "Protection is configured to stay on but the tunnel is down"
@@ -304,7 +304,7 @@ object IntelligenceAggregator {
                 }
                 unavailable = null
             }
-            VpnStatus.CONNECTED -> {
+            DnsStatus.CONNECTED -> {
                 if (inputs.loadedRuleCount <= 0) {
                     state = IntelligenceModuleState.WARNING
                     detail = "Tunnel is up but no filter rules are loaded"
@@ -315,9 +315,9 @@ object IntelligenceAggregator {
                 }
                 unavailable = null
             }
-            VpnStatus.STARTING, VpnStatus.RECONNECTING -> {
+            DnsStatus.STARTING, DnsStatus.RECONNECTING -> {
                 state = IntelligenceModuleState.MONITORING
-                detail = "Tunnel is ${inputs.vpnStatus.name.lowercase()} — no verdict yet"
+                detail = "Tunnel is ${inputs.dnsStatus.name.lowercase()} — no verdict yet"
                 unavailable = null
             }
         }
@@ -448,7 +448,7 @@ object IntelligenceAggregator {
         var state = IntelligenceModuleState.NORMAL
         var detail = "Readiness $readinessPercent% · ${checks.size} checks passed"
         when {
-            inputs.emergencyAllowlistOnly && inputs.vpnStatus != VpnStatus.CONNECTED -> {
+            inputs.emergencyAllowlistOnly && inputs.dnsStatus != DnsStatus.CONNECTED -> {
                 state = IntelligenceModuleState.CRITICAL
                 detail = "Lockdown is active but the DNS tunnel is not connected"
             }
@@ -456,7 +456,7 @@ object IntelligenceAggregator {
                 state = IntelligenceModuleState.WARNING
                 detail = "Allowlist-only lockdown is active by user choice"
             }
-            inputs.vpnStatus == VpnStatus.ERROR -> {
+            inputs.dnsStatus == DnsStatus.ERROR -> {
                 state = IntelligenceModuleState.CRITICAL
                 detail = "The tunnel cannot start; lockdown would not filter anything"
             }
@@ -483,7 +483,7 @@ object IntelligenceAggregator {
                     if (inputs.emergencyAllowlistOnly) "ACTIVE" else "OFF",
                     IntelligenceMetricSource.CONFIGURED
                 ),
-                metric("Tunnel", inputs.vpnStatus.name, IntelligenceMetricSource.MEASURED),
+                metric("Tunnel", inputs.dnsStatus.name, IntelligenceMetricSource.MEASURED),
                 metric("Rules", inputs.loadedRuleCount.toString(), IntelligenceMetricSource.MEASURED),
                 metric("Checks failed", failed.size.toString(), IntelligenceMetricSource.COMPUTED)
             ),
@@ -651,20 +651,20 @@ object IntelligenceAggregator {
             result += IntelligenceIncident(module, severity, title, detail, now, null)
         }
 
-        when (inputs.vpnStatus) {
-            VpnStatus.ERROR -> add(
+        when (inputs.dnsStatus) {
+            DnsStatus.ERROR -> add(
                 IntelligenceModule.NETWORK_DEFENSE,
                 IntelligenceSeverity.CRITICAL,
                 "DNS tunnel error",
-                inputs.vpnLastError?.take(160) ?: "The local DNS tunnel reported an error"
+                inputs.dnsLastError?.take(160) ?: "The local DNS tunnel reported an error"
             )
-            VpnStatus.PAUSED -> add(
+            DnsStatus.PAUSED -> add(
                 IntelligenceModule.NETWORK_DEFENSE,
                 IntelligenceSeverity.WARNING,
                 "DNS filtering paused",
                 "Queries are not being filtered while the tunnel is paused"
             )
-            VpnStatus.DISCONNECTED -> if (inputs.protectionExpected) {
+            DnsStatus.DISCONNECTED -> if (inputs.protectionExpected) {
                 add(
                     IntelligenceModule.NETWORK_DEFENSE,
                     IntelligenceSeverity.CRITICAL,
@@ -672,7 +672,7 @@ object IntelligenceAggregator {
                     "Protection should be running but no DNS tunnel is connected"
                 )
             }
-            VpnStatus.CONNECTED -> if (inputs.loadedRuleCount <= 0) {
+            DnsStatus.CONNECTED -> if (inputs.loadedRuleCount <= 0) {
                 add(
                     IntelligenceModule.NETWORK_DEFENSE,
                     IntelligenceSeverity.WARNING,
@@ -706,17 +706,17 @@ object IntelligenceAggregator {
         if (inputs.emergencyAllowlistOnly) {
             add(
                 IntelligenceModule.EMERGENCY_INTELLIGENCE,
-                if (inputs.vpnStatus == VpnStatus.CONNECTED) IntelligenceSeverity.WARNING else IntelligenceSeverity.CRITICAL,
+                if (inputs.dnsStatus == DnsStatus.CONNECTED) IntelligenceSeverity.WARNING else IntelligenceSeverity.CRITICAL,
                 "Emergency lockdown active",
-                if (inputs.vpnStatus == VpnStatus.CONNECTED) {
+                if (inputs.dnsStatus == DnsStatus.CONNECTED) {
                     "Only explicit allowlist entries resolve until lockdown is released"
                 } else {
                     "Lockdown is armed but the tunnel is not filtering anything"
                 }
             )
-        } else if (inputs.vpnStatus == VpnStatus.CONNECTED && inputs.loadedRuleCount > 0) {
+        } else if (inputs.dnsStatus == DnsStatus.CONNECTED && inputs.loadedRuleCount > 0) {
             // Ready; nothing to derive.
-        } else if (inputs.vpnStatus != VpnStatus.ERROR) {
+        } else if (inputs.dnsStatus != DnsStatus.ERROR) {
             add(
                 IntelligenceModule.EMERGENCY_INTELLIGENCE,
                 IntelligenceSeverity.WARNING,
@@ -847,13 +847,13 @@ object IntelligenceAggregator {
         metric("System health", "$health%", IntelligenceMetricSource.COMPUTED),
         metric(
             "DNS protection",
-            when (inputs.vpnStatus) {
-                VpnStatus.CONNECTED -> "ACTIVE"
-                VpnStatus.PAUSED -> "PAUSED"
-                VpnStatus.ERROR -> "ERROR"
-                VpnStatus.STARTING -> "STARTING"
-                VpnStatus.RECONNECTING -> "RECONNECTING"
-                VpnStatus.DISCONNECTED -> "OFF"
+            when (inputs.dnsStatus) {
+                DnsStatus.CONNECTED -> "ACTIVE"
+                DnsStatus.PAUSED -> "PAUSED"
+                DnsStatus.ERROR -> "ERROR"
+                DnsStatus.STARTING -> "STARTING"
+                DnsStatus.RECONNECTING -> "RECONNECTING"
+                DnsStatus.DISCONNECTED -> "OFF"
             },
             IntelligenceMetricSource.MEASURED
         ),
@@ -879,7 +879,7 @@ object IntelligenceAggregator {
 
     /** A readiness checklist built only from state the app can actually verify. */
     fun readinessChecks(inputs: IntelligenceInputs): List<Pair<String, Boolean>> = listOf(
-        "DNS tunnel connected" to (inputs.vpnStatus == VpnStatus.CONNECTED),
+        "DNS tunnel connected" to (inputs.dnsStatus == DnsStatus.CONNECTED),
         "Filter rules loaded" to (inputs.loadedRuleCount > 0),
         "Resolver configured" to inputs.resolverLabel.isNotBlank(),
         "Emergency policy readable" to true

@@ -274,7 +274,9 @@ test or stable, can upgrade to it in place.
 
 ## What AdShield Pro does
 
-- **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
+- **Device-wide DNS filtering:** Run a local DNS service (built on Android's `VpnService`) that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server. The app's own UI calls this "DNS protection", because Android only exposes another app's DNS through the VPN permission.
+- **See how protection actually works:** An in-app explainer (Settings → How protection works) shows the exact two addresses routed into the local DNS tunnel, why Android displays a VPN key, what changes per protection mode, and the honest limits — no IP masking, no HTTPS inspection, no filtering of hardcoded IPs.
+- **Close CNAME cloaking:** A first-party host that quietly resolves through a blocked tracker is blocked too — in Strict and Custom modes only, because balanced modes must not break a site that genuinely depends on a third party.
 - **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
 - **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.
 - **Use the built-in Privacy Browser:** Filter browser requests, remove common tracking query parameters, block pop-ups, manage third-party cookies, and apply cosmetic hiding rules inside this browser.
@@ -297,8 +299,8 @@ Everything needed is pinned in the repository (Gradle 9.7.1 wrapper, AGP 9.4.1, 
 ```
 
 The JVM suite (`AdShieldEngineTestSuite`, `SecurityCenterTestSuite`, `BatteryIntelligenceTestSuite`,
-`AetherCoreTest`, `DashboardPresentationTest`, `PrivateSearchTest`, `ScanJournalTest`
-and `CapabilityRegistryTest`) covers DNS
+`AetherCoreTest`, `DashboardPresentationTest`, `PrivateSearchTest`, `ScanJournalTest`,
+`ProtectionExplainerTest` and `CapabilityRegistryTest`) covers DNS
 wire-format parsing, UDP/TCP packet framing and checksums, upstream response validation and cache
 policy, UDP truncation and TCP segmentation limits, the filter rule engine, the browser blocker, and
 in-app update asset selection (release APK over debug/split APKs), the battery power/rate maths and
@@ -321,6 +323,12 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
 
 ## Technical architecture
 
+**Naming:** the app and its code call this feature *DNS protection*. Android exposes the
+underlying capability only through `VpnService`, so the manifest declares
+`BIND_VPN_SERVICE`, the one-time system prompt says "VPN", and Android draws a VPN key
+while filtering is active. Those platform strings cannot be renamed by the app.
+
+
 ### Layer 1 — Device-Wide Wire-Format DNS Engine (`engine/dns/`)
 - **`DnsPacketCodec.kt`**: Full RFC 1035 / RFC 3596 wire-format DNS parser and response synthesizer. Supports IPv4 (`A`) and IPv6 (`AAAA`), `CNAME`, `HTTPS`, `SVCB`, `TXT`, and `MX` queries. Hardened against truncated headers and malicious cyclic compression pointer loops (`0xC0`).
 - **`IpPacketFraming.kt`**: Full IPv4 and IPv6 packet parser and response builder supporting both **UDP (Port 53)** and **TCP (Port 53)** with RFC 1071 and RFC 8200 pseudo-header checksums.
@@ -330,7 +338,7 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
   - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
   - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
 
-### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
+### Layer 2 — High-Throughput Local DNS Service (`service/AdShieldDnsService.kt`, Android `VpnService`)
 - **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.
 - **Loop Prevention**: Protects all upstream DoH, DoT, and UDP/TCP sockets via `VpnService.protect(socket)` and excludes `com.adshield.pro` from the tunnel.
 - **Per-App Split Tunneling**: Supports per-app VPN exclusion via `VpnService.Builder.addDisallowedApplication()`.
@@ -387,12 +395,12 @@ PROJECT/
 │       │       │   ├── local/preferences/UserPreferencesRepository.kt
 │       │       │   └── repository/AdShieldRepository.kt
 │       │       ├── di/AppModule.kt
-│       │       ├── domain/model/ (ProtectionModels.kt, RuleAndVpnModels.kt, StatsAndBillingModels.kt)
+│       │       ├── domain/model/ (ProtectionModels.kt, RuleAndDnsModels.kt, StatsAndBillingModels.kt)
 │       │       ├── engine/
 │       │       │   ├── browser/BrowserContentBlocker.kt
 │       │       │   ├── dns/ (DnsPacketCodec.kt, IpPacketFraming.kt, UpstreamDnsResolver.kt)
 │       │       │   └── filter/FilterRuleEngine.kt
-│       │       ├── service/ (AdShieldVpnService.kt, BootCompletedReceiver.kt)
+│       │       ├── service/ (AdShieldDnsService.kt, BootCompletedReceiver.kt)
 │       │       ├── ui/
 │       │       │   ├── screens/ (HomeScreen, ActivityScreen, FiltersScreen, RulesScreen, BrowserScreen, SettingsScreen)
 │       │       │   ├── theme/Theme.kt

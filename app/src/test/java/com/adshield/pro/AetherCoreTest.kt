@@ -5,8 +5,8 @@ import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.DomainBlockCount
 import com.adshield.pro.domain.model.FilterEvaluationResult
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.aether.AetherAction
 import com.adshield.pro.engine.aether.AetherCore
 import com.adshield.pro.engine.aether.DomainRiskAnalyzer
@@ -246,7 +246,7 @@ class AetherCoreTest {
 
     @Test
     fun testLiveSnapshot_isBuiltOnlyFromRealLogs() {
-        val empty = LiveNetworkModel.snapshot(VpnRuntimeState(status = VpnStatus.CONNECTED), emptyList(), emptyList(), emptyList())
+        val empty = LiveNetworkModel.snapshot(DnsRuntimeState(status = DnsStatus.CONNECTED), emptyList(), emptyList(), emptyList())
         assertFalse(empty.hasData)
         assertNotNull(empty.emptyReason)
         assertEquals(0, empty.totalQueries)
@@ -258,7 +258,7 @@ class AetherCoreTest {
             record("news.test", blocked = false, category = null, latency = 120)
         )
         val snapshot = LiveNetworkModel.snapshot(
-            VpnRuntimeState(status = VpnStatus.CONNECTED),
+            DnsRuntimeState(status = DnsStatus.CONNECTED),
             logs,
             listOf(AppDnsActivity("com.app", "App", 10, 3)),
             listOf(DomainBlockCount("ads.test", "ADS", 5))
@@ -276,15 +276,15 @@ class AetherCoreTest {
 
     @Test
     fun testConnectionHealth_isHonestAboutMissingData() {
-        val idle = LiveNetworkModel.snapshot(VpnRuntimeState(status = VpnStatus.CONNECTED), emptyList(), emptyList(), emptyList())
+        val idle = LiveNetworkModel.snapshot(DnsRuntimeState(status = DnsStatus.CONNECTED), emptyList(), emptyList(), emptyList())
         assertTrue("an idle tunnel is not a failure", idle.connectionHealth.isHealthy)
         assertTrue(idle.connectionHealth.label.contains("Waiting", ignoreCase = true))
 
-        val off = LiveNetworkModel.snapshot(VpnRuntimeState(status = VpnStatus.DISCONNECTED), emptyList(), emptyList(), emptyList())
+        val off = LiveNetworkModel.snapshot(DnsRuntimeState(status = DnsStatus.DISCONNECTED), emptyList(), emptyList(), emptyList())
         assertFalse(off.connectionHealth.isHealthy)
 
         val slow = LiveNetworkModel.snapshot(
-            VpnRuntimeState(status = VpnStatus.CONNECTED),
+            DnsRuntimeState(status = DnsStatus.CONNECTED),
             listOf(record("a.test", false, null, latency = 900), record("b.test", false, null, latency = 800)),
             emptyList(), emptyList()
         )

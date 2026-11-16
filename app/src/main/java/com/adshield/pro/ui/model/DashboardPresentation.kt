@@ -2,7 +2,7 @@ package com.adshield.pro.ui.model
 
 import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import kotlin.math.roundToInt
 
 /**
@@ -77,8 +77,8 @@ object DashboardPresentation {
     }
 
     /** Motion is a comfort feature, not a data source: never animate an idle or disconnected shield. */
-    fun shouldAnimate(status: VpnStatus, hasTraffic: Boolean, systemAnimationsEnabled: Boolean): Boolean =
-        systemAnimationsEnabled && status == VpnStatus.CONNECTED && hasTraffic
+    fun shouldAnimate(status: DnsStatus, hasTraffic: Boolean, systemAnimationsEnabled: Boolean): Boolean =
+        systemAnimationsEnabled && status == DnsStatus.CONNECTED && hasTraffic
 
     /** Keeps the selected bottom-nav item near the middle of the scrollable bar. */
     fun navScrollTarget(selectedIndex: Int, visibleItems: Int): Int =

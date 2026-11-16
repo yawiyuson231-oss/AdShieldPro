@@ -4,8 +4,8 @@ import com.adshield.pro.domain.model.AppDnsActivity
 import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.DomainBlockCount
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.ui.model.DashboardPresentation
 import org.junit.Assert.assertEquals
@@ -119,11 +119,11 @@ class DashboardPresentationTest {
 
     @Test
     fun motionRequiresConnectedTunnelRealTrafficAndSystemAnimations() {
-        assertTrue(DashboardPresentation.shouldAnimate(VpnStatus.CONNECTED, true, true))
-        assertFalse(DashboardPresentation.shouldAnimate(VpnStatus.CONNECTED, false, true))
-        assertFalse(DashboardPresentation.shouldAnimate(VpnStatus.PAUSED, true, true))
-        assertFalse(DashboardPresentation.shouldAnimate(VpnStatus.DISCONNECTED, true, true))
-        assertFalse(DashboardPresentation.shouldAnimate(VpnStatus.CONNECTED, true, false))
+        assertTrue(DashboardPresentation.shouldAnimate(DnsStatus.CONNECTED, true, true))
+        assertFalse(DashboardPresentation.shouldAnimate(DnsStatus.CONNECTED, false, true))
+        assertFalse(DashboardPresentation.shouldAnimate(DnsStatus.PAUSED, true, true))
+        assertFalse(DashboardPresentation.shouldAnimate(DnsStatus.DISCONNECTED, true, true))
+        assertFalse(DashboardPresentation.shouldAnimate(DnsStatus.CONNECTED, true, false))
     }
 
     @Test
@@ -145,7 +145,7 @@ class DashboardPresentationTest {
     @Test
     fun liveEventsKeepDatabaseIdsForStableLazyKeys() {
         val snapshot = LiveNetworkModel.snapshot(
-            VpnRuntimeState(status = VpnStatus.CONNECTED),
+            DnsRuntimeState(status = DnsStatus.CONNECTED),
             listOf(record(id = 7), record(id = 8, blocked = false, category = null)),
             emptyList<AppDnsActivity>(),
             emptyList<DomainBlockCount>()
@@ -157,11 +157,11 @@ class DashboardPresentationTest {
     @Test
     fun idleLiveSnapshotDoesNotPretendToHaveTraffic() {
         val snapshot = LiveNetworkModel.snapshot(
-            VpnRuntimeState(status = VpnStatus.CONNECTED),
+            DnsRuntimeState(status = DnsStatus.CONNECTED),
             emptyList(), emptyList(), emptyList()
         )
         assertFalse(snapshot.hasData)
         assertTrue(snapshot.emptyReason!!.contains("idle"))
-        assertFalse(DashboardPresentation.shouldAnimate(VpnStatus.CONNECTED, snapshot.hasData, true))
+        assertFalse(DashboardPresentation.shouldAnimate(DnsStatus.CONNECTED, snapshot.hasData, true))
     }
 }

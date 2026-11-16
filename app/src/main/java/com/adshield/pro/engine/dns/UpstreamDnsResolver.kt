@@ -85,7 +85,7 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     private var currentDatagramProtector: ((DatagramSocket) -> Boolean)? = null
 
-    fun bindVpnSocketProtectors(
+    fun bindSocketProtectors(
         protectTcp: ((Socket) -> Boolean)?,
         protectUdp: ((DatagramSocket) -> Boolean)?
     ) {
@@ -145,7 +145,7 @@ class UpstreamDnsResolver @Inject constructor(
 
     /**
      * Bootstrap DNS resolver for DoH endpoints so OkHttp never triggers a recursive DNS lookup
-     * through the VPN tunnel when resolving well-known DoH hostnames.
+     * through the local DNS tunnel when resolving well-known DoH hostnames.
      *
      * The lookup itself is wrapped in a hard bound. `InetAddress.getByName("1.1.1.1")`
      * performs a *reverse* lookup when the string is not a literal, and Dns.SYSTEM

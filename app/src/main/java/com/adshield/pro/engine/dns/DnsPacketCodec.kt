@@ -363,6 +363,49 @@ object DnsPacketCodec {
         return if (offset == message.size) types else null
     }
 
+    /**
+     * Collects the CNAME targets of a response, in record order, up to [maxTargets].
+     *
+     * Returns an empty list when the answer contains no CNAME, and null when the message is not
+     * a well-formed response. Callers must treat null as "cannot judge" and never enforce a
+     * cloaking decision on data this parser could not fully walk.
+     */
+    fun extractCnameTargets(message: ByteArray, maxTargets: Int = 8): List<String>? {
+        if (message.size < 12) return null
+        if ((u16At(message, 2) and 0x8000) == 0) return null // not a response
+        val questionCount = u16At(message, 4)
+        val recordCount = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
+        if (questionCount != 1 || recordCount > 4096) return null
+
+        var offset = 12
+        val question = readDomainName(message, 0, offset, message.size) ?: return null
+        offset = question.nextOffset + 4
+        if (offset > message.size) return null
+
+        val targets = mutableListOf<String>()
+        repeat(recordCount) {
+            val owner = readDomainName(message, 0, offset, message.size) ?: return null
+            offset = owner.nextOffset
+            if (offset + 10 > message.size) return null
+            val type = u16At(message, offset)
+            val rdLength = u16At(message, offset + 8)
+            val rdStart = offset + 10
+            val rdEnd = rdStart + rdLength
+            if (rdEnd > message.size) return null
+            if (type == TYPE_CNAME && rdLength > 0 && targets.size < maxTargets) {
+                val target = readDomainName(message, 0, rdStart, message.size) ?: return null
+                // A compressed target ends two bytes into RDATA; an uncompressed one must end
+                // exactly at the RDATA boundary. Anything else is a parser differential.
+                if (target.nextOffset > rdEnd) return null
+                if (target.domain.isNotBlank()) targets += target.domain.lowercase()
+            }
+            offset = rdEnd
+        }
+        // Trailing bytes would let two parsers disagree about the same message.
+        if (offset != message.size) return null
+        return targets
+    }
+
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
 

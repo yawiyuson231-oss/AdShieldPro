@@ -36,7 +36,7 @@ data class AppExclusionInfo(
     val packageName: String,
     val appName: String,
     val isSystemApp: Boolean,
-    val isExcludedFromVpn: Boolean,
+    val isExcludedFromFiltering: Boolean,
     val dnsPolicy: AppDnsPolicy = AppDnsPolicy.DEFAULT,
     val usesFirstPartyMultiplexedAds: Boolean,
     val compatibilityNote: String?

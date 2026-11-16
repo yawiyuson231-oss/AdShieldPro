@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
  * Isolated Room SQLite store (`world_monitor_2035.db`) for OMNISHIELD X INFINITY — WORLD MONITOR.
  *
  * Kept separate from [com.adshield.pro.data.local.db.AdShieldDatabase] so high-volume geospatial
- * tile/entity caching never contends with foreground DNS-VPN writes or alters existing app schemas.
+ * tile/entity caching never contends with foreground DNS writes or alters existing app schemas.
  */
 @Database(
     entities = [

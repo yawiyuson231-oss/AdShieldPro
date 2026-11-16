@@ -38,7 +38,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
         super.onCreate()
         // Process-lifetime observation of real telemetry and settings transitions. This does not
         // request background execution: it stops with the process, while DNS protection continues
-        // to run in the foreground VPN service regardless of whether the map is open.
+        // to run in the foreground DNS service regardless of whether the map is open.
         intelligenceMonitor.start()
         IntelligenceRetentionWorker.schedule(this)
         ConnectorSyncWorker.schedule(this)

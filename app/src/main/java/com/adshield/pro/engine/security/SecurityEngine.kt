@@ -189,17 +189,17 @@ class SecurityEngine @Inject constructor(
         fun buildSecurityPosture(
             highRiskApps: Int,
             threatSignatures: Int,
-            vpnActive: Boolean
+            dnsActive: Boolean
         ): SecurityPosture {
             var score = 100
-            if (!vpnActive) score -= 40
+            if (!dnsActive) score -= 40
             score -= (highRiskApps * 12).coerceAtMost(36)
             if (threatSignatures < 1000) score -= 15
             return SecurityPosture(
                 protectionScore = score.coerceIn(0, 100),
                 highRiskApps = highRiskApps,
                 threatSignatures = threatSignatures,
-                webProtectionActive = vpnActive && threatSignatures > 0
+                webProtectionActive = dnsActive && threatSignatures > 0
             )
         }
     }

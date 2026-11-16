@@ -1,7 +1,7 @@
 package com.adshield.pro.domain.intelligence
 
 import com.adshield.pro.domain.model.ProtectionMode
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.security.QuarantinedItem
 import com.adshield.pro.engine.security.SecurityScanRecord
@@ -294,7 +294,7 @@ enum class IntelligenceAction(
     val description: String
 ) {
     OPEN_MODULE("Open module", false, "Jump to the screen that owns this data"),
-    START_PROTECTION("Start protection", true, "Connect the local DNS firewall (Android asks for VPN consent)"),
+    START_PROTECTION("Start protection", true, "Start the local DNS filter (Android asks for its VPN permission once)"),
     STOP_PROTECTION("Stop protection", true, "Disconnect the local DNS firewall"),
     TOGGLE_LOCKDOWN("Emergency lockdown", true, "Only explicit allowlist entries will resolve"),
     SYNC_FILTERS("Sync filter lists", false, "Download enabled lists now using WorkManager"),
@@ -435,15 +435,15 @@ data class IntelligenceFilters(
 
 /**
  * Every real reading the aggregator is allowed to use. Built by the ViewModel from live app
- * state (VPN runtime, preferences, scan journal, battery telemetry, DNS counters).
+ * state (DNS runtime, preferences, scan journal, battery telemetry, counters).
  */
 data class IntelligenceInputs(
     val nowEpochMs: Long,
-    val vpnStatus: VpnStatus = VpnStatus.DISCONNECTED,
+    val dnsStatus: DnsStatus = DnsStatus.DISCONNECTED,
     /** True when the user asked protection to stay on (it should be connected). */
     val protectionExpected: Boolean = false,
     val connectedSinceEpochMs: Long? = null,
-    val vpnLastError: String? = null,
+    val dnsLastError: String? = null,
     val protectionMode: ProtectionMode = ProtectionMode.STANDARD,
     val loadedRuleCount: Int = 0,
     val sessionTotalQueries: Long = 0L,

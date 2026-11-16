@@ -342,7 +342,7 @@ fun IntelligenceTopBar(
             if (!state.isLive) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Visual updates paused. DNS protection, VPN filtering and scheduled jobs keep running.",
+                    text = "Visual updates paused. DNS protection and scheduled jobs keep running.",
                     color = Color(0xFF94A3B8),
                     fontSize = 9.sp,
                     maxLines = 2

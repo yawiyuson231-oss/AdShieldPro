@@ -7,7 +7,7 @@ Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to G
 ## 1. Google Play `VpnService` Policy Compliance
 
 - [x] **Core Functionality:** The app's primary purpose is device-wide DNS privacy, tracker protection, and malicious domain filtering using a local `VpnService` interface.
-- [x] **Explicit User Consent:** `VpnService.prepare(context)` is invoked on user interaction before starting `AdShieldVpnService`.
+- [x] **Explicit User Consent:** `VpnService.prepare(context)` is invoked on user interaction before starting `AdShieldDnsService`.
 - [x] **No Undisclosed Traffic Tunneling:** Only virtual DNS server IPs (`10.215.173.2/32`, `fd00:ad5:1e1d::2/128`) are routed through the local TUN descriptor.
 - [x] **No Root Certificate / HTTPS Interception:** The app never installs a user/system CA certificate and never decrypts third-party HTTPS traffic.
 - [x] **Play Console Declaration:** In **App Content -> VPN Service**, declare that `VpnService` is used locally on-device to filter DNS queries and encrypt upstream DNS via DoH/DoT.
@@ -17,7 +17,7 @@ Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to G
 ## 2. Android 14 / 15 Foreground Service (`FOREGROUND_SERVICE_SPECIAL_USE`) Declaration
 
 - [x] Manifest declares `android.permission.FOREGROUND_SERVICE` and `android.permission.FOREGROUND_SERVICE_SPECIAL_USE`.
-- [x] `<service android:name=".service.AdShieldVpnService" android:foregroundServiceType="specialUse">` includes `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="local_dns_ad_and_tracker_filtering_vpn" />`.
+- [x] `<service android:name=".service.AdShieldDnsService" android:foregroundServiceType="specialUse">` includes `<property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="local_dns_ad_and_tracker_filtering_vpn" />`.
 - [ ] In Play Console **App Content -> Foreground Service Permissions**, submit the video walk-through showing the persistent notification ("AdShield Pro Active") and how the user can Pause or Stop the VPN directly from the notification or main dashboard.
 
 ---

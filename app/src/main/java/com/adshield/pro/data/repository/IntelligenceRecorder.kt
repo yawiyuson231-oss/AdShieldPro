@@ -74,7 +74,7 @@ class IntelligenceRecorder @Inject constructor(
     private val mutex = Mutex()
     private val lastEmitted = LinkedHashMap<String, Long>()
 
-    /** Fire-and-forget (DNS hot path, VPN callbacks, workers). */
+    /** Fire-and-forget (DNS hot path, resolver callbacks, workers). */
     fun record(draft: IntelligenceEvent) {
         scope.launch { emit(draft) }
     }

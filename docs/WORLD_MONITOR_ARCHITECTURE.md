@@ -4,7 +4,7 @@ World Monitor 2035 is an additive, offline-resilient **3D Digital Earth & Multi-
 
 ## 1. Non-Destructive Integration Guarantees
 - **Navigation & Shell Preserved**: All 13 existing `MainNavDestination` tabs, `CyberBottomNav`, and isolated `*Destination` composables in `MainActivity.kt` remain intact. World Monitor 2035 opens additively via a dedicated `worldMonitorOpen` full-screen overlay (matching `ConnectorRegistryScreen`), accessible from the **Intel Command Panel**, **Home Dashboard**, and **Watchtower Notification** deep links.
-- **Database Isolation**: World Monitor persists cached entities, kinematic trails, provider sync metadata, Watchtower geofences, and alert history in an isolated Room database (`world_monitor_2035.db`), leaving `AdShieldDatabase` v6 (`adshield_pro_v2.db`) untouched with zero WAL contention against `AdShieldVpnService`.
+- **Database Isolation**: World Monitor persists cached entities, kinematic trails, provider sync metadata, Watchtower geofences, and alert history in an isolated Room database (`world_monitor_2035.db`), leaving `AdShieldDatabase` v6 (`adshield_pro_v2.db`) untouched with zero WAL contention against `AdShieldDnsService`.
 - **No Mandatory VPN or Cloud Backend**: All 26 default-enabled providers connect directly over HTTPS from the user's device without requiring the local DNS VPN to be active, without proprietary proxy servers, and without any paid or cloud AI service.
 
 ## 2. 3D Digital Earth & WebView Security Architecture

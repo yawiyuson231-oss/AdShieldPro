@@ -79,8 +79,9 @@ contains all twelve libraries across the four supported ABIs and that their pack
 `AdShieldEngineTestSuite` is a pure JVM (Robolectric-free) suite. It exercises the
 device-independent engine code directly, which is where all DNS, filtering and scoring
 logic lives. `AetherCoreTest`, `BatteryIntelligenceTestSuite`, `DashboardPresentationTest`,
-`SecurityCenterTestSuite` and `CapabilityRegistryTest` cover the decision core, battery/thermal
-rules, dashboard honesty/motion rules, security scoring and capability-report constraints:
+`SecurityCenterTestSuite`, `CapabilityRegistryTest` and `ProtectionExplainerTest` cover the decision
+core, battery/thermal rules, dashboard honesty/motion rules, security scoring, capability-report
+constraints and the in-app architecture explainer:
 
 | Area | Covered behaviour |
 | --- | --- |
@@ -94,6 +95,8 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
+| `ProtectionExplainer` | The explainer's routed addresses match `ProtectionArchitecture`, no default route is ever described, every protection mode's blocked-answer wording matches `blockSinkholeZeroIp`, every `DnsProtocol` is listed, and the copy never claims IP masking or HTTPS inspection |
+| `DnsCnameGuardTest` | CNAME extraction from real wire responses (compression pointers, lowercase targets), rejection of truncated/non-response/questionless messages, blocked-hop detection with the 8-hop cap, and the rule that only Strict/Custom modes enforce cloaking |
 | `IntelligenceMapTestSuite` | Event sanitizer (evidence required, size bounds, secret/PII redaction, severity escalation), factory routing (DNS/scan/battery/VPN/automation), aggregator state derivation from real inputs only, dedupe policy, repository round-trip/prune/corrupt rows, hit-testing, pinch focal stability, tap-vs-drag, camera lerp/clamping, recommendations, aggregation performance budget |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
@@ -106,6 +109,8 @@ Those cannot be exercised by JVM unit tests.
 1. Install the debug APK, open the app, tap the shield and accept the VPN consent dialog.
 2. Open a browser and load a page; verify `Blocked` counters increase on the Home screen.
 3. Open **Statistics** and confirm queries appear in real time (requires detailed logging).
+   Then open **Settings → How protection works** and confirm the addresses shown match the tunnel
+   (`ip addr`/VPN details in Android Settings) and that the limits section renders.
 4. Add a custom block rule (`||example.com^`) in **Ad Blocker → Rules** and confirm the domain
    is blocked immediately without restarting protection.
 5. Switch protection modes and confirm blocking changes take effect without a tunnel restart.

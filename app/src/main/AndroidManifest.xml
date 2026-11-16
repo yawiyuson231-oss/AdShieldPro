@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Core Network & VPN Permissions (No Root or invasive permissions) -->
+    <!-- Core network permissions for the local DNS filter (no root, no invasive access) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Normal permission: lets the Wi-Fi security probe read link security type. No prompt. -->
@@ -65,9 +65,9 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/update_file_paths" />
         </provider>
-        <!-- Local DNS-Filtering VPN Service -->
+        <!-- Local DNS-filtering service (implemented on Android's VpnService API) -->
         <service
-            android:name=".service.AdShieldVpnService"
+            android:name=".service.AdShieldDnsService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             android:permission="android.permission.BIND_VPN_SERVICE">
@@ -79,7 +79,7 @@
                 android:value="true" />
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="local_dns_ad_and_tracker_filtering_vpn" />
+                android:value="local_dns_ad_and_tracker_filtering" />
         </service>
 
         <!-- Quick Settings Tiles for System Preferences -->
@@ -110,7 +110,7 @@
             android:enabled="true"
             android:exported="false" />
 
-        <!-- Boot Receiver for restoring VPN protection after device restart -->
+        <!-- Boot receiver for restoring DNS protection after a device restart -->
         <receiver
             android:name=".service.BootCompletedReceiver"
             android:enabled="true"

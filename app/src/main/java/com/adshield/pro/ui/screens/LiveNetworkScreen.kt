@@ -39,7 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.ui.components.BarRow
 import com.adshield.pro.ui.components.CyberPanel
@@ -80,10 +80,10 @@ fun LiveNetworkScreen(
                 CyberPanel(
                     title = "Live network",
                     subtitle = "${snapshot.modeLabel} · ${snapshot.protocolLabel}",
-                    trailing = { StatusPill(if (snapshot.vpnConnected) "● LIVE" else "IDLE", if (snapshot.vpnConnected) EmeraldPrimary else WarningAmber) }
+                    trailing = { StatusPill(if (snapshot.dnsConnected) "● LIVE" else "IDLE", if (snapshot.dnsConnected) EmeraldPrimary else WarningAmber) }
                 ) {
                     ProtectionShield(
-                        status = if (snapshot.vpnConnected) VpnStatus.CONNECTED else VpnStatus.DISCONNECTED,
+                        status = if (snapshot.dnsConnected) DnsStatus.CONNECTED else DnsStatus.DISCONNECTED,
                         hasTraffic = snapshot.hasData,
                         threatSignals = snapshot.threatsBlocked.toInt(),
                         modifier = Modifier.fillMaxWidth().height(210.dp)
@@ -106,14 +106,14 @@ fun LiveNetworkScreen(
                                 Button(
                                     onClick = onToggleProtection,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (snapshot.vpnConnected) AlertRed else EmeraldPrimary
+                                        containerColor = if (snapshot.dnsConnected) AlertRed else EmeraldPrimary
                                     ),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Text(
-                                        text = if (snapshot.vpnConnected) "Stop Live Shield" else "▶ Start Live DNS",
-                                        color = if (snapshot.vpnConnected) Color.White else Color.Black,
+                                        text = if (snapshot.dnsConnected) "Stop Live Shield" else "▶ Start Live DNS",
+                                        color = if (snapshot.dnsConnected) Color.White else Color.Black,
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 12.sp
                                     )

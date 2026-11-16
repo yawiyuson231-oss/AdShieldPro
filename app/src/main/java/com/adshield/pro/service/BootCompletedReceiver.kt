@@ -38,14 +38,14 @@ class BootCompletedReceiver : BroadcastReceiver() {
                     systemPreferencesController.reconcileAutoRevertTimers()
                 }
                 val settings = preferencesRepository.getSettingsSnapshot()
-                if (settings.vpnShouldRemainActive && settings.autoStartOnBoot) {
+                if (settings.protectionShouldRemainActive && settings.autoStartOnBoot) {
                     // Verify VPN consent is still granted before starting foreground service
                     val prepareIntent = VpnService.prepare(context)
                     if (prepareIntent == null) {
-                        val vpnIntent = Intent(context, AdShieldVpnService::class.java).apply {
-                            this.action = AdShieldVpnService.ACTION_START_VPN
+                        val consentIntent = Intent(context, AdShieldDnsService::class.java).apply {
+                            this.action = AdShieldDnsService.ACTION_START_PROTECTION
                         }
-                        ContextCompat.startForegroundService(context, vpnIntent)
+                        ContextCompat.startForegroundService(context, consentIntent)
                     }
                 }
             } finally {

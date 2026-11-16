@@ -39,12 +39,12 @@ private val Context.adShieldDataStore: DataStore<Preferences> by preferencesData
 
 data class AppSettingsState(
     /**
-     * Detailed per-query DNS logging. The VPN resolver reads this on every single
+     * Detailed per-query DNS logging. The resolver reads this on every single
      * query, so the whole settings state is cached in memory by
      * [UserPreferencesRepository.cachedSettings] instead of re-reading DataStore
      * (and re-decoding every JSON preference) once per DNS packet.
      */
-    val vpnShouldRemainActive: Boolean = false,
+    val protectionShouldRemainActive: Boolean = false,
     val autoStartOnBoot: Boolean = true,
     val darkThemeMode: DarkThemePreference = DarkThemePreference.DARK,
     val protectionMode: ProtectionMode = ProtectionMode.STANDARD,
@@ -117,7 +117,7 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     private object Keys {
-        val VPN_ACTIVE = booleanPreferencesKey("vpn_should_remain_active")
+        val PROTECTION_ACTIVE = booleanPreferencesKey("vpn_should_remain_active")
         val AUTO_START_BOOT = booleanPreferencesKey("auto_start_on_boot")
         val DARK_THEME = stringPreferencesKey("dark_theme_mode")
         val PROTECTION_MODE = stringPreferencesKey("protection_mode")
@@ -240,7 +240,7 @@ class UserPreferencesRepository @Inject constructor(
         } ?: UsbDebuggingTileConfig()
 
         return AppSettingsState(
-            vpnShouldRemainActive = prefs[Keys.VPN_ACTIVE] ?: false,
+            protectionShouldRemainActive = prefs[Keys.PROTECTION_ACTIVE] ?: false,
             autoStartOnBoot = prefs[Keys.AUTO_START_BOOT] ?: true,
             darkThemeMode = theme,
             protectionMode = mode,
@@ -338,8 +338,8 @@ class UserPreferencesRepository @Inject constructor(
         cachedSettings.set(null)
     }
 
-    suspend fun setVpnShouldRemainActive(active: Boolean) {
-        context.adShieldDataStore.edit { it[Keys.VPN_ACTIVE] = active }
+    suspend fun setProtectionShouldRemainActive(active: Boolean) {
+        context.adShieldDataStore.edit { it[Keys.PROTECTION_ACTIVE] = active }
     }
 
     suspend fun setAutoStartOnBoot(enabled: Boolean) {

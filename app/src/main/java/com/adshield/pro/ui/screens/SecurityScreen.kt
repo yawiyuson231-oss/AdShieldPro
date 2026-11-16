@@ -62,8 +62,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.adshield.pro.domain.model.VpnStatus
-import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
 import com.adshield.pro.engine.aether.SecurityReportExplainer
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.QuarantinedItem
@@ -92,7 +92,7 @@ import java.util.Date
 @Composable
 fun SecurityScreen(
     posture: SecurityPosture,
-    vpnState: VpnRuntimeState,
+    dnsState: DnsRuntimeState,
     malwareBlocks: Long,
     appAudits: List<AppRiskAuditor.AppRiskAudit>,
     isAuditingApps: Boolean,
@@ -141,7 +141,7 @@ fun SecurityScreen(
         }
 
         when (selectedSubTab) {
-            0 -> ProtectionPostureTab(posture, vpnState, malwareBlocks, onAuditApps)
+            0 -> ProtectionPostureTab(posture, dnsState, malwareBlocks, onAuditApps)
             1 -> AppAuditTab(appAudits, isAuditingApps, onAuditApps)
             2 -> FileScanTab(fileScanResult, isScanning, scanProgress, onScanUri, onQuarantineLastScanned, onDeleteScannedDocument)
             3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl)
@@ -185,7 +185,7 @@ private fun SecurityTabChip(
 @Composable
 private fun ProtectionPostureTab(
     posture: SecurityPosture,
-    vpnState: VpnRuntimeState,
+    dnsState: DnsRuntimeState,
     malwareBlocks: Long,
     onAuditApps: () -> Unit
 ) {
@@ -252,12 +252,12 @@ private fun ProtectionPostureTab(
             SecurityStatusRow(
                 icon = Icons.Default.Shield,
                 title = "Web & DNS Threat Protection",
-                detail = if (vpnState.status == VpnStatus.CONNECTED) {
+                detail = if (dnsState.status == DnsStatus.CONNECTED) {
                     "ACTIVE — ${posture.threatSignatures} malware/phishing signatures blocking sites and apps device-wide"
                 } else {
                     "OFFLINE — enable Home protection to block malicious domains in every app"
                 },
-                isGood = vpnState.status == VpnStatus.CONNECTED
+                isGood = dnsState.status == DnsStatus.CONNECTED
             )
         }
         item {

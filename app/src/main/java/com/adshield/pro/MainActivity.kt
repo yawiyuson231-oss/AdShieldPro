@@ -78,7 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.domain.intelligence.IntelligenceAction
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.model.RuleMatchType
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.screens.ActivityScreen
@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * Shell only: navigation, VPN consent and snackbars. Each destination collects just the state it
+ * Shell only: navigation, DNS-filtering consent and snackbars. Each destination collects just the state it
  * renders, so a DNS tick on Home does not recompose Battery/Settings/Optimizer state holders.
  */
 @Composable
@@ -173,11 +173,12 @@ fun AdShieldMainApp(
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
+    var showProtectionExplainer by rememberSaveable { mutableStateOf(false) }
     var showQuickTilesScreen by rememberSaveable { mutableStateOf(false) }
     var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var worldMonitorOpen by rememberSaveable { mutableStateOf(initialOpenWorldMonitor) }
-    var showVpnConsentHelp by remember { mutableStateOf(false) }
+    var showConsentHelp by remember { mutableStateOf(false) }
     val connectorViewModel: ConnectorViewModel = hiltViewModel()
     val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -189,24 +190,29 @@ fun AdShieldMainApp(
             connectorsOpen = false
             worldMonitorOpen = false
             showAboutScreen = false
+            showProtectionExplainer = false
             currentTab = MainNavDestination.SETTINGS
             showQuickTilesScreen = true
         }
     }
 
-    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR) {
+    BackHandler(
+        enabled = showAboutScreen || showProtectionExplainer || showQuickTilesScreen ||
+            connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR
+    ) {
         when {
             connectorsOpen -> connectorsOpen = false
             showQuickTilesScreen -> showQuickTilesScreen = false
             worldMonitorOpen -> worldMonitorOpen = false
             currentTab == MainNavDestination.WORLD_MONITOR -> currentTab = MainNavDestination.HOME
+            showProtectionExplainer -> showProtectionExplainer = false
             else -> showAboutScreen = false
         }
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { _ -> viewModel.startVpnService() }
+    ) { _ -> viewModel.startProtection() }
 
     val startAfterConsent: () -> Unit = {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -214,68 +220,69 @@ fun AdShieldMainApp(
         ) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            viewModel.startVpnService()
+            viewModel.startProtection()
         }
     }
 
-    val vpnConsentLauncher = rememberLauncherForActivityResult(
+    val consentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK || VpnService.prepare(context) == null) {
             startAfterConsent()
         } else {
-            showVpnConsentHelp = true
+            showConsentHelp = true
         }
     }
 
-    val launchVpnConsent: () -> Unit = {
+    val launchConsent: () -> Unit = {
         val prepareIntent = try {
             VpnService.prepare(context)
         } catch (e: Exception) {
-            null.also { showVpnConsentHelp = true }
+            null.also { showConsentHelp = true }
         }
         if (prepareIntent != null) {
             try {
-                vpnConsentLauncher.launch(prepareIntent)
+                consentLauncher.launch(prepareIntent)
             } catch (e: Exception) {
-                showVpnConsentHelp = true
+                showConsentHelp = true
             }
-        } else if (!showVpnConsentHelp) {
+        } else if (!showConsentHelp) {
             startAfterConsent()
         }
     }
 
-    val handleToggleVpn: (Boolean) -> Unit = { enable ->
-        if (enable) launchVpnConsent() else viewModel.stopVpnService()
+    val handleToggleProtection: (Boolean) -> Unit = { enable ->
+        if (enable) launchConsent() else viewModel.stopProtection()
     }
 
-    if (showVpnConsentHelp) {
+    if (showConsentHelp) {
         AlertDialog(
-            onDismissRequest = { showVpnConsentHelp = false },
-            title = { Text("VPN permission needed") },
+            onDismissRequest = { showConsentHelp = false },
+            title = { Text("DNS protection permission needed") },
             text = {
                 Text(
-                    "AdShield Pro filters ads through a local, on-device VPN. Android didn't grant " +
-                        "the VPN permission. This usually happens when:\n\n" +
+                    "Android guards DNS filtering with the VPN permission, so the system dialog " +
+                        "says \"VPN\" even though this is a local filter with no remote server.\n\n" +
+                        "The permission wasn't granted. This usually happens when:\n\n" +
                         "• \"Cancel\" was tapped on the connection request, or\n" +
                         "• Another VPN app is set as \"Always-on VPN\" (often with \"Block connections " +
                         "without VPN\" enabled).\n\n" +
-                        "Tap Try Again and choose OK. If no dialog appears, open VPN settings, turn off " +
+                        "Tap Try Again and choose OK. If no dialog appears, open Android VPN settings, turn off " +
                         "Always-on for the other VPN app, then try again."
                 )
             },
             confirmButton = {
-                TextButton(onClick = { showVpnConsentHelp = false; launchVpnConsent() }) { Text("Try Again") }
+                TextButton(onClick = { showConsentHelp = false; launchConsent() }) { Text("Try Again") }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showVpnConsentHelp = false
+                    showConsentHelp = false
                     try {
                         context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     } catch (e: Exception) {
                         context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
-                }) { Text("Open VPN Settings") }
+                }) { Text("Open Android VPN settings") }
             }
         )
     }
@@ -292,7 +299,9 @@ fun AdShieldMainApp(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen && !showQuickTilesScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
+            if (!showAboutScreen && !showProtectionExplainer && !showQuickTilesScreen && !connectorsOpen &&
+                !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR
+            ) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -301,10 +310,10 @@ fun AdShieldMainApp(
             when (currentTab) {
                 MainNavDestination.HOME -> HomeDestination(
                     viewModel = viewModel,
-                    onToggleVpn = handleToggleVpn,
-                    onPauseResumeVpn = {
-                        if (viewModel.vpnState.value.status == VpnStatus.PAUSED) viewModel.resumeVpnService()
-                        else viewModel.pauseVpnService()
+                    onToggleProtection = handleToggleProtection,
+                    onPauseResumeProtection = {
+                        if (viewModel.dnsState.value.status == DnsStatus.PAUSED) viewModel.resumeProtection()
+                        else viewModel.pauseProtection()
                     },
                     onOpenOptimizer = { currentTab = MainNavDestination.OPTIMIZER },
                     onOpenLive = { currentTab = MainNavDestination.LIVE },
@@ -318,13 +327,13 @@ fun AdShieldMainApp(
                 MainNavDestination.AD_BLOCKER -> AdBlockerDestination(viewModel)
                 MainNavDestination.LIVE -> LiveDestination(
                     viewModel = viewModel,
-                    onToggleProtection = handleToggleVpn,
+                    onToggleProtection = handleToggleProtection,
                     onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
                 )
                 MainNavDestination.INTELLIGENCE -> IntelligenceDestination(
                     adShieldViewModel = viewModel,
                     connectorState = connectorState,
-                    onToggleProtection = handleToggleVpn,
+                    onToggleProtection = handleToggleProtection,
                     onNavigate = { currentTab = it },
                     onOpenConnectors = { module ->
                         connectorViewModel.setModuleFilter(module)
@@ -344,6 +353,9 @@ fun AdShieldMainApp(
                     showAboutScreen = showAboutScreen,
                     onOpenAbout = { showAboutScreen = true },
                     onCloseAbout = { showAboutScreen = false },
+                    showProtectionExplainer = showProtectionExplainer,
+                    onOpenProtectionExplainer = { showProtectionExplainer = true },
+                    onCloseProtectionExplainer = { showProtectionExplainer = false },
                     showQuickTilesScreen = showQuickTilesScreen,
                     onOpenQuickTiles = { showQuickTilesScreen = true },
                     onCloseQuickTiles = { showQuickTilesScreen = false }
@@ -426,15 +438,15 @@ private fun CyberBottomNav(currentTab: MainNavDestination, onSelect: (MainNavDes
 @Composable
 private fun HomeDestination(
     viewModel: AdShieldViewModel,
-    onToggleVpn: (Boolean) -> Unit,
-    onPauseResumeVpn: () -> Unit,
+    onToggleProtection: (Boolean) -> Unit,
+    onPauseResumeProtection: () -> Unit,
     onOpenOptimizer: () -> Unit,
     onOpenLive: () -> Unit,
     onOpenStatistics: () -> Unit,
     onOpenStatus: () -> Unit,
     onOpenWorldMonitor: () -> Unit = {}
 ) {
-    val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
+    val dnsState by viewModel.dnsState.collectAsStateWithLifecycle()
     val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val allTimeTotal by viewModel.allTimeTotalQueries.collectAsStateWithLifecycle()
@@ -449,7 +461,7 @@ private fun HomeDestination(
     val isRunningSmartBoost by viewModel.isRunningSmartBoost.collectAsStateWithLifecycle()
     val isCheckingForUpdates by viewModel.isCheckingForUpdates.collectAsStateWithLifecycle()
     HomeScreen(
-        vpnState = vpnState,
+        dnsState = dnsState,
         settings = settings,
         protectionStatus = protectionStatus,
         allTimeTotal = allTimeTotal,
@@ -464,8 +476,8 @@ private fun HomeDestination(
         isRunningSmartBoost = isRunningSmartBoost,
         isCheckingForUpdates = isCheckingForUpdates,
         onCheckForUpdates = viewModel::checkForUpdates,
-        onToggleVpn = onToggleVpn,
-        onPauseResumeVpn = onPauseResumeVpn,
+        onToggleProtection = onToggleProtection,
+        onPauseResumeProtection = onPauseResumeProtection,
         onSelectProtectionMode = viewModel::setProtectionMode,
         onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
         onRunOptimizeNow = viewModel::runOneTapSmartBoost,
@@ -526,7 +538,7 @@ private fun LiveDestination(
     val liveNetwork by viewModel.liveNetwork.collectAsStateWithLifecycle()
     LiveNetworkScreen(
         snapshot = liveNetwork,
-        onToggleProtection = { onToggleProtection(!liveNetwork.vpnConnected) },
+        onToggleProtection = { onToggleProtection(!liveNetwork.dnsConnected) },
         onOpenWorldMonitor = onOpenWorldMonitor
     )
 }
@@ -604,7 +616,7 @@ private fun IntelligenceDestination(
 @Composable
 private fun SecurityDestination(viewModel: AdShieldViewModel) {
     val securityPosture by viewModel.securityPosture.collectAsStateWithLifecycle()
-    val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
+    val dnsState by viewModel.dnsState.collectAsStateWithLifecycle()
     val malwareBlocks by viewModel.malwareBlocks.collectAsStateWithLifecycle()
     val appAudits by viewModel.appAudits.collectAsStateWithLifecycle()
     val isAuditingApps by viewModel.isAuditingApps.collectAsStateWithLifecycle()
@@ -618,7 +630,7 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     SecurityScreen(
         posture = securityPosture,
-        vpnState = vpnState,
+        dnsState = dnsState,
         malwareBlocks = malwareBlocks,
         appAudits = appAudits,
         isAuditingApps = isAuditingApps,
@@ -900,6 +912,9 @@ private fun SettingsDestination(
     showAboutScreen: Boolean,
     onOpenAbout: () -> Unit,
     onCloseAbout: () -> Unit,
+    showProtectionExplainer: Boolean,
+    onOpenProtectionExplainer: () -> Unit,
+    onCloseProtectionExplainer: () -> Unit,
     showQuickTilesScreen: Boolean,
     onOpenQuickTiles: () -> Unit,
     onCloseQuickTiles: () -> Unit
@@ -944,6 +959,9 @@ private fun SettingsDestination(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
         onCloseAbout = onCloseAbout,
+        showProtectionExplainer = showProtectionExplainer,
+        onOpenProtectionExplainer = onOpenProtectionExplainer,
+        onCloseProtectionExplainer = onCloseProtectionExplainer,
         onOpenQuickTiles = onOpenQuickTiles,
         hasQuickTilePermission = systemTilesStatus.hasWriteSecureSettingsPermission,
         settings = settings,

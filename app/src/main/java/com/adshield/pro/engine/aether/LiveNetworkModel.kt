@@ -4,8 +4,8 @@ import com.adshield.pro.domain.model.AppDnsActivity
 import com.adshield.pro.domain.model.DnsActivityRecord
 import com.adshield.pro.domain.model.DomainBlockCount
 import com.adshield.pro.domain.model.RuleCategory
-import com.adshield.pro.domain.model.VpnRuntimeState
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsRuntimeState
+import com.adshield.pro.domain.model.DnsStatus
 
 /**
  * Aether AI — live network model for the visual dashboard.
@@ -40,7 +40,7 @@ object LiveNetworkModel {
 
     data class NetworkSnapshot(
         val hasData: Boolean,
-        val vpnConnected: Boolean,
+        val dnsConnected: Boolean,
         val modeLabel: String,
         val resolverLabel: String,
         val protocolLabel: String,
@@ -68,13 +68,13 @@ object LiveNetworkModel {
 
     /** Builds the snapshot from the repository's real streams. */
     fun snapshot(
-        runtime: VpnRuntimeState,
+        runtime: DnsRuntimeState,
         logs: List<DnsActivityRecord>,
         topApps: List<AppDnsActivity>,
         topBlocked: List<DomainBlockCount>,
         appLabels: Map<String, String> = emptyMap()
     ): NetworkSnapshot {
-        val connected = runtime.status == VpnStatus.CONNECTED
+        val connected = runtime.status == DnsStatus.CONNECTED
         val total = logs.size.toLong()
         val blocked = logs.count { it.isBlocked }.toLong()
         val allowed = total - blocked
@@ -119,7 +119,7 @@ object LiveNetworkModel {
 
         return NetworkSnapshot(
             hasData = total > 0,
-            vpnConnected = connected,
+            dnsConnected = connected,
             modeLabel = runtime.activeMode.title,
             resolverLabel = resolverLabel(runtime),
             protocolLabel = runtime.resolverConfig.protocol.name,
@@ -148,7 +148,7 @@ object LiveNetworkModel {
         null -> null
     }
 
-    private fun resolverLabel(runtime: VpnRuntimeState): String {
+    private fun resolverLabel(runtime: DnsRuntimeState): String {
         val config = runtime.resolverConfig
         return when (config.protocol.name) {
             "DOH" -> config.activeDohUrl
@@ -161,10 +161,10 @@ object LiveNetworkModel {
      * Health is judged from real signals only: tunnel state plus observed resolver latency.
      * No latency data means "unknown", not "excellent".
      */
-    private fun health(connected: Boolean, runtime: VpnRuntimeState, latencies: List<Int>): ConnectionHealth = when {
+    private fun health(connected: Boolean, runtime: DnsRuntimeState, latencies: List<Int>): ConnectionHealth = when {
         !connected -> ConnectionHealth(
             "Protection inactive",
-            "The local DNS tunnel is not running (${runtime.status.name.lowercase()}).",
+            "Local DNS filtering is not running (${runtime.status.name.lowercase()}).",
             false
         )
         latencies.isEmpty() -> ConnectionHealth(

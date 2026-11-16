@@ -74,7 +74,7 @@ data class RuleConflictReport(
     }
 }
 
-enum class VpnStatus {
+enum class DnsStatus {
     DISCONNECTED,
     STARTING,
     CONNECTED,
@@ -83,8 +83,8 @@ enum class VpnStatus {
     ERROR
 }
 
-data class VpnRuntimeState(
-    val status: VpnStatus = VpnStatus.DISCONNECTED,
+data class DnsRuntimeState(
+    val status: DnsStatus = DnsStatus.DISCONNECTED,
     val connectedSinceEpochMs: Long? = null,
     val activeMode: ProtectionMode = ProtectionMode.STANDARD,
     val resolverConfig: DnsResolverConfig = DnsResolverConfig(),

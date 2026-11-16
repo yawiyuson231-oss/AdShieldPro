@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.ElectricBlue
@@ -49,20 +49,20 @@ import kotlin.math.sin
  */
 @Composable
 fun ProtectionShield(
-    status: VpnStatus,
+    status: DnsStatus,
     hasTraffic: Boolean,
     threatSignals: Int,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val active = status == VpnStatus.CONNECTED
+    val active = status == DnsStatus.CONNECTED
     val animate = rememberAnimationsEnabled() && active && hasTraffic
     val accent = when (status) {
-        VpnStatus.CONNECTED -> SkyBlueGlow
-        VpnStatus.PAUSED -> WarningAmber
-        VpnStatus.STARTING, VpnStatus.RECONNECTING -> CyberCyan
-        VpnStatus.ERROR -> AlertRed
-        VpnStatus.DISCONNECTED -> Color(0xFF5B718C)
+        DnsStatus.CONNECTED -> SkyBlueGlow
+        DnsStatus.PAUSED -> WarningAmber
+        DnsStatus.STARTING, DnsStatus.RECONNECTING -> CyberCyan
+        DnsStatus.ERROR -> AlertRed
+        DnsStatus.DISCONNECTED -> Color(0xFF5B718C)
     }
     val pulse: State<Float>
     val rotation: State<Float>
