@@ -89,7 +89,7 @@ class TemporaryAllowlist @Inject constructor() {
     }
 
     private fun normalize(domain: String): String? {
-        val trimmed = domain.trim().trimEnd('.').lowercase()
+        val trimmed = HostNameNormalizer.toAscii(domain.trim().trimEnd('.').lowercase())
         if (trimmed.isEmpty() || trimmed.length > MAX_DOMAIN_LENGTH) return null
         if (!DOMAIN_PATTERN.matches(trimmed)) return null
         return trimmed

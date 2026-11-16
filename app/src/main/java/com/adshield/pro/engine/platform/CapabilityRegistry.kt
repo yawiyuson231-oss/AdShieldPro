@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "idn-hostname-parity", "A Unicode host and its punycode form are the same host to filtering", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/HostNameNormalizer.kt", emptyList(),
+            listOf("The query name from each DNS message, the pattern of every loaded rule, and each catalogue and lease lookup"),
+            listOf("Converts per label with java.net.IDN; a label the codec refuses is left Unicode and treated as an unknown name rather than guessed at", "Does not implement full IDNA2008/UTS46 validation or homograph detection"),
+            "IdnHostnameTest.testAUnicodeRuleBlocksBothFormsOfTheQuery and IdnHostnameTest.testAPunycodeRuleBlocksTheUnicodeQuery and IdnHostnameTest.testToAsciiConvertsOnlyTheLabelsThatNeedIt"
+        ),
+        cap(
             "temporary-allow", "Bounded \"allow for 15 minutes\" lease when an app stalls", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/TemporaryAllowlist.kt", emptyList(),
             listOf("An in-memory lease keyed by the normalized name, held by the DNS service and the Activity log quick action"),

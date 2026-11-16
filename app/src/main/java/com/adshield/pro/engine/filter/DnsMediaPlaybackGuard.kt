@@ -142,8 +142,11 @@ object DnsMediaPlaybackGuard {
         if (s.contains('@')) s = s.substringAfterLast('@')
         s = s.substringBefore('/').substringBefore('?').substringBefore('#').substringBefore(':')
         s = s.trimStart('.').trimEnd('.')
+        s = HostNameNormalizer.toAscii(s)
         if (s.isEmpty() || s.length > 253) return ""
-        if (!s.all { it.isLetterOrDigit() || it == '.' || it == '-' || it == '_' }) return ""
+        // ASCII only: a label the IDN codec could not convert stays Unicode and is not a name we
+        // are willing to make a blocking decision about.
+        if (!s.all { it.code < 0x80 && (it.isLetterOrDigit() || it == '.' || it == '-' || it == '_') }) return ""
         val labels = s.split('.')
         if (labels.any { it.isEmpty() || it.length > 63 }) return ""
         return s

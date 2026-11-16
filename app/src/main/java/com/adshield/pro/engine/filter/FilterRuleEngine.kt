@@ -675,7 +675,8 @@ class FilterRuleEngine @Inject constructor() {
             if (s.startsWith("https://")) s = s.removePrefix("https://")
             if (s.contains('/')) s = s.substringBefore('/')
             if (s.contains(':')) s = s.substringBefore(':')
-            return s.trimEnd('.')
+            // A rule and a query must agree on the same host even when one of them is Unicode.
+            return HostNameNormalizer.toAscii(s).trimEnd('.')
         }
 
         /**
