@@ -156,7 +156,10 @@ class ProtectionStatusTest {
         assertTrue(status.badges.contains("Failover: 2 provider(s)"))
         assertTrue(status.badges.contains("1 app rule"))
         assertTrue(status.badges.contains("Network: Wi-Fi"))
-        assertTrue(status.stages.first { it.id == "integrity" }.detail.contains("Strict"))
+        val integrity = status.stages.first { it.id == "integrity" }.detail
+        assertTrue(integrity.contains("Strict"))
+        assertTrue("integrity must state the subnet and question guarantees, was: $integrity", integrity.contains("client subnet"))
+        assertTrue(integrity.contains("echo the question"))
     }
     @Test
     fun pausedOrStartingWithEmergencyModeDoesNotClaimLockdownIsActive() {

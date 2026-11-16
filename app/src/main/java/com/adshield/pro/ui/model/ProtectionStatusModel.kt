@@ -118,13 +118,14 @@ object ProtectionStatusEvaluator {
             )
         }
 
+        val dnssecDetail = if (config.dnssecMode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS) {
+            "Strict: positive answers require the upstream AD bit"
+        } else {
+            "Reporting upstream DNSSEC evidence (no local validation)"
+        }
         val integrityStage = PipelineStage(
             "integrity", "Answer integrity",
-            if (config.dnssecMode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS) {
-                "Strict: positive answers require the upstream AD bit"
-            } else {
-                "Reporting upstream DNSSEC evidence (no local validation)"
-            },
+            "$dnssecDetail · client subnet removed · answers must echo the question",
             if (connected) StageState.ACTIVE else StageState.STANDBY
         )
 
