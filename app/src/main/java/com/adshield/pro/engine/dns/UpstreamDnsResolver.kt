@@ -88,8 +88,16 @@ class UpstreamDnsResolver @Inject constructor(
      */
     private val inFlight = HashMap<String, CompletableDeferred<UpstreamResult>>()
 
+    /**
+     * Wire bytes the cache may hold. 1024 maximally sized answers would be a few megabytes on a
+     * device that can ill afford it, so the entry count is not the only bound: the least recently
+     * used entries are dropped until the payload fits too.
+     */
+    @Volatile
+    internal var cacheByteBudget: Int = DEFAULT_CACHE_BYTE_BUDGET
+
     private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > 1024
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > MAX_CACHE_ENTRIES
     }
 
     @Volatile
@@ -111,6 +119,9 @@ class UpstreamDnsResolver @Inject constructor(
             dnsCache.clear()
         }
     }
+
+    /** Wire bytes currently held by the cache. */
+    fun getCacheBytes(): Int = synchronized(dnsCache) { dnsCache.values.sumOf { it.wireResponse.size } }
 
     fun getCacheSize(): Int {
         synchronized(dnsCache) {
@@ -328,6 +339,7 @@ class UpstreamDnsResolver @Inject constructor(
                             protocolOrigin = protocol
                         )
                     )
+                    trimCacheToByteBudget()
                 }
             }
             return UpstreamResult(
@@ -614,6 +626,21 @@ class UpstreamDnsResolver @Inject constructor(
         }
     }
 
+    /**
+     * Drops least-recently-used entries until the cache payload fits [cacheByteBudget]. Called on
+     * every insert while holding the cache lock.
+     */
+    private fun trimCacheToByteBudget() {
+        var total = dnsCache.values.sumOf { it.wireResponse.size }
+        if (total <= cacheByteBudget) return
+        val iterator = dnsCache.entries.iterator()
+        while (total > cacheByteBudget && iterator.hasNext()) {
+            val eldest = iterator.next()
+            total -= eldest.value.wireResponse.size
+            iterator.remove()
+        }
+    }
+
     companion object {
         private val DNS_MESSAGE_MEDIA_TYPE = "application/dns-message".toMediaType()
 
@@ -689,6 +716,12 @@ class UpstreamDnsResolver @Inject constructor(
          * millisecond the app waits before the failover provider is even tried.
          */
         private const val UDP_TIMEOUT_MS = 2500
+
+        /** Hard entry ceiling, independent of the byte budget. */
+        private const val MAX_CACHE_ENTRIES = 1024
+
+        /** Default payload ceiling: 2 MiB of cached wire answers. */
+        internal const val DEFAULT_CACHE_BYTE_BUDGET = 2 * 1024 * 1024
 
         /**
          * How long a coalesced follower waits for the leader's answer before resolving on its own.

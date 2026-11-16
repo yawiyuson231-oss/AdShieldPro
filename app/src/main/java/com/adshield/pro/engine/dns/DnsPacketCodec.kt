@@ -22,6 +22,13 @@ object DnsPacketCodec {
     const val TYPE_OPT = 41
     const val EDNS_OPTION_CLIENT_SUBNET = 8
 
+    /** Bounds every cache lifetime is clamped to, positive or negative. */
+    const val MIN_POSITIVE_TTL_SECONDS = 15L
+    const val MAX_POSITIVE_TTL_SECONDS = 1800L
+
+    /** Lifetime used when a negative answer carries no usable SOA record. */
+    const val NEGATIVE_TTL_FALLBACK_SECONDS = 30
+
     const val CLASS_IN = 1
 
     data class ParsedDnsQuery(
@@ -316,15 +323,21 @@ object DnsPacketCodec {
 
     /**
      * Extracts a conservative cache TTL (in seconds) from an upstream DNS response, clamped to [15, 1800].
+     *
+     * Negative answers (NXDOMAIN and NODATA) use the RFC 2308 lifetime instead: the smaller of the
+     * authority SOA record's TTL and its MINIMUM field. A server that publishes "this name does not
+     * exist for an hour" is believed, and a server that publishes 30 s is not cached for longer.
      */
     fun extractResponseTtlSeconds(dnsResponse: ByteArray): Int {
         if (dnsResponse.size < 12) return 60
         val flags = ((dnsResponse[2].toInt() and 0xFF) shl 8) or (dnsResponse[3].toInt() and 0xFF)
         val rcode = flags and 0x000F
-        if (rcode != 0) return 30 // Short cache for NXDOMAIN
+        if (rcode == 3) return extractNegativeTtlSeconds(dnsResponse) // NXDOMAIN
 
         val anCount = ((dnsResponse[6].toInt() and 0xFF) shl 8) or (dnsResponse[7].toInt() and 0xFF)
-        if (anCount <= 0) return 60
+        // NODATA: the name exists but has no record of this type, also a negative answer.
+        if (rcode == 0 && anCount <= 0) return extractNegativeTtlSeconds(dnsResponse)
+        if (rcode != 0) return NEGATIVE_TTL_FALLBACK_SECONDS
 
         // Skip question section to inspect first answer TTL if easily reachable
         val qRead = readDomainName(dnsResponse, 0, 12, dnsResponse.size) ?: return 120
@@ -333,10 +346,64 @@ object DnsPacketCodec {
         val ttlOffset = nameRead.nextOffset + 4 // skip TYPE(2) + CLASS(2)
         if (ttlOffset + 4 <= dnsResponse.size) {
             val ttl = ByteBuffer.wrap(dnsResponse, ttlOffset, 4).int
-            return ttl.coerceIn(15, 1800)
+            return ttl.coerceIn(MIN_POSITIVE_TTL_SECONDS.toInt(), MAX_POSITIVE_TTL_SECONDS.toInt())
         }
         return 120
     }
+
+    /**
+     * RFC 2308 negative-cache lifetime: `min(SOA TTL, SOA MINIMUM)` from the authority section,
+     * clamped to the same bounds as a positive answer. Falls back to
+     * [NEGATIVE_TTL_FALLBACK_SECONDS] when the response carries no usable SOA.
+     */
+    fun extractNegativeTtlSeconds(dnsResponse: ByteArray): Int {
+        if (dnsResponse.size < 12) return NEGATIVE_TTL_FALLBACK_SECONDS
+        val questionCount = u16At(dnsResponse, 4)
+        val answerCount = u16At(dnsResponse, 6)
+        val authorityCount = u16At(dnsResponse, 8)
+        var offset = 12
+        repeat(questionCount) {
+            val name = readDomainName(dnsResponse, 0, offset, dnsResponse.size)
+                ?: return NEGATIVE_TTL_FALLBACK_SECONDS
+            offset = name.nextOffset + 4
+            if (offset > dnsResponse.size) return NEGATIVE_TTL_FALLBACK_SECONDS
+        }
+        repeat(answerCount) {
+            offset = readResourceRecord(dnsResponse, offset)?.nextOffset
+                ?: return NEGATIVE_TTL_FALLBACK_SECONDS
+        }
+        repeat(authorityCount) {
+            val record = readResourceRecord(dnsResponse, offset)
+                ?: return NEGATIVE_TTL_FALLBACK_SECONDS
+            offset = record.nextOffset
+            if (record.type == TYPE_SOA) {
+                val minimum = readSoaMinimum(dnsResponse, record.dataStart, record.dataLength)
+                if (minimum != null) {
+                    return minOf(record.ttlSeconds, minimum.toLong())
+                        .coerceIn(MIN_POSITIVE_TTL_SECONDS, MAX_POSITIVE_TTL_SECONDS)
+                        .toInt()
+                }
+            }
+        }
+        return NEGATIVE_TTL_FALLBACK_SECONDS
+    }
+
+    /** SOA MINIMUM (the last of the five 32-bit fields), or null when the RDATA is malformed. */
+    private fun readSoaMinimum(packet: ByteArray, dataStart: Int, dataLength: Int): Int? {
+        val end = dataStart + dataLength
+        if (end > packet.size) return null
+        val mname = readDomainName(packet, 0, dataStart, end) ?: return null
+        val rname = readDomainName(packet, 0, mname.nextOffset, end) ?: return null
+        val minimumOffset = rname.nextOffset + 16 // serial, refresh, retry, expire
+        if (minimumOffset + 4 > end) return null
+        return u32At(packet, minimumOffset)
+    }
+
+    private fun u32At(bytes: ByteArray, offset: Int): Int =
+        ((bytes[offset].toInt() and 0xFF) shl 24) or
+            ((bytes[offset + 1].toInt() and 0xFF) shl 16) or
+            ((bytes[offset + 2].toInt() and 0xFF) shl 8) or
+            (bytes[offset + 3].toInt() and 0xFF)
 
     /**
      * Walks every resource record with bounds and compression-pointer checks.
@@ -553,10 +620,10 @@ object DnsPacketCodec {
 
     private data class WireRecord(
         val start: Int,
-        val nameEnd: Int,
         val typeOffset: Int,
         val nextOffset: Int,
         val type: Int,
+        val ttlSeconds: Long,
         val dataStart: Int,
         val dataLength: Int
     )
@@ -568,12 +635,14 @@ object DnsPacketCodec {
         val dataLength = u16At(packet, typeOffset + 8)
         val dataStart = typeOffset + 10
         if (dataStart + dataLength > packet.size) return null
+        val ttl = ((u16At(packet, typeOffset + 4).toLong() shl 16) or
+            u16At(packet, typeOffset + 6).toLong())
         return WireRecord(
             start = startPos,
-            nameEnd = name.nextOffset,
             typeOffset = typeOffset,
             nextOffset = dataStart + dataLength,
             type = u16At(packet, typeOffset),
+            ttlSeconds = ttl,
             dataStart = dataStart,
             dataLength = dataLength
         )

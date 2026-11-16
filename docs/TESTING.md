@@ -96,6 +96,8 @@ constraints and the in-app architecture explainer:
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
 | `ProtectionExplainer` | The explainer's routed addresses match `ProtectionArchitecture`, no default route is ever described, every protection mode's blocked-answer wording matches `blockSinkholeZeroIp`, every `DnsProtocol` is listed, and the copy never claims IP masking or HTTPS inspection |
+| `DnsNegativeCacheTtlTest` | RFC 2308 negative caching: `min(SOA TTL, SOA MINIMUM)`, the 1800 s ceiling, NODATA, and a 30 s fallback when no SOA is present or the packet is truncated |
+| `DnsCacheBudgetTest` | Cache payload budget and least-recently-used eviction order |
 | `DnsQueryCoalescingTest` | Single-flight: six concurrent identical lookups cost one upstream query, a coalesced answer is rewritten to the follower's transaction ID, and a failed upstream produces one shared SERVFAIL |
 | `VideoAdNetworkCatalogTest` | Video-ad baseline: safe ad infrastructure blocked in every mode, the conditional tier gated on Strict/Custom, no catalogue zone is playback infrastructure, label-boundary matching and input normalisation |
 | `DnsClientSubnetPolicyTest` | Client-subnet hygiene: the ECS option is stripped while cookies and the DO bit survive, queries without ECS are returned untouched, malformed messages are rejected, and the subnet is only forwarded for opted-in streaming hosts |

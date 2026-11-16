@@ -124,6 +124,8 @@ JVM tests in `app/src/test/java/com/adshield/pro/CybersecurityPlatformTestSuite.
 | `testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked` | question binding for plaintext transports, question-less errors allowed |
 | `testCacheKeysAreScopedToTheActiveResolver` | resolver, protocol and validation-policy scoping |
 | `DnsQueryCoalescingTest` (3 tests) | one upstream query per burst, transaction-ID rewrite, shared SERVFAIL |
+| `DnsNegativeCacheTtlTest` (4 tests) | SOA-based negative lifetime, ceiling clamp, NODATA, SOA-less fallback |
+| `DnsCacheBudgetTest` (2 tests) | payload budget, LRU eviction order |
 | `fileScannerFlagsEncodedPowerShellDropper` | scanner verdict is driven by a real dropper-pattern match |
 
 CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, assembled the
@@ -163,6 +165,8 @@ prove it understood the packet hands the packet on unchanged rather than half-re
 | Stage | Code | Behaviour |
 | --- | --- | --- |
 | Cache key | `UpstreamDnsResolver.buildCacheKey` | `protocol@endpoint`, the failover plan, the DNSSEC mode, the CD bit, then `domain:qtype:qclass`. Switching resolver or validation policy can never replay an answer obtained under the previous one. |
+| Cache lifetime | `DnsPacketCodec.extractResponseTtlSeconds` / `extractNegativeTtlSeconds` | Positive answers use the first record's TTL; NXDOMAIN and NODATA use RFC 2308 `min(SOA TTL, SOA MINIMUM)`. Everything is clamped to 15–1800 s, and a negative answer with no usable SOA falls back to 30 s. |
+| Cache bound | `UpstreamDnsResolver.trimCacheToByteBudget` | Two limits at once: 1024 entries and 2 MiB of payload. Eviction is least-recently-used, so a burst of large answers cannot grow the cache into device memory. |
 | Cache hit | `UpstreamDnsResolver.resolve` + `DnsPacketCodec.rewriteResponseTtls` | Answers are rewritten to the lifetime the entry has left (ceiling division, so a live entry never reports 0 s). EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags. A message the codec cannot walk is served from the stored bytes untouched. |
 | Client subnet | `DnsPacketCodec.stripEdnsClientSubnet` | The EDNS Client Subnet option is removed from every outgoing query, so a CDN cannot use a forwarded subnet to correlate unrelated lookups. Cookies, padding, the UDP payload size and the DO bit are preserved. The subnet is kept only for streaming hosts when geo-accurate media DNS is enabled (`UpstreamDnsResolver.forwardsClientSubnet`). |
 | Plaintext question binding | `UpstreamDnsResolver.isValidDnsResponseForQuery(ByteArray, ByteArray)` | UDP/TCP answers must echo the exact question (name case-folded, QTYPE, QCLASS) that was sent. A question-less error response is accepted; a question-less NOERROR answer is not. |

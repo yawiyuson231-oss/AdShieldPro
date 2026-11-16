@@ -113,6 +113,28 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-negative-caching", "RFC 2308 negative caching from the authority SOA", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("The authority SOA record of NXDOMAIN and NODATA answers, including its MINIMUM field"),
+            listOf(
+                "Only the lifetime rule is implemented: the resolver caches the negative answer, it does not re-derive the zone's cut",
+                "A negative answer without a usable SOA falls back to 30 s rather than guessing",
+                "Lifetimes stay inside the same 15 s to 1800 s bounds as a positive answer"
+            ),
+            "DnsNegativeCacheTtlTest.testNxdomainUsesTheSmallerOfSoaTtlAndMinimum and DnsNegativeCacheTtlTest.testNodataUsesTheSoaLifetimeToo and DnsNegativeCacheTtlTest.testNegativeAnswersWithoutSoaFallBackToAShortLifetime"
+        ),
+        cap(
+            "dns-cache-memory-budget", "Answer cache bounded by payload bytes, not only by entry count", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("Wire size of every cached answer and the recency order of the cache"),
+            listOf(
+                "Two bounds apply at once: 1024 entries and 2 MiB of payload",
+                "Eviction is least-recently-used, so the answer a client just asked for is not the first to go",
+                "The cache is per-process: it does not survive a service restart"
+            ),
+            "DnsCacheBudgetTest.testCacheStaysInsideItsByteBudget and DnsCacheBudgetTest.testEvictionDropsTheLeastRecentlyUsedEntryFirst"
+        ),
+        cap(
             "dns-query-coalescing", "Concurrent lookups for one name share a single upstream query", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The cache key: protocol and endpoint, failover plan, DNSSEC mode, CD bit, domain:qtype:qclass"),
