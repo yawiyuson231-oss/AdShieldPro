@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.VideoAdNetworkCatalogTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T16:41:15.071Z" hostname="runnervmccnms" time="0.002">
+<testsuite name="com.adshield.pro.VideoAdNetworkCatalogTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:16.516Z" hostname="runnervmccnms" time="0.003">
   <properties/>
   <testcase name="testModeFlagsMatchTheDocumentedTiering" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.0"/>
   <testcase name="testPlaybackHostsAreNeverMatchedThroughAMediaDomain" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.001"/>
-  <testcase name="testNoCatalogueZoneCanBePlaybackInfrastructure" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.0"/>
-  <testcase name="testMatchingRespectsLabelBoundariesAndNormalisesInput" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.001"/>
+  <testcase name="testNoCatalogueZoneCanBePlaybackInfrastructure" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.001"/>
+  <testcase name="testMatchingRespectsLabelBoundariesAndNormalisesInput" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.0"/>
   <testcase name="testSafeAdInfrastructureIsBlockedInEveryMode" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.0"/>
-  <testcase name="testConditionalTierNeedsTheAggressiveModes" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.0"/>
+  <testcase name="testConditionalTierNeedsTheAggressiveModes" classname="com.adshield.pro.VideoAdNetworkCatalogTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

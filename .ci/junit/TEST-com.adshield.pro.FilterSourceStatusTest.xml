@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.FilterSourceStatusTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:15.505Z" hostname="runnervmccnms" time="0.001">
+  <properties/>
+  <testcase name="testTheStatusNeverClaimsPlaybackWasBlocked" classname="com.adshield.pro.FilterSourceStatusTest" time="0.001"/>
+  <testcase name="testSingularWording" classname="com.adshield.pro.FilterSourceStatusTest" time="0.0"/>
+  <testcase name="testRefusedPlaybackUnsafeLinesAreReported" classname="com.adshield.pro.FilterSourceStatusTest" time="0.0"/>
+  <testcase name="testAPlainSourceKeepsItsShortStatus" classname="com.adshield.pro.FilterSourceStatusTest" time="0.0"/>
+  <testcase name="testDuplicatesAndUnsafeLinesAreBothReported" classname="com.adshield.pro.FilterSourceStatusTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

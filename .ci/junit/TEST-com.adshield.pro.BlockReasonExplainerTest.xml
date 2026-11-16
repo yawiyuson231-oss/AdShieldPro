@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.BlockReasonExplainerTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:10.453Z" hostname="runnervmccnms" time="0.005">
+  <properties/>
+  <testcase name="testAnUnknownListNameIsReportedAsAListName" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.002"/>
+  <testcase name="testATemporaryAllowIsNeverDescribedAsABlock" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.0"/>
+  <testcase name="testRebindingExplanationSaysServfailBecauseTheNameExists" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.0"/>
+  <testcase name="testAllowedRowsAreNotDescribedAsBlocks" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.0"/>
+  <testcase name="testEveryEngineSourceIsExplainedByTheComponentThatDecided" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.001"/>
+  <testcase name="testAWholeRecordMapsThrough" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.0"/>
+  <testcase name="testTheBaselineExplanationKeepsItsHonestBoundary" classname="com.adshield.pro.BlockReasonExplainerTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

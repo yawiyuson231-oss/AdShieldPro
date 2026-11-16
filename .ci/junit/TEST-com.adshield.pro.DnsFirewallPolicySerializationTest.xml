@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.DnsFirewallPolicySerializationTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:14.775Z" hostname="runnervmccnms" time="0.004">
+  <properties/>
+  <testcase name="testConditionalTierDefaultsOffAndSurvivesARoundTrip" classname="com.adshield.pro.DnsFirewallPolicySerializationTest" time="0.004"/>
+  <testcase name="testSettingsWrittenBeforeTheFieldExistedStillDecode" classname="com.adshield.pro.DnsFirewallPolicySerializationTest" time="0.0"/>
+  <testcase name="testRoundTripKeepsTheBaselineSwitchedOff" classname="com.adshield.pro.DnsFirewallPolicySerializationTest" time="0.0"/>
+  <testcase name="testVideoAdBaselineDefaultsToEnabled" classname="com.adshield.pro.DnsFirewallPolicySerializationTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

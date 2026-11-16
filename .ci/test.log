@@ -188,6 +188,20 @@ BatteryIntelligenceTestSuite > testDiagnostics_needsTimeBeforeJudgingChargeSpeed
 
 BatteryIntelligenceTestSuite > testVoltageUnitNormalisation_handlesBothVendorConventions PASSED
 
+BlockReasonExplainerTest > testAnUnknownListNameIsReportedAsAListName PASSED
+
+BlockReasonExplainerTest > testATemporaryAllowIsNeverDescribedAsABlock PASSED
+
+BlockReasonExplainerTest > testRebindingExplanationSaysServfailBecauseTheNameExists PASSED
+
+BlockReasonExplainerTest > testAllowedRowsAreNotDescribedAsBlocks PASSED
+
+BlockReasonExplainerTest > testEveryEngineSourceIsExplainedByTheComponentThatDecided PASSED
+
+BlockReasonExplainerTest > testAWholeRecordMapsThrough PASSED
+
+BlockReasonExplainerTest > testTheBaselineExplanationKeepsItsHonestBoundary PASSED
+
 CapabilityRegistryTest > testSummaryCountsMatchTheRegistry PASSED
 
 CapabilityRegistryTest > testNoCapabilityClaimsCloudAiOrChargeControl PASSED
@@ -358,14 +372,19 @@ DnsCnameGuardTest > testRejectsMalformedAndNonResponseMessages PASSED
 
 DnsCnameGuardTest > testGuardBlocksOnlyBlockedHopsAndRespectsHopCap PASSED
 
-DnsNegativeCacheTtlTest > testNodataUsesTheSoaLifetimeToo FAILED
-    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:29
+DnsFirewallPolicySerializationTest > testConditionalTierDefaultsOffAndSurvivesARoundTrip PASSED
 
-DnsNegativeCacheTtlTest > testNothingNegativeIsCachedLongerThanThePositiveCeiling FAILED
-    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:23
+DnsFirewallPolicySerializationTest > testSettingsWrittenBeforeTheFieldExistedStillDecode PASSED
 
-DnsNegativeCacheTtlTest > testNxdomainUsesTheSmallerOfSoaTtlAndMinimum FAILED
-    java.lang.AssertionError at DnsNegativeCacheTtlTest.kt:17
+DnsFirewallPolicySerializationTest > testRoundTripKeepsTheBaselineSwitchedOff PASSED
+
+DnsFirewallPolicySerializationTest > testVideoAdBaselineDefaultsToEnabled PASSED
+
+DnsNegativeCacheTtlTest > testNodataUsesTheSoaLifetimeToo PASSED
+
+DnsNegativeCacheTtlTest > testNothingNegativeIsCachedLongerThanThePositiveCeiling PASSED
+
+DnsNegativeCacheTtlTest > testNxdomainUsesTheSmallerOfSoaTtlAndMinimum PASSED
 
 DnsNegativeCacheTtlTest > testNegativeAnswersWithoutSoaFallBackToAShortLifetime PASSED
 
@@ -375,6 +394,18 @@ DnsQueryCoalescingTest > testCoalescedAnswerIsRewrittenForTheRequestingTransacti
 
 DnsQueryCoalescingTest > testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller PASSED
 
+DnsRebindingGuardTest > testOnlyTheAggressiveModesEnforceTheGuard PASSED
+
+DnsRebindingGuardTest > testPrivateIpv4AnswersAreDetected PASSED
+
+DnsRebindingGuardTest > testPublicIpv4AnswersAreLeftAlone PASSED
+
+DnsRebindingGuardTest > testPrivateIpv6AnswersAreDetected PASSED
+
+DnsRebindingGuardTest > testLocalNamesAreExempt PASSED
+
+DnsRebindingGuardTest > testUnwalkableAnswersAreNeverJudged PASSED
+
 DnsResponseCacheTest > testCachedTtlsAreRewrittenToRemainingLifetime PASSED
 
 DnsResponseCacheTest > testOptRecordTtlIsLeftAlone PASSED
@@ -382,6 +413,31 @@ DnsResponseCacheTest > testOptRecordTtlIsLeftAlone PASSED
 DnsResponseCacheTest > testTtlIsClampedToAtLeastOneSecond PASSED
 
 DnsResponseCacheTest > testRewriterRejectsMalformedMessages PASSED
+
+DnsStaleFallbackTest > testOnlyAnExpiredAnswerInsideTheGraceWindowIsStaleServeable PASSED
+
+DnsStaleFallbackTest > testExpiredEntriesSurviveTrimmingOnlyWhileTheyCanStillHelp PASSED
+
+FilterSourceStatusTest > testTheStatusNeverClaimsPlaybackWasBlocked PASSED
+
+FilterSourceStatusTest > testSingularWording PASSED
+
+FilterSourceStatusTest > testRefusedPlaybackUnsafeLinesAreReported PASSED
+
+FilterSourceStatusTest > testAPlainSourceKeepsItsShortStatus PASSED
+
+FilterSourceStatusTest > testDuplicatesAndUnsafeLinesAreBothReported PASSED
+
+IdnHostnameTest > testAUnicodeRuleBlocksBothFormsOfTheQuery PASSED
+
+IdnHostnameTest > testToAsciiConvertsOnlyTheLabelsThatNeedIt FAILED
+    org.junit.ComparisonFailure at IdnHostnameTest.kt:42
+
+IdnHostnameTest > testThePlaybackGuardSeesTheSameHostInBothForms PASSED
+
+IdnHostnameTest > testAPunycodeRuleBlocksTheUnicodeQuery PASSED
+
+IdnHostnameTest > testATemporaryLeaseCoversBothForms PASSED
 
 InfinityCoreTestSuite > testWebDavPaths_rejectTraversalAndBuildSafeChildren PASSED
 
@@ -460,6 +516,14 @@ IntelligenceMapTestSuite > testFiltersMatchModuleSeverityRangeAndQuery PASSED
 IntelligenceMapTestSuite > testNetworkStateFollowsRealTunnelState PASSED
 
 IntelligenceMapTestSuite > testRepositoryDropsCorruptRowsOnRead PASSED
+
+LoginSafetyAllowlistTest > testLoginCriticalMatchingRespectsLabelBoundaries PASSED
+
+LoginSafetyAllowlistTest > testCaptivePortalChecksStayAllowed PASSED
+
+LoginSafetyAllowlistTest > testAggressiveRulesCannotBreakLoginsPaymentsOrCaptchas PASSED
+
+LoginSafetyAllowlistTest > testSafetyZonesNeverOverlapTheAdOrCdnZones PASSED
 
 LookupAndQrTestSuite > cidr containment matches real networks PASSED
 
@@ -683,6 +747,18 @@ TelegramCloudTestSuite > testEncryptedSessionThatCannotBeUnlockedIsWipedNotInven
 
 TelegramCloudTestSuite > testPrivateChannelConnectionCreatesChannelAndOnlyDesignatedChatIsQueried PASSED
 
+TemporaryAllowlistTest > testTheSoonestExpiringGrantIsEvictedWhenFull PASSED
+
+TemporaryAllowlistTest > testDurationIsClampedToTheBoundedWindow PASSED
+
+TemporaryAllowlistTest > testRevokeAndClearRemoveAccessImmediately PASSED
+
+TemporaryAllowlistTest > testAGrantExpiresAndDisappearsFromTheActiveList PASSED
+
+TemporaryAllowlistTest > testAPublicSuffixOrGarbageIsRefused PASSED
+
+TemporaryAllowlistTest > testAGrantCoversTheNameAndItsSubdomainsOnly PASSED
+
 VideoAdNetworkCatalogTest > testModeFlagsMatchTheDocumentedTiering PASSED
 
 VideoAdNetworkCatalogTest > testPlaybackHostsAreNeverMatchedThroughAMediaDomain PASSED
@@ -735,7 +811,7 @@ WorldMonitorTestSuite > testNewsParserKeepsTimezonesStrictInsteadOfGuessing PASS
 
 WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
-341 tests completed, 3 failed
+380 tests completed, 1 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -897,5 +973,5 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	... 30 more
 
 
-BUILD FAILED in 37s
+BUILD FAILED in 39s
 34 actionable tasks: 9 executed, 1 from cache, 24 up-to-date

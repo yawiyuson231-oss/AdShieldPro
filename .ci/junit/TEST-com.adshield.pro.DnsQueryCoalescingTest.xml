@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsQueryCoalescingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T16:41:13.624Z" hostname="runnervmccnms" time="0.71">
+<testsuite name="com.adshield.pro.DnsQueryCoalescingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:14.782Z" hostname="runnervmccnms" time="0.71">
   <properties/>
   <testcase name="testABurstOfIdenticalLookupsCostsOneUpstreamQuery" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.205"/>
   <testcase name="testCoalescedAnswerIsRewrittenForTheRequestingTransaction" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.303"/>
