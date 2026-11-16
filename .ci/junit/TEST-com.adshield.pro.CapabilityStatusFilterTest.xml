@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.CapabilityStatusFilterTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T14:28:03.465Z" hostname="ip-10-0-142-36" time="0.009">
+<testsuite name="com.adshield.pro.CapabilityStatusFilterTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T14:39:52.206Z" hostname="runnervmccnms" time="0.01">
   <properties/>
   <testcase name="eachStatusFilterMatchesTheRegistry" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.001"/>
   <testcase name="searchMatchesAreaAndLimitations" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.004"/>
   <testcase name="searchIsCaseInsensitiveAndCombinesWithStatus" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.003"/>
-  <testcase name="emptySearchShowsEveryFeature" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.0"/>
+  <testcase name="emptySearchShowsEveryFeature" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

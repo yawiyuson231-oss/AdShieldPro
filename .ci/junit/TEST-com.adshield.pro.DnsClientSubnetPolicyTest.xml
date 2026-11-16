@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsClientSubnetPolicyTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-16T14:28:07.671Z" hostname="ip-10-0-142-36" time="0.005">
+<testsuite name="com.adshield.pro.DnsClientSubnetPolicyTest" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-16T14:39:56.588Z" hostname="runnervmccnms" time="0.022">
   <properties/>
-  <testcase name="testClientSubnetOptionIsRemovedAndOtherOptionsSurvive" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.005">
-    <failure message="java.lang.IllegalStateException: query should be walkable" type="java.lang.IllegalStateException">java.lang.IllegalStateException: query should be walkable
-	at com.adshield.pro.DnsClientSubnetPolicyTest.testClientSubnetOptionIsRemovedAndOtherOptionsSurvive(DnsClientSubnetPolicyTest.kt:26)
+  <testcase name="testClientSubnetOptionIsRemovedAndOtherOptionsSurvive" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.021">
+    <failure message="java.lang.AssertionError" type="java.lang.AssertionError">java.lang.AssertionError
+	at org.junit.Assert.fail(Assert.java:87)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at org.junit.Assert.assertTrue(Assert.java:53)
+	at com.adshield.pro.DnsClientSubnetPolicyTest.testClientSubnetOptionIsRemovedAndOtherOptionsSurvive(DnsClientSubnetPolicyTest.kt:32)
 	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
 	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
@@ -48,7 +51,7 @@
 	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
 </failure>
   </testcase>
-  <testcase name="testClientSubnetIsForwardedOnlyForOptedInStreamingHosts" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.0"/>
+  <testcase name="testClientSubnetIsForwardedOnlyForOptedInStreamingHosts" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.001"/>
   <testcase name="testQueryWithoutClientSubnetIsReturnedUntouched" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.0"/>
   <testcase name="testMalformedQueryIsRejectedInsteadOfHalfRewritten" classname="com.adshield.pro.DnsClientSubnetPolicyTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>

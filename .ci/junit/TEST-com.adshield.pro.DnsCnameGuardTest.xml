@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsCnameGuardTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-16T14:28:07.678Z" hostname="ip-10-0-142-36" time="0.002">
+<testsuite name="com.adshield.pro.DnsCnameGuardTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-16T14:39:56.611Z" hostname="runnervmccnms" time="0.003">
   <properties/>
-  <testcase name="testOnlyAggressiveModesEnforceCloaking" classname="com.adshield.pro.DnsCnameGuardTest" time="0.0"/>
+  <testcase name="testOnlyAggressiveModesEnforceCloaking" classname="com.adshield.pro.DnsCnameGuardTest" time="0.001"/>
   <testcase name="testExtractsCnameTargetsFromWireResponse" classname="com.adshield.pro.DnsCnameGuardTest" time="0.0"/>
   <testcase name="testReturnsEmptyListWhenAnswerHasNoCname" classname="com.adshield.pro.DnsCnameGuardTest" time="0.0"/>
   <testcase name="testRejectsMalformedAndNonResponseMessages" classname="com.adshield.pro.DnsCnameGuardTest" time="0.0"/>
