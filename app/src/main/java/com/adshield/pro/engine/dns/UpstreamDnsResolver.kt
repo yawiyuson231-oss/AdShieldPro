@@ -230,6 +230,13 @@ class UpstreamDnsResolver @Inject constructor(
         )
         val plan = mediaAwareOrder(healthOrdered, config, query.questionDomain)
         val failures = mutableListOf<String>()
+        // Client-subnet normalisation happens once per resolve so every provider attempt sends
+        // exactly the same bytes.
+        val upstreamQueryPayload = if (forwardsClientSubnet(query.questionDomain, config)) {
+            query.rawPayload
+        } else {
+            DnsPacketCodec.stripEdnsClientSubnet(query.rawPayload) ?: query.rawPayload
+        }
 
         /**
          * One provider attempt. Returns only a response that passed
@@ -239,8 +246,8 @@ class UpstreamDnsResolver @Inject constructor(
             val providerStart = System.currentTimeMillis()
             healthMonitor.checkAvailable(endpoint.providerId, config.protocol, providerStart)
             val response = providerTransport?.query(query, config, endpoint)
-                ?: executeProviderQuery(query, config, endpoint)
-            val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
+                ?: executeProviderQuery(query, config, endpoint, upstreamQueryPayload)
+            val inspection = DnsResponseValidator.validate(upstreamQueryPayload, response, config.dnssecMode)
             val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
             healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
             val protocol = "${config.protocol.name} (${endpoint.displayName}) · ${inspection.dnssecStatus.name}"
@@ -364,11 +371,12 @@ class UpstreamDnsResolver @Inject constructor(
     private fun executeProviderQuery(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig,
-        endpoint: DnsProviderEndpoint
+        endpoint: DnsProviderEndpoint,
+        payload: ByteArray
     ): ByteArray = when (config.protocol) {
-        DnsProtocol.DOH -> queryDoh(query.rawPayload, endpoint.dohUrl)
-        DnsProtocol.DOT -> queryDot(query.rawPayload, endpoint, config.enableIpv6)
-        DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6)
+        DnsProtocol.DOH -> queryDoh(payload, endpoint.dohUrl)
+        DnsProtocol.DOT -> queryDot(payload, endpoint, config.enableIpv6)
+        DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6, payload)
     }
 
     fun providerHealthSnapshots(): List<DnsProviderHealth> = healthMonitor.snapshots()
@@ -463,7 +471,8 @@ class UpstreamDnsResolver @Inject constructor(
     fun queryUdpOrTcp(
         query: DnsPacketCodec.ParsedDnsQuery,
         endpoint: DnsProviderEndpoint,
-        enableIpv6: Boolean = true
+        enableIpv6: Boolean = true,
+        payload: ByteArray = query.rawPayload
     ): ByteArray {
         val servers = buildList {
             addAll(endpoint.ipv4Addresses)
@@ -473,11 +482,11 @@ class UpstreamDnsResolver @Inject constructor(
 
         for (serverIp in servers) {
             try {
-                val udpResponse = querySingleUdpServer(query.rawPayload, serverIp)
+                val udpResponse = querySingleUdpServer(payload, serverIp)
                 // Check TC (Truncation) bit (0x0200 in flags)
                 val flags = ((udpResponse[2].toInt() and 0xFF) shl 8) or (udpResponse[3].toInt() and 0xFF)
                 if ((flags and 0x0200) != 0) {
-                    return querySingleTcpServer(query.rawPayload, serverIp)
+                    return querySingleTcpServer(payload, serverIp)
                 }
                 return udpResponse
             } catch (t: Throwable) {
@@ -554,6 +563,16 @@ class UpstreamDnsResolver @Inject constructor(
          * so ordinary browsing is unaffected and no provider outside the user's plan
          * is ever contacted.
          */
+        /**
+         * Whether the client subnet may be forwarded upstream for [domain].
+         *
+         * Geo-accurate answers for streaming hosts are the only reason this app lets a client
+         * subnet reach the resolver. Every other query is normalised, so a CDN cannot use a
+         * forwarded subnet to link unrelated lookups from the same device.
+         */
+        internal fun forwardsClientSubnet(domain: String, config: DnsResolverConfig): Boolean =
+            config.preferGeoAccurateMediaDns && DnsMediaPlaybackGuard.isProtectedPlaybackHost(domain)
+
         internal fun mediaAwareOrder(
             plan: List<DnsProviderEndpoint>,
             config: DnsResolverConfig,

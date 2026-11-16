@@ -20,6 +20,7 @@ object DnsPacketCodec {
     const val TYPE_SVCB = 64
     const val TYPE_HTTPS = 65
     const val TYPE_OPT = 41
+    const val EDNS_OPTION_CLIENT_SUBNET = 8
 
     const val CLASS_IN = 1
 
@@ -445,6 +446,117 @@ object DnsPacketCodec {
         // Trailing bytes would let two parsers disagree about the same message.
         if (offset != message.size) return null
         return targets
+    }
+
+    /**
+     * Removes the EDNS Client Subnet option (RFC 7871) from an outgoing query.
+     *
+     * A forwarding resolver that receives a client subnet can hand it to authoritative servers,
+     * which lets a CDN correlate unrelated lookups from the same device. The app only needs a
+     * client subnet for the streaming hosts where geo-accurate answers were opted into, so every
+     * other query is normalised before it leaves the tunnel.
+     *
+     * Every other option (cookie, padding, ...), the OPT record's UDP payload size, its extended
+     * RCODE/version and the DO bit are preserved byte for byte. Returns the untouched array when
+     * the query has no client subnet option, and null when the message cannot be walked safely so
+     * the caller can forward the original query rather than a half-rewritten one.
+     */
+    fun stripEdnsClientSubnet(query: ByteArray): ByteArray? {
+        if (query.size < 12) return null
+        val questionCount = u16At(query, 4)
+        val answerCount = u16At(query, 6)
+        val authorityCount = u16At(query, 8)
+        val additionalCount = u16At(query, 10)
+        var offset = 12
+        repeat(questionCount) {
+            val name = readDomainName(query, 0, offset, query.size) ?: return null
+            offset = name.nextOffset + 4
+            if (offset > query.size) return null
+        }
+        repeat(answerCount + authorityCount) {
+            offset = readResourceRecord(query, offset)?.nextOffset ?: return null
+        }
+        val additionalStart = offset
+        val additional = ArrayList<WireRecord>(additionalCount)
+        repeat(additionalCount) {
+            val record = readResourceRecord(query, offset) ?: return null
+            offset = record.nextOffset
+            additional += record
+        }
+        // Trailing bytes would let two parsers disagree about the same message.
+        if (offset != query.size) return null
+
+        val out = ByteArrayOutputStream(query.size)
+        var changed = false
+        for (record in additional) {
+            val stripped = if (record.type == TYPE_OPT) {
+                stripClientSubnetOption(query, record.dataStart, record.dataLength)
+            } else {
+                null
+            }
+            if (stripped == null) {
+                out.write(query, record.start, record.nextOffset - record.start)
+            } else {
+                changed = true
+                out.write(query, record.start, record.typeOffset + 8 - record.start)
+                writeU16(out, stripped.size)
+                out.write(stripped)
+            }
+        }
+        if (!changed) return query
+        val rebuilt = ByteArrayOutputStream(query.size)
+        rebuilt.write(query, 0, additionalStart)
+        val additionalBytes = out.toByteArray()
+        rebuilt.write(additionalBytes, 0, additionalBytes.size)
+        return rebuilt.toByteArray()
+    }
+
+    private fun stripClientSubnetOption(packet: ByteArray, dataStart: Int, dataLength: Int): ByteArray? {
+        val end = dataStart + dataLength
+        val kept = ByteArrayOutputStream(dataLength)
+        var position = dataStart
+        var removed = false
+        while (position < end) {
+            if (position + 4 > end) return null
+            val code = u16At(packet, position)
+            val length = u16At(packet, position + 2)
+            if (position + 4 + length > end) return null
+            if (code == EDNS_OPTION_CLIENT_SUBNET) {
+                removed = true
+            } else {
+                kept.write(packet, position, 4 + length)
+            }
+            position += 4 + length
+        }
+        return if (removed) kept.toByteArray() else null
+    }
+
+    private data class WireRecord(
+        val start: Int,
+        val nameEnd: Int,
+        val typeOffset: Int,
+        val nextOffset: Int,
+        val type: Int,
+        val dataStart: Int,
+        val dataLength: Int
+    )
+
+    private fun readResourceRecord(packet: ByteArray, startPos: Int): WireRecord? {
+        val name = readDomainName(packet, 0, startPos, packet.size) ?: return null
+        val typeOffset = name.nextOffset
+        if (typeOffset + 10 > packet.size) return null
+        val dataLength = u16At(packet, typeOffset + 8)
+        val dataStart = typeOffset + 10
+        if (dataStart + dataLength > packet.size) return null
+        return WireRecord(
+            start = startPos,
+            nameEnd = name.nextOffset,
+            typeOffset = typeOffset,
+            nextOffset = dataStart + dataLength,
+            type = u16At(packet, typeOffset),
+            dataStart = dataStart,
+            dataLength = dataLength
+        )
     }
 
     private fun u16At(bytes: ByteArray, offset: Int): Int =

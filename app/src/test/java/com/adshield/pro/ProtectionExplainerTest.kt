@@ -140,5 +140,13 @@ class ProtectionExplainerTest {
             "the upstream note must explain the no-downgrade rule",
             ProtectionExplainer.UPSTREAM_NOTE.contains("plaintext", ignoreCase = true)
         )
+        assertTrue(
+            "the client-subnet note must name the option it removes",
+            ProtectionExplainer.CLIENT_SUBNET_NOTE.contains("EDNS Client Subnet")
+        )
+        assertTrue(
+            "the client-subnet note must keep the streaming exception honest",
+            ProtectionExplainer.CLIENT_SUBNET_NOTE.contains("streaming", ignoreCase = true)
+        )
     }
 }

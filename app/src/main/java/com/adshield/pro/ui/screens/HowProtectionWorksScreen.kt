@@ -94,6 +94,9 @@ fun HowProtectionWorksScreen(onBack: () -> Unit) {
             item { SectionTitle("Upstream transports") }
             item { PointsCard(ProtectionExplainer.UPSTREAM_MODES) }
             item { NoteCard(ProtectionExplainer.UPSTREAM_NOTE) }
+
+            item { SectionTitle("Privacy of each lookup") }
+            item { NoteCard(ProtectionExplainer.CLIENT_SUBNET_NOTE) }
         }
     }
 }

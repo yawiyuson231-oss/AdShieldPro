@@ -168,6 +168,15 @@ object ProtectionExplainer {
         ExplainerPoint(title = protocol.label, detail = protocol.description)
     }
 
+    /**
+     * What leaves the tunnel about the user's network position: nothing, unless the user opted
+     * into geo-accurate answers for a streaming host.
+     */
+    const val CLIENT_SUBNET_NOTE =
+        "Queries leave the tunnel without the EDNS Client Subnet option, so a CDN cannot use your " +
+            "network position to link unrelated lookups. The one exception is a streaming host you opted " +
+            "into geo-accurate answers for; there the subnet is kept so the nearest edge is returned."
+
     const val UPSTREAM_NOTE =
         "If the encrypted upstream fails, AdShield returns SERVFAIL rather than quietly " +
             "downgrading to plaintext. Opt-in failover only moves between providers you selected."

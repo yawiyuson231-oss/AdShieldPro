@@ -113,6 +113,20 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-client-subnet-privacy", "Client subnet is forwarded only for opted-in streaming hosts", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
+            listOf(
+                "Outgoing query wire format, including the EDNS0 OPT record and its options",
+                "The streaming host allowlist that geo-accurate media DNS was already scoped to"
+            ),
+            listOf(
+                "Only the EDNS Client Subnet option (code 8) is removed; cookies, padding and the DO bit are preserved",
+                "A query the codec cannot walk is forwarded unchanged rather than half-rewritten",
+                "Geo-accurate media answers still need a client subnet, so the option is kept for those hosts when the user left that preference on"
+            ),
+            "DnsClientSubnetPolicyTest.testClientSubnetOptionIsRemovedAndOtherOptionsSurvive and DnsClientSubnetPolicyTest.testClientSubnetIsForwardedOnlyForOptedInStreamingHosts and DnsClientSubnetPolicyTest.testMalformedQueryIsRejectedInsteadOfHalfRewritten"
+        ),
+        cap(
             "dns-cache-ttl-aging", "Cache hits report the TTL the entry has left", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
             listOf(
