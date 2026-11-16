@@ -4,12 +4,14 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.engine.filter.DnsMediaPlaybackGuard
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -66,7 +68,9 @@ class UpstreamDnsResolver @Inject constructor(
         val fromCache: Boolean,
         val latencyMs: Int,
         val providerId: String? = null,
-        val dnssecStatus: DnssecStatus? = null
+        val dnssecStatus: DnssecStatus? = null,
+        /** True when this answer was produced by another coroutine's query for the same name. */
+        val coalesced: Boolean = false
     )
 
     private data class CachedDnsEntry(
@@ -74,6 +78,15 @@ class UpstreamDnsResolver @Inject constructor(
         val expiresAtEpochMs: Long,
         val protocolOrigin: String
     )
+
+    /**
+     * Queries currently waiting on an upstream answer, keyed by cache key.
+     *
+     * A single page load fires many lookups for the same name; without this, each one becomes its
+     * own upstream round trip. Followers wait for the leader with a bounded timeout and then fall
+     * back to their own query, so a cancelled or stalled leader can never strand a client.
+     */
+    private val inFlight = HashMap<String, CompletableDeferred<UpstreamResult>>()
 
     private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > 1024
@@ -202,7 +215,7 @@ class UpstreamDnsResolver @Inject constructor(
     suspend fun resolve(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig
-    ): UpstreamResult = withContext(Dispatchers.IO) {
+    ): UpstreamResult {
         val now = System.currentTimeMillis()
         val cacheKey = buildCacheKey(query, config)
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
@@ -214,7 +227,7 @@ class UpstreamDnsResolver @Inject constructor(
                 val remainingSeconds = (((cached.expiresAtEpochMs - now) + 999L) / 1000L).toInt()
                 val aged = DnsPacketCodec.rewriteResponseTtls(cached.wireResponse, remainingSeconds)
                     ?: cached.wireResponse
-                return@withContext UpstreamResult(
+                return UpstreamResult(
                     responseBytes = DnsPacketCodec.rewriteTransactionId(aged, query.transactionId),
                     protocolUsed = "${cached.protocolOrigin} (Cached)",
                     fromCache = true,
@@ -223,6 +236,59 @@ class UpstreamDnsResolver @Inject constructor(
             }
             synchronized(dnsCache) { dnsCache.remove(cacheKey) }
         }
+
+        // Single-flight: the first caller resolves, everyone asking the same question while that
+        // is in progress shares the answer instead of opening a second upstream connection.
+        val mine = CompletableDeferred<UpstreamResult>()
+        val leader = synchronized(inFlight) {
+            val existing = inFlight[cacheKey]
+            if (existing == null) {
+                inFlight[cacheKey] = mine
+                null
+            } else {
+                existing
+            }
+        }
+        if (leader != null) {
+            val shared = runCatching {
+                withTimeoutOrNull(FOLLOWER_TIMEOUT_MS) { leader.await() }
+            }.getOrNull()
+            if (shared != null) {
+                // The shared answer carries the leader's transaction ID, so it must be rewritten
+                // for this client before it is handed back.
+                return shared.copy(
+                    responseBytes = DnsPacketCodec.rewriteTransactionId(
+                        shared.responseBytes,
+                        query.transactionId
+                    ),
+                    coalesced = true
+                )
+            }
+        }
+
+        return try {
+            val result = resolveUncached(query, config, cacheKey)
+            mine.complete(result)
+            result
+        } catch (t: Throwable) {
+            mine.completeExceptionally(t)
+            throw t
+        } finally {
+            synchronized(inFlight) {
+                if (inFlight[cacheKey] === mine) inFlight.remove(cacheKey)
+            }
+        }
+    }
+
+    /**
+     * The upstream half of [resolve]: provider plan, racing, validation, caching and the
+     * fail-closed SERVFAIL. Only reached by the coroutine that owns the cache key.
+     */
+    private suspend fun resolveUncached(
+        query: DnsPacketCodec.ParsedDnsQuery,
+        config: DnsResolverConfig,
+        cacheKey: String
+    ): UpstreamResult = withContext(Dispatchers.IO) {
 
         val configuredPlan = DnsProviderRegistry.queryPlan(config)
         val healthOrdered = DnsProviderRegistry.orderedByHealth(
@@ -623,6 +689,13 @@ class UpstreamDnsResolver @Inject constructor(
          * millisecond the app waits before the failover provider is even tried.
          */
         private const val UDP_TIMEOUT_MS = 2500
+
+        /**
+         * How long a coalesced follower waits for the leader's answer before resolving on its own.
+         * Comfortably longer than one provider timeout, short enough that a stalled leader cannot
+         * turn into a visibly hung app.
+         */
+        private const val FOLLOWER_TIMEOUT_MS = 5_000L
 
         fun transactionIdOf(rawDnsMessage: ByteArray): Int {
             if (rawDnsMessage.size < 2) return -1
