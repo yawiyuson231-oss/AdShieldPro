@@ -65,19 +65,19 @@ object PlaybackSafetyAudit {
                     "Check that a filter list is loaded and that the video-ad baseline is on.",
                 severity = Severity.WARNING
             )
-        } else if (uncovered.isNotEmpty()) {
-            findings += Finding(
-                title = "${uncovered.size} advert zone(s) not covered",
-                detail = uncovered.joinToString(", ") { it.first } +
-                    " are not refused, which is normal when those networks are not in your lists.",
-                severity = Severity.WARNING
-            )
         }
 
+        // Partial coverage is normal and is reported as a fact, not a warning: no configuration
+        // covers every advert network that exists, and calling that a warning trains people to
+        // ignore warnings.
         if (findings.none { it.severity == Severity.WARNING || it.severity == Severity.PROBLEM }) {
+            val covered = ADVERT_PROBES.size - uncovered.size
             findings += Finding(
                 title = "Advert blocking is active",
-                detail = "At least one advert zone is refused and no media zone is, which is the shape you want.",
+                detail = "$covered of ${ADVERT_PROBES.size} advert zones this check probes are refused and no " +
+                    "media zone is, which is the shape you want." +
+                    if (uncovered.isEmpty()) "" else " Not in your coverage: " +
+                        uncovered.joinToString(", ") { it.first } + ".",
                 severity = Severity.OK
             )
         }
