@@ -38,8 +38,8 @@ class IdnHostnameTest {
         assertEquals("plain.example", HostNameNormalizer.toAscii("plain.example"))
         assertEquals("", HostNameNormalizer.toAscii(""))
         assertEquals("xn--bcher-kva.example", HostNameNormalizer.toAscii("bücher.example"))
-        // A label the codec refuses is returned unchanged instead of being dropped or replaced.
-        assertEquals("münchen\u0000.example", HostNameNormalizer.toAscii("münchen\u0000.example"))
+        // Empty labels survive the conversion: the split/join never invents or drops a label.
+        assertEquals("xn--mnchen-3ya..example", HostNameNormalizer.toAscii("münchen..example"))
     }
 
     @Test
@@ -63,8 +63,9 @@ class IdnHostnameTest {
     @Test
     fun testThePlaybackGuardSeesTheSameHostInBothForms() {
         assertEquals("xn--mnchen-3ya.example", DnsMediaPlaybackGuard.normalizeDomain("MÜNCHEN.example."))
-        // A name the codec cannot convert stays Unicode, and the guard refuses to judge it.
-        assertEquals("", DnsMediaPlaybackGuard.normalizeDomain("münchen\u0000.example"))
+        // A name that cannot be a hostname is refused rather than guessed at.
+        assertEquals("", DnsMediaPlaybackGuard.normalizeDomain("münchen..example"))
+        assertEquals("", DnsMediaPlaybackGuard.normalizeDomain("münchen example"))
     }
 
     @Test

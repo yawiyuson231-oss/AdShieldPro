@@ -41,7 +41,12 @@ object BlockReasonExplainer {
                 body = "${rule ?: "This zone"} belongs to video ad serving, verification or measurement. It was " +
                     "refused before any upstream lookup, so this works even with no filter list loaded. Zones that " +
                     "carry playback are never in the baseline.",
-                action = "Allow it to exempt just this domain, or pause the baseline in Settings.",
+                action = if (rule?.contains("probable playback stall") == true) {
+                    "This app asked for the same zone repeatedly, which is how a stalled advert step looks. " +
+                        "Press \"Allow 15 min\" if the app is stuck right now."
+                } else {
+                    "Allow it to exempt just this domain, or pause the baseline in Settings."
+                },
                 isBlock = true
             )
             "CNAME cloaking guard" -> Explanation(

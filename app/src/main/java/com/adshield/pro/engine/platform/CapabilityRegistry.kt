@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "playback-stall-signal", "A player that keeps asking for a refused zone is flagged as a possible stall", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/PlaybackStallDetector.kt", emptyList(),
+            listOf("The app package and query name of each baseline block, recorded by the DNS service"),
+            listOf("A symptom, not a diagnosis: it never unblocks on its own and only annotates the log row", "Three asks inside twenty seconds for the same app and zone; at most 256 pairs are tracked and stale ones are forgotten", "Ordinary advert refresh traffic can trigger it, so the wording says 'possible' and the decision stays with the user"),
+            "PlaybackStallDetectorTest.testTheThirdAskInsideTheWindowIsTheSignal and PlaybackStallDetectorTest.testAsksSpreadBeyondTheWindowNeverSignal and PlaybackStallDetectorTest.testDifferentAppsAndDifferentZonesAreNotCombined and BlockReasonExplainerTest.testAProbableStallOffersTheLeaseInsteadOfAGenericAdvice"
+        ),
+        cap(
             "idn-hostname-parity", "A Unicode host and its punycode form are the same host to filtering", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/HostNameNormalizer.kt", emptyList(),
             listOf("The query name from each DNS message, the pattern of every loaded rule, and each catalogue and lease lookup"),

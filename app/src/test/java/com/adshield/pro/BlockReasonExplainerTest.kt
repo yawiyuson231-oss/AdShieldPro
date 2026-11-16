@@ -81,6 +81,26 @@ class BlockReasonExplainerTest {
     }
 
     @Test
+    fun testAProbableStallOffersTheLeaseInsteadOfAGenericAdvice() {
+        val stalled = BlockReasonExplainer.explain(
+            sourceName = "Video ad infrastructure",
+            matchedRule = "doubleclick.net · probable playback stall",
+            category = RuleCategory.ADS,
+            isBlocked = true
+        )
+        assertTrue(stalled.action.contains("Allow 15 min"))
+        assertTrue("the hint must stay a hint", stalled.action.contains("looks"))
+
+        val ordinary = BlockReasonExplainer.explain(
+            sourceName = "Video ad infrastructure",
+            matchedRule = "doubleclick.net",
+            category = RuleCategory.ADS,
+            isBlocked = true
+        )
+        assertFalse("a single block must not be called a stall", ordinary.action.contains("Allow 15 min"))
+    }
+
+    @Test
     fun testATemporaryAllowIsNeverDescribedAsABlock() {
         val explanation = BlockReasonExplainer.explain(
             sourceName = "Temporary allow",

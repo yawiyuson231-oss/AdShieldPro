@@ -31,6 +31,7 @@ import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.PlaybackStallDetector
 import com.adshield.pro.engine.filter.TemporaryAllowlist
 import com.adshield.pro.engine.filter.VideoAdNetworkCatalog
 import dagger.hilt.android.AndroidEntryPoint
@@ -69,6 +70,7 @@ class AdShieldDnsService : VpnService() {
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
     @Inject lateinit var temporaryAllowlist: TemporaryAllowlist
+    @Inject lateinit var playbackStallDetector: PlaybackStallDetector
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var tunInterface: ParcelFileDescriptor? = null
@@ -447,6 +449,10 @@ class AdShieldDnsService : VpnService() {
             null
         }
         if (videoAdMatch?.blocked == true) {
+            // A player that keeps asking for the same refused zone is the visible shape of a stalled
+            // advert step. The signal is recorded with the block so the log can offer the lease at
+            // the moment it matters; it never unblocks anything on its own.
+            val stall = playbackStallDetector.record(app?.packageName, query.questionDomain)
             val blockedBytes = DnsPacketCodec.buildBlockedResponse(
                 query = query,
                 sinkholeZeroIp = enforcementMode.blockSinkholeZeroIp
@@ -456,7 +462,11 @@ class AdShieldDnsService : VpnService() {
                 queryType = query.qTypeName,
                 isBlocked = true,
                 category = RuleCategory.ADS,
-                matchedRule = videoAdMatch.entry.suffix,
+                matchedRule = if (stall != null) {
+                    "${videoAdMatch.entry.suffix} · probable playback stall"
+                } else {
+                    videoAdMatch.entry.suffix
+                },
                 sourceList = "Video ad infrastructure",
                 latencyMs = 0,
                 protocolUsed = if (enforcementMode.blockSinkholeZeroIp) "Sinkhole 0.0.0.0" else "Local NXDOMAIN",
