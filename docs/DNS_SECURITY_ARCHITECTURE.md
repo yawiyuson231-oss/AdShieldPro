@@ -129,6 +129,13 @@ CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, a
 debug and R8 release APKs, ran the full JVM suite, Android lint, the test-count gate and the APK
 installability gate successfully.
 
+The cache, client-subnet and question-binding work above is covered by CI run `43888284328` on
+branch `arena/906f38de-adshieldpro`: Kotlin compiled, the debug and R8 release APKs assembled,
+315 JVM tests passed, Android lint, the test-count gate and the APK installability gate all
+succeeded. Two fixture defects were found by that run and fixed before it went green (option
+fields written into the message instead of the OPT RDATA, and signed-byte comparison of the OPT
+payload-size bytes); the pipeline code itself did not change.
+
 ## 8. What is still unverified
 
 - No physical device or emulator run: VPN routing, per-app attribution, battery impact and
