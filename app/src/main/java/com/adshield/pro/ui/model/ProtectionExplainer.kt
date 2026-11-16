@@ -208,6 +208,12 @@ object ProtectionExplainer {
                 "served with a 30 second lifetime instead of SERVFAIL, so pages keep loading while you recover."
         ),
         ExplainerPoint(
+            title = "A dead resolver is not re-walked for every lookup",
+            detail = "When every provider has just failed for a name, the failure is remembered for fifteen seconds " +
+                "so a page's burst of retries fails fast instead of walking the whole provider plan again for each " +
+                "one. A recently expired answer is still preferred over a remembered failure."
+        ),
+        ExplainerPoint(
             title = "Negative answers expire with the zone",
             detail = "NXDOMAIN and \"no record of this type\" answers live exactly as long as the zone's SOA " +
                 "record allows, between 15 seconds and 30 minutes, and never longer."

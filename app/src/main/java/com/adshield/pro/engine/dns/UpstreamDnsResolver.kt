@@ -106,6 +106,9 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     private var currentDatagramProtector: ((DatagramSocket) -> Boolean)? = null
 
+    /** RFC 2308 §7.1 failure cache: a dead upstream must not be re-walked for every lookup. */
+    internal val failureCache = DnsFailureCache()
+
     fun bindSocketProtectors(
         protectTcp: ((Socket) -> Boolean)?,
         protectUdp: ((DatagramSocket) -> Boolean)?
@@ -118,6 +121,8 @@ class UpstreamDnsResolver @Inject constructor(
         synchronized(dnsCache) {
             dnsCache.clear()
         }
+        // A user who clears the cache is asking for a fresh start, including remembered failures.
+        failureCache.clearAll()
     }
 
     /**
@@ -328,6 +333,19 @@ class UpstreamDnsResolver @Inject constructor(
         cacheKey: String
     ): UpstreamResult = withContext(Dispatchers.IO) {
 
+        // A failure remembered a moment ago saves walking the whole plan again for the same
+        // question. A recently expired answer still wins, because it is a real answer.
+        val failureRemainingMs = failureCache.remainingMs(cacheKey)
+        if (failureRemainingMs > 0L) {
+            resolveStale(cacheKey, query)?.let { return@withContext it }
+            return@withContext UpstreamResult(
+                responseBytes = DnsPacketCodec.buildServFailResponse(query),
+                protocolUsed = "SERVFAIL (cached failure, ${((failureRemainingMs + 999L) / 1000L)}s left)",
+                fromCache = true,
+                latencyMs = 0
+            )
+        }
+
         val configuredPlan = DnsProviderRegistry.queryPlan(config)
         val healthOrdered = DnsProviderRegistry.orderedByHealth(
             configuredPlan, healthMonitor, config.protocol, config.fastestHealthyProvider
@@ -461,13 +479,18 @@ class UpstreamDnsResolver @Inject constructor(
             }
         }
 
-        if (resolved != null) return@withContext resolved as UpstreamResult
+        if (resolved != null) {
+            failureCache.clear(cacheKey)
+            return@withContext resolved as UpstreamResult
+        }
 
         // A recently expired answer beats SERVFAIL when the upstream is down.
         resolveStale(cacheKey, query)?.let { return@withContext it }
 
         // Fail closed at the DNS protocol layer: return SERVFAIL, never an unvalidated response
-        // and never an implicit plaintext downgrade.
+        // and never an implicit plaintext downgrade. The failure is remembered briefly so the next
+        // burst of lookups for this name fails fast instead of re-walking a dead plan.
+        failureCache.recordFailure(cacheKey)
         UpstreamResult(
             responseBytes = DnsPacketCodec.buildServFailResponse(query),
             protocolUsed = "SERVFAIL (${failures.joinToString("; ").take(180)})",

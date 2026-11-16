@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "dns-failure-cache", "RFC 2308 failure caching so a dead upstream is not re-walked per lookup", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFailureCache.kt", emptyList(),
+            listOf("The cache key of each upstream attempt: question name, type, class, protocol and resolver preset"),
+            listOf("Fifteen seconds and at most 512 entries; the failure nearest to expiry is evicted first", "Never used while a fresh or stale answer exists, and cleared by the user's cache reset", "It shortens the burst of retries, it does not repair a broken network"),
+            "DnsFailureCacheTest.testAFailureIsRememberedOnlyForItsWindow and DnsFailureCacheTest.testAResolverAnswersFromTheFailureCacheWithoutTouchingTheNetwork and DnsFailureCacheTest.testClearCacheForgetsRememberedFailuresSoRecoveryIsImmediate"
+        ),
+        cap(
             "playback-stall-signal", "A player that keeps asking for a refused zone is flagged as a possible stall", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/PlaybackStallDetector.kt", emptyList(),
             listOf("The app package and query name of each baseline block, recorded by the DNS service"),
