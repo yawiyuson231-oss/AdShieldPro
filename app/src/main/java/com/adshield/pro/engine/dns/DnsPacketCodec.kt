@@ -19,6 +19,7 @@ object DnsPacketCodec {
     const val TYPE_AAAA = 28
     const val TYPE_SVCB = 64
     const val TYPE_HTTPS = 65
+    const val TYPE_OPT = 41
 
     const val CLASS_IN = 1
 
@@ -361,6 +362,46 @@ object DnsPacketCodec {
         }
         // Trailing bytes are not a valid DNS message and can conceal parser differentials.
         return if (offset == message.size) types else null
+    }
+
+    /**
+     * Rewrites every resource-record TTL to [ttlSeconds] so a cache hit reports the time the entry
+     * still has left instead of its original lifetime.
+     *
+     * EDNS0 OPT records are skipped: their TTL field carries extended RCODE and flag bits, not a
+     * lifetime. Returns null when the message is malformed, so callers fall back to the stored
+     * bytes rather than serving a half-rewritten answer.
+     */
+    fun rewriteResponseTtls(message: ByteArray, ttlSeconds: Int): ByteArray? {
+        if (message.size < 12) return null
+        val questionCount = u16At(message, 4)
+        val recordCount = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
+        if (questionCount != 1 || recordCount > 4096) return null
+
+        val copy = message.copyOf()
+        var offset = 12
+        val question = readDomainName(copy, 0, offset, copy.size) ?: return null
+        offset = question.nextOffset + 4
+        if (offset > copy.size) return null
+
+        val ttl = ttlSeconds.coerceAtLeast(1)
+        repeat(recordCount) {
+            val owner = readDomainName(copy, 0, offset, copy.size) ?: return null
+            offset = owner.nextOffset
+            if (offset + 10 > copy.size) return null
+            val type = u16At(copy, offset)
+            if (type != TYPE_OPT) {
+                val ttlOffset = offset + 4
+                copy[ttlOffset] = ((ttl ushr 24) and 0xFF).toByte()
+                copy[ttlOffset + 1] = ((ttl ushr 16) and 0xFF).toByte()
+                copy[ttlOffset + 2] = ((ttl ushr 8) and 0xFF).toByte()
+                copy[ttlOffset + 3] = (ttl and 0xFF).toByte()
+            }
+            offset += 10 + u16At(copy, offset + 8)
+            if (offset > copy.size) return null
+        }
+        if (offset != copy.size) return null
+        return copy
     }
 
     /**

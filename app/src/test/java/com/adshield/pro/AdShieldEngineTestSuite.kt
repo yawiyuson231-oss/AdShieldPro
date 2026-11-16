@@ -5,6 +5,7 @@ import com.adshield.pro.domain.model.BatteryThermalSnapshot
 import com.adshield.pro.domain.model.BottleneckSeverity
 import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.DnsProtocol
+import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.RamSnapshot
@@ -573,6 +574,14 @@ class AdShieldEngineTestSuite {
         assertTrue(cloudflareKey.endsWith("|cache.example.com:1:1"))
         assertFalse(cloudflareKey == UpstreamDnsResolver.buildCacheKey(query, quad9))
         assertFalse(cloudflareKey == UpstreamDnsResolver.buildCacheKey(query, cloudflare.copy(protocol = DnsProtocol.DOT)))
+        // Validation policy is part of the answer's meaning: a REPORT_ONLY answer must not be
+        // replayed under strict authenticated-answer enforcement.
+        assertFalse(
+            cloudflareKey == UpstreamDnsResolver.buildCacheKey(
+                query,
+                cloudflare.copy(dnssecMode = DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS)
+            )
+        )
     }
 
     @Test

@@ -208,8 +208,14 @@ class UpstreamDnsResolver @Inject constructor(
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
         if (cached != null) {
             if (cached.expiresAtEpochMs > now) {
+                // A cache hit must report the lifetime it has left, not the lifetime it had when
+                // it was stored: clients honour the TTL they are handed, so serving the original
+                // value would let them keep a stale answer past its real expiry.
+                val remainingSeconds = (((cached.expiresAtEpochMs - now) + 999L) / 1000L).toInt()
+                val aged = DnsPacketCodec.rewriteResponseTtls(cached.wireResponse, remainingSeconds)
+                    ?: cached.wireResponse
                 return@withContext UpstreamResult(
-                    responseBytes = DnsPacketCodec.rewriteTransactionId(cached.wireResponse, query.transactionId),
+                    responseBytes = DnsPacketCodec.rewriteTransactionId(aged, query.transactionId),
                     protocolUsed = "${cached.protocolOrigin} (Cached)",
                     fromCache = true,
                     latencyMs = 0
@@ -655,7 +661,12 @@ class UpstreamDnsResolver @Inject constructor(
             val failoverScope = if (config.failoverEnabled && config.protocol != DnsProtocol.UDP_TCP) {
                 "|plan=" + DnsProviderRegistry.queryPlan(config).joinToString(",") { it.providerId }
             } else ""
-            return "${config.protocol.name}@$endpoint$failoverScope|${query.cacheKey}"
+            // DNSSEC mode and the checking-disabled bit change what a valid answer means. An
+            // answer accepted under REPORT_ONLY must never be replayed once the user switches to
+            // REQUIRE_AUTHENTICATED_ANSWERS, and a CD=1 answer is not interchangeable with a
+            // checked one.
+            val validationScope = "|dnssec=${config.dnssecMode.name}|cd=${query.flags and 0x0010 != 0}"
+            return "${config.protocol.name}@$endpoint$failoverScope$validationScope|${query.cacheKey}"
         }
     }
 }

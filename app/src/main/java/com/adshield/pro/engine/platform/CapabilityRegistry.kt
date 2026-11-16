@@ -113,6 +113,19 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-cache-ttl-aging", "Cache hits report the TTL the entry has left", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
+            listOf(
+                "Stored wire responses and their absolute expiry in the 1024-entry LRU cache",
+                "EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags"
+            ),
+            listOf(
+                "Only TTL fields are rewritten: record data, names and message size are unchanged",
+                "A message the codec cannot fully walk is never half-rewritten; the stored bytes are served instead"
+            ),
+            "DnsResponseCacheTest.testCachedTtlsAreRewrittenToRemainingLifetime and DnsResponseCacheTest.testOptRecordTtlIsLeftAlone and DnsResponseCacheTest.testRewriterRejectsMalformedMessages"
+        ),
+        cap(
             "cname-cloak-enforcement", "CNAME-cloaking enforcement (Strict and Custom modes)", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsCnameGuard.kt", listOf(PERM_INTERNET, PERM_DNS_TUNNEL),
             listOf(

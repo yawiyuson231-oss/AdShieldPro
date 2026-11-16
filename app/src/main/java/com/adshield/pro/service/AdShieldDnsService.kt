@@ -421,7 +421,9 @@ class AdShieldDnsService : VpnService() {
         // tracker. Enforced only in modes that accept the compatibility risk, and never on wire
         // data the codec could not fully walk.
         val cloakMode = filterRuleEngine.getCurrentSnapshot().protectionMode
-        if (cloakMode.enforceCnameCloaking) {
+        // A per-app "allow all" or an unprotected transport already said "do not filter this
+        // lookup", so the guard must not overrule that decision.
+        if (cloakMode.enforceCnameCloaking && !decision.bypassDomainFilters) {
             val cloakTarget = DnsCnameGuard.firstBlockedTarget(upstreamResult.responseBytes) { target ->
                 filterRuleEngine.evaluate(target).isBlocked
             }
