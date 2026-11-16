@@ -145,6 +145,11 @@ class ProtectionExplainerTest {
             ProtectionExplainer.CLIENT_SUBNET_NOTE.contains("EDNS Client Subnet")
         )
         assertTrue(
+            "the video-ad note must state the in-host limitation",
+            ProtectionExplainer.VIDEO_ADS_NOTE.contains("YouTube") &&
+                ProtectionExplainer.VIDEO_ADS_NOTE.contains("no DNS filter")
+        )
+        assertTrue(
             "the client-subnet note must keep the streaming exception honest",
             ProtectionExplainer.CLIENT_SUBNET_NOTE.contains("streaming", ignoreCase = true)
         )

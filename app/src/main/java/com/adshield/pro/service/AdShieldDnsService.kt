@@ -23,12 +23,14 @@ import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.domain.model.ProtectionArchitecture
 import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.engine.dns.DnsPacketCodec
 import com.adshield.pro.engine.dns.DnsCnameGuard
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.VideoAdNetworkCatalog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -406,6 +408,40 @@ class AdShieldDnsService : VpnService() {
                 sourceList = decision.sourceName,
                 latencyMs = 0,
                 protocolUsed = if (mode.blockSinkholeZeroIp) "Sinkhole 0.0.0.0" else "Local NXDOMAIN",
+                fromCache = false,
+                appPackageName = app?.packageName,
+                appName = app?.label
+            )
+            maybeRefreshNotificationCounter()
+            return blockedBytes
+        }
+
+        // Built-in video-advert baseline. It runs before the upstream lookup, so it works even
+        // when no filter list is loaded or the installed list predates the network. The user
+        // allowlist, per-app bypass and unprotected transports keep their say.
+        val enforcementMode = filterRuleEngine.getCurrentSnapshot().protectionMode
+        val videoAdMatch = if (!decision.bypassDomainFilters && evaluation.sourceName != "User Allowlist") {
+            VideoAdNetworkCatalog.matchForEnforcement(
+                input = query.questionDomain,
+                allowConditional = enforcementMode.enforceConditionalVideoAds
+            )
+        } else {
+            null
+        }
+        if (videoAdMatch?.blocked == true) {
+            val blockedBytes = DnsPacketCodec.buildBlockedResponse(
+                query = query,
+                sinkholeZeroIp = enforcementMode.blockSinkholeZeroIp
+            )
+            repository.recordDnsQueryEvent(
+                domain = query.questionDomain,
+                queryType = query.qTypeName,
+                isBlocked = true,
+                category = RuleCategory.ADS,
+                matchedRule = videoAdMatch.entry.suffix,
+                sourceList = "Video ad infrastructure",
+                latencyMs = 0,
+                protocolUsed = if (enforcementMode.blockSinkholeZeroIp) "Sinkhole 0.0.0.0" else "Local NXDOMAIN",
                 fromCache = false,
                 appPackageName = app?.packageName,
                 appName = app?.label

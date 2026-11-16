@@ -113,6 +113,17 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "video-ad-baseline", "Built-in video-advert baseline that cannot remove playback", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/VideoAdNetworkCatalog.kt", emptyList(),
+            listOf("A curated zone list of video ad serving, exchange, verification and measurement infrastructure, enforced before the upstream lookup"),
+            listOf(
+                "Two tiers: SAFE hosts (ad or measurement only) are blocked in every mode, CONDITIONAL hosts (player or rewarded-ad code) only in Strict and Custom",
+                "Cannot block an advert served from the media host itself: YouTube, TikTok and Instagram feed adverts never perform a separate DNS lookup",
+                "The user allowlist, per-app bypass and unprotected transports keep precedence over the baseline"
+            ),
+            "VideoAdNetworkCatalogTest.testSafeAdInfrastructureIsBlockedInEveryMode and VideoAdNetworkCatalogTest.testConditionalTierNeedsTheAggressiveModes and VideoAdNetworkCatalogTest.testNoCatalogueZoneCanBePlaybackInfrastructure"
+        ),
+        cap(
             "dns-client-subnet-privacy", "Client subnet is forwarded only for opted-in streaming hosts", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
             listOf(

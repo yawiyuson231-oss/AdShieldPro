@@ -127,6 +127,7 @@ S3/Ceph adapters, and periodic folder scanning are explicitly listed as remainin
 | [`docs/INFINITY_VERIFICATION.md`](docs/INFINITY_VERIFICATION.md) | Feature-by-feature implementation/test status, evidence, external requirements and remaining issues |
 | [`docs/TELEGRAM_CLOUD_STORAGE.md`](docs/TELEGRAM_CLOUD_STORAGE.md) | Official TDLib Android integration, direct account authorization, encrypted session, transfers, limits, security and device test checklist |
 | [`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) | Generated in-app/source-of-truth capability matrix |
+| [`docs/VIDEO_AD_BLOCKING.md`](docs/VIDEO_AD_BLOCKING.md) | What DNS can and cannot do about video adverts, the two-tier baseline and the playback-safety rules |
 | [`docs/DNS_SECURITY_ARCHITECTURE.md`](docs/DNS_SECURITY_ARCHITECTURE.md) | Upstream failover, response validation, DNSSEC reporting and DNS-only app/network policy |
 | [`docs/INTELLIGENCE_MAP.md`](docs/INTELLIGENCE_MAP.md) | Live Intelligence Map: event pipeline, module data sources, gestures, honesty rules, performance budget and acceptance evidence |
 | [`docs/CONNECTORS.md`](docs/CONNECTORS.md) | Connector platform: architecture, free-provider terms, Android limitations, privacy guarantees and verification steps |
@@ -336,7 +337,8 @@ while filtering is active. Those platform strings cannot be renamed by the app.
   - **DNS-over-HTTPS (DoH, RFC 8484)** via `application/dns-message` wireformat POST with bootstrap DNS resolution.
   - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
   - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
-  - **Client-Subnet Normalisation** strips the EDNS Client Subnet option from every outgoing query except the streaming hosts where geo-accurate answers were opted into, so a CDN cannot use a forwarded subnet to link unrelated lookups from the same device. Cookies, padding and the DNSSEC OK bit are kept.
+  - **Built-in Video-Ad Baseline** blocks video ad serving, exchanges, verification and measurement infrastructure (`doubleclick.net`, `2mdn.net`, `moatads.com`, `adsafeprotected.com`, `taboola.com`, FreeWheel, rewarded-video networks) even with no list loaded. Playback-critical zones are excluded by construction, and the conditional tier only runs in Strict and Custom.
+- **Client-Subnet Normalisation** strips the EDNS Client Subnet option from every outgoing query except the streaming hosts where geo-accurate answers were opted into, so a CDN cannot use a forwarded subnet to link unrelated lookups from the same device. Cookies, padding and the DNSSEC OK bit are kept.
 - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups, and ageing every answer TTL down to the lifetime the entry has left so clients never hold a stale answer past its upstream expiry (EDNS0 OPT records are left untouched). Entries are scoped to the active resolver, the DNSSEC mode and the checking-disabled bit, so switching validation policy never replays an answer that was accepted under the previous one. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
 
 ### Layer 2 — High-Throughput Local DNS Service (`service/AdShieldDnsService.kt`, Android `VpnService`)

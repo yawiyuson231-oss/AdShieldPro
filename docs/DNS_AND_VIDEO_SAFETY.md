@@ -11,6 +11,9 @@ capability is impossible, it says so instead of implying otherwise.
 
 ---
 
+> The built-in video-advert baseline and its two risk tiers are documented in
+> [`VIDEO_AD_BLOCKING.md`](VIDEO_AD_BLOCKING.md).
+
 ## 1. The DNS upgrade
 
 ### 1.1 Why DNS changes what a video does

@@ -182,6 +182,16 @@ object ProtectionExplainer {
             "network position to link unrelated lookups. The one exception is a streaming host you opted " +
             "into geo-accurate answers for; there the subnet is kept so the nearest edge is returned."
 
+    /**
+     * What the built-in video-advert baseline reaches, and the one case no DNS filter can reach:
+     * an advert served from the media host itself performs no lookup at all.
+     */
+    const val VIDEO_ADS_NOTE =
+        "Video adverts are blocked by name: ad servers, exchanges, verification and measurement hosts " +
+            "are refused even when no filter list is loaded. An advert served from the same host as the " +
+            "video (YouTube, TikTok, Instagram) performs no lookup, so no DNS filter can separate it from " +
+            "the content. Strict and Custom also block ad servers that ship player code."
+
     const val UPSTREAM_NOTE =
         "If the encrypted upstream fails, AdShield returns SERVFAIL rather than quietly " +
             "downgrading to plaintext. Opt-in failover only moves between providers you selected."

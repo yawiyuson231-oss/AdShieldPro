@@ -91,6 +91,9 @@ fun HowProtectionWorksScreen(onBack: () -> Unit) {
             item { PointsCard(ProtectionExplainer.BLOCK_ANSWERS) }
             item { NoteCard(ProtectionExplainer.CNAME_NOTE) }
 
+            item { SectionTitle("Video adverts") }
+            item { NoteCard(ProtectionExplainer.VIDEO_ADS_NOTE) }
+
             item { SectionTitle("Upstream transports") }
             item { PointsCard(ProtectionExplainer.UPSTREAM_MODES) }
             item { NoteCard(ProtectionExplainer.UPSTREAM_NOTE) }

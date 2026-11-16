@@ -25,7 +25,15 @@ enum class ProtectionMode(
      * genuinely relies on the third party. On for the aggressive modes, which already warn about
      * compatibility risk.
      */
-    val enforceCnameCloaking: Boolean = false
+    val enforceCnameCloaking: Boolean = false,
+    /**
+     * Whether the conditional tier of the built-in video-advert baseline is blocked as well.
+     *
+     * Those hosts can ship player or rewarded-ad code, so a missing answer is visible as a stalled
+     * advert step in some apps. Only the modes that already warn about compatibility risk take
+     * that trade.
+     */
+    val enforceConditionalVideoAds: Boolean = false
 ) {
     STANDARD(
         title = "Standard Mode",
@@ -46,7 +54,8 @@ enum class ProtectionMode(
             RuleCategory.CUSTOM
         ),
         blockSinkholeZeroIp = true,
-        enforceCnameCloaking = true
+        enforceCnameCloaking = true,
+        enforceConditionalVideoAds = true
     ),
     PRIVACY(
         title = "Privacy Mode",
@@ -67,7 +76,8 @@ enum class ProtectionMode(
             RuleCategory.CUSTOM
         ),
         blockSinkholeZeroIp = true,
-        enforceCnameCloaking = true
+        enforceCnameCloaking = true,
+        enforceConditionalVideoAds = true
     )
 }
 
