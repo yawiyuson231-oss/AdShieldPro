@@ -113,6 +113,18 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-query-coalescing", "Concurrent lookups for one name share a single upstream query", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/UpstreamDnsResolver.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("The cache key: protocol and endpoint, failover plan, DNSSEC mode, CD bit, domain:qtype:qclass"),
+            listOf(
+                "Only lookups with an identical cache key are shared; a different question still goes upstream",
+                "A follower waits at most 5 s for the leader and then resolves on its own, so a stalled leader cannot hang a client",
+                "The shared answer is rewritten for the follower's transaction ID before it is returned",
+                "In-process only: queries made through another resolver instance are not deduplicated"
+            ),
+            "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
+        ),
+        cap(
             "video-ad-baseline", "Built-in video-advert baseline that cannot remove playback", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/VideoAdNetworkCatalog.kt", emptyList(),
             listOf("A curated zone list of video ad serving, exchange, verification and measurement infrastructure, enforced before the upstream lookup"),
