@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsNegativeCacheTtlTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:14.780Z" hostname="runnervmccnms" time="0.001">
+<testsuite name="com.adshield.pro.DnsNegativeCacheTtlTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:16.085Z" hostname="ip-10-0-138-224" time="0.001">
   <properties/>
-  <testcase name="testNodataUsesTheSoaLifetimeToo" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.001"/>
+  <testcase name="testNodataUsesTheSoaLifetimeToo" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.0"/>
   <testcase name="testNothingNegativeIsCachedLongerThanThePositiveCeiling" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.0"/>
   <testcase name="testNxdomainUsesTheSmallerOfSoaTtlAndMinimum" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.0"/>
-  <testcase name="testNegativeAnswersWithoutSoaFallBackToAShortLifetime" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.0"/>
+  <testcase name="testNegativeAnswersWithoutSoaFallBackToAShortLifetime" classname="com.adshield.pro.DnsNegativeCacheTtlTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

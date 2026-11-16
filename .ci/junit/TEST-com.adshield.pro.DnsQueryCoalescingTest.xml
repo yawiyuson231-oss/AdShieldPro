@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsQueryCoalescingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:14.782Z" hostname="runnervmccnms" time="0.71">
+<testsuite name="com.adshield.pro.DnsQueryCoalescingTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:16.086Z" hostname="ip-10-0-138-224" time="0.713">
   <properties/>
-  <testcase name="testABurstOfIdenticalLookupsCostsOneUpstreamQuery" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.205"/>
+  <testcase name="testABurstOfIdenticalLookupsCostsOneUpstreamQuery" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.206"/>
   <testcase name="testCoalescedAnswerIsRewrittenForTheRequestingTransaction" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.303"/>
-  <testcase name="testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.202"/>
+  <testcase name="testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller" classname="com.adshield.pro.DnsQueryCoalescingTest" time="0.203"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

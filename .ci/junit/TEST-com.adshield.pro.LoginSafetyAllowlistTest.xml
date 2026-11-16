@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.LoginSafetyAllowlistTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:16.101Z" hostname="runnervmccnms" time="0.002">
+<testsuite name="com.adshield.pro.LoginSafetyAllowlistTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:17.259Z" hostname="ip-10-0-138-224" time="0.002">
   <properties/>
-  <testcase name="testLoginCriticalMatchingRespectsLabelBoundaries" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.0"/>
-  <testcase name="testCaptivePortalChecksStayAllowed" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.001"/>
+  <testcase name="testLoginCriticalMatchingRespectsLabelBoundaries" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.001"/>
+  <testcase name="testCaptivePortalChecksStayAllowed" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.0"/>
   <testcase name="testAggressiveRulesCannotBreakLoginsPaymentsOrCaptchas" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.0"/>
   <testcase name="testSafetyZonesNeverOverlapTheAdOrCdnZones" classname="com.adshield.pro.LoginSafetyAllowlistTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>

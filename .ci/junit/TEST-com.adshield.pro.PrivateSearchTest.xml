@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.PrivateSearchTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:16.230Z" hostname="runnervmccnms" time="0.002">
+<testsuite name="com.adshield.pro.PrivateSearchTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:17.319Z" hostname="ip-10-0-138-224" time="0.002">
   <properties/>
-  <testcase name="providerLabelsAndPrivacyNotesArePresentAndHonest" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
-  <testcase name="searchUrl_encodesUtf8PerByte" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="providerLabelsAndPrivacyNotesArePresentAndHonest" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
+  <testcase name="searchUrl_encodesUtf8PerByte" classname="com.adshield.pro.PrivateSearchTest" time="0.001"/>
   <testcase name="everyProviderSearchesOverHttps" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="providerLookup_unknownOrMissingFallsBackToPrivacyDefault" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>
   <testcase name="switchingProviderChangesOnlyTheSearchEndpoint" classname="com.adshield.pro.PrivateSearchTest" time="0.0"/>

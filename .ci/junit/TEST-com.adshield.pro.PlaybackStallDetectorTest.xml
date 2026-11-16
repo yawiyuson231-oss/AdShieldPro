@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.PlaybackStallDetectorTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:17.305Z" hostname="ip-10-0-138-224" time="0.013">
+  <properties/>
+  <testcase name="testForgetAndClearDropTheHistory" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.002"/>
+  <testcase name="testTrackingStaysBounded" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.009"/>
+  <testcase name="testTheThirdAskInsideTheWindowIsTheSignal" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.001"/>
+  <testcase name="testTheCaseAndTrailingDotOfTheQueryDoNotSplitTheCount" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.0"/>
+  <testcase name="testAMissingAppIsTrackedAsUnknownRatherThanCrashing" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.0"/>
+  <testcase name="testDifferentAppsAndDifferentZonesAreNotCombined" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.001"/>
+  <testcase name="testAsksSpreadBeyondTheWindowNeverSignal" classname="com.adshield.pro.PlaybackStallDetectorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

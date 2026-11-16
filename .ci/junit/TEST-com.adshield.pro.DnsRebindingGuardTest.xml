@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsRebindingGuardTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:05:15.494Z" hostname="runnervmccnms" time="0.004">
+<testsuite name="com.adshield.pro.DnsRebindingGuardTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-16T23:52:16.800Z" hostname="ip-10-0-138-224" time="0.006">
   <properties/>
   <testcase name="testOnlyTheAggressiveModesEnforceTheGuard" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.0"/>
-  <testcase name="testPrivateIpv4AnswersAreDetected" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.003"/>
+  <testcase name="testPrivateIpv4AnswersAreDetected" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.004"/>
   <testcase name="testPublicIpv4AnswersAreLeftAlone" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.0"/>
   <testcase name="testPrivateIpv6AnswersAreDetected" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.001"/>
   <testcase name="testLocalNamesAreExempt" classname="com.adshield.pro.DnsRebindingGuardTest" time="0.0"/>

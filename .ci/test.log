@@ -194,6 +194,8 @@ BlockReasonExplainerTest > testATemporaryAllowIsNeverDescribedAsABlock PASSED
 
 BlockReasonExplainerTest > testRebindingExplanationSaysServfailBecauseTheNameExists PASSED
 
+BlockReasonExplainerTest > testAProbableStallOffersTheLeaseInsteadOfAGenericAdvice PASSED
+
 BlockReasonExplainerTest > testAllowedRowsAreNotDescribedAsBlocks PASSED
 
 BlockReasonExplainerTest > testEveryEngineSourceIsExplainedByTheComponentThatDecided PASSED
@@ -372,6 +374,16 @@ DnsCnameGuardTest > testRejectsMalformedAndNonResponseMessages PASSED
 
 DnsCnameGuardTest > testGuardBlocksOnlyBlockedHopsAndRespectsHopCap PASSED
 
+DnsFailureCacheTest > testClearCacheForgetsRememberedFailuresSoRecoveryIsImmediate PASSED
+
+DnsFailureCacheTest > testTheCacheStaysBoundedAndDropsTheOldestFailureFirst PASSED
+
+DnsFailureCacheTest > testAFailureIsRememberedOnlyForItsWindow PASSED
+
+DnsFailureCacheTest > testClearRemovesOnlyWhatItIsGiven PASSED
+
+DnsFailureCacheTest > testAResolverAnswersFromTheFailureCacheWithoutTouchingTheNetwork PASSED
+
 DnsFirewallPolicySerializationTest > testConditionalTierDefaultsOffAndSurvivesARoundTrip PASSED
 
 DnsFirewallPolicySerializationTest > testSettingsWrittenBeforeTheFieldExistedStillDecode PASSED
@@ -430,8 +442,7 @@ FilterSourceStatusTest > testDuplicatesAndUnsafeLinesAreBothReported PASSED
 
 IdnHostnameTest > testAUnicodeRuleBlocksBothFormsOfTheQuery PASSED
 
-IdnHostnameTest > testToAsciiConvertsOnlyTheLabelsThatNeedIt FAILED
-    org.junit.ComparisonFailure at IdnHostnameTest.kt:42
+IdnHostnameTest > testToAsciiConvertsOnlyTheLabelsThatNeedIt PASSED
 
 IdnHostnameTest > testThePlaybackGuardSeesTheSameHostInBothForms PASSED
 
@@ -550,6 +561,31 @@ OnionRoutingTestSuite > proxyPortsFromOrbotAreUsedAndInvalidOnesFallBackToTheDef
 OnionRoutingTestSuite > torIsVerifiedAgainstTorsOwnCheckService PASSED
 
 OnionRoutingTestSuite > socksProxyIsUnresolvedSoOnionNamesNeverReachTheDeviceResolver PASSED
+
+PlaybackSafetyAuditTest > testNoCoverageAtAllIsAWarningNotASilentSuccess PASSED
+
+PlaybackSafetyAuditTest > testEveryFindingCarriesTextThatCanBeShownToAUser PASSED
+
+PlaybackSafetyAuditTest > testTheProbesAreZonesNotIndividualApiHosts PASSED
+
+PlaybackSafetyAuditTest > testABlockedMediaZoneIsReportedAsAProblemNamingTheZone PASSED
+
+PlaybackSafetyAuditTest > testACleanConfigurationReportsClearPlaybackAndActiveBlocking FAILED
+    java.lang.AssertionError at PlaybackSafetyAuditTest.kt:33
+
+PlaybackStallDetectorTest > testForgetAndClearDropTheHistory PASSED
+
+PlaybackStallDetectorTest > testTrackingStaysBounded PASSED
+
+PlaybackStallDetectorTest > testTheThirdAskInsideTheWindowIsTheSignal PASSED
+
+PlaybackStallDetectorTest > testTheCaseAndTrailingDotOfTheQueryDoNotSplitTheCount PASSED
+
+PlaybackStallDetectorTest > testAMissingAppIsTrackedAsUnknownRatherThanCrashing PASSED
+
+PlaybackStallDetectorTest > testDifferentAppsAndDifferentZonesAreNotCombined PASSED
+
+PlaybackStallDetectorTest > testAsksSpreadBeyondTheWindowNeverSignal PASSED
 
 PrivateSearchTest > providerLabelsAndPrivacyNotesArePresentAndHonest PASSED
 
@@ -759,6 +795,10 @@ TemporaryAllowlistTest > testAPublicSuffixOrGarbageIsRefused PASSED
 
 TemporaryAllowlistTest > testAGrantCoversTheNameAndItsSubdomainsOnly PASSED
 
+TemporaryLeaseTextTest > testTheLabelNeverClaimsMoreTimeThanRemains PASSED
+
+TemporaryLeaseTextTest > testTheRemainingLabelIsPlainAndNeverNegative PASSED
+
 VideoAdNetworkCatalogTest > testModeFlagsMatchTheDocumentedTiering PASSED
 
 VideoAdNetworkCatalogTest > testPlaybackHostsAreNeverMatchedThroughAMediaDomain PASSED
@@ -811,7 +851,7 @@ WorldMonitorTestSuite > testNewsParserKeepsTimezonesStrictInsteadOfGuessing PASS
 
 WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
-380 tests completed, 1 failed
+400 tests completed, 1 failed
 
 > Task :app:testDebugUnitTest FAILED
 
@@ -859,6 +899,37 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:tes
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$0(DefaultBuildLifecycleController.java:323)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:324)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$0(StateTransitionController.java:235)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:235)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There were failing tests. See the report at: file:///home/runner/work/AdShieldPro/AdShieldPro/app/build/reports/tests/testDebugUnitTest/index.html
@@ -970,8 +1041,8 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 30 more
+	... 61 more
 
 
-BUILD FAILED in 39s
+BUILD FAILED in 34s
 34 actionable tasks: 9 executed, 1 from cache, 24 up-to-date
