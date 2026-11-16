@@ -31,6 +31,7 @@ import com.adshield.pro.domain.model.UsbDebuggingTileConfig
 import com.adshield.pro.domain.model.DnsRuntimeState
 import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.FilterSourceStatus
 import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -671,7 +672,12 @@ class AdShieldRepository @Inject constructor(
                                 ruleCount = parsed.totalValidRules,
                                 duplicateCount = parsed.duplicateCount,
                                 lastUpdatedEpochMs = now,
-                                lastStatusMessage = "Bundled Active (${parsed.totalValidRules} rules)"
+                                lastStatusMessage = FilterSourceStatus.describe(
+                                    prefix = "Bundled Active",
+                                    validRules = parsed.totalValidRules,
+                                    duplicateCount = parsed.duplicateCount,
+                                    rejectedUnsafeRules = parsed.rejectedVideoUnsafeRules
+                                )
                             )
                         )
                         updatedSourcesCount++
@@ -724,7 +730,12 @@ class AdShieldRepository @Inject constructor(
                                 ruleCount = parsed.totalValidRules,
                                 duplicateCount = parsed.duplicateCount,
                                 lastUpdatedEpochMs = now,
-                                lastStatusMessage = "Updated (${parsed.totalValidRules} rules)",
+                                lastStatusMessage = FilterSourceStatus.describe(
+                                    prefix = "Updated",
+                                    validRules = parsed.totalValidRules,
+                                    duplicateCount = parsed.duplicateCount,
+                                    rejectedUnsafeRules = parsed.rejectedVideoUnsafeRules
+                                ),
                                 etagOrHash = hash
                             )
                         )

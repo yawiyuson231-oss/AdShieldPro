@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "playback-safety-report", "A filter list trimmed for playback safety says so in its status", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/FilterSourceStatus.kt", emptyList(),
+            listOf("The rejectedVideoUnsafeRules, duplicateCount and totalValidRules counters of each parsed list"),
+            listOf("Reports the lines refused at parse time; it does not name them individually", "Wording is neutral: a refused line is \"ignored\", never \"blocked\""),
+            "FilterSourceStatusTest.testRefusedPlaybackUnsafeLinesAreReported and FilterSourceStatusTest.testDuplicatesAndUnsafeLinesAreBothReported and FilterSourceStatusTest.testTheStatusNeverClaimsPlaybackWasBlocked"
+        ),
+        cap(
             "block-reason-explainer", "Every DNS log row answers 'why was this blocked?'", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "ui/model/BlockReasonExplainer.kt", emptyList(),
             listOf("The recorded sourceList, matchedRule, category and blocked flag of each DNS activity row"),
