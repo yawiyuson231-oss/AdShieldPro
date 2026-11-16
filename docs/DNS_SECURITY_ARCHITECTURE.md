@@ -119,6 +119,10 @@ JVM tests in `app/src/test/java/com/adshield/pro/CybersecurityPlatformTestSuite.
 | `resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt` | open circuit is skipped without inflating failure counts |
 | `appNetworkAndEmergencyPoliciesAreDeterministic` | per-app, per-transport and emergency decisions |
 | `diagnosticQueryUsesEdns0AndNormalisesCase` | EDNS0/DO diagnostic query construction and input validation |
+| `DnsResponseCacheTest` (4 tests) | cache-hit TTL ageing, OPT untouched, ≥1 s clamp, malformed rejected |
+| `DnsClientSubnetPolicyTest` (4 tests) | ECS stripped, other options kept, pass-through, streaming-only forwarding |
+| `testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked` | question binding for plaintext transports, question-less errors allowed |
+| `testCacheKeysAreScopedToTheActiveResolver` | resolver, protocol and validation-policy scoping |
 | `fileScannerFlagsEncodedPowerShellDropper` | scanner verdict is driven by a real dropper-pattern match |
 
 CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, assembled the
@@ -142,3 +146,27 @@ An encrypted endpoint's own hostname is never resolved through the tunnel. Every
 shipped provider is in a literal-address table, and any other lookup through the
 system resolver is capped at 1.5 s, so a broken network cannot stall the DoH path
 (which every query crosses) for seconds at a time.
+
+## 9. Cache, client-subnet and question binding
+
+Every allowed query crosses the same pipeline, and each stage is fail-closed: a stage that cannot
+prove it understood the packet hands the packet on unchanged rather than half-rewriting it.
+
+| Stage | Code | Behaviour |
+| --- | --- | --- |
+| Cache key | `UpstreamDnsResolver.buildCacheKey` | `protocol@endpoint`, the failover plan, the DNSSEC mode, the CD bit, then `domain:qtype:qclass`. Switching resolver or validation policy can never replay an answer obtained under the previous one. |
+| Cache hit | `UpstreamDnsResolver.resolve` + `DnsPacketCodec.rewriteResponseTtls` | Answers are rewritten to the lifetime the entry has left (ceiling division, so a live entry never reports 0 s). EDNS0 OPT records are skipped because their TTL field carries extended RCODE and flags. A message the codec cannot walk is served from the stored bytes untouched. |
+| Client subnet | `DnsPacketCodec.stripEdnsClientSubnet` | The EDNS Client Subnet option is removed from every outgoing query, so a CDN cannot use a forwarded subnet to correlate unrelated lookups. Cookies, padding, the UDP payload size and the DO bit are preserved. The subnet is kept only for streaming hosts when geo-accurate media DNS is enabled (`UpstreamDnsResolver.forwardsClientSubnet`). |
+| Plaintext question binding | `UpstreamDnsResolver.isValidDnsResponseForQuery(ByteArray, ByteArray)` | UDP/TCP answers must echo the exact question (name case-folded, QTYPE, QCLASS) that was sent. A question-less error response is accepted; a question-less NOERROR answer is not. |
+| CNAME cloaking | `DnsCnameGuard` + `DnsPacketCodec.extractCnameTargets` | Strict and Custom modes block a first-party name that resolves through a blocked tracker, up to 8 hops. Per-app "allow all" bypasses the guard, and a response the parser cannot walk is never decided on. |
+
+Verification: `DnsResponseCacheTest` (TTL ageing, OPT preservation, ≥1 s clamp, malformed
+rejection), `DnsClientSubnetPolicyTest` (option removal, untouched pass-through, malformed
+rejection, streaming-only forwarding), `AdShieldEngineTestSuite.testUdpAndTcpAnswersMustEchoTheQuestionThatWasAsked`
+and `AdShieldEngineTestSuite.testCacheKeysAreScopedToTheActiveResolver` (validation-policy
+scoping), `DnsCnameGuardTest` (hop cap, first clean hop, malformed wire data).
+
+Honest limits: the cache is in-process, so it is lost when the DNS service restarts and is never
+shared between profiles; ageing rewrites TTLs only, so a cached answer keeps the record data its
+upstream sent; client-subnet normalisation cannot stop an upstream resolver from inferring
+approximate location from the source address of the connection itself.
