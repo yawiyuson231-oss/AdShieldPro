@@ -25,6 +25,7 @@ import com.adshield.pro.domain.model.DnsStatus
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.domain.model.RuleCategory
 import com.adshield.pro.engine.dns.DnsPacketCodec
+import com.adshield.pro.engine.dns.DnsRebindingGuard
 import com.adshield.pro.engine.dns.DnsCnameGuard
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
@@ -457,10 +458,39 @@ class AdShieldDnsService : VpnService() {
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
 
+        val cloakMode = filterRuleEngine.getCurrentSnapshot().protectionMode
+
+        // DNS rebinding: a public name that answers with a private address is how a page reaches
+        // the router or an intranet host without any exploit. Local names are exempt, the guard
+        // never decides on wire data it could not walk, and only the aggressive modes enforce it.
+        if (cloakMode.enforceRebindingGuard &&
+            !decision.bypassDomainFilters &&
+            !DnsRebindingGuard.isLocalName(query.questionDomain)
+        ) {
+            val privateAnswer = DnsRebindingGuard.firstPrivateAnswer(upstreamResult.responseBytes)
+            if (privateAnswer != null) {
+                repository.recordDnsQueryEvent(
+                    domain = query.questionDomain,
+                    queryType = query.qTypeName,
+                    isBlocked = true,
+                    category = RuleCategory.MALWARE,
+                    matchedRule = "${privateAnswer.address} (${privateAnswer.range})",
+                    sourceList = "DNS rebinding guard",
+                    latencyMs = upstreamResult.latencyMs,
+                    protocolUsed = upstreamResult.protocolUsed,
+                    fromCache = upstreamResult.fromCache,
+                    appPackageName = app?.packageName,
+                    appName = app?.label
+                )
+                maybeRefreshNotificationCounter()
+                // SERVFAIL, not NXDOMAIN: the name exists, the answer is the problem.
+                return DnsPacketCodec.buildServFailResponse(query)
+            }
+        }
+
         // CNAME cloaking: the queried name is allowed, but the chain can still land on a blocked
         // tracker. Enforced only in modes that accept the compatibility risk, and never on wire
         // data the codec could not fully walk.
-        val cloakMode = filterRuleEngine.getCurrentSnapshot().protectionMode
         // A per-app "allow all" or an unprotected transport already said "do not filter this
         // lookup", so the guard must not overrule that decision.
         if (cloakMode.enforceCnameCloaking && !decision.bypassDomainFilters) {

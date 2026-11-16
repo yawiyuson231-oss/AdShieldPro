@@ -126,6 +126,7 @@ JVM tests in `app/src/test/java/com/adshield/pro/CybersecurityPlatformTestSuite.
 | `DnsQueryCoalescingTest` (3 tests) | one upstream query per burst, transaction-ID rewrite, shared SERVFAIL |
 | `DnsNegativeCacheTtlTest` (4 tests) | SOA-based negative lifetime, ceiling clamp, NODATA, SOA-less fallback |
 | `DnsCacheBudgetTest` (2 tests) | payload budget, LRU eviction order |
+| `DnsRebindingGuardTest` (6 tests) | RFC 1918/loopback/link-local/CGNAT/ULA detection, public answers, local-name exemptions, mode gating |
 | `fileScannerFlagsEncodedPowerShellDropper` | scanner verdict is driven by a real dropper-pattern match |
 
 CI: Android build & test run `41868023328` (commit `c14f997`) compiled Kotlin, assembled the
@@ -171,6 +172,7 @@ prove it understood the packet hands the packet on unchanged rather than half-re
 | Client subnet | `DnsPacketCodec.stripEdnsClientSubnet` | The EDNS Client Subnet option is removed from every outgoing query, so a CDN cannot use a forwarded subnet to correlate unrelated lookups. Cookies, padding, the UDP payload size and the DO bit are preserved. The subnet is kept only for streaming hosts when geo-accurate media DNS is enabled (`UpstreamDnsResolver.forwardsClientSubnet`). |
 | Plaintext question binding | `UpstreamDnsResolver.isValidDnsResponseForQuery(ByteArray, ByteArray)` | UDP/TCP answers must echo the exact question (name case-folded, QTYPE, QCLASS) that was sent. A question-less error response is accepted; a question-less NOERROR answer is not. |
 | Single-flight | `UpstreamDnsResolver.resolve` | Concurrent lookups for one cache key share a single upstream query. Followers wait at most 5 s, then resolve on their own; the shared answer is rewritten to the follower's transaction ID. |
+| Rebinding guard | `DnsRebindingGuard` + `DnsPacketCodec.extractAddressAnswers` | In Strict and Custom, a public name that answers with a private, loopback, link-local, CGNAT or unique-local address is refused with SERVFAIL. Local names are exempt and an unwalkable message is never judged. |
 | CNAME cloaking | `DnsCnameGuard` + `DnsPacketCodec.extractCnameTargets` | Strict and Custom modes block a first-party name that resolves through a blocked tracker, up to 8 hops. Per-app "allow all" bypasses the guard, and a response the parser cannot walk is never decided on. |
 
 Verification: `DnsResponseCacheTest` (TTL ageing, OPT preservation, ≥1 s clamp, malformed
@@ -179,7 +181,8 @@ rejection, streaming-only forwarding), `AdShieldEngineTestSuite.testUdpAndTcpAns
 and `AdShieldEngineTestSuite.testCacheKeysAreScopedToTheActiveResolver` (validation-policy
 scoping), `DnsCnameGuardTest` (hop cap, first clean hop, malformed wire data).
 
-Honest limits: the cache is in-process, so it is lost when the DNS service restarts and is never
+Honest limits: the rebinding guard classifies address records only and leaves HTTPS/SVCB hint
+addresses alone; the cache is in-process, so it is lost when the DNS service restarts and is never
 shared between profiles; ageing rewrites TTLs only, so a cached answer keeps the record data its
 upstream sent; client-subnet normalisation cannot stop an upstream resolver from inferring
 approximate location from the source address of the connection itself.

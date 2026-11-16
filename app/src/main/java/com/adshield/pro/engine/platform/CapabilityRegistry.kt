@@ -113,6 +113,18 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "dns-rebinding-guard", "Public names that resolve into private address space are refused", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsRebindingGuard.kt", listOf(PERM_DNS_TUNNEL),
+            listOf("The A and AAAA record data of every answer, walked by DnsPacketCodec.extractAddressAnswers"),
+            listOf(
+                "Strict and Custom only: split-horizon corporate DNS legitimately answers intranet names with RFC 1918 addresses",
+                "Local names are exempt: single-label hosts and .local/.lan/.home.arpa/.internal/.arpa",
+                "Only address records are judged; HTTPS/SVCB hint addresses are not inspected",
+                "A message the codec cannot walk is never judged, and the reply is SERVFAIL because the name itself exists"
+            ),
+            "DnsRebindingGuardTest.testPrivateIpv4AnswersAreDetected and DnsRebindingGuardTest.testPrivateIpv6AnswersAreDetected and DnsRebindingGuardTest.testLocalNamesAreExempt"
+        ),
+        cap(
             "login-safety-allowlist", "Logins, captchas, SSO and payments can never be blocked", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/LoginSafetyAllowlist.kt", emptyList(),
             listOf("A curated set of identity, captcha, SSO and payment zones merged into the built-in safety allowlist"),

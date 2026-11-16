@@ -598,6 +598,51 @@ object DnsPacketCodec {
         return if (removed) kept.toByteArray() else null
     }
 
+    /** One address record from an answer section, as raw bytes (4 for A, 16 for AAAA). */
+    data class AddressAnswer(val type: Int, val addressBytes: ByteArray)
+
+    /**
+     * Every A and AAAA record in the answer section, in wire order, or null when the message
+     * cannot be walked safely. Used by the rebinding guard; the caller decides what an address
+     * means, the codec only reports what is there.
+     */
+    fun extractAddressAnswers(message: ByteArray, maxAnswers: Int = 64): List<AddressAnswer>? {
+        if (message.size < 12) return null
+        if ((u16At(message, 2) and 0x8000) == 0) return null // not a response
+        val questionCount = u16At(message, 4)
+        val answerCount = u16At(message, 6)
+        val recordCount = answerCount + u16At(message, 8) + u16At(message, 10)
+        if (questionCount != 1 || recordCount > 4096) return null
+
+        var offset = 12
+        val question = readDomainName(message, 0, offset, message.size) ?: return null
+        offset = question.nextOffset + 4
+        if (offset > message.size) return null
+
+        val answers = mutableListOf<AddressAnswer>()
+        repeat(recordCount) { index ->
+            val owner = readDomainName(message, 0, offset, message.size) ?: return null
+            offset = owner.nextOffset
+            if (offset + 10 > message.size) return null
+            val type = u16At(message, offset)
+            val rdLength = u16At(message, offset + 8)
+            val rdStart = offset + 10
+            val rdEnd = rdStart + rdLength
+            if (rdEnd > message.size) return null
+            // Only the answer section can carry the addresses a client will connect to.
+            if (index < answerCount && answers.size < maxAnswers) {
+                if (type == TYPE_A && rdLength == 4) {
+                    answers += AddressAnswer(TYPE_A, message.copyOfRange(rdStart, rdEnd))
+                } else if (type == TYPE_AAAA && rdLength == 16) {
+                    answers += AddressAnswer(TYPE_AAAA, message.copyOfRange(rdStart, rdEnd))
+                }
+            }
+            offset = rdEnd
+        }
+        if (offset != message.size) return null
+        return answers
+    }
+
     /** First question of any message, query or response, with the case folded away. */
     data class WireQuestion(val domain: String, val qType: Int, val qClass: Int)
 

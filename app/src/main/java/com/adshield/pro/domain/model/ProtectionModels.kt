@@ -33,7 +33,15 @@ enum class ProtectionMode(
      * advert step in some apps. Only the modes that already warn about compatibility risk take
      * that trade.
      */
-    val enforceConditionalVideoAds: Boolean = false
+    val enforceConditionalVideoAds: Boolean = false,
+    /**
+     * Whether a public name that resolves into private address space is refused.
+     *
+     * That is the shape of a DNS rebinding attack, but it is also how split-horizon corporate DNS
+     * answers intranet names, so only the aggressive modes take the trade. Local names are exempt
+     * either way (`DnsRebindingGuard.isLocalName`).
+     */
+    val enforceRebindingGuard: Boolean = false
 ) {
     STANDARD(
         title = "Standard Mode",
@@ -55,7 +63,8 @@ enum class ProtectionMode(
         ),
         blockSinkholeZeroIp = true,
         enforceCnameCloaking = true,
-        enforceConditionalVideoAds = true
+        enforceConditionalVideoAds = true,
+        enforceRebindingGuard = true
     ),
     PRIVACY(
         title = "Privacy Mode",
@@ -77,7 +86,8 @@ enum class ProtectionMode(
         ),
         blockSinkholeZeroIp = true,
         enforceCnameCloaking = true,
-        enforceConditionalVideoAds = true
+        enforceConditionalVideoAds = true,
+        enforceRebindingGuard = true
     )
 }
 
