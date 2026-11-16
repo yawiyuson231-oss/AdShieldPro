@@ -136,6 +136,11 @@ object ProtectionExplainer {
         ExplainerPoint(
             title = "Prove your resolver is not leaking",
             detail = "No external DNS leak test is implemented, so the app makes no such claim."
+        ),
+        ExplainerPoint(
+            title = "Hide your source address from the resolver",
+            detail = "The EDNS Client Subnet option is removed from every query, but your resolver " +
+                "still sees the IP address that sent it."
         )
     )
 

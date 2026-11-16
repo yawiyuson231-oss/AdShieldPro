@@ -40,6 +40,10 @@ under **Capabilities**.
 - `SERVFAIL` with DNSSEC requested is reported as *"could be bogus or simply unreachable"*.
   OmniShield X never asserts that a signature was proven invalid.
 
+**Client subnet*, not the address itself.** Outgoing queries are normalised to drop the EDNS
+Client Subnet option, but the resolver still sees the source address of the connection. No
+anonymising relay is implemented, so the app never claims to hide the user from their resolver.
+
 ## 3b. Redirects and CNAME chains
 
 - **HTTP redirects are not visible.** A DNS filter sees names, not HTTP responses, so a
