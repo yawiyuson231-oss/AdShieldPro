@@ -317,5 +317,13 @@ data class DnsFirewallPolicy(
      * removes adverts without touching playback. Turning it off leaves the feed rules and every
      * other guard in place, which is what a user wants when one specific streaming app misbehaves.
      */
-    val videoAdBaselineEnabled: Boolean = true
+    val videoAdBaselineEnabled: Boolean = true,
+    /**
+     * Whether the baseline's conditional tier is blocked as well.
+     *
+     * Those hosts can ship player or rewarded-ad code, so a refused lookup can surface as a
+     * stalled "loading advert" step. Strict and Custom already take that trade; this switch lets a
+     * user opt in from a balanced mode as well, and it is off by default.
+     */
+    val videoAdConditionalTierEnabled: Boolean = false
 )

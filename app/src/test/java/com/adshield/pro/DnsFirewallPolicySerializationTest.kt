@@ -21,6 +21,15 @@ class DnsFirewallPolicySerializationTest {
     }
 
     @Test
+    fun testConditionalTierDefaultsOffAndSurvivesARoundTrip() {
+        assertFalse(DnsFirewallPolicy().videoAdConditionalTierEnabled)
+        val policy = DnsFirewallPolicy(videoAdConditionalTierEnabled = true)
+        val decoded = json.decodeFromString<DnsFirewallPolicy>(json.encodeToString(policy))
+        assertTrue(decoded.videoAdConditionalTierEnabled)
+        assertTrue("the baseline itself stays on", decoded.videoAdBaselineEnabled)
+    }
+
+    @Test
     fun testRoundTripKeepsTheBaselineSwitchedOff() {
         val policy = DnsFirewallPolicy(videoAdBaselineEnabled = false)
         val decoded = json.decodeFromString<DnsFirewallPolicy>(json.encodeToString(policy))

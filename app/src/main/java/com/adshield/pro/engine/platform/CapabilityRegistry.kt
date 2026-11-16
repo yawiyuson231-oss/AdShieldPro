@@ -155,11 +155,18 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "block-reason-explainer", "Every DNS log row answers 'why was this blocked?'", CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "ui/model/BlockReasonExplainer.kt", emptyList(),
+            listOf("The recorded sourceList, matchedRule, category and blocked flag of each DNS activity row"),
+            listOf("Explains the decision that was recorded; it does not re-evaluate the domain", "An unrecognised list name is reported as a list name instead of being dressed up as a product feature"),
+            "BlockReasonExplainerTest.testEveryEngineSourceIsExplainedByTheComponentThatDecided and BlockReasonExplainerTest.testAnUnknownListNameIsReportedAsAListName and BlockReasonExplainerTest.testAllowedRowsAreNotDescribedAsBlocks"
+        ),
+        cap(
             "video-ad-baseline", "Built-in video-advert baseline that cannot remove playback", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "engine/filter/VideoAdNetworkCatalog.kt", emptyList(),
             listOf("A curated zone list of video ad serving, exchange, verification and measurement infrastructure, enforced before the upstream lookup"),
             listOf("Two tiers: SAFE hosts (ad or measurement only) are blocked in every mode, CONDITIONAL hosts (player or rewarded-ad code) only in Strict and Custom", "Cannot block an advert served from the media host itself: YouTube, TikTok and Instagram feed adverts never perform a separate DNS lookup", "The user allowlist, per-app bypass and unprotected transports keep precedence over the baseline", "Can be switched off in Settings (DnsFirewallPolicy.videoAdBaselineEnabled) without changing the protection mode, and the switch is carried by encrypted settings backup"),
-            "VideoAdNetworkCatalogTest.testSafeAdInfrastructureIsBlockedInEveryMode and VideoAdNetworkCatalogTest.testConditionalTierNeedsTheAggressiveModes and VideoAdNetworkCatalogTest.testNoCatalogueZoneCanBePlaybackInfrastructure and DnsFirewallPolicySerializationTest.testSettingsWrittenBeforeTheFieldExistedStillDecode"
+            "VideoAdNetworkCatalogTest.testSafeAdInfrastructureIsBlockedInEveryMode and VideoAdNetworkCatalogTest.testConditionalTierNeedsTheAggressiveModes and VideoAdNetworkCatalogTest.testNoCatalogueZoneCanBePlaybackInfrastructure and DnsFirewallPolicySerializationTest.testSettingsWrittenBeforeTheFieldExistedStillDecode and DnsFirewallPolicySerializationTest.testConditionalTierDefaultsOffAndSurvivesARoundTrip"
         ),
         cap(
             "dns-client-subnet-privacy", "Client subnet is forwarded only for opted-in streaming hosts", CapabilityArea.DNS_PROTECTION,

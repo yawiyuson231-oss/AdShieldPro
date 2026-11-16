@@ -92,6 +92,7 @@ fun SettingsScreen(
     protectionStatus: ProtectionPipelineStatus? = null,
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
     onSetVideoAdBaseline: (Boolean) -> Unit = {},
+    onSetVideoAdConditionalTier: (Boolean) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
@@ -493,6 +494,21 @@ fun SettingsScreen(
                         Switch(
                             checked = settings.dnsFirewallPolicy.videoAdBaselineEnabled,
                             onCheckedChange = onSetVideoAdBaseline
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Also block player-adjacent ad servers", style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                "FreeWheel and rewarded-video networks. A refused lookup can stall an advert " +
+                                    "step in a few streaming apps, so this is off unless you ask for it.",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        Switch(
+                            checked = settings.dnsFirewallPolicy.videoAdConditionalTierEnabled,
+                            onCheckedChange = onSetVideoAdConditionalTier,
+                            enabled = settings.dnsFirewallPolicy.videoAdBaselineEnabled
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {

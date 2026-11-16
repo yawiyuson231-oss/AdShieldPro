@@ -429,7 +429,10 @@ class AdShieldDnsService : VpnService() {
         ) {
             VideoAdNetworkCatalog.matchForEnforcement(
                 input = query.questionDomain,
-                allowConditional = enforcementMode.enforceConditionalVideoAds
+                // The aggressive modes take the compatibility trade already; the switch lets a
+                // balanced mode opt into it as well.
+                allowConditional = enforcementMode.enforceConditionalVideoAds ||
+                    currentSettings.dnsFirewallPolicy.videoAdConditionalTierEnabled
             )
         } else {
             null

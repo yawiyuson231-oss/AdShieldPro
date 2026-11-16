@@ -805,6 +805,17 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun setVideoAdConditionalTierEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsState.value.dnsFirewallPolicy
+            preferencesRepository.updateDnsFirewallPolicy(current.copy(videoAdConditionalTierEnabled = enabled))
+            showFeedback(
+                if (enabled) "Player-adjacent ad servers (FreeWheel, rewarded-video networks) are blocked too. If a streaming app stalls on an advert, turn this back off."
+                else "Player-adjacent ad servers are left alone; only Strict and Custom block them."
+            )
+        }
+    }
+
     fun setEmergencyAllowlistOnly(enabled: Boolean) {
         viewModelScope.launch {
             val current = settingsState.value.dnsFirewallPolicy

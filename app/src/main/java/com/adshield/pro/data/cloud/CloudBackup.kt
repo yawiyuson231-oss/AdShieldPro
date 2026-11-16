@@ -97,6 +97,7 @@ data class BackupSource(
 data class BackupFirewall(
     val emergencyAllowlistOnly: Boolean = false,
     val videoAdBaselineEnabled: Boolean = true,
+    val videoAdConditionalTierEnabled: Boolean = false,
     val transports: List<String> = listOf("WIFI", "CELLULAR", "ETHERNET", "OTHER"),
     val appPolicies: List<BackupAppPolicy> = emptyList()
 )
@@ -215,6 +216,7 @@ class CloudBackupManager @Inject constructor(
             firewall = BackupFirewall(
                 emergencyAllowlistOnly = settings.dnsFirewallPolicy.emergencyAllowlistOnly,
                 videoAdBaselineEnabled = settings.dnsFirewallPolicy.videoAdBaselineEnabled,
+                videoAdConditionalTierEnabled = settings.dnsFirewallPolicy.videoAdConditionalTierEnabled,
                 transports = settings.dnsFirewallPolicy.protectedTransports.map { it.name },
                 appPolicies = settings.dnsFirewallPolicy.appPolicies.map { (pkg, policy) ->
                     BackupAppPolicy(pkg, policy.name)
@@ -355,7 +357,8 @@ class CloudBackupManager @Inject constructor(
                 appPolicies = policies,
                 protectedTransports = transports,
                 emergencyAllowlistOnly = payload.firewall.emergencyAllowlistOnly,
-                videoAdBaselineEnabled = payload.firewall.videoAdBaselineEnabled
+                videoAdBaselineEnabled = payload.firewall.videoAdBaselineEnabled,
+                videoAdConditionalTierEnabled = payload.firewall.videoAdConditionalTierEnabled
             )
         )
         applied += "per-app firewall"

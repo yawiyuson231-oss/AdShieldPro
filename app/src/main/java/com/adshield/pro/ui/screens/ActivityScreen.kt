@@ -11,6 +11,7 @@ import com.adshield.pro.domain.model.AppDnsActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +65,7 @@ import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.RuleType
 import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.TimeBucketStat
+import com.adshield.pro.ui.model.BlockReasonExplainer
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.formatInteger
 import com.adshield.pro.ui.theme.CyberCyan
@@ -91,6 +95,43 @@ fun ActivityScreen(
     onQuickRuleFromLog: (String, RuleType) -> Unit
 ) {
     var logFilterIndex by remember { mutableIntStateOf(0) } // 0 = All, 1 = Blocked, 2 = Allowed
+    var explainRecord by remember { mutableStateOf<DnsActivityRecord?>(null) }
+
+    // "Why was this blocked?" — one tap on a log row names the component that decided, what it
+    // checked, and the one action that would change the outcome.
+    explainRecord?.let { record ->
+        val explanation = BlockReasonExplainer.explain(record)
+        AlertDialog(
+            onDismissRequest = { explainRecord = null },
+            title = { Text(explanation.title, fontWeight = FontWeight.SemiBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(record.domain, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                    Text(explanation.body, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Decided by: ${record.sourceList}" +
+                            (record.matchedRule?.let { " · rule $it" } ?: "") +
+                            (record.category?.let { " · ${it.displayName}" } ?: ""),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(explanation.action, style = MaterialTheme.typography.labelMedium, color = CyberCyan)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val targetType = if (record.isBlocked) RuleType.ALLOW else RuleType.BLOCK
+                    onQuickRuleFromLog(record.domain, targetType)
+                    explainRecord = null
+                }) {
+                    Text(if (record.isBlocked) "Allow this domain" else "Block this domain", color = EmeraldPrimary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { explainRecord = null }) { Text("Close") }
+            }
+        )
+    }
     val filteredLogs = remember(logs, logFilterIndex) {
         when (logFilterIndex) {
             1 -> logs.filter { it.isBlocked }
@@ -451,7 +492,9 @@ fun ActivityScreen(
         } else {
             items(filteredLogs, key = { it.id }, contentType = { "dns-log" }) { record ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { explainRecord = record },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {

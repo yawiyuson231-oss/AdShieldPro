@@ -974,6 +974,7 @@ private fun SettingsDestination(
         protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
         onSetVideoAdBaseline = viewModel::setVideoAdBaselineEnabled,
+        onSetVideoAdConditionalTier = viewModel::setVideoAdConditionalTierEnabled,
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
