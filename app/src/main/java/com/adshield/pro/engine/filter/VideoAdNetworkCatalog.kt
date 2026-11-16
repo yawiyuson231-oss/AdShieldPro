@@ -53,6 +53,8 @@ object VideoAdNetworkCatalog {
         Entry("googleadservices.com", "Google Ads", Risk.SAFE, "Paid-click redirect and conversion measurement"),
 
         // Programmatic video ad exchanges and servers.
+        Entry("criteo.com", "Criteo", Risk.SAFE, "Retargeting and sponsored product adverts"),
+        Entry("criteo.net", "Criteo", Risk.SAFE, "Retargeting creative delivery"),
         Entry("adsrvr.org", "The Trade Desk", Risk.SAFE, "Programmatic bid requests"),
         Entry("rubiconproject.com", "Magnite", Risk.SAFE, "Programmatic video supply-side bidding"),
         Entry("pubmatic.com", "PubMatic", Risk.SAFE, "Programmatic bidding"),

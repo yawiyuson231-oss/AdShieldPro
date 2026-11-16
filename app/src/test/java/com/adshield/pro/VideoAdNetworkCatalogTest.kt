@@ -71,13 +71,10 @@ class VideoAdNetworkCatalogTest {
                 "${entry.suffix} is entity-level",
                 DnsMediaPlaybackGuard.ENTITY_LEVEL_DOMAINS.contains(entry.suffix)
             )
-            // A catalogue zone may not swallow a media host either: every entry must look like
-            // advertising infrastructure to the playback guard's own classifier.
-            assertTrue(
-                "${entry.suffix} does not look like advertising infrastructure",
-                DnsMediaPlaybackGuard.isAdvertDeliveryHost(entry.suffix) ||
-                    !DnsMediaPlaybackGuard.isProtectedPlaybackHost(entry.suffix) ||
-                    DnsMediaPlaybackGuard.protectedZoneFor(entry.suffix) == null
+            // Every zone must be something the playback guard is happy to block on its own.
+            assertFalse(
+                "${entry.suffix} is treated as playback infrastructure by the media guard",
+                DnsMediaPlaybackGuard.isProtectedPlaybackHost(entry.suffix)
             )
         }
         assertEquals(
