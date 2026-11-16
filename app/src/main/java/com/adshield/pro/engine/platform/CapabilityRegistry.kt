@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "temporary-lease-panel", "Active temporary allows are visible and can be ended early", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/SettingsScreen.kt", emptyList(),
+            listOf("TemporaryAllowlist.activeGrants() through the view model's activeTemporaryLeases state"),
+            listOf("The panel listing itself is not asserted by a test: only the lease engine and the label formatting are", "Shows the wall-clock end time rather than a live countdown, so nothing recomposes every second"),
+            "TemporaryLeaseTextTest.testTheRemainingLabelIsPlainAndNeverNegative and TemporaryAllowlistTest.testRevokeAndClearRemoveAccessImmediately"
+        ),
+        cap(
             "dns-failure-cache", "RFC 2308 failure caching so a dead upstream is not re-walked per lookup", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsFailureCache.kt", emptyList(),
             listOf("The cache key of each upstream attempt: question name, type, class, protocol and resolver preset"),

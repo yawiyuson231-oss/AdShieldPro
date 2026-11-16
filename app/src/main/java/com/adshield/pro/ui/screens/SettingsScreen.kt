@@ -55,6 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
+import com.adshield.pro.ui.model.TemporaryLeaseText
+import com.adshield.pro.ui.model.TemporaryLeaseUi
 import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.DnssecMode
@@ -93,6 +95,8 @@ fun SettingsScreen(
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
     onSetVideoAdBaseline: (Boolean) -> Unit = {},
     onSetVideoAdConditionalTier: (Boolean) -> Unit = {},
+    activeTemporaryLeases: List<TemporaryLeaseUi> = emptyList(),
+    onEndTemporaryLease: (String) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
@@ -522,6 +526,41 @@ fun SettingsScreen(
                                 if (enabled) showEmergencyConfirm = true else onSetEmergencyAllowlistOnly(false)
                             }
                         )
+                    }
+                }
+            }
+        }
+
+        if (activeTemporaryLeases.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Temporary allows", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Leases you granted from the Activity log. They end by themselves, are never saved, " +
+                                "and disappear when the app restarts.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        activeTemporaryLeases.forEach { lease ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(lease.domain, style = MaterialTheme.typography.bodyLarge)
+                                    Text(
+                                        "${TemporaryLeaseText.remainingLabel(lease.minutesLeft)} · ends ${lease.endsAtLabel}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(onClick = { onEndTemporaryLease(lease.domain) }) {
+                                    Text("End now", color = WarningAmber)
+                                }
+                            }
+                        }
                     }
                 }
             }

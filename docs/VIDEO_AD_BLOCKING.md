@@ -105,4 +105,5 @@ stall** — a symptom, not a diagnosis.
 Open the Activity log, tap the blocked row and press **Allow 15 min**. The domain gets an in-memory
 lease that outranks the lists, the baseline and the CNAME guard — but not the rebinding guard, since
 an answer pointing at a private address is a security problem rather than an advert. The dialog also
-names the component that decided, so the next fix is a deliberate one rather than a guess.
+names the component that decided, so the next fix is a deliberate one rather than a guess. Active
+leases are listed in Settings with the time they end and an "End now" button.

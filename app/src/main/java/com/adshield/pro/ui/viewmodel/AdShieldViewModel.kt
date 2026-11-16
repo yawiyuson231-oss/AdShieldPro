@@ -66,6 +66,7 @@ import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.engine.dns.runDiagnostics
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.filter.TemporaryAllowlist
+import com.adshield.pro.ui.model.TemporaryLeaseUi
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
 import com.adshield.pro.engine.security.AppRiskAuditor
@@ -106,6 +107,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class StatsChartRange(val label: String, val days: Int) {
     DAILY_7D("7 Days", 7),
@@ -257,6 +261,7 @@ class AdShieldViewModel @Inject constructor(
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
     init {
+        refreshTemporaryLeases()
         viewModelScope.launch {
             while (isActive) {
                 delay(3_000L)
@@ -817,9 +822,32 @@ class AdShieldViewModel @Inject constructor(
             showFeedback("Cannot allow '$domain' temporarily: it is not a single site name.")
             return
         }
+        refreshTemporaryLeases()
         upstreamDnsResolver.clearCache()
         val minutes = (grant.expiresAtEpochMs - System.currentTimeMillis()) / 60_000L
         showFeedback("$domain is allowed for ${minutes.coerceAtLeast(1)} min. Protection stays on, and the lease ends by itself.")
+    }
+
+    /** The leases that are currently in force, newest expiry last. */
+    val activeTemporaryLeases = MutableStateFlow<List<TemporaryLeaseUi>>(emptyList())
+
+    fun refreshTemporaryLeases() {
+        val now = System.currentTimeMillis()
+        activeTemporaryLeases.value = temporaryAllowlist.activeGrants().map { grant ->
+            TemporaryLeaseUi(
+                domain = grant.domain,
+                endsAtLabel = SimpleDateFormat("HH:mm", Locale.getDefault())
+                    .format(Date(grant.expiresAtEpochMs)),
+                minutesLeft = (grant.expiresAtEpochMs - now).coerceAtLeast(0L) / 60_000L
+            )
+        }
+    }
+
+    fun endTemporaryLease(domain: String) {
+        val revoked = temporaryAllowlist.revoke(domain)
+        refreshTemporaryLeases()
+        upstreamDnsResolver.clearCache()
+        showFeedback(if (revoked) "$domain is filtered again." else "$domain had no active lease.")
     }
 
     fun setVideoAdConditionalTierEnabled(enabled: Boolean) {
