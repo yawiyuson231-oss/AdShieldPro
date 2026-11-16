@@ -30,16 +30,16 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:mergeExtDexDebug FROM-CACHE
 > Task :app:mergeLibDexDebug FROM-CACHE
 > Task :app:hiltJavaCompileDebug
-> Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
+> Task :app:checkDebugAarMetadata
 > Task :app:compileDebugNavigationResources FROM-CACHE
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug FROM-CACHE
-> Task :app:mergeDebugResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:mergeDebugJniLibFolders
 > Task :app:processDebugManifestForPackage
+> Task :app:mergeDebugResources
 > Task :app:mergeDebugNativeLibs
 > Task :app:processDebugResources
 > Task :app:validateSigningDebug
