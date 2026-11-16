@@ -97,6 +97,12 @@ network it belonged to.
 The enforcement path itself (`AdShieldDnsService`) is device-verified only: the JVM suite cannot
 execute a `VpnService`.
 
+## Checking a configuration before blaming it
+
+**Settings → Playback safety check** probes six media delivery zones and three advert zones through
+the loaded rules and the baseline. A blocked media zone is reported as a problem by name; blocking
+nothing at all is reported as a warning rather than a silent success.
+
 ## When a stream stalls anyway
 
 Rows that were refused three times inside twenty seconds by the same app are marked **probable playback

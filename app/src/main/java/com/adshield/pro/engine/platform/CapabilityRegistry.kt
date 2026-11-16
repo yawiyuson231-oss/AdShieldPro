@@ -155,6 +155,13 @@ object CapabilityRegistry {
             "DnsQueryCoalescingTest.testABurstOfIdenticalLookupsCostsOneUpstreamQuery and DnsQueryCoalescingTest.testCoalescedAnswerIsRewrittenForTheRequestingTransaction and DnsQueryCoalescingTest.testAFailedUpstreamIsSharedInsteadOfRetriedByEveryCaller"
         ),
         cap(
+            "playback-safety-audit", "One check answers whether current filtering is still compatible with playback", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/PlaybackSafetyAudit.kt", emptyList(),
+            listOf("Six media delivery zones and three advert zones, probed through the rule engine and the video-ad catalogue"),
+            listOf("Read-only: it never changes a rule, a mode or a catalogue entry", "A probe list, not a proof: an app may depend on a zone this check does not know about", "The Settings panel that shows the findings is not asserted by a test"),
+            "PlaybackSafetyAuditTest.testACleanConfigurationReportsClearPlaybackAndActiveBlocking and PlaybackSafetyAuditTest.testABlockedMediaZoneIsReportedAsAProblemNamingTheZone and PlaybackSafetyAuditTest.testNoCoverageAtAllIsAWarningNotASilentSuccess"
+        ),
+        cap(
             "temporary-lease-panel", "Active temporary allows are visible and can be ended early", CapabilityArea.FILTERING,
             CapabilityStatus.IMPLEMENTED, "ui/screens/SettingsScreen.kt", emptyList(),
             listOf("TemporaryAllowlist.activeGrants() through the view model's activeTemporaryLeases state"),

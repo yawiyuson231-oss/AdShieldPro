@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
 import com.adshield.pro.data.local.preferences.DarkThemePreference
+import com.adshield.pro.engine.filter.PlaybackSafetyAudit
 import com.adshield.pro.ui.model.TemporaryLeaseText
 import com.adshield.pro.ui.model.TemporaryLeaseUi
 import com.adshield.pro.domain.model.AppExclusionInfo
@@ -70,6 +71,7 @@ import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.engine.platform.SystemTileEngine
 import com.adshield.pro.ui.theme.CyberCyan
+import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
 import kotlinx.coroutines.launch
@@ -97,6 +99,8 @@ fun SettingsScreen(
     onSetVideoAdConditionalTier: (Boolean) -> Unit = {},
     activeTemporaryLeases: List<TemporaryLeaseUi> = emptyList(),
     onEndTemporaryLease: (String) -> Unit = {},
+    playbackSafetyFindings: List<PlaybackSafetyAudit.Finding> = emptyList(),
+    onRunPlaybackSafetyAudit: () -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
@@ -560,6 +564,46 @@ fun SettingsScreen(
                                     Text("End now", color = WarningAmber)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Playback safety check", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Probes the media zones players need and the advert zones we expect to be blocked, " +
+                            "through the same rules that filter your traffic.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(onClick = onRunPlaybackSafetyAudit, modifier = Modifier.fillMaxWidth()) {
+                        Text("Check playback safety")
+                    }
+                    playbackSafetyFindings.forEach { finding ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                finding.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when (finding.severity) {
+                                    PlaybackSafetyAudit.Severity.OK -> EmeraldPrimary
+                                    PlaybackSafetyAudit.Severity.WARNING -> WarningAmber
+                                    PlaybackSafetyAudit.Severity.PROBLEM -> AlertRed
+                                }
+                            )
+                            Text(
+                                finding.detail,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

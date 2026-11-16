@@ -65,7 +65,9 @@ import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.engine.dns.runDiagnostics
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.filter.PlaybackSafetyAudit
 import com.adshield.pro.engine.filter.TemporaryAllowlist
+import com.adshield.pro.engine.filter.VideoAdNetworkCatalog
 import com.adshield.pro.ui.model.TemporaryLeaseUi
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
@@ -826,6 +828,20 @@ class AdShieldViewModel @Inject constructor(
         upstreamDnsResolver.clearCache()
         val minutes = (grant.expiresAtEpochMs - System.currentTimeMillis()) / 60_000L
         showFeedback("$domain is allowed for ${minutes.coerceAtLeast(1)} min. Protection stays on, and the lease ends by itself.")
+    }
+
+    /** Findings of the last "check playback safety" run, empty until the user asks for one. */
+    val playbackSafetyFindings = MutableStateFlow<List<PlaybackSafetyAudit.Finding>>(emptyList())
+
+    /**
+     * Probes the media and advert zones through the same engine that decides real lookups, so the
+     * answer reflects the lists, the user's rules and the safety allowlist as they are right now.
+     */
+    fun runPlaybackSafetyAudit() {
+        playbackSafetyFindings.value = PlaybackSafetyAudit.audit { host ->
+            filterRuleEngine.evaluate(host).isBlocked ||
+                VideoAdNetworkCatalog.matchForEnforcement(host, allowConditional = true)?.blocked == true
+        }
     }
 
     /** The leases that are currently in force, newest expiry last. */

@@ -957,6 +957,7 @@ private fun SettingsDestination(
     val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
     val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     val activeTemporaryLeases by viewModel.activeTemporaryLeases.collectAsStateWithLifecycle()
+    val playbackSafetyFindings by viewModel.playbackSafetyFindings.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
@@ -979,6 +980,8 @@ private fun SettingsDestination(
         onSetVideoAdConditionalTier = viewModel::setVideoAdConditionalTierEnabled,
         activeTemporaryLeases = activeTemporaryLeases,
         onEndTemporaryLease = viewModel::endTemporaryLease,
+        playbackSafetyFindings = playbackSafetyFindings,
+        onRunPlaybackSafetyAudit = viewModel::runPlaybackSafetyAudit,
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
