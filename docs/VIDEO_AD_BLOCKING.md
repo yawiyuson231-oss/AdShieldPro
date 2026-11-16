@@ -55,7 +55,9 @@ The baseline is the lowest-priority blocker. In order:
 4. Unprotected transport — that lookup is not filtered.
 5. Per-app `ALLOW_ALL` — the app bypasses domain filtering, including the baseline.
 6. User allowlist and custom allow rules — an explicit allow wins over the baseline.
-7. Filter lists and the built-in baseline.
+7. Built-in safety allowlist — captive-portal probes and the login, captcha, SSO and payment zones
+   (`LoginSafetyAllowlist`) are never blocked by a rule or by the baseline.
+8. Filter lists and the built-in baseline.
 
 The baseline records its blocks with `sourceList = "Video ad infrastructure"` and
 `matchedRule = <zone>`, so a blocked entry in the DNS activity log always says which zone and which

@@ -420,7 +420,11 @@ class AdShieldDnsService : VpnService() {
         // when no filter list is loaded or the installed list predates the network. The user
         // allowlist, per-app bypass and unprotected transports keep their say.
         val enforcementMode = filterRuleEngine.getCurrentSnapshot().protectionMode
-        val videoAdMatch = if (!decision.bypassDomainFilters && evaluation.sourceName != "User Allowlist") {
+        val videoAdMatch = if (
+            !decision.bypassDomainFilters &&
+            evaluation.sourceName != "User Allowlist" &&
+            evaluation.sourceName != "System Safety Allowlist"
+        ) {
             VideoAdNetworkCatalog.matchForEnforcement(
                 input = query.questionDomain,
                 allowConditional = enforcementMode.enforceConditionalVideoAds

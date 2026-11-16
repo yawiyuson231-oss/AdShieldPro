@@ -656,13 +656,18 @@ class FilterRuleEngine @Inject constructor() {
             "127.0.0.1"
         )
 
+        /**
+         * Zones no rule may block: captive-portal and Play connectivity checks (a blocked probe
+         * makes Android think the network is dead) plus the login, captcha, SSO and payment zones
+         * in [LoginSafetyAllowlist] (a blocked one is a login or checkout that cannot complete).
+         */
         val DEFAULT_SAFE_ALLOWLIST = setOf(
             "connectivitycheck.gstatic.com",
             "clients3.google.com",
             "captive.apple.com",
             "play.googleapis.com",
             "android.clients.google.com"
-        )
+        ) + LoginSafetyAllowlist.ZONES
 
         fun normalizeDomain(input: String): String {
             var s = input.trim().lowercase()

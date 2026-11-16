@@ -99,6 +99,7 @@ constraints and the in-app architecture explainer:
 | `DnsNegativeCacheTtlTest` | RFC 2308 negative caching: `min(SOA TTL, SOA MINIMUM)`, the 1800 s ceiling, NODATA, and a 30 s fallback when no SOA is present or the packet is truncated |
 | `DnsCacheBudgetTest` | Cache payload budget and least-recently-used eviction order |
 | `DnsQueryCoalescingTest` | Single-flight: six concurrent identical lookups cost one upstream query, a coalesced answer is rewritten to the follower's transaction ID, and a failed upstream produces one shared SERVFAIL |
+| `LoginSafetyAllowlistTest` | A hostile list cannot block logins, payments or captchas; label-boundary matching; safety zones never overlap ad or shared-CDN zones; captive-portal probes stay allowed |
 | `VideoAdNetworkCatalogTest` | Video-ad baseline: safe ad infrastructure blocked in every mode, the conditional tier gated on Strict/Custom, no catalogue zone is playback infrastructure, label-boundary matching and input normalisation |
 | `DnsClientSubnetPolicyTest` | Client-subnet hygiene: the ECS option is stripped while cookies and the DO bit survive, queries without ECS are returned untouched, malformed messages are rejected, and the subnet is only forwarded for opted-in streaming hosts |
 | `DnsResponseCacheTest` | Cache-hit TTL ageing: every answer TTL is rewritten to the remaining lifetime, the stored bytes are never mutated, EDNS0 OPT flag fields are preserved, lifetimes clamp to ≥1s, and malformed messages are rejected instead of half-rewritten |

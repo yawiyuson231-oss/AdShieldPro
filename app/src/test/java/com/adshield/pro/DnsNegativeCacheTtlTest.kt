@@ -81,10 +81,6 @@ class DnsNegativeCacheTtlTest {
             u16(DnsPacketCodec.CLASS_IN)
             u32(soaTtl.toLong())
             val rdata = ByteArrayOutputStream()
-            fun r16(value: Int) {
-                rdata.write((value ushr 8) and 0xFF)
-                rdata.write(value and 0xFF)
-            }
             fun rdomain(name: String) {
                 name.split('.').forEach { label ->
                     val bytes = label.toByteArray(Charsets.US_ASCII)
@@ -107,7 +103,8 @@ class DnsNegativeCacheTtlTest {
             r32(1_209_600)   // expire
             r32(soaMinimum.toLong()) // MINIMUM
             val rdataBytes = rdata.toByteArray()
-            r16(rdataBytes.size)
+            // The RDLENGTH belongs to the record header in the message, not to the RDATA itself.
+            u16(rdataBytes.size)
             out.write(rdataBytes)
         }
         return out.toByteArray()

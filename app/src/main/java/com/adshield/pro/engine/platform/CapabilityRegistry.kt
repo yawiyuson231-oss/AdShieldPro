@@ -113,6 +113,17 @@ object CapabilityRegistry {
             "AdShieldEngineTestSuite.testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu"
         ),
         cap(
+            "login-safety-allowlist", "Logins, captchas, SSO and payments can never be blocked", CapabilityArea.FILTERING,
+            CapabilityStatus.IMPLEMENTED, "engine/filter/LoginSafetyAllowlist.kt", emptyList(),
+            listOf("A curated set of identity, captcha, SSO and payment zones merged into the built-in safety allowlist"),
+            listOf(
+                "Protects the named zones only; a host an app invents for itself is not covered",
+                "Applies before feed rules and the video-ad baseline, but a user block rule and a per-app BLOCK_ALL still win",
+                "An app that resolves through its own encrypted resolver never reaches the tunnel and is unaffected"
+            ),
+            "LoginSafetyAllowlistTest.testAggressiveRulesCannotBreakLoginsPaymentsOrCaptchas and LoginSafetyAllowlistTest.testCaptivePortalChecksStayAllowed and LoginSafetyAllowlistTest.testLoginCriticalMatchingRespectsLabelBoundaries"
+        ),
+        cap(
             "dns-negative-caching", "RFC 2308 negative caching from the authority SOA", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsPacketCodec.kt", listOf(PERM_DNS_TUNNEL),
             listOf("The authority SOA record of NXDOMAIN and NODATA answers, including its MINIMUM field"),
