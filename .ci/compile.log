@@ -16,21 +16,61 @@ TDLib native runtime: 12 libraries verified and installed
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/MainActivity.kt:958:9 No parameter with name 'onSetVideoPlatformEnabled' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:312:40 Unresolved reference 'heuristicBlockingEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:313:43 Unresolved reference 'videoPlatformYoutubeEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:314:42 Unresolved reference 'videoPlatformTiktokEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:315:42 Unresolved reference 'videoPlatformTwitchEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:316:40 Unresolved reference 'videoPlatformMetaEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:317:42 Unresolved reference 'videoPlatformKdramaEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:328:40 Unresolved reference 'heuristicBlockingEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:329:43 Unresolved reference 'videoPlatformYoutubeEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:330:42 Unresolved reference 'videoPlatformTiktokEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:331:42 Unresolved reference 'videoPlatformTwitchEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:332:40 Unresolved reference 'videoPlatformMetaEnabled'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/local/preferences/UserPreferencesRepository.kt:333:42 Unresolved reference 'videoPlatformKdramaEnabled'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/data/repository/AdShieldRepository.kt:712:50 Unresolved reference 'req'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:35:7 Syntax error: Expecting member declaration.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:35:7 Function declaration must have a name.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:79:5 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:82:17 Unresolved reference 'evictions'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:82:26 Unresolved reference 'evictions'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:83:25 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:83:31 Unresolved reference 'currentMemoryBytes'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:86:17 Unresolved reference 'currentMemoryBytes'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:87:25 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:87:31 Unresolved reference 'currentMemoryBytes'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:88:17 Unresolved reference 'evictions'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:88:26 Unresolved reference 'evictions'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:95:5 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:96:5 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:98:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:98:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:99:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:99:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:100:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:100:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:101:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:101:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:102:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:102:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:103:5 This annotation is not applicable to target 'local variable'. Applicable targets: field
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:103:15 Modifier 'private' is not applicable to 'local variable'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:162:41 Unresolved reference 'extractTtl'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:163:26 Unresolved reference 'isNegativeResponse'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:277:5 Modifier 'private' is not applicable to 'local function'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:286:5 Modifier 'private' is not applicable to 'local function'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/InfinityDnsCache.kt:292:2 Syntax error: Missing '}.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:48:13 Const 'val' is only allowed on top level, in named objects, in companion objects or companion blocks.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:49:13 Const 'val' is only allowed on top level, in named objects, in companion objects or companion blocks.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:50:13 Const 'val' is only allowed on top level, in named objects, in companion objects or companion blocks.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:111:9 Argument type mismatch: actual type is 'Double', but 'Float' was expected.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:111:35 Argument type mismatch: actual type is 'Float', but 'Double' was expected.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/TfliteDomainClassifier.kt:111:39 Argument type mismatch: actual type is 'Float', but 'Double' was expected.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:392:20 Unresolved reference 'executeDohQuery'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:709:28 'when' expression must be exhaustive. Add the 'DOQ', 'ODOH' branches or an 'else' branch.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:210:24 Unresolved reference 'get' on receiver of type 'InfinityDnsCache'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:210:44 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:210:44 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:210:50 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:212:73 Unresolved reference 'response'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:213:40 Unresolved reference 'isStale'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:268:35 Unresolved reference 'put' on receiver of type 'InfinityDnsCache'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:399:20 Unresolved reference 'executeDohQuery'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:401:16 Unresolved reference 'executeDohQuery'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:407:20 Unresolved reference 'executeDohQuery'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:409:16 Unresolved reference 'executeDohQuery'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/filter/BloomFilter.kt:58:32 Value out of range.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/filter/BloomFilter.kt:59:32 Value out of range.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/filter/FilterRuleEngine.kt:142:51 Argument type mismatch: actual type is 'Sequence<String>', but 'Iterable<String>' was expected.
@@ -95,6 +135,37 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$0(DefaultBuildLifecycleController.java:323)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:324)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$0(StateTransitionController.java:235)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:235)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
@@ -215,7 +286,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 30 more
+	... 61 more
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No parameter with name 'onSetVideoPlatformEnabled' found.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
@@ -253,5 +324,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No param
 	... 2 more
 
 
-BUILD FAILED in 2m 23s
+BUILD FAILED in 1m 58s
 9 actionable tasks: 9 executed
