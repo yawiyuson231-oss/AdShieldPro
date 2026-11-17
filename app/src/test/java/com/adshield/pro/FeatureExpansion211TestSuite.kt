@@ -145,7 +145,7 @@ class FeatureExpansion211TestSuite {
         val compressedRdata = ByteArrayOutputStream().apply {
             write(3)
             write("cdn".toByteArray(Charsets.US_ASCII))
-            writeU16(0xC000 or 14) // pointer to "tracker.example"
+            writeU16(this, 0xC000 or 14) // pointer to "tracker.example"
         }.toByteArray()
         writeU16(compressedOut, compressedRdata.size)
         compressedOut.write(compressedRdata)
@@ -183,7 +183,12 @@ class FeatureExpansion211TestSuite {
             RuleCategory.TRACKERS,
             "Tracker Feed"
         ).getOrThrow()
-        engine.updateFilterListRules(parsedList)
+        engine.updateFilterListRules(
+            subdomainRules = parsedList.subdomainRules,
+            exactRules = parsedList.exactRules,
+            wildcardRules = parsedList.wildcardRules,
+            allowSubdomains = parsedList.allowSubdomains
+        )
 
         val cloakedWire = buildCnameChainResponse(
             txId = 0x3030,
