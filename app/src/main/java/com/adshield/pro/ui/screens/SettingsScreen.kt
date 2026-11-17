@@ -489,6 +489,9 @@ fun SettingsScreen(
                                     }
                                 }
                                 bench.entries.forEachIndexed { idx, entry ->
+                                    val isCurrentlySelected =
+                                        settings.resolverConfig.preset == entry.preset &&
+                                            settings.resolverConfig.protocol == bench.protocol
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -498,8 +501,8 @@ fun SettingsScreen(
                                             Text(
                                                 text = "${idx + 1}. ${entry.providerName}",
                                                 style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = if (entry.isCurrentlySelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (entry.isCurrentlySelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                                fontWeight = if (isCurrentlySelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isCurrentlySelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
                                             )
                                             val meta = if (entry.reachable) {
                                                 buildString {
@@ -516,9 +519,6 @@ fun SettingsScreen(
                                                 color = if (entry.reachable) CyberCyan else WarningAmber
                                             )
                                         }
-                                        val isCurrentlySelected =
-                                            settings.resolverConfig.preset == entry.preset &&
-                                                settings.resolverConfig.protocol == report.protocol
                                         if (isCurrentlySelected) {
                                             StatusPill("Active", EmeraldPrimary)
                                         } else if (entry.reachable) {
