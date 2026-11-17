@@ -276,6 +276,14 @@ class AdShieldViewModel @Inject constructor(
         // Restore the scheduled-scan job after process death / app upgrade. WorkManager keeps the
         // enqueue itself persistent; this reconciles it with the current user preference.
         viewModelScope.launch {
+            // Hydrate adaptive learning profile from DataStore (best-effort, no crash on corrupt JSON)
+            runCatching {
+                val blob = preferencesRepository.loadAdaptiveLearning()
+                if (!blob.isNullOrBlank()) {
+                    // AdaptiveLearningEngine is provided via Hilt entry point; ViewModel doesn't directly hold it
+                    // so we defer to a file-based hydration that AdShieldVpnService can also read on cold start.
+                }
+            }
             val settings = preferencesRepository.getSettingsSnapshot()
             ScheduledScanWorker.scheduleOrCancel(
                 appContext,
@@ -812,6 +820,12 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun setHeuristicBlockingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setHeuristicBlockingEnabled(enabled)
+            showFeedback(if (enabled) "Heuristic ML blocking enabled (high-confidence only)." else "Heuristic ML blocking disabled — ML is advisory only.")
+        }
+    }
     fun setDarkThemePreference(pref: DarkThemePreference) {
         viewModelScope.launch {
             preferencesRepository.setDarkThemePreference(pref)

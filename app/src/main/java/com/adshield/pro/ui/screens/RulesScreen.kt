@@ -73,7 +73,8 @@ fun RulesScreen(
     onDeduplicateRules: () -> Unit,
     onImportRulesText: (String) -> Unit,
     onExportRulesText: suspend () -> String,
-    onTestDomainSandbox: (String) -> Unit
+    onTestDomainSandbox: (String) -> Unit,
+    compatibilityGuard: com.adshield.pro.engine.dns.CompatibilityGuard? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var filterType by remember { mutableStateOf<RuleType?>(null) }
@@ -364,6 +365,10 @@ fun RulesScreen(
                                 tint = if (rule.ruleType == RuleType.BLOCK) AlertRed else EmeraldPrimary,
                                 modifier = Modifier.size(20.dp)
                             )
+                            if (compatibilityGuard?.isProtected(rule.normalizedPattern) == true) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Protected by Compatibility Guard", tint = CyberCyan, modifier = Modifier.size(14.dp))
+                            }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(

@@ -87,6 +87,7 @@ fun SettingsScreen(
     onSetTransportProtected: (NetworkTransportPolicy, Boolean) -> Unit,
     protectionStatus: ProtectionPipelineStatus? = null,
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
+    onSetHeuristicBlockingEnabled: (Boolean) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
@@ -446,6 +447,28 @@ fun SettingsScreen(
                         color = if (settings.resolverConfig.dnssecMode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS)
                             WarningAmber else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Infinity Diagnostics & Cache", style = MaterialTheme.typography.titleMedium)
+                    if (protectionStatus != null) {
+                        val m = protectionStatus.dnsHealth
+                        Text("Provider health: " + (if (m.isEmpty()) "measuring…" else m.joinToString { it.providerId + " " + String.format("%.0f%%", it.successRate*100) }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("Cache, TTL-aware LRU + stale-while-revalidate (5s). Hit rate appears in the VPN notification when Infinity is active.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f).padding(end = 12.dp)) { Text("Heuristic ML blocking (opt-in)", style = MaterialTheme.typography.bodyLarge); Text("Blocks high-confidence ML malware when lists miss — may increase false positives.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Switch(checked = settings.heuristicBlockingEnabled, onCheckedChange = { onSetHeuristicBlockingEnabled(it) })
+                    }
+                    Text("When off, ML is advisory only (reports never block).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

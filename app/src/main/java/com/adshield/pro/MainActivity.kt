@@ -955,6 +955,7 @@ private fun SettingsDestination(
         onSetTransportProtected = viewModel::setTransportProtected,
         protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
+        onSetHeuristicBlockingEnabled = viewModel::setHeuristicBlockingEnabled,
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,

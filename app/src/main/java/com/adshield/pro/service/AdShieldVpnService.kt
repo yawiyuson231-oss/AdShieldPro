@@ -64,6 +64,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
     @Inject lateinit var infinityCoordinator: InfinityDnsCoordinator
+    @Inject lateinit var tfliteClassifier: com.adshield.pro.engine.dns.TfliteDomainClassifier
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -86,6 +87,11 @@ class AdShieldVpnService : VpnService() {
             protectTcp = { socket -> protect(socket) },
             protectUdp = { datagramSocket -> protect(datagramSocket) }
         )
+        runCatching {
+            assets.open("ml/domain_classifier.json").bufferedReader().readText().let { json ->
+                tfliteClassifier.loadJsonWeights(json)
+            }
+        }
         // Wire Infinity CNAME live hook — cloaked trackers blocked post-upstream, no UI change.
         upstreamDnsResolver.cnamePostInspector = { domain, response ->
             runCatching { infinityCoordinator.evaluatePostUpstream(domain, response).shouldBlock }.getOrDefault(false)
@@ -386,7 +392,9 @@ class AdShieldVpnService : VpnService() {
 
         // DNS-only app/network policy is enforced before upstream resolution. Non-DNS packets
         // are not routed through this service and therefore are not governed by these controls.
-        val evaluation = filterRuleEngine.evaluate(query.questionDomain)
+        infinityCoordinator.setHeuristicBlockingEnabled(currentSettings.heuristicBlockingEnabled)
+        val infinityDecision = infinityCoordinator.evaluatePreUpstream(query.questionDomain)
+        val evaluation = if (infinityDecision.isBlocked) infinityDecision.primaryVerdict else filterRuleEngine.evaluate(query.questionDomain)
         val decision = DnsFirewallPolicyDecider.evaluate(
             evaluation = evaluation,
             appPackageName = app?.packageName,
@@ -579,7 +587,8 @@ class AdShieldVpnService : VpnService() {
             "AdShield Pro Active (${state.activeMode.title})"
         }
 
-        val content = "Blocked ${state.sessionBlockedQueries} of ${state.sessionTotalQueries} DNS queries • ${state.resolverConfig.protocol.name}"
+        val hitRate = infinityCoordinator.cacheHitRateOrNull()?.let { String.format(" • %.0f%% cache", it * 100) } ?: ""
+        val content = "Blocked ${state.sessionBlockedQueries} of ${state.sessionTotalQueries} DNS queries • ${state.resolverConfig.protocol.name}$hitRate"
 
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_shield)

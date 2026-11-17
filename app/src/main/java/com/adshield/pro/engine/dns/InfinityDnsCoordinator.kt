@@ -35,8 +35,11 @@ class InfinityDnsCoordinator @Inject constructor(
     private val performanceOptimizer: DnsPerformanceOptimizer,
     private val tfliteClassifier: TfliteDomainClassifier,
     private val adaptiveLearning: AdaptiveLearningEngine,
-    private val dgaDetector: DgaFamilyDetector
+    private val dgaDetector: DgaFamilyDetector,
+    private val preferencesRepository: com.adshield.pro.data.local.preferences.UserPreferencesRepository? = null
 ) {
+    private var settingsHeuristicBlockingEnabled: Boolean = false
+    fun setHeuristicBlockingEnabled(enabled: Boolean) { settingsHeuristicBlockingEnabled = enabled }
 
     data class InfinityDecision(
         val domain: String,
@@ -133,6 +136,29 @@ class InfinityDnsCoordinator @Inject constructor(
             )
         }
 
+        // Heuristic ML blocking (opt-in, user-gated): high-confidence ML + threat concordance
+        if (settingsHeuristicBlockingEnabled) {
+            val domainIntel = domainIntelligence.analyze(domain)
+            val ml = tfliteClassifier.classify(domainIntel.features)
+            if (ml.label == TfliteDomainClassifier.Label.MALWARE && ml.score >= 0.78f && domainIntel.riskScore >= 65) {
+                pipeline.add("ml:block:malware:" + String.format("%.2f", ml.score))
+                val elapsed = (System.nanoTime() - startNs) / 1000
+                return InfinityDecision(
+                    domain = domain, isBlocked = true,
+                    primaryVerdict = FilterEvaluationResult(
+                        domain = domain, isBlocked = true,
+                        matchedRule = "heuristic:ml-malware:" + String.format("%.2f", ml.score),
+                        matchedCategory = com.adshield.pro.domain.model.RuleCategory.MALWARE,
+                        matchType = null, sourceName = "Infinity Heuristic (ML " + ml.label.name + ")",
+                        priority = 55, evaluationTimeMicros = elapsed
+                    ),
+                    compatibilityCheck = compatCheck, domainIntelligence = null, videoIntelligence = null,
+                    threatResult = threatResult, securityAssessment = null, shouldEnrichTelemetry = true,
+                    decisionTimeMicros = elapsed, pipeline = pipeline
+                )
+            }
+        }
+
         // Video ad intelligence (for telemetry — not auto-blocking unknown video infra)
         val videoResult = if (domain.contains("doubleclick") || domain.contains("ad") ||
             domain.contains("vast") || domain.contains("tracking")
@@ -192,6 +218,7 @@ class InfinityDnsCoordinator @Inject constructor(
     }
 
     /** Lightweight telemetry hook — per-app counters without UI change. */
+    fun cacheHitRateOrNull(): Double? = runCatching { performanceOptimizer.getMetrics().cacheHitRate }.getOrNull()
     fun recordPostUpstreamTelemetry(domain: String, appPackage: String?, isBlocked: Boolean) {
         performanceOptimizer.recordQuery(latencyMs = 0, fromCache = false, providerId = appPackage, cpuMicros = 0)
     }

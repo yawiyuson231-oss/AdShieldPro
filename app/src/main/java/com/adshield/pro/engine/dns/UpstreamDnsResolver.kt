@@ -243,7 +243,7 @@ class UpstreamDnsResolver @Inject constructor(
             val providerStart = System.currentTimeMillis()
             healthMonitor.checkAvailable(endpoint.providerId, config.protocol, providerStart)
             val response = providerTransport?.query(query, config, endpoint)
-                ?: executeProviderQuery(query, config, endpoint)
+                ?: if (config.protocol == DnsProtocol.DOQ) executeDoQQuery(query, endpoint) else executeProviderQuery(query, config, endpoint)
             val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
             val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
             healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
@@ -383,6 +383,16 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     var cnamePostInspector: ((String, ByteArray) -> Boolean)? = null
 
+    // DoQ (RFC 9250) — experimental: requires QUIC stack (Cronet/quiche). Until a QUIC dep is bundled,
+    // DoQ degrades to DoH with a logged warning; the DnsProtocol.DOQ enum already exists for forward-compat.
+    private fun isDoQAvailable(): Boolean = false // flip when Cronet is added; see docs/infinity_dns/ROADMAP.md §4
+    private fun executeDoQQuery(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
+        if (!isDoQAvailable()) {
+            android.util.Log.w("InfinityDNS", "DoQ is experimental and no QUIC transport is bundled — degrading to DoH for ${endpoint.displayName}")
+            return executeDohQuery(query, endpoint)
+        }
+        throw UnsupportedOperationException("DoQ transport not yet bundled")
+    }
     private fun executeProviderQuery(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig,

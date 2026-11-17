@@ -86,7 +86,8 @@ data class AppSettingsState(
     val scheduledScanIntervalHours: Int = 24,
     // --- Quick Settings Tiles for System Preferences ---
     val privateDnsTileConfig: PrivateDnsTileConfig = PrivateDnsTileConfig(),
-    val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig()
+    val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig(),
+    val heuristicBlockingEnabled: Boolean = false
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -177,6 +178,8 @@ class UserPreferencesRepository @Inject constructor(
         val PRIVATE_DNS_TILE_CONFIG_JSON = stringPreferencesKey("private_dns_tile_config_json")
         val USB_DEBUGGING_TILE_CONFIG_JSON = stringPreferencesKey("usb_debugging_tile_config_json")
         val ADAPTIVE_LEARNING_JSON = stringPreferencesKey("adaptive_learning_json")
+        val HEURISTIC_BLOCKING = booleanPreferencesKey("heuristic_blocking_enabled")
+        val FILTER_LAST_MODIFIED = stringPreferencesKey("filter_last_modified_map_json")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -295,7 +298,8 @@ class UserPreferencesRepository @Inject constructor(
             scheduledScanEnabled = prefs[Keys.SCHEDULED_SCAN_ENABLED] ?: false,
             scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168),
             privateDnsTileConfig = privateDnsTileConfig,
-            usbDebuggingTileConfig = usbDebuggingTileConfig
+            usbDebuggingTileConfig = usbDebuggingTileConfig,
+            heuristicBlockingEnabled = heuristicBlockingEnabled
         )
     }
 
@@ -614,4 +618,10 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun clearAdaptiveLearning() {
         context.adShieldDataStore.edit { it.remove(Keys.ADAPTIVE_LEARNING_JSON) }
     }
+    suspend fun setHeuristicBlockingEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.HEURISTIC_BLOCKING] = enabled }
+    }
+    suspend fun saveFilterLastModified(mapJson: String) { context.adShieldDataStore.edit { it[Keys.FILTER_LAST_MODIFIED] = mapJson } }
+    suspend fun loadFilterLastModified(): String? = context.adShieldDataStore.data.map { it[Keys.FILTER_LAST_MODIFIED] }.first()
 }

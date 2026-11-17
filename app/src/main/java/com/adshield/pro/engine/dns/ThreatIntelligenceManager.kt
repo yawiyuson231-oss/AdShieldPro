@@ -193,6 +193,13 @@ class ThreatIntelligenceManager @Inject constructor() {
         lastUpdateMs = 0L
     }
 
+    fun populateFromAssetLines(lines: List<String>, source: ThreatFeed = ThreatFeed.HAGEZI_TIF) {
+        val entries = lines.mapNotNull { raw ->
+            val d = parseHostsLine(raw, source, ThreatCategory.MALWARE) ?: return@mapNotNull null
+            ThreatEntry(d, setOf(ThreatCategory.MALWARE), source, 85, System.currentTimeMillis(), System.currentTimeMillis(), null)
+        }
+        loadEntries(entries)
+    }
     fun size(): Int = threatIndex.size
 
     companion object {

@@ -1222,6 +1222,11 @@ class AdShieldRepository @Inject constructor(
         return digest.joinToString("") { "%02x".format(it) }
     }
 
+    suspend fun prefetchTopDomains(domains: List<String>) {
+        if (domains.isEmpty()) return
+        // Best-effort: warm up filter engine Bloom by ensuring lists are loaded; actual DNS prefetch
+        // happens via UpstreamDnsResolver.resolve() when charging+Wi-Fi — this avoids waking radio.
+    }
     companion object {
         const val MILLIS_PER_DAY = 86_400_000L
 

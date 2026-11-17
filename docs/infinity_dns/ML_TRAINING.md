@@ -42,3 +42,12 @@ Target: **~200 KB** quantized, **AUC 0.92** on test, inference **< 1 ms** on mid
 * Uncomment the Interpreter block in `TfliteDomainClassifier.classifyWithTflite()`.
 
 Until the asset ships, the heuristic fallback (logistic regression distilled from the same training run) is used automatically — zero behavior change.
+
+## Reproducible training
+
+```bash
+pip install tensorflow  # optional — without TF the script still emits the distilled JSON fallback
+python tools/train_tinyml.py --positives data/hagezi_tif_domains.txt --negatives data/tranco_top50k.txt --out app/src/main/assets/ml/
+```
+
+The script is checked in at `tools/train_tinyml.py` and has zero APK impact — it only produces `domain_classifier.json` (≈0.6 KB) and, when TF is present, `domain_classifier.tflite` (≈200 KB quantized).

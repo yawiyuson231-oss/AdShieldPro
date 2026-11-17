@@ -64,6 +64,7 @@ import com.adshield.pro.domain.model.SourceEffectiveness
 import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.ui.theme.AlertRed
 import com.adshield.pro.ui.theme.formatInteger
+import com.adshield.pro.engine.dns.InfinityDnsCoordinator
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
@@ -88,7 +89,8 @@ fun ActivityScreen(
     onToggleDetailedLogging: (Boolean) -> Unit,
     onChangeRetentionDays: (Int) -> Unit,
     onClearHistory: () -> Unit,
-    onQuickRuleFromLog: (String, RuleType) -> Unit
+    onQuickRuleFromLog: (String, RuleType) -> Unit,
+    infinityCoordinator: InfinityDnsCoordinator? = null
 ) {
     var logFilterIndex by remember { mutableIntStateOf(0) } // 0 = All, 1 = Blocked, 2 = Allowed
     val filteredLogs = remember(logs, logFilterIndex) {
@@ -489,6 +491,14 @@ fun ActivityScreen(
                             }
                         }
 
+                        if (infinityCoordinator != null) {
+                            val intel = androidx.compose.runtime.remember(record.domain) { infinityCoordinator.fullIntelligenceReport(record.domain) }
+                            val mlLabel = (intel["ml"] as? Map<*,*>)?.get("label")?.toString() ?: ""
+                            if (mlLabel.isNotEmpty()) {
+                                androidx.compose.material3.AssistChip(onClick = {}, label = { Text(mlLabel.take(14), style = MaterialTheme.typography.labelSmall) })
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                        }
                         TextButton(
                             onClick = {
                                 val targetType = if (record.isBlocked) RuleType.ALLOW else RuleType.BLOCK

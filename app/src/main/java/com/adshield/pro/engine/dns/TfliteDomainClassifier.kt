@@ -54,9 +54,19 @@ class TfliteDomainClassifier @Inject constructor() {
      * We probe via classloader so this stays JVM-testable; on Android the same asset is
      * visible through AssetManager.
      */
+    @Volatile private var loadedWeights: FloatArray? = null
+    @Volatile private var loadedBias: Float? = null
+    fun loadJsonWeights(json: String): Boolean = runCatching {
+        val w = Regex("\"weights\":\\s*\\[([^\\]]+)\\]").find(json)?.groupValues?.get(1) ?: return false
+        val arr = w.split(',').map { it.trim().toFloat() }.toFloatArray()
+        if (arr.size != FALLBACK_WEIGHTS.size) return false
+        val b = Regex("\"bias\":\\s*(-?[0-9.]+)").find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: return false
+        loadedWeights = arr; loadedBias = b; true
+    }.getOrDefault(false)
     fun isModelAvailable(): Boolean = try {
-        javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.tflite") != null ||
-            javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.json") != null
+        loadedWeights != null || javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.tflite") != null ||
+            javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.json") != null ||
+            javaClass.classLoader?.getResourceAsStream("assets/ml/domain_classifier.json") != null
     } catch (_: Exception) { false }
 
     fun classify(features: DomainIntelligenceEngine.DomainFeatures): MlResult {
@@ -84,8 +94,10 @@ class TfliteDomainClassifier @Inject constructor() {
 
     fun classifyHeuristic(features: DomainIntelligenceEngine.DomainFeatures): MlResult {
         val v = vectorize(features)
-        var logit = FALLBACK_BIAS
-        for (i in v.indices) logit += v[i] * FALLBACK_WEIGHTS[i]
+        val weights = loadedWeights ?: FALLBACK_WEIGHTS
+        val bias = loadedBias ?: FALLBACK_BIAS
+        var logit = bias
+        for (i in v.indices) logit += v[i] * weights[i]
         val score = 1f / (1f + kotlin.math.exp(-logit).toFloat())
         return toResult(score, usedTflite = false)
     }
