@@ -89,6 +89,8 @@ fun SettingsScreen(
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
     onSetHeuristicBlockingEnabled: (Boolean) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
+    infinityCacheStats: String? = null,
+    performanceMetrics: String? = null,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
     onToggleAutoStartBoot: (Boolean) -> Unit,
@@ -463,7 +465,9 @@ fun SettingsScreen(
                         val m = protectionStatus.dnsHealth
                         Text("Provider health: " + (if (m.isEmpty()) "measuring…" else m.joinToString { it.providerId + " " + String.format("%.0f%%", it.successRate*100) }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("Cache, TTL-aware LRU + stale-while-revalidate (5s). Hit rate appears in the VPN notification when Infinity is active.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    infinityCacheStats?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CyberCyan) }
+                    performanceMetrics?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    Text("Stale-while-revalidate (5s) keeps playback smooth on network hops. Hit rate also in VPN notification.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).padding(end = 12.dp)) { Text("Heuristic ML blocking (opt-in)", style = MaterialTheme.typography.bodyLarge); Text("Blocks high-confidence ML malware when lists miss — may increase false positives.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         Switch(checked = settings.heuristicBlockingEnabled, onCheckedChange = { onSetHeuristicBlockingEnabled(it) })

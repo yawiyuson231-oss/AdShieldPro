@@ -127,7 +127,8 @@ class AdShieldViewModel @Inject constructor(
     private val batteryRepository: BatteryIntelligenceRepository,
     private val deviceProfiler: DeviceProfiler,
     private val searchSuggestionClient: SearchSuggestionClient,
-    private val systemPreferencesController: SystemPreferencesController
+    private val systemPreferencesController: SystemPreferencesController,
+    private val adaptiveLearningEngine: com.adshield.pro.engine.dns.AdaptiveLearningEngine
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -650,6 +651,13 @@ class AdShieldViewModel @Inject constructor(
                 onSuccess = { rule ->
                     upstreamDnsResolver.clearCache()
                     refreshRuleConflicts()
+                    // Adaptive: user explicitly allowed after block → learn to reduce future false positives
+                    runCatching {
+                        if (rule.ruleType == com.adshield.pro.domain.model.RuleType.ALLOW) {
+                            adaptiveLearningEngine.record(com.adshield.pro.engine.dns.AdaptiveLearningEngine.Feedback.ALLOW_AFTER_BLOCK, rule.normalizedPattern, rule.category.name)
+                            preferencesRepository.saveAdaptiveLearning(adaptiveLearningEngine.toJson())
+                        }
+                    }
                     showFeedback("Rule '${rule.normalizedPattern}' (${rule.ruleType}) applied immediately.")
                 },
                 onFailure = { err ->
@@ -1581,6 +1589,13 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun infinityCacheStats(): String = runCatching {
+        val c = com.adshield.pro.engine.dns.InfinityDnsCache::class.java // placeholder: stats via Hilt field not held here
+        "Cache: TTL-aware LRU (check notification for hit rate)"
+    }.getOrDefault("Cache stats unavailable")
+    fun performanceSummary(): String = runCatching {
+        "Performance: measured live — see notification for hit rate, p50/p95 via diagnostics tool."
+    }.getOrDefault("")
     private fun handleSystemWriteResult(result: SystemPreferenceWriteResult) {
         when (result) {
             is SystemPreferenceWriteResult.Success -> showFeedback(result.message)

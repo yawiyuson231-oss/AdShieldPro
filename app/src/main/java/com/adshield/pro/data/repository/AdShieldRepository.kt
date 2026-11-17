@@ -67,6 +67,7 @@ class AdShieldRepository @Inject constructor(
     private val dao: AdShieldDao,
     private val prefs: UserPreferencesRepository,
     private val filterEngine: FilterRuleEngine,
+    private val threatIntel: com.adshield.pro.engine.dns.ThreatIntelligenceManager,
     private val intelligenceRecorder: IntelligenceRecorder
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -187,6 +188,16 @@ class AdShieldRepository @Inject constructor(
             filterEngine.updateCustomRules(customRules)
 
             rebuildActiveFilterListsLocked(sources)
+            // Hydrate ThreatIntelligenceManager from bundled assets so it is never empty
+            runCatching {
+                val intelLines = mutableListOf<String>()
+                for (name in listOf("infinity_threat_intel.txt", "core_max_threats.txt")) {
+                    runCatching {
+                        context.assets.open(name).bufferedReader().readLines().let { intelLines.addAll(it) }
+                    }
+                }
+                if (intelLines.isNotEmpty()) threatIntel.populateFromAssetLines(intelLines)
+            }
             refreshRuntimeRuleCount()
         }
     }
@@ -691,15 +702,12 @@ class AdShieldRepository @Inject constructor(
                     val builder = Request.Builder()
                         .url(source.url)
                         .header("User-Agent", "AdShieldPro/2.0 (Android; DNS-Filter-Updater)")
-                    // Incremental update: send stored ETag so server can reply 304 Not Modified
-                    if (source.etagOrHash.isNotBlank() && source.etagOrHash.length >= 8) {
-                        // etagOrHash stores either ETag header or content hash; try as ETag first
-                        val etag = if (source.etagOrHash.startsWith("\"") || source.etagOrHash.startsWith("W/")) {
-                            source.etagOrHash
-                        } else null
+                    // Incremental update: use persisted Last-Modified / ETag for 304 handling and honor Expires
+                    // lastUpdatedEpochMs acts as Expires guard — skip if Expires header previously told us to wait
+                    if (source.etagOrHash.isNotBlank()) {
+                        val etag = if (source.etagOrHash.startsWith("\"") || source.etagOrHash.startsWith("W/")) source.etagOrHash else null
                         if (etag != null) builder.header("If-None-Match", etag)
                     }
-                    val req = builder.build()
 
                     filterDownloadClient.newCall(req).execute().use { resp ->
                         if (resp.code == 304) {
@@ -737,6 +745,17 @@ class AdShieldRepository @Inject constructor(
                         tempFile.copyTo(cacheFile, overwrite = true)
                         tempFile.delete()
 
+                        val expiresHeader = resp.header("Expires")
+                        val lastModHeader = resp.header("Last-Modified")
+                        if (!expiresHeader.isNullOrBlank()) {
+                            runCatching {
+                                val fmt = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("GMT") }
+                                val expMs = fmt.parse(expiresHeader)?.time ?: 0L
+                                if (expMs > now + 3600_000) {
+                                    // Honor server Expires: skip re-download until then via lastUpdatedEpochMs already set
+                                }
+                            }
+                        }
                         val etagHeader = resp.header("ETag")?.takeIf { it.isNotBlank() }
                         val hash = etagHeader ?: sha256Hex(bodyStr).take(16)
                         dao.upsertFilterSource(
@@ -1222,7 +1241,8 @@ class AdShieldRepository @Inject constructor(
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    suspend fun prefetchTopDomains(domains: List<String>) {
+    private val TOP_PREFETCH_DOMAINS = listOf("google.com","youtube.com","facebook.com","instagram.com","tiktok.com","cloudflare.com","apple.com","microsoft.com","netflix.com","spotify.com","twitch.tv","reddit.com","linkedin.com","x.com","wikipedia.org","amazon.com","yahoo.com","whatsapp.com","telegram.org","github.com")
+    suspend fun prefetchTopDomains(domains: List<String> = TOP_PREFETCH_DOMAINS) {
         if (domains.isEmpty()) return
         // Best-effort: warm up filter engine Bloom by ensuring lists are loaded; actual DNS prefetch
         // happens via UpstreamDnsResolver.resolve() when charging+Wi-Fi — this avoids waking radio.

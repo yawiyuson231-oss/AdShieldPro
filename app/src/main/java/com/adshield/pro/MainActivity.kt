@@ -956,6 +956,8 @@ private fun SettingsDestination(
         protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
         onSetHeuristicBlockingEnabled = viewModel::setHeuristicBlockingEnabled,
+        infinityCacheStats = "Infinity cache: " + viewModel.infinityCacheStats(),
+        performanceMetrics = viewModel.performanceSummary(),
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
