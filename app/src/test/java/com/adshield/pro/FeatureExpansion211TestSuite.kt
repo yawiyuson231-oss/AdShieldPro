@@ -230,7 +230,8 @@ class FeatureExpansion211TestSuite {
             listOf(
                 CustomRule(
                     id = 1L,
-                    pattern = "stats.news-site.example",
+                    rawPattern = "stats.news-site.example",
+                    normalizedPattern = "stats.news-site.example",
                     ruleType = RuleType.ALLOW,
                     matchType = RuleMatchType.EXACT
                 )
