@@ -333,19 +333,38 @@ object LinkSanitizer {
         for (match in URL_CANDIDATE_REGEX.findAll(text)) {
             val start = match.range.first
             var end = match.range.last
+            // Count delimiters once in O(n) over the candidate and update close counts in O(1).
+            var openParens = 0
+            var closeParens = 0
+            var openBrackets = 0
+            var closeBrackets = 0
+            for (idx in start..end) {
+                when (text[idx]) {
+                    '(' -> openParens++
+                    ')' -> closeParens++
+                    '[' -> openBrackets++
+                    ']' -> closeBrackets++
+                }
+            }
             while (end > start) {
                 val ch = text[end]
                 if (ch in TRAILING_PUNCTUATION) {
                     end--
                 } else if (ch == ')') {
                     // Preserve closing ')' only when balanced by an opening '(' inside the URL.
-                    val slice = text.substring(start, end + 1)
-                    val opens = slice.count { it == '(' }
-                    val closes = slice.count { it == ')' }
-                    if (closes > opens) end-- else break
+                    if (closeParens > openParens) {
+                        closeParens--
+                        end--
+                    } else {
+                        break
+                    }
                 } else if (ch == ']') {
-                    val slice = text.substring(start, end + 1)
-                    if (slice.count { it == ']' } > slice.count { it == '[' }) end-- else break
+                    if (closeBrackets > openBrackets) {
+                        closeBrackets--
+                        end--
+                    } else {
+                        break
+                    }
                 } else {
                     break
                 }

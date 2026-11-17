@@ -189,6 +189,7 @@ class UpstreamDnsResolver @Inject constructor(
         OkHttpClient.Builder()
             .socketFactory(protectedSocketFactory)
             .dns(bootstrapDns)
+            .callTimeout(8, TimeUnit.SECONDS)
             .connectTimeout(4, TimeUnit.SECONDS)
             .readTimeout(4, TimeUnit.SECONDS)
             .writeTimeout(4, TimeUnit.SECONDS)

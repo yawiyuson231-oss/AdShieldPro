@@ -445,11 +445,12 @@ class AdShieldVpnService : VpnService() {
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
 
-        // Inspect returned CNAME answer chains so disguised first-party tracker aliases
-        // (e.g. metrics.site.example -> collector.adtech.example) are blocked cleanly.
+        // Re-evaluate question against the latest snapshot in case user allowlisted while in flight,
+        // then inspect returned CNAME answer chains so disguised first-party trackers are blocked.
+        val latestQuestionEval = filterRuleEngine.evaluate(query.questionDomain)
         val cnameDecision = CnameCloakingInspector.inspect(
             questionDomain = query.questionDomain,
-            questionEvaluation = evaluation,
+            questionEvaluation = latestQuestionEval,
             dnsResponse = upstreamResult.responseBytes,
             filterEngine = filterRuleEngine,
             enabled = currentSettings.cnameUncloakingEnabled,

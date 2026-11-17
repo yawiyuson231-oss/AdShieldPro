@@ -516,7 +516,10 @@ fun SettingsScreen(
                                                 color = if (entry.reachable) CyberCyan else WarningAmber
                                             )
                                         }
-                                        if (entry.isCurrentlySelected) {
+                                        val isCurrentlySelected =
+                                            settings.resolverConfig.preset == entry.preset &&
+                                                settings.resolverConfig.protocol == report.protocol
+                                        if (isCurrentlySelected) {
                                             StatusPill("Active", EmeraldPrimary)
                                         } else if (entry.reachable) {
                                             TextButton(onClick = { onApplyBenchmarkedPreset(entry.preset) }) {

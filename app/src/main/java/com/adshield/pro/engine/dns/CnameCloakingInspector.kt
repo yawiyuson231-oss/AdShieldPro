@@ -55,8 +55,9 @@ object CnameCloakingInspector {
             if (!targetEval.isBlocked) continue
 
             // Never break video/audio stream delivery when a site CNAMEs onto a protected playback
-            // host (unless the user explicitly wrote a custom block rule for that exact target).
-            val isExplicitUserBlock = targetEval.sourceName == "User Custom Rule"
+            // host (unless the user explicitly wrote a custom block rule for that target).
+            val isExplicitUserBlock =
+                targetEval.sourceName == "User Custom Rule" || targetEval.sourceName == "User Blocklist"
             if (!isExplicitUserBlock && DnsMediaPlaybackGuard.isProtectedPlaybackHost(target)) {
                 continue
             }

@@ -907,7 +907,7 @@ class AdShieldViewModel @Inject constructor(
     // --- Share-Sheet Link Cleaner & Instant Threat Check ---
 
     fun inspectSharedOrPastedLink(rawText: String) {
-        val trimmed = rawText.trim()
+        val trimmed = rawText.trim().take(8_192)
         if (trimmed.isEmpty()) {
             showFeedback("Nothing to clean — paste or share a link first.")
             return

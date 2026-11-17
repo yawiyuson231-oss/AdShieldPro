@@ -466,7 +466,9 @@ fun BrowserScreen(
                         }
                     }
 
-                    webView.loadUrl(currentPageUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+                    if (pendingExternalUrl.isNullOrBlank()) {
+                        webView.loadUrl(currentPageUrl, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+                    }
                 }
             },
             update = { webView ->

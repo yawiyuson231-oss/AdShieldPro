@@ -225,7 +225,7 @@ fun AdShieldMainApp(
     var showAppFirewallScreen by rememberSaveable { mutableStateOf(false) }
     var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
     var handledWorldMonitorTrigger by rememberSaveable { mutableIntStateOf(0) }
-    var handledStartConsentTrigger by rememberSaveable { mutableIntStateOf(0) }
+    var handledStartConsentTrigger by remember { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var worldMonitorOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }

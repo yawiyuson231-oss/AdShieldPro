@@ -32,22 +32,26 @@ class ProtectionSnoozeController @Inject constructor(
      * resume alarm. Returns the persisted resume deadline in epoch milliseconds.
      */
     suspend fun snoozeProtection(minutes: Int, currentStatus: VpnStatus): Long {
+        if (currentStatus != VpnStatus.CONNECTED &&
+            currentStatus != VpnStatus.STARTING &&
+            currentStatus != VpnStatus.RECONNECTING &&
+            currentStatus != VpnStatus.PAUSED
+        ) {
+            notifySurfacesChanged(context)
+            return 0L
+        }
         val clamped = ProtectionSnoozeEngine.clampMinutes(minutes)
         val deadline = ProtectionSnoozeEngine.computeDeadline(System.currentTimeMillis(), clamped)
         preferencesRepository.setVpnShouldRemainActive(true)
         preferencesRepository.setVpnSnoozeUntilEpochMs(deadline)
         scheduleResumeAlarm(deadline)
 
-        if (currentStatus == VpnStatus.CONNECTED || currentStatus == VpnStatus.STARTING ||
-            currentStatus == VpnStatus.RECONNECTING || currentStatus == VpnStatus.PAUSED
-        ) {
-            runCatching {
-                context.startService(
-                    Intent(context, AdShieldVpnService::class.java).apply {
-                        action = AdShieldVpnService.ACTION_PAUSE_VPN
-                    }
-                )
-            }
+        runCatching {
+            context.startService(
+                Intent(context, AdShieldVpnService::class.java).apply {
+                    action = AdShieldVpnService.ACTION_PAUSE_VPN
+                }
+            )
         }
         notifySurfacesChanged(context)
         return deadline
@@ -90,13 +94,22 @@ class ProtectionSnoozeController @Inject constructor(
         val settings = preferencesRepository.getSettingsSnapshot()
         val now = System.currentTimeMillis()
         if (ProtectionSnoozeEngine.isSnoozeDue(settings.vpnSnoozeUntilEpochMs, settings.vpnShouldRemainActive, now)) {
-            preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
             cancelResumeAlarm()
             if (VpnService.prepare(context) == null) {
                 val resumeIntent = Intent(context, AdShieldVpnService::class.java).apply {
                     action = AdShieldVpnService.ACTION_RESUME_VPN
                 }
-                runCatching { ContextCompat.startForegroundService(context, resumeIntent) }
+                val started = runCatching {
+                    ContextCompat.startForegroundService(context, resumeIntent)
+                }.isSuccess
+                // Clear deadline only when service start succeeded; if Android 12+ background FGS
+                // restrictions block the alarm start, keeping the elapsed deadline allows the live
+                // VPN packet loop to self-resume on the very next DNS query.
+                if (started) {
+                    preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
+                }
+            } else {
+                preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
             }
         } else if (!settings.vpnShouldRemainActive && settings.vpnSnoozeUntilEpochMs != 0L) {
             preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
