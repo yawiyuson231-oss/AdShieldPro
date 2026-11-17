@@ -24,6 +24,15 @@ class InfinityDnsCache(
     private val negativeTtlSeconds: Int = 30,
     private val staleTtlMs: Long = 5000L // serve stale for 5s while revalidating
 ) {
+    companion object {
+        fun maxProfile() = InfinityDnsCache(
+            maxEntries = 4096,
+            maxMemoryBytes = 8L * 1024 * 1024,
+            negativeTtlSeconds = 15,
+            staleTtlMs = 8000L
+        )
+        fun standard() = InfinityDnsCache()
+    } {
 
     data class CacheEntry(
         val key: String,

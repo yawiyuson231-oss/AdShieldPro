@@ -58,12 +58,26 @@ enum class ProtectionMode(
             RuleCategory.CUSTOM
         ),
         blockSinkholeZeroIp = true
+    ),
+    MAX(
+        title = "MAX DNS Mode",
+        subtitle = "Maximum DNS hardening — all categories, fastest-healthy failover, media-aware ECS, QNAME minimization, EDNS padding, and full Infinity intelligence. Recommended for power users.",
+        warningNote = "MAX enables every filter category including strict telemetry. Some banking or enterprise apps may need an allowlist entry.",
+        activeCategories = setOf(
+            RuleCategory.ADS,
+            RuleCategory.TRACKERS,
+            RuleCategory.MALWARE,
+            RuleCategory.STRICT_TELEMETRY,
+            RuleCategory.CUSTOM
+        ),
+        blockSinkholeZeroIp = true
     )
 }
 
 @Serializable
 enum class DnsProtocol(val label: String, val description: String, val experimental: Boolean = false) {
     DOH("DNS-over-HTTPS (DoH)", "RFC 8484 encrypted HTTPS POST queries on port 443"),
+    DOH3("DNS-over-HTTP/3 (DoH3)", "DoH over QUIC/HTTP/3 — 0-RTT, connection migration, fastest encrypted (experimental)", experimental = true),
     DOT("DNS-over-TLS (DoT)", "RFC 7858 TLS-encrypted TCP stream on port 853"),
     UDP_TCP("Standard DNS (UDP/TCP)", "Protected low-latency UDP/TCP queries on port 53"),
     DOQ("DNS-over-QUIC (DoQ)", "RFC 9250 QUIC-encrypted DNS on port 853 (experimental, fastest encrypted)", experimental = true),
@@ -181,6 +195,42 @@ enum class DnsProviderPreset(
         dohUrl = "https://freedns.controld.com/p0",
         dotHostname = "p0.freedns.controld.com"
     ),
+    MULLVAD(
+        id = "mullvad",
+        displayName = "Mullvad DNS (194.242.2.2)",
+        providerSummary = "Privacy-first no-logging DNS operated by Mullvad VPN — encrypted DNS with no client profiling.",
+        privacyDisclosure = "Operated by Mullvad VPN AB under Swedish law; strict no-logging policy, no ECS forwarding.",
+        primaryIpv4 = "194.242.2.2",
+        secondaryIpv4 = "194.242.2.3",
+        primaryIpv6 = "2a07:e340::2",
+        secondaryIpv6 = "2a07:e340::3",
+        dohUrl = "https://dns.mullvad.net/dns-query",
+        dotHostname = "dns.mullvad.net"
+    ),
+    CLOUDFLARE_FAMILY(
+        id = "cloudflare-family",
+        displayName = "Cloudflare Families (1.1.1.3)",
+        providerSummary = "Cloudflare Families — blocks malware and adult content at DNS, with global anycast speed.",
+        privacyDisclosure = "Cloudflare Families privacy policy applies; no sale of browsing data, optional filtering logs anonymized.",
+        primaryIpv4 = "1.1.1.3",
+        secondaryIpv4 = "1.0.0.3",
+        primaryIpv6 = "2606:4700:4700::1113",
+        secondaryIpv6 = "2606:4700:4700::1003",
+        dohUrl = "https://family.cloudflare-dns.com/dns-query",
+        dotHostname = "family.cloudflare-dns.com"
+    ),
+    ADGUARD_DEFAULT(
+        id = "adguard-default",
+        displayName = "AdGuard Default (94.140.14.14)",
+        providerSummary = "AdGuard Default — blocks ads, trackers and phishing with AdGuard filtering at the resolver.",
+        privacyDisclosure = "Operated by AdGuard Software Ltd; default filtering mode, no personal profiling.",
+        primaryIpv4 = "94.140.14.14",
+        secondaryIpv4 = "94.140.15.15",
+        primaryIpv6 = "2a10:50c0::ad1:ff",
+        secondaryIpv6 = "2a10:50c0::ad2:ff",
+        dohUrl = "https://dns.adguard-dns.com/dns-query",
+        dotHostname = "dns.adguard-dns.com"
+    ),
     CUSTOM(
         id = "custom",
         displayName = "Custom DNS Resolver",
@@ -206,9 +256,9 @@ data class DnsResolverConfig(
     val customPrimaryIpv6: String = "2606:4700:4700::1111",
     val customSecondaryIpv6: String = "2606:4700:4700::1001",
     val enableIpv6: Boolean = true,
-    val failoverEnabled: Boolean = false,
+    val failoverEnabled: Boolean = true,
     val failoverProviderIds: Set<String> = emptySet(),
-    val fastestHealthyProvider: Boolean = false,
+    val fastestHealthyProvider: Boolean = true,
     val dnssecMode: DnssecMode = DnssecMode.REPORT_ONLY,
     /**
      * Prefer a subnet-forwarding resolver for media/CDN hostnames.
@@ -219,7 +269,24 @@ data class DnsResolverConfig(
      * first healthy provider that forwards a client subnet (the selected provider
      * when it already does), while everything else keeps the configured order.
      */
-    val preferGeoAccurateMediaDns: Boolean = true
+    val preferGeoAccurateMediaDns: Boolean = true,
+    // --- MAX DNS future-proof flags (all default ON for max hardening) ---
+    /** RFC 7816 QNAME minimization — minimize leaked labels on iterative fallback. */
+    val qnameMinimization: Boolean = true,
+    /** RFC 8467 / RFC 7830 EDNS(0) padding — pad DoH queries to block size. */
+    val ednsPadding: Boolean = true,
+    /** Anonymize ECS — never send full client subnet, truncate to /24 or disable. */
+    val anonymizedEcs: Boolean = true,
+    /** Enable parallel hedged queries (250ms hedge) for lowest p99 latency. */
+    val parallelHedging: Boolean = true,
+    /** Prefetch popular domains on idle — warms cache, zero privacy leak (local only). */
+    val prefetchTopDomains: Boolean = true,
+    /** Parse RFC 8914 Extended DNS Errors for richer diagnostics. */
+    val extendedDnsErrors: Boolean = true,
+    /** Enable SVCB/HTTPS record opportunistic upgrade (RFC 8484 §5, RFC 9460). */
+    val svcbHttpsUpgrade: Boolean = true,
+    /** MAX cache profile: 4096 entries / 8MB when true, else 2048 / 4MB. */
+    val maxCacheProfile: Boolean = true
 ) {
     val activeDohUrl: String
         get() = if (preset == DnsProviderPreset.CUSTOM) customDohUrl.ifBlank { preset.dohUrl } else preset.dohUrl

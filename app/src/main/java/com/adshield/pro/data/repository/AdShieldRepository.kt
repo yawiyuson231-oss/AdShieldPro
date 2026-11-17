@@ -1168,17 +1168,17 @@ class AdShieldRepository @Inject constructor(
             FilterSourceEntity(
                 id = "infinity_video_ads_update",
                 name = "Infinity Video Ads — Daily Refresh (Incremental)",
-                description = "Incremental refresh of programmatic video ad exchanges, mobile SDKs, and new TikTok/Twitch endpoints. Uses ETag/304 so unchanged days cost 0 bytes.",
+                description = "MAX DNS: Incremental refresh of programmatic video ad exchanges, mobile SDKs, and new TikTok/Twitch endpoints. Uses ETag/304 so unchanged days cost 0 bytes. Enabled by default in MAX DNS.",
                 url = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt",
                 licenseName = "GNU GPLv3",
                 category = RuleCategory.ADS.name,
                 isBuiltIn = true,
-                isEnabled = false,
+                isEnabled = true,
                 isPremiumOnly = false,
                 ruleCount = 0,
                 duplicateCount = 0,
                 lastUpdatedEpochMs = 0L,
-                lastStatusMessage = "Disabled — enable to auto-refresh video ad infra daily (incremental via ETag/Expires)"
+                lastStatusMessage = "MAX DNS — auto-refresh enabled (incremental via ETag/Expires)"
             ),
             FilterSourceEntity(
                 id = "infinity_threat_intel",

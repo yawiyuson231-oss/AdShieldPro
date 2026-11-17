@@ -140,6 +140,14 @@ class UserPreferencesRepository @Inject constructor(
         val DNS_FASTEST_HEALTHY = booleanPreferencesKey("dns_fastest_healthy")
         val DNS_PREFER_MEDIA_ECS = booleanPreferencesKey("dns_prefer_media_ecs")
         val DNSSEC_MODE = stringPreferencesKey("dnssec_mode")
+        val DNS_QNAME_MINIMIZATION = booleanPreferencesKey("dns_qname_minimization")
+        val DNS_EDNS_PADDING = booleanPreferencesKey("dns_edns_padding")
+        val DNS_ANONYMIZED_ECS = booleanPreferencesKey("dns_anonymized_ecs")
+        val DNS_PARALLEL_HEDGING = booleanPreferencesKey("dns_parallel_hedging")
+        val DNS_PREFETCH_TOP = booleanPreferencesKey("dns_prefetch_top")
+        val DNS_EXTENDED_ERRORS = booleanPreferencesKey("dns_extended_errors")
+        val DNS_SVCB_UPGRADE = booleanPreferencesKey("dns_svcb_upgrade")
+        val DNS_MAX_CACHE = booleanPreferencesKey("dns_max_cache")
         val DNS_FIREWALL_POLICY = stringPreferencesKey("dns_firewall_policy_json")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
         val DETAILED_LOGGING = booleanPreferencesKey("detailed_dns_logging_enabled")
@@ -208,8 +216,8 @@ class UserPreferencesRepository @Inject constructor(
         }.getOrDefault(DnsProtocol.DOH)
 
         val mode = runCatching {
-            ProtectionMode.valueOf(prefs[Keys.PROTECTION_MODE] ?: ProtectionMode.STANDARD.name)
-        }.getOrDefault(ProtectionMode.STANDARD)
+            ProtectionMode.valueOf(prefs[Keys.PROTECTION_MODE] ?: ProtectionMode.MAX.name)
+        }.getOrDefault(ProtectionMode.MAX)
 
         val theme = runCatching {
             DarkThemePreference.valueOf(prefs[Keys.DARK_THEME] ?: DarkThemePreference.DARK.name)
@@ -268,11 +276,19 @@ class UserPreferencesRepository @Inject constructor(
                 customPrimaryIpv6 = prefs[Keys.CUSTOM_IPV6_PRIMARY] ?: "2606:4700:4700::1111",
                 customSecondaryIpv6 = prefs[Keys.CUSTOM_IPV6_SECONDARY] ?: "2606:4700:4700::1001",
                 enableIpv6 = prefs[Keys.ENABLE_IPV6] ?: true,
-                failoverEnabled = prefs[Keys.DNS_FAILOVER_ENABLED] ?: false,
+                failoverEnabled = prefs[Keys.DNS_FAILOVER_ENABLED] ?: true,
                 failoverProviderIds = prefs[Keys.DNS_FAILOVER_PROVIDERS] ?: emptySet(),
-                fastestHealthyProvider = prefs[Keys.DNS_FASTEST_HEALTHY] ?: false,
+                fastestHealthyProvider = prefs[Keys.DNS_FASTEST_HEALTHY] ?: true,
                 dnssecMode = dnssecMode,
-                preferGeoAccurateMediaDns = prefs[Keys.DNS_PREFER_MEDIA_ECS] ?: true
+                preferGeoAccurateMediaDns = prefs[Keys.DNS_PREFER_MEDIA_ECS] ?: true,
+                qnameMinimization = prefs[Keys.DNS_QNAME_MINIMIZATION] ?: true,
+                ednsPadding = prefs[Keys.DNS_EDNS_PADDING] ?: true,
+                anonymizedEcs = prefs[Keys.DNS_ANONYMIZED_ECS] ?: true,
+                parallelHedging = prefs[Keys.DNS_PARALLEL_HEDGING] ?: true,
+                prefetchTopDomains = prefs[Keys.DNS_PREFETCH_TOP] ?: true,
+                extendedDnsErrors = prefs[Keys.DNS_EXTENDED_ERRORS] ?: true,
+                svcbHttpsUpgrade = prefs[Keys.DNS_SVCB_UPGRADE] ?: true,
+                maxCacheProfile = prefs[Keys.DNS_MAX_CACHE] ?: true
             ),
             dnsFirewallPolicy = dnsFirewallPolicy,
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
@@ -390,6 +406,14 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.DNS_FAILOVER_PROVIDERS] = config.failoverProviderIds
             prefs[Keys.DNS_FASTEST_HEALTHY] = config.fastestHealthyProvider
             prefs[Keys.DNS_PREFER_MEDIA_ECS] = config.preferGeoAccurateMediaDns
+            prefs[Keys.DNS_QNAME_MINIMIZATION] = config.qnameMinimization
+            prefs[Keys.DNS_EDNS_PADDING] = config.ednsPadding
+            prefs[Keys.DNS_ANONYMIZED_ECS] = config.anonymizedEcs
+            prefs[Keys.DNS_PARALLEL_HEDGING] = config.parallelHedging
+            prefs[Keys.DNS_PREFETCH_TOP] = config.prefetchTopDomains
+            prefs[Keys.DNS_EXTENDED_ERRORS] = config.extendedDnsErrors
+            prefs[Keys.DNS_SVCB_UPGRADE] = config.svcbHttpsUpgrade
+            prefs[Keys.DNS_MAX_CACHE] = config.maxCacheProfile
             prefs[Keys.DNSSEC_MODE] = config.dnssecMode.name
             prefs[Keys.ENABLE_IPV6] = config.enableIpv6
         }

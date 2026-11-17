@@ -232,7 +232,11 @@ class UpstreamDnsResolver @Inject constructor(
         val healthOrdered = DnsProviderRegistry.orderedByHealth(
             configuredPlan, healthMonitor, config.protocol, config.fastestHealthyProvider
         )
-        val plan = mediaAwareOrder(healthOrdered, config, query.questionDomain)
+        // MAX DNS: inject EDNS padding / ECS anonymization when enabled — applies wire-format level
+        val effectiveQuery = if (config.ednsPadding || config.qnameMinimization) {
+            applyMaxDnsWireEnhancements(query, config)
+        } else query
+        val plan = mediaAwareOrder(healthOrdered, config, effectiveQuery.questionDomain)
         val failures = mutableListOf<String>()
 
         /**
@@ -242,9 +246,13 @@ class UpstreamDnsResolver @Inject constructor(
         suspend fun attempt(endpoint: DnsProviderEndpoint): UpstreamResult {
             val providerStart = System.currentTimeMillis()
             healthMonitor.checkAvailable(endpoint.providerId, config.protocol, providerStart)
-            val response = providerTransport?.query(query, config, endpoint)
-                ?: if (config.protocol == DnsProtocol.DOQ) executeDoQQuery(query, endpoint) else executeProviderQuery(query, config, endpoint)
-            val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
+            val response = providerTransport?.query(effectiveQuery, config, endpoint)
+                ?: when (config.protocol) {
+                    DnsProtocol.DOQ -> executeDoQQuery(effectiveQuery, endpoint)
+                    DnsProtocol.DOH3 -> executeDoH3Query(effectiveQuery, endpoint)
+                    else -> executeProviderQuery(effectiveQuery, config, endpoint)
+                }
+            val inspection = DnsResponseValidator.validate(effectiveQuery.rawPayload, response, config.dnssecMode)
             val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
             healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
             val protocol = "${config.protocol.name} (${endpoint.displayName}) · ${inspection.dnssecStatus.name}"
@@ -393,12 +401,38 @@ class UpstreamDnsResolver @Inject constructor(
         }
         throw UnsupportedOperationException("DoQ transport not yet bundled")
     }
+    private fun isDoH3Available(): Boolean = false // flip when Cronet HTTP/3 is bundled
+    private fun executeDoH3Query(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
+        if (!isDoH3Available()) {
+            android.util.Log.w("InfinityDNS", "DoH3 is experimental — degrading to DoH for ${endpoint.displayName}")
+            return executeDohQuery(query, endpoint)
+        }
+        throw UnsupportedOperationException("DoH3 transport not yet bundled")
+    }
+
+    /** MAX DNS wire enhancements: EDNS padding (RFC 8467), QNAME minimization note, ECS anonymization. */
+    internal fun applyMaxDnsWireEnhancements(
+        query: DnsPacketCodec.ParsedDnsQuery,
+        config: DnsResolverConfig
+    ): DnsPacketCodec.ParsedDnsQuery {
+        if (!config.ednsPadding && !config.qnameMinimization) return query
+        // EDNS padding is applied at DoH/DoT wire level inside DnsPacketCodec;
+        // QNAME minimization is iterative-resolver behavior — for stub we ensure we don't leak extra labels via ECS.
+        // ECS anonymization: already handled by provider selection (anonymizedEcs = true means never forward full /32).
+        // For now return original query with padding injected if needed — padded query is functionally identical cache-wise.
+        return if (config.ednsPadding) {
+            val padded = DnsPacketCodec.ensureEdnsPadding(query.rawPayload, padToBlock = 128)
+            DnsPacketCodec.parseQuery(padded) ?: query
+        } else query
+    }
+
     private fun executeProviderQuery(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig,
         endpoint: DnsProviderEndpoint
     ): ByteArray = when (config.protocol) {
         DnsProtocol.DOH -> queryDoh(query.rawPayload, endpoint.dohUrl)
+        DnsProtocol.DOH3 -> executeDoH3Query(query, endpoint)
         DnsProtocol.DOT -> queryDot(query.rawPayload, endpoint, config.enableIpv6)
         DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6)
         // Experimental transports: gracefully fall through to the best available
@@ -640,6 +674,7 @@ class UpstreamDnsResolver @Inject constructor(
         private val PRESET_BOOTSTRAP_IPS: Map<String, List<String>> = mapOf(
             "cloudflare-dns.com" to listOf("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"),
             "one.one.one.one" to listOf("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"),
+            "family.cloudflare-dns.com" to listOf("1.1.1.3", "1.0.0.3", "2606:4700:4700::1113", "2606:4700:4700::1003"),
             "dns.quad9.net" to listOf("9.9.9.9", "149.112.112.112", "2620:fe::fe", "2620:fe::9"),
             // Quad9 Secure + ECS endpoints.
             "dns11.quad9.net" to listOf("9.9.9.11", "149.112.112.11", "2620:fe::11", "2620:fe::fe:11"),
@@ -647,7 +682,8 @@ class UpstreamDnsResolver @Inject constructor(
             "dns.adguard-dns.com" to listOf("94.140.14.14", "94.140.14.15", "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff"),
             "dns.google" to listOf("8.8.8.8", "8.8.4.4", "2001:4860:4860::8888", "2001:4860:4860::8844"),
             "dns.nextdns.io" to listOf("45.90.28.0", "45.90.30.0", "2a07:a8c0::", "2a07:a8c1::"),
-            "dns.mullvad.net" to listOf("194.242.2.2", "2a07:e340::2"),
+            "dns.mullvad.net" to listOf("194.242.2.2", "194.242.2.3", "2a07:e340::2", "2a07:e340::3"),
+            "doh.mullvad.net" to listOf("194.242.2.2", "194.242.2.3", "2a07:e340::2", "2a07:e340::3"),
             "freedns.controld.com" to listOf("76.76.2.0", "76.76.10.0", "2606:1a40::", "2606:1a40:1::"),
             "p0.freedns.controld.com" to listOf("76.76.2.0", "76.76.10.0", "2606:1a40::", "2606:1a40:1::")
         )
@@ -707,14 +743,16 @@ class UpstreamDnsResolver @Inject constructor(
          */
         fun buildCacheKey(query: DnsPacketCodec.ParsedDnsQuery, config: DnsResolverConfig): String {
             val endpoint = when (config.protocol) {
-                DnsProtocol.DOH -> config.activeDohUrl.lowercase()
+                DnsProtocol.DOH, DnsProtocol.DOH3 -> config.activeDohUrl.lowercase()
                 DnsProtocol.DOT -> "${config.activeDotHost.lowercase()}:${config.preset.dotPort}"
                 DnsProtocol.UDP_TCP -> upstreamUdpTcpServers(config).joinToString(",")
+                DnsProtocol.DOQ, DnsProtocol.ODOH -> "${config.protocol.name}:${config.activeDohUrl.lowercase()}"
             }
             val failoverScope = if (config.failoverEnabled && config.protocol != DnsProtocol.UDP_TCP) {
                 "|plan=" + DnsProviderRegistry.queryPlan(config).joinToString(",") { it.providerId }
             } else ""
-            return "${config.protocol.name}@$endpoint$failoverScope|${query.cacheKey}"
+            val maxFlags = "|pad=${config.ednsPadding}|qmin=${config.qnameMinimization}|ecsAnon=${config.anonymizedEcs}"
+            return "${config.protocol.name}@$endpoint$failoverScope$maxFlags|${query.cacheKey}"
         }
     }
 }

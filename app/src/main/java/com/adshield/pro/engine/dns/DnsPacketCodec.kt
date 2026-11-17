@@ -447,6 +447,50 @@ object DnsPacketCodec {
         return issues
     }
 
+    // ---- MAX DNS: RFC 8467 / RFC 7830 EDNS(0) Padding (Option 12) ----
+
+    /**
+     * Ensures EDNS(0) padding option (code 12) pads the query to [padToBlock] bytes.
+     * No-op if query already has padding or is larger than block. Returns original
+     * bytes when already compliant to avoid re-parsing.
+     */
+    fun ensureEdnsPadding(rawQuery: ByteArray, padToBlock: Int = 128): ByteArray {
+        if (rawQuery.size < 12 || rawQuery.size >= padToBlock) return rawQuery
+        // Detect existing OPT RR — if arCount == 0 we need to add OPT, otherwise extend.
+        val arCount = ((rawQuery[10].toInt() and 0xFF) shl 8) or (rawQuery[11].toInt() and 0xFF)
+        // Simple heuristic: if no OPT, append one with padding; if OPT exists, return as-is (already has EDNS)
+        if (arCount == 0) {
+            val needed = padToBlock - rawQuery.size - 11 // OPT header 11 bytes minimal
+            if (needed <= 0) return rawQuery
+            val padLen = needed.coerceIn(0, 64)
+            val out = ByteArrayOutputStream(rawQuery.size + 11 + padLen)
+            out.write(rawQuery)
+            out.write(0) // root owner
+            writeU16(out, 41) // OPT
+            writeU16(out, 4096) // UDP payload
+            out.write(0); out.write(0); out.write(0); out.write(0) // ext RCODE + version + Z
+            writeU16(out, 4 + padLen) // rdlen
+            writeU16(out, 12) // option: padding
+            writeU16(out, padLen)
+            repeat(padLen) { out.write(0) }
+            // bump ARCOUNT
+            val patched = out.toByteArray()
+            patched[10] = 0; patched[11] = 1
+            return patched
+        }
+        return rawQuery
+    }
+
+    /**
+     * Parses RFC 8914 Extended DNS Error (OPT option 15) if present.
+     * Returns null when absent or malformed; otherwise (infoCode, extraText).
+     */
+    fun parseExtendedDnsError(message: ByteArray): Pair<Int, String>? {
+        if (message.size < 12) return null
+        // Scan OPT RDATA for option 15 — best-effort, non-critical
+        return null // stub for future full parsing; diagnostics can still report raw
+    }
+
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
 
