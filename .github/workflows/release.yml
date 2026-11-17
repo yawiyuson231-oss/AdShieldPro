@@ -209,6 +209,8 @@ jobs:
 
       - name: Verify and package APK
         id: apk
+        env:
+          APK_NAME: ${{ steps.meta.outputs.apk_name }}
         run: |
           set -euo pipefail
           APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
@@ -216,7 +218,7 @@ jobs:
           unzip -l "$APK" | grep -q 'AndroidManifest.xml'
           unzip -l "$APK" | grep -qE 'classes[0-9]*\.dex'
           unzip -l "$APK" | grep -q 'resources.arsc'
-          OUT="${{ steps.meta.outputs.apk_name }}"
+          OUT="$APK_NAME"
           cp "$APK" "$OUT"
           sha256sum "$OUT" | cut -d' ' -f1 > "$OUT.sha256"
           echo "apk=$OUT" >> "$GITHUB_OUTPUT"
@@ -228,10 +230,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.meta.outputs.tag }}
           APK: ${{ steps.apk.outputs.apk }}
+          VERSION_NAME: ${{ steps.meta.outputs.version_name }}
+          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
         run: |
           set -euo pipefail
           cat > /tmp/notes.md <<EOF
-          # AdShield Pro ${{ steps.meta.outputs.version_name }}
+          # AdShield Pro ${VERSION_NAME}
 
           Signed, R8-minified release build from commit \`$GITHUB_SHA\`.
 
@@ -244,6 +248,11 @@ jobs:
           \`$(cat "$APK.sha256")\`.
 
           ## What is in this build
+          - Security & reliability hardening across VPN/TCP-DNS/IPv6 packet framing, DoH/DoT and
+            DNSSEC-scoped caching, video-safe wildcard filtering, Privacy Browser cosmetic/scheme
+            guards and Tor \`.onion\` leak prevention, World Monitor tile & RSS/Atom feed isolation,
+            APK Signature Scheme v2/v3+ checks, verified Cloud/WebDAV/direct-download handling,
+            and repo-pinned HTTPS in-app update verification.
           - Private search (DuckDuckGo default or Google), persistent scan journal (up to 200
             records), exportable threat reports, SHA-256 verified file quarantine and optional
             scheduled installed-app scanning.
@@ -280,7 +289,7 @@ jobs:
           Verified by \`tools/check_universal_release.py\` before this release was published.
 
           ## Notes
-          - \`versionCode ${{ steps.meta.outputs.version_code }}\`, \`minSdk 29\`, \`targetSdk 36\`.
+          - \`versionCode ${VERSION_CODE}\`, \`minSdk 29\`, \`targetSdk 36\`.
           - Built and verified by the "Release APK" workflow (unit tests, APK structure checks,
             universal-build gate, signing-continuity check against the previous release).
           - Signing keys are not included in release assets. Previously published keystore assets
@@ -290,7 +299,7 @@ jobs:
             echo "release $TAG already exists: updating its APK assets and release notes"
             gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
             gh release edit "$TAG" \
-              --title "AdShield Pro ${{ steps.meta.outputs.version_name }}" \
+              --title "AdShield Pro ${VERSION_NAME}" \
               --notes-file /tmp/notes.md
             exit 0
           fi
@@ -299,7 +308,7 @@ jobs:
           git tag -f "$TAG" "$GITHUB_SHA"
           git push -f origin "$TAG" || true
           gh release create "$TAG" "$APK" "$APK.sha256" \
-            --title "AdShield Pro ${{ steps.meta.outputs.version_name }}" \
+            --title "AdShield Pro ${VERSION_NAME}" \
             --notes-file /tmp/notes.md \
             --target "$GITHUB_SHA"
 
