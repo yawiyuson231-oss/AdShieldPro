@@ -63,6 +63,8 @@ class WorldMonitorWatchWorker @AssistedInject constructor(
                 )
             )
             Result.success()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (t: Throwable) {
             runCatching {
                 recorder.emit(

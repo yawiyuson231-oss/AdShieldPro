@@ -58,6 +58,7 @@ class BatteryIntelligenceRepository @Inject constructor(
     private var sessionStartMs = System.currentTimeMillis()
     private var sessionStartLevel: Int? = null
     private var sessionWasCharging = telemetry.value.isCharging
+    private var sessionPluggedLabel: String = telemetry.value.pluggedLabel
     private var sessionPeakTemp: Float? = null
     private var sessionVoltageSum = 0.0
     private var sessionVoltageCount = 0
@@ -79,8 +80,14 @@ class BatteryIntelligenceRepository @Inject constructor(
         // null receiver at first read already yields the current state, and an explicit receiver
         // keeps history building while the Battery tab is open. Android stops delivering these to
         // a stopped app, which is why history restarts on launch and the UI says so.
-        context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        androidx.core.content.ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         sessionStartLevel = telemetry.value.levelPercent.rawValue
+        sessionPluggedLabel = telemetry.value.pluggedLabel
         onBatteryChanged()
     }
 
@@ -105,6 +112,9 @@ class BatteryIntelligenceRepository @Inject constructor(
         sessionPeakPower = listOfNotNull(sessionPeakPower, sample.powerWatts).maxOrNull()
 
         val chargingNow = snapshot.isCharging || snapshot.isFull
+        if (chargingNow && snapshot.pluggedLabel.isNotBlank() && !snapshot.pluggedLabel.equals("Unplugged", ignoreCase = true)) {
+            sessionPluggedLabel = snapshot.pluggedLabel
+        }
         if (lastChargingState && !chargingNow) sessionInterruptions++
         lastChargingState = chargingNow
 
@@ -137,7 +147,7 @@ class BatteryIntelligenceRepository @Inject constructor(
                 averageVoltageVolts = if (sessionVoltageCount > 0) (sessionVoltageSum / sessionVoltageCount).toFloat() else null,
                 averageCurrentMilliAmps = if (sessionCurrentCount > 0) (sessionCurrentSum / sessionCurrentCount).toFloat() else null,
                 peakPowerWatts = sessionPeakPower,
-                pluggedLabel = telemetry.value.pluggedLabel,
+                pluggedLabel = if (sessionWasCharging) sessionPluggedLabel else telemetry.value.pluggedLabel,
                 wasCharging = sessionWasCharging,
                 interruptions = sessionInterruptions
             )
@@ -147,6 +157,7 @@ class BatteryIntelligenceRepository @Inject constructor(
         sessionStartMs = now
         sessionStartLevel = endLevel
         sessionWasCharging = nextCharging
+        sessionPluggedLabel = telemetry.value.pluggedLabel
         sessionPeakTemp = null
         sessionVoltageSum = 0.0
         sessionVoltageCount = 0

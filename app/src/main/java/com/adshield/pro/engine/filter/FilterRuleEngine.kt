@@ -113,7 +113,10 @@ class FilterRuleEngine @Inject constructor() {
             }
         }
 
-        wildcards.sortByDescending { it.priority }
+        wildcards.sortWith(
+            compareByDescending<WildcardEntry> { it.ruleType == RuleType.ALLOW }
+                .thenByDescending { it.priority }
+        )
 
         snapshotRef.updateAndGet { current ->
             current.copy(
@@ -127,7 +130,8 @@ class FilterRuleEngine @Inject constructor() {
     }
 
     /**
-     * Atomically replaces the compiled filter list rules. Supports instant rollback if needed.
+     * Atomically replaces the compiled filter list rules without clobbering concurrent mode/custom edits.
+     * Supports instant rollback if needed.
      */
     fun updateFilterListRules(
         subdomainRules: Map<String, FilterListEntry>,
@@ -135,16 +139,15 @@ class FilterRuleEngine @Inject constructor() {
         wildcardRules: List<WildcardEntry>,
         allowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST
     ): FilterSnapshot {
-        val previous = snapshotRef.get()
-        snapshotRef.set(
-            previous.copy(
-                builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
+        val mergedAllow = DEFAULT_SAFE_ALLOWLIST + allowSubdomains
+        return snapshotRef.getAndUpdate { current ->
+            current.copy(
+                builtInAllowSubdomains = mergedAllow,
                 filterListSubdomains = subdomainRules,
                 filterListExact = exactRules,
                 filterListWildcards = wildcardRules
             )
-        )
-        return previous
+        }
     }
 
     fun restoreSnapshot(snapshot: FilterSnapshot) {
@@ -260,6 +263,12 @@ class FilterRuleEngine @Inject constructor() {
         // 9. Filter List Wildcard Rules
         for (wc in snap.filterListWildcards) {
             if (activeCategories.contains(wc.category) && wc.regex.matches(domain)) {
+                if (videoZone != null && DnsMediaPlaybackGuard.isProtectedPlaybackHost(domain)) {
+                    return buildResult(
+                        domain, false, wc.rawPattern, null, RuleMatchType.WILDCARD,
+                        "Video Safety", 70, startNs
+                    )
+                }
                 return buildResult(domain, true, wc.rawPattern, wc.category, RuleMatchType.WILDCARD, wc.sourceName, wc.priority, startNs)
             }
         }

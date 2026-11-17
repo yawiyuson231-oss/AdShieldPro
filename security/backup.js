@@ -32,8 +32,14 @@ export const MIGRATIONS = Object.freeze({
 });
 
 export function migrate(state) {
-  let current = { ...state };
+  let current = { ...(state && typeof state === 'object' ? state : {}) };
   let version = Number(current.schemaVersion ?? 1);
+  if (!Number.isInteger(version) || version < 1) {
+    throw new Error(`invalid schema version ${current.schemaVersion}`);
+  }
+  if (version > SCHEMA_VERSION) {
+    throw new Error(`unsupported future schema version ${version} (max ${SCHEMA_VERSION})`);
+  }
   const applied = [];
   while (version < SCHEMA_VERSION) {
     const step = MIGRATIONS[version];
@@ -72,8 +78,9 @@ export class BackupManager {
       state: migrated.state
     });
     const hash = sha256Hex(payload);
+    const bytes = new TextEncoder().encode(payload).length;
     const id = `${this.clock().toString(36)}-${hash.slice(0, 8)}`;
-    const record = JSON.stringify({ id, hash, bytes: payload.length, payload });
+    const record = JSON.stringify({ id, hash, bytes, payload });
 
     // Verify the write immediately: a silently failed write must not look saved.
     await this.storage.setItem(this._key(id), record);
@@ -81,7 +88,7 @@ export class BackupManager {
     if (readBack !== record) throw new Error('backup write verification failed (storage did not persist the snapshot)');
 
     await this._prune();
-    return { id, hash, bytes: payload.length, schemaVersion: SCHEMA_VERSION, appliedMigrations: migrated.applied };
+    return { id, hash, bytes, schemaVersion: SCHEMA_VERSION, appliedMigrations: migrated.applied };
   }
 
   async list() {
@@ -94,17 +101,18 @@ export class BackupManager {
         const record = JSON.parse(raw);
         let meta = null;
         try { meta = JSON.parse(record.payload); } catch { meta = null; }
+        const hasHash = typeof record.hash === 'string' && record.hash.length > 0;
         out.push({
-          id: record.id, hash: record.hash, bytes: record.bytes,
+          id: record.id ?? key.slice(this.prefix.length), hash: record.hash, bytes: record.bytes,
           createdAt: meta?.createdAt ?? null, reason: meta?.reason ?? 'unknown',
           schemaVersion: meta?.schemaVersion ?? null,
-          valid: !!meta && sha256Hex(record.payload) === record.hash
+          valid: !!meta && hasHash && sha256Hex(record.payload) === record.hash
         });
       } catch {
-        out.push({ id: key.slice(this.prefix.length), corrupt: true, valid: false });
+        out.push({ id: key.slice(this.prefix.length), createdAt: null, corrupt: true, valid: false });
       }
     }
-    return out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    return out.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
   }
 
   async _prune() {
@@ -126,8 +134,11 @@ export class BackupManager {
     try { record = JSON.parse(raw); } catch { return { ok: false, reason: 'corrupt-record' }; }
     if (typeof record.payload !== 'string') return { ok: false, reason: 'corrupt-payload' };
 
+    if (typeof record.hash !== 'string' || !record.hash) {
+      return { ok: false, reason: 'missing-hash' };
+    }
     const actual = sha256Hex(record.payload);
-    if (record.hash && actual !== record.hash) {
+    if (actual !== record.hash) {
       return { ok: false, reason: 'hash-mismatch', expected: record.hash, actual };
     }
     let parsed;

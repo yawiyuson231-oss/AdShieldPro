@@ -81,11 +81,25 @@ class OnionRoutingManager(private val context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-    fun torClient(port: Int = DEFAULT_SOCKS_PORT): OkHttpClient = OkHttpClient.Builder()
-        .proxy(socksProxy(port))
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(45, TimeUnit.SECONDS)
-        .build()
+    private val clientCacheLock = Any()
+    private var cachedClientPort: Int = -1
+    private var cachedClient: OkHttpClient? = null
+
+    fun torClient(port: Int = DEFAULT_SOCKS_PORT): OkHttpClient {
+        val safePort = port.takeIf { it in 1..65535 } ?: DEFAULT_SOCKS_PORT
+        synchronized(clientCacheLock) {
+            val existing = cachedClient
+            if (existing != null && cachedClientPort == safePort) return existing
+            val created = OkHttpClient.Builder()
+                .proxy(socksProxy(safePort))
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(45, TimeUnit.SECONDS)
+                .build()
+            cachedClientPort = safePort
+            cachedClient = created
+            return created
+        }
+    }
 
     /**
      * Proves the route by asking Tor's own check service through the proxy. A direct connection
@@ -126,6 +140,8 @@ class OnionRoutingManager(private val context: Context) {
      */
     fun fetch(url: String, headers: Map<String, String> = emptyMap(), port: Int = DEFAULT_SOCKS_PORT): WebResourceResponse? =
         runCatching {
+            val lowerUrl = url.lowercase()
+            if (!lowerUrl.startsWith("https://") && !lowerUrl.startsWith("http://")) return null
             val builder = Request.Builder().url(url).get()
             headers.forEach { (name, value) ->
                 if (name.lowercase() !in HOP_BY_HOP_HEADERS) builder.header(name, value)
@@ -135,24 +151,39 @@ class OnionRoutingManager(private val context: Context) {
                 response.close()
                 return null
             }
-            val mimeType = response.header("content-type")?.substringBefore(';')?.trim()
+            val contentTypeHeader = response.header("content-type")
+            val mimeType = contentTypeHeader?.substringBefore(';')?.trim()?.ifBlank { null }
                 ?: "application/octet-stream"
-            val encoding = response.header("content-encoding")
+            // WebResourceResponse's second argument is the text charset (NOT HTTP Content-Encoding;
+            // OkHttp transparently decompresses gzip responses).
+            val charset = extractCharset(contentTypeHeader)
             val responseHeaders = response.headers.toMultimap()
+                .filterKeys { it.lowercase() !in STRIPPED_RESPONSE_HEADERS }
                 .mapValues { (_, values) -> values.joinToString(", ") }
                 .toMutableMap()
-            // WebView needs CORS headers for cross-origin subresources it would otherwise drop.
-            if (url.contains("://")) {
-                responseHeaders["Access-Control-Allow-Origin"] = "*"
+            responseHeaders["Access-Control-Allow-Origin"] = "*"
+            val body = response.body
+            val rawStream = body?.byteStream()
+            if (rawStream == null) {
+                response.close()
+                return null
             }
-            val stream = response.body?.byteStream() ?: return null
+            val closingStream = object : java.io.FilterInputStream(rawStream) {
+                override fun close() {
+                    try {
+                        super.close()
+                    } finally {
+                        response.close()
+                    }
+                }
+            }
             WebResourceResponse(
                 mimeType,
-                encoding,
+                charset,
                 response.code,
                 response.message.ifBlank { "OK" },
                 responseHeaders,
-                stream
+                closingStream
             )
         }.getOrNull()
 
@@ -209,5 +240,21 @@ class OnionRoutingManager(private val context: Context) {
             "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
             "te", "trailer", "transfer-encoding", "upgrade", "host", "accept-encoding"
         )
+
+        private val STRIPPED_RESPONSE_HEADERS = setOf(
+            "content-encoding", "content-length", "transfer-encoding", "connection", "keep-alive"
+        )
+
+        internal fun extractCharset(contentType: String?): String? {
+            if (contentType.isNullOrBlank()) return null
+            for (part in contentType.split(';').drop(1)) {
+                val trimmed = part.trim()
+                if (trimmed.startsWith("charset=", ignoreCase = true)) {
+                    val value = trimmed.substringAfter('=').trim().trim('"', '\'')
+                    if (value.isNotEmpty()) return value
+                }
+            }
+            return null
+        }
     }
 }

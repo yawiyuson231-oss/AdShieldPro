@@ -112,7 +112,14 @@ class FileUploadSource(private val file: File) : UploadSource {
     override val sizeBytes: Long get() = file.length()
     override fun open(offsetBytes: Long): InputStream {
         val stream = FileInputStream(file)
-        if (offsetBytes > 0) skipExactly(stream, offsetBytes)
+        if (offsetBytes > 0) {
+            try {
+                skipExactly(stream, offsetBytes)
+            } catch (t: Throwable) {
+                runCatching { stream.close() }
+                throw t
+            }
+        }
         return stream
     }
 }
@@ -125,7 +132,14 @@ class UriUploadSource(
     override fun open(offsetBytes: Long): InputStream {
         val stream = resolver.openInputStream(uri)
             ?: throw IOException("cannot open $uri")
-        if (offsetBytes > 0) skipExactly(stream, offsetBytes)
+        if (offsetBytes > 0) {
+            try {
+                skipExactly(stream, offsetBytes)
+            } catch (t: Throwable) {
+                runCatching { stream.close() }
+                throw t
+            }
+        }
         return stream
     }
 
@@ -199,7 +213,14 @@ class JsonFileUploadJobStore(context: Context) : UploadJobStore {
     }.getOrDefault(emptyList())
 
     private fun write(jobs: List<UploadJob>) {
-        runCatching { file.writeText(json.encodeToString(jobs)) }
+        runCatching {
+            val tmp = File(file.parentFile, "$FILE_NAME.tmp")
+            tmp.writeText(json.encodeToString(jobs))
+            if (!tmp.renameTo(file)) {
+                tmp.copyTo(file, overwrite = true)
+                tmp.delete()
+            }
+        }
     }
 
     private companion object {
@@ -297,6 +318,7 @@ class CloudUploadEngine(
     fun pause(jobId: String) {
         pauseFlags[jobId] = true
         val job = jobs[jobId] ?: return
+        if (job.state == UploadState.COMPLETED || job.state == UploadState.CANCELLED) return
         jobs[jobId] = job.copy(state = UploadState.PAUSED, updatedAt = clock())
         publish()
     }
@@ -415,6 +437,8 @@ class CloudUploadEngine(
                 job.sessionId?.let { runCatching { api.uploadStatus(it) } }
             }
             job
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (e: Throwable) {
             job = job.copy(
                 state = UploadState.FAILED,
@@ -479,7 +503,7 @@ class CloudUploadEngine(
                 .addHeader("X-Bz-Content-Sha1", sha1)
                 .apply {
                     if (job.multipart) addHeader("X-Bz-Part-Number", partNumber.toString())
-                    else addHeader("X-Bz-File-Name", job.objectKey ?: job.name)
+                    else addHeader("X-Bz-File-Name", encodeB2HeaderFileName(job.objectKey ?: job.name))
                 }
                 .build()
             val ok = runCatching {
@@ -494,7 +518,10 @@ class CloudUploadEngine(
                     }
                 }
             }.getOrElse { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
                 if (error is UploadInterruptedException) throw error
+                if (cancelFlags[job.id] == true) throw UploadInterruptedException(InterruptReason.CANCELLED)
+                if (pauseFlags[job.id] == true) throw UploadInterruptedException(InterruptReason.PAUSED)
                 if (attempt >= MAX_PART_ATTEMPTS) throw error
                 tickets.remove(job.id)
                 val current = jobs[job.id] ?: job

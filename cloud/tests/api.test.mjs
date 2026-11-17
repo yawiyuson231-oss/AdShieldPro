@@ -411,4 +411,135 @@ describe('AdShield Cloud API', () => {
     assert.ok(actions.includes('upload_init'))
     assert.ok(actions.includes('upload_complete'))
   })
+
+  test('trashing then purging frees quota, cleans version objects, and protects copied blobs', async () => {
+    const { call } = await setup()
+    const v1 = randomData(128 * 1024)
+    const v2 = randomData(256 * 1024)
+    await upload({ call, name: 'doc.bin', data: v1 })
+    const { completed } = await upload({ call, name: 'doc.bin', data: v2 })
+
+    // Reconcile agrees to the byte with live quota (current + stored v1).
+    const rec = await json(await call('/v1/account/reconcile', { method: 'POST' }))
+    assert.equal(rec.driftBytes, 0)
+    assert.equal(rec.b2Bytes, v1.length + v2.length)
+
+    // Shallow-copy doc.bin, then purge the copy: original must still download intact.
+    const copied = await json(await call(`/v1/nodes/${completed.node.id}/copy`, { method: 'POST' }))
+    const purgeCopy = await call(`/v1/nodes/${copied.node.id}`, { method: 'DELETE' })
+    assert.equal(purgeCopy.status, 200)
+    const dl = await json(await call(`/v1/nodes/${completed.node.id}/download`))
+    const bytes = Buffer.from(await (await fetch(dl.url)).arrayBuffer())
+    assert.equal(sha256Hex(bytes), sha256Hex(v2))
+
+    // Soft-delete then permanently purge original -> quota drops to 0 and version blob is deleted.
+    await call(`/v1/nodes/${completed.node.id}/delete`, { method: 'POST' })
+    const purgeOrig = await call(`/v1/nodes/${completed.node.id}`, { method: 'DELETE' })
+    assert.equal(purgeOrig.status, 200)
+    const after = await json(await call('/v1/account'))
+    assert.equal(after.usage.usedBytes, 0)
+    assert.equal(b2.objects().filter((o) => o.key.includes('doc.bin')).length, 0)
+  })
+
+  test('folder hierarchy, share safety, backup commit idempotency, and prod guard hold', async () => {
+    const { call, app, env } = await setup()
+
+    // Dot-segment names are rejected.
+    assert.equal((await call('/v1/folders', { method: 'POST', body: JSON.stringify({ name: '..' }) })).status, 400)
+
+    // Folder cycle and non-empty purge are refused.
+    const root = await json(await call('/v1/folders', { method: 'POST', body: JSON.stringify({ name: 'A' }) }))
+    const sub = await json(await call('/v1/folders', { method: 'POST', body: JSON.stringify({ name: 'B', parentId: root.node.id }) }))
+    const cycle = await call(`/v1/nodes/${root.node.id}/move`, { method: 'POST', body: JSON.stringify({ parentId: sub.node.id }) })
+    assert.equal(cycle.status, 400)
+    const nonEmpty = await call(`/v1/nodes/${root.node.id}`, { method: 'DELETE' })
+    assert.equal(nonEmpty.status, 409)
+
+    // Folders cannot be shared, and trashing a shared file invalidates its public link.
+    assert.equal((await call('/v1/shares', { method: 'POST', body: JSON.stringify({ nodeId: root.node.id }) })).status, 400)
+    const { completed } = await upload({ call, name: 'secret.txt', data: randomData(4096) })
+    assert.equal((await call('/v1/folders', { method: 'POST', body: JSON.stringify({ name: 'Sub', parentId: completed.node.id }) })).status, 404)
+    const share = await json(await call('/v1/shares', { method: 'POST', body: JSON.stringify({ nodeId: completed.node.id }) }))
+    await call(`/v1/nodes/${completed.node.id}/delete`, { method: 'POST' })
+    assert.equal((await app.fetch(new Request(`http://api/v1/share/${share.share.token}`), env)).status, 404)
+
+    // Cancelled upload cannot be completed.
+    const up = await json(await call('/v1/uploads/init', { method: 'POST', body: JSON.stringify({ name: 'x.bin', size: 1024 }) }))
+    await call(`/v1/uploads/${up.sessionId}/cancel`, { method: 'POST' })
+    assert.equal((await call(`/v1/uploads/${up.sessionId}/complete`, { method: 'POST' })).status, 409)
+
+    // Backup: uncommitted is hidden, missing sha256 is refused, double-commit does not double-charge.
+    const payload = Buffer.from('{"v":1}', 'utf8')
+    const bk = await json(await call('/v1/backups/init', { method: 'POST', body: JSON.stringify({ size: payload.length }) }))
+    assert.equal((await json(await call('/v1/backups'))).backups.length, 0)
+    await fetch(bk.uploadUrl, {
+      method: 'POST',
+      headers: { Authorization: bk.token, 'X-Bz-File-Name': bk.key, 'X-Bz-Content-Sha1': sha1Hex(payload) },
+      body: payload
+    })
+    assert.equal((await call(`/v1/backups/${bk.backupId}/commit`, { method: 'POST', body: JSON.stringify({ size: payload.length }) })).status, 400)
+    const c1 = await call(`/v1/backups/${bk.backupId}/commit`, { method: 'POST', body: JSON.stringify({ size: payload.length, sha256: sha256Hex(payload) }) })
+    assert.equal(c1.status, 200)
+    const usedAfterFirst = (await json(await call('/v1/account'))).usage.usedBytes
+    const c2 = await json(await call(`/v1/backups/${bk.backupId}/commit`, { method: 'POST', body: JSON.stringify({ size: payload.length, sha256: sha256Hex(payload) }) }))
+    assert.equal(c2.alreadyCommitted, true)
+    assert.equal((await json(await call('/v1/account'))).usage.usedBytes, usedAfterFirst)
+
+    // Production guard blocks default (empty) and trailing-slash B2_API_BASE in test mode.
+    const { default: worker } = await import('../src/index.js')
+    const guardEmpty = await worker.fetch(new Request('http://api/v1/health'), { AUTH_MODE: 'test', B2_API_BASE: '' })
+    assert.equal(guardEmpty.status, 500)
+    const guardSlash = await worker.fetch(new Request('http://api/v1/health'), { AUTH_MODE: 'test', B2_API_BASE: 'https://api.backblazeb2.com/' })
+    assert.equal(guardSlash.status, 500)
+  })
+
+  test('ES256 DER conversion and strict issuer/kid validation prevent auth bypasses', async () => {
+    const { derToRaw, verifyToken } = await import('../src/lib/auth.js')
+    const { generateKeyPairSync, createSign } = await import('node:crypto')
+
+    // Sign with Node OpenSSL (ASN.1 DER) and verify via WebCrypto P-256 through verifyToken.
+    const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+    const pubJwk = { ...publicKey.export({ format: 'jwk' }), kid: 'key-1', alg: 'ES256', use: 'sig' }
+
+    const b64u = (buf) => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const makeEs256 = (header, payload) => {
+      const input = `${b64u(JSON.stringify(header))}.${b64u(JSON.stringify(payload))}`
+      const signer = createSign('SHA256')
+      signer.update(input)
+      const derSig = signer.sign({ key: privateKey, dsaEncoding: 'der' })
+      return { jwt: `${input}.${b64u(derSig)}`, derSig }
+    }
+
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      if (String(url).endsWith('/auth/v1/.well-known/jwks.json')) {
+        return new Response(JSON.stringify({ keys: [pubJwk] }), { status: 200 })
+      }
+      return realFetch(url)
+    }
+    try {
+      const exp = Math.floor(Date.now() / 1000) + 600
+      const prodEnv = { AUTH_MODE: 'production', SUPABASE_URL: 'https://proj.supabase.co' }
+
+      // Valid DER-signed ES256 token succeeds.
+      const good = makeEs256({ alg: 'ES256', kid: 'key-1' }, { sub: 'u-ec', email: 'a@b.c', exp, iss: 'https://proj.supabase.co/auth/v1' })
+      assert.equal(derToRaw(new Uint8Array(good.derSig))?.length, 64)
+      const verified = await verifyToken(good.jwt, prodEnv)
+      assert.equal(verified?.sub, 'u-ec')
+
+      // Subdomain-spoofed issuer is rejected.
+      const badIss = makeEs256({ alg: 'ES256', kid: 'key-1' }, { sub: 'u-ec', exp, iss: 'https://proj.supabase.co.evil.example/auth/v1' })
+      assert.equal(await verifyToken(badIss.jwt, prodEnv), null)
+
+      // Unknown kid does NOT fall back to keys[0].
+      const badKid = makeEs256({ alg: 'ES256', kid: 'other-key' }, { sub: 'u-ec', exp, iss: 'https://proj.supabase.co/auth/v1' })
+      assert.equal(await verifyToken(badKid.jwt, prodEnv), null)
+
+      // Future nbf is rejected.
+      const futureNbf = makeEs256({ alg: 'ES256', kid: 'key-1' }, { sub: 'u-ec', exp, nbf: exp - 10, iss: 'https://proj.supabase.co/auth/v1' })
+      assert.equal(await verifyToken(futureNbf.jwt, prodEnv), null)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
 })

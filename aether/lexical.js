@@ -95,19 +95,28 @@ export function decodePunycodeLabel(label) {
       const c = input.charCodeAt(pos++);
       const digit = c - 48 < 10 ? c - 22 : c - 65 < 26 ? c - 65 : c - 97 < 26 ? c - 97 : base;
       if (digit < 0 || digit >= base) return label;
+      if (digit > Math.floor((0x7fffffff - i) / w)) return label;
       i += digit * w;
       const t = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
       if (digit < t) break;
+      if (w > Math.floor(0x7fffffff / (base - t))) return label;
       w *= base - t;
     }
     const out = output.length + 1;
     bias = adapt(i - oldi, out, oldi === 0);
-    n += Math.floor(i / out);
+    const step = Math.floor(i / out);
+    if (step > 0x10ffff - n) return label;
+    n += step;
+    if (n > 0x10ffff || (n >= 0xd800 && n <= 0xdfff)) return label;
     i %= out;
     output.splice(i, 0, n);
     i++;
   }
-  return String.fromCodePoint(...output);
+  try {
+    return String.fromCodePoint(...output);
+  } catch {
+    return label;
+  }
 }
 
 /**
@@ -198,9 +207,11 @@ export function extractFeatures(domain) {
     subdomain: sub,
     mainLabel: main,
     adTokens: findTokens(domain, AD_TRACKER_TOKENS),
-    threatTokens: findTokens(sub ? sub.split('.').join('-') : '', THREAT_TOKENS)
-      .concat(findTokens(main, THREAT_TOKENS)),
-    highAbuseTld: HIGH_ABUSE_TLDS.includes(publicSuffix(domain)),
+    threatTokens: [...new Set([
+      ...findTokens(sub ? sub.split('.').join('-') : '', THREAT_TOKENS),
+      ...findTokens(main, THREAT_TOKENS)
+    ])],
+    highAbuseTld: HIGH_ABUSE_TLDS.includes(suffix),
     punycode: scripts.punycode,
     scripts: scripts.scripts,
     mixedScripts: scripts.mixed,

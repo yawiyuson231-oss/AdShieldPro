@@ -128,9 +128,12 @@ object CloudBackupCodec {
         return digest.joinToString("") { String.format("%02x", it.toInt() and 0xFF) }
     }
 
-    /** A backup only verifies when the stored bytes still hash to the value recorded at upload. */
-    fun verify(bytes: ByteArray, expectedSha256: String): Boolean =
-        expectedSha256.isBlank() || sha256(bytes).equals(expectedSha256.trim(), ignoreCase = true)
+    /** A backup only verifies when a recorded SHA-256 exists and the stored bytes match it. */
+    fun verify(bytes: ByteArray, expectedSha256: String): Boolean {
+        val trimmed = expectedSha256.trim()
+        if (trimmed.length != 64) return false
+        return sha256(bytes).equals(trimmed, ignoreCase = true)
+    }
 
     fun decodeOrNull(bytes: ByteArray): CloudBackupPayload? = runCatching { decode(bytes) }.getOrNull()
 
@@ -235,7 +238,7 @@ class CloudBackupManager @Inject constructor(
                 .url(init.uploadUrl)
                 .post(bytes.toRequestBody("application/octet-stream".toMediaType()))
                 .addHeader("Authorization", init.token)
-                .addHeader("X-Bz-File-Name", init.key)
+                .addHeader("X-Bz-File-Name", encodeB2HeaderFileName(init.key))
                 .addHeader("X-Bz-Content-Sha1", CloudBackupCodec.sha1(bytes))
                 .build()
             http.newCall(request).execute().use { response ->
@@ -359,10 +362,12 @@ class CloudBackupManager @Inject constructor(
 
         dao.clearAllCustomRules()
         if (payload.rules.isNotEmpty()) {
-            dao.insertCustomRules(payload.rules.map { rule ->
+            dao.insertCustomRules(payload.rules.mapNotNull { rule ->
+                val raw = rule.pattern.trim()
+                if (raw.isEmpty()) return@mapNotNull null
                 CustomRuleEntity(
-                    rawPattern = rule.pattern,
-                    normalizedPattern = rule.pattern.trim().lowercase(),
+                    rawPattern = raw,
+                    normalizedPattern = normalizeBackupRulePattern(raw),
                     ruleType = rule.type,
                     matchType = rule.matchType,
                     category = rule.category,
@@ -376,20 +381,22 @@ class CloudBackupManager @Inject constructor(
         applied += "${payload.rules.size} custom rules"
 
         if (payload.sources.isNotEmpty()) {
+            val existingSources = dao.getAllFilterSourcesNow().associateBy { it.id }
             dao.upsertFilterSources(payload.sources.map { source ->
+                val prior = existingSources[source.id]
                 FilterSourceEntity(
                     id = source.id,
-                    name = source.name,
-                    description = "",
-                    url = source.url,
-                    licenseName = "",
-                    category = source.category,
-                    isBuiltIn = false,
+                    name = source.name.ifBlank { prior?.name.orEmpty() },
+                    description = prior?.description.orEmpty(),
+                    url = source.url.ifBlank { prior?.url.orEmpty() },
+                    licenseName = prior?.licenseName.orEmpty(),
+                    category = source.category.ifBlank { prior?.category ?: "ADS" },
+                    isBuiltIn = prior?.isBuiltIn ?: false,
                     isEnabled = source.enabled,
-                    isPremiumOnly = false,
+                    isPremiumOnly = prior?.isPremiumOnly ?: false,
                     ruleCount = source.ruleCount,
-                    duplicateCount = 0,
-                    lastUpdatedEpochMs = 0L,
+                    duplicateCount = prior?.duplicateCount ?: 0,
+                    lastUpdatedEpochMs = prior?.lastUpdatedEpochMs ?: 0L,
                     lastStatusMessage = "restored from cloud backup"
                 )
             })
@@ -427,6 +434,16 @@ class CloudBackupManager @Inject constructor(
 
     companion object {
         const val BACKUP_KIND_FULL = "full_config"
-        const val APP_VERSION = "2.8.0"
+        val APP_VERSION: String = com.adshield.pro.BuildConfig.VERSION_NAME
+
+        internal fun normalizeBackupRulePattern(raw: String): String {
+            var s = raw.trim().lowercase()
+            s = s.removePrefix("@@").trim()
+            s = s.removePrefix("||").removePrefix("|")
+            s = s.substringBefore('^').substringBefore('$')
+            s = s.removePrefix("https://").removePrefix("http://")
+            s = s.substringBefore('/').trim('.')
+            return s
+        }
     }
 }

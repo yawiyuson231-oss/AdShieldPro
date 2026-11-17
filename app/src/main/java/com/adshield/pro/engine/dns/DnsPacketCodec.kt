@@ -58,9 +58,8 @@ object DnsPacketCodec {
         val txId = ((payload[offset].toInt() and 0xFF) shl 8) or (payload[offset + 1].toInt() and 0xFF)
         val flags = ((payload[offset + 2].toInt() and 0xFF) shl 8) or (payload[offset + 3].toInt() and 0xFF)
 
-        // QR bit (highest bit of flags) must be 0 for a query
-        val isResponse = (flags and 0x8000) != 0
-        if (isResponse) return null
+        // QR bit (highest bit of flags) must be 0 for a query, and OPCODE (0x7800) must be 0 (QUERY)
+        if ((flags and 0x8000) != 0 || (flags and 0x7800) != 0) return null
 
         val qdCount = ((payload[offset + 4].toInt() and 0xFF) shl 8) or (payload[offset + 5].toInt() and 0xFF)
         if (qdCount <= 0 || qdCount > 64) return null
@@ -136,7 +135,7 @@ object DnsPacketCodec {
                 }
                 val pointerOffset = ((lenByte and 0x3F) shl 8) or (packet[pos + 1].toInt() and 0xFF)
                 val targetPos = msgStart + pointerOffset
-                if (targetPos < msgStart || targetPos >= limit || targetPos == pos) return null
+                if (pointerOffset < 12 || targetPos >= limit || targetPos == pos) return null
                 pos = targetPos
             } else if (pointerMask == 0x00) {
                 // Standard label (1..63 bytes)
@@ -181,7 +180,9 @@ object DnsPacketCodec {
         val out = ByteArrayOutputStream(128)
         val rdBit = query.flags and 0x0100 // Preserve Recursion Desired bit
 
-        val canSinkholeIp = sinkholeZeroIp && (query.qType == TYPE_A || query.qType == TYPE_AAAA)
+        val canSinkholeIp = sinkholeZeroIp &&
+            query.qClass == CLASS_IN &&
+            (query.qType == TYPE_A || query.qType == TYPE_AAAA)
         val rcode = if (sinkholeZeroIp) 0 else 3 // 0 = NOERROR, 3 = NXDOMAIN
         // QR = 1 (0x8000), AA = 0, RA = 1 (0x0080)
         val responseFlags = 0x8000 or rdBit or 0x0080 or rcode
@@ -324,14 +325,28 @@ object DnsPacketCodec {
         val anCount = ((dnsResponse[6].toInt() and 0xFF) shl 8) or (dnsResponse[7].toInt() and 0xFF)
         if (anCount <= 0) return 60
 
-        // Skip question section to inspect first answer TTL if easily reachable
-        val qRead = readDomainName(dnsResponse, 0, 12, dnsResponse.size) ?: return 120
-        val firstAnswerOffset = qRead.nextOffset + 4
-        val nameRead = readDomainName(dnsResponse, 0, firstAnswerOffset, dnsResponse.size) ?: return 120
-        val ttlOffset = nameRead.nextOffset + 4 // skip TYPE(2) + CLASS(2)
-        if (ttlOffset + 4 <= dnsResponse.size) {
-            val ttl = ByteBuffer.wrap(dnsResponse, ttlOffset, 4).int
-            return ttl.coerceIn(15, 1800)
+        // Walk all answer RRs and take the minimum TTL so a long-TTL CNAME cannot mask a short A/AAAA TTL.
+        val qdCount = u16At(dnsResponse, 4)
+        var offset = 12
+        repeat(qdCount) {
+            val qRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return 120
+            offset = qRead.nextOffset + 4
+            if (offset > dnsResponse.size) return 120
+        }
+        var minTtl = Long.MAX_VALUE
+        repeat(anCount.coerceAtMost(256)) {
+            val nameRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return@repeat
+            val rrHeader = nameRead.nextOffset
+            if (rrHeader + 10 > dnsResponse.size) return@repeat
+            val ttl = ByteBuffer.wrap(dnsResponse, rrHeader + 4, 4).int.toLong() and 0xFFFFFFFFL
+            val rdLength = u16At(dnsResponse, rrHeader + 8)
+            val nextOffset = rrHeader + 10 + rdLength
+            if (nextOffset > dnsResponse.size) return@repeat
+            if (ttl < minTtl) minTtl = ttl
+            offset = nextOffset
+        }
+        if (minTtl != Long.MAX_VALUE) {
+            return minTtl.coerceIn(15L, 1800L).toInt()
         }
         return 120
     }

@@ -143,6 +143,7 @@ export class Aether {
     const adaptation = this.reputation.recordFeedback(name, { falsePositive: true, report });
     let allowRuleAdded = false;
     if (allowlist) {
+      this.engine.removeUserRule(`||${name}^`, false);
       allowRuleAdded = this.engine.addUserRule(`||${name}^`, true);
       this.reputation.cache.clear();
     }
@@ -210,11 +211,21 @@ export class Aether {
     }
     if (Array.isArray(state.observations)) {
       this.observations.clear();
+      const now = this.clock();
+      const safeCount = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.floor(Number(v)) : 0);
+      const safeTime = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : now);
       for (const o of state.observations.slice(-MAX_OBSERVATIONS)) {
-        if (o?.domain) this.observations.set(o.domain, {
-          firstSeen: o.firstSeen, lastSeen: o.lastSeen, count: o.count || 0,
-          allowed: o.allowed || 0, blocked: o.blocked || 0
-        });
+        const domain = OmniShieldFilterEngine.normalizeDomain(o?.domain);
+        if (domain) {
+          const firstSeen = safeTime(o.firstSeen);
+          const lastSeen = Math.max(firstSeen, safeTime(o.lastSeen));
+          this.observations.set(domain, {
+            firstSeen, lastSeen,
+            count: safeCount(o.count),
+            allowed: safeCount(o.allowed),
+            blocked: safeCount(o.blocked)
+          });
+        }
       }
     }
     return { ok: true, classifierRestored };

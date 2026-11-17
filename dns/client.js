@@ -71,11 +71,12 @@ export class DnsClient {
     this.stats.lookups++;
 
     const raw = String(input ?? '');
+    const cleanedIp = raw.trim().replace(/^\[|\]$/g, '');
 
     // 1a. IP literals need no DNS and cannot be filtered by name.
-    if (OmniShieldFilterEngine.isIpLiteral(raw)) {
+    if (OmniShieldFilterEngine.isIpLiteral(cleanedIp)) {
       const result = {
-        name: raw, type, status: 'ip-literal', ok: true, addresses: [raw],
+        name: cleanedIp, type, status: 'ip-literal', ok: true, addresses: [cleanedIp],
         blocked: false, cached: false, reasons: ['Input is already an IP address; no DNS lookup was performed.'],
         latencyMs: this.clock() - started, dnssec: null, resolver: null, transport: null,
         ttl: null, pipeline: ['ip-literal']
@@ -159,15 +160,17 @@ export class DnsClient {
 
   async _network(name, type, options) {
     const started = this.clock();
-    this.stats.network++;
     const key = DnsCache.key(name, type);
 
     const result = await this.cache.singleFlight(
       key,
-      () => this.pool.query(name, type, { preferredIds: options.preferredIds }),
-      (value) => ({
-        ttl: value.ttl, negative: value.negative, negativeTtl: value.negativeTtl
-      })
+      () => {
+        this.stats.network++;
+        return this.pool.query(name, type, { preferredIds: options.preferredIds });
+      },
+      (value) => (value.ok || value.negative
+        ? { ttl: value.ttl, negative: value.negative, negativeTtl: value.negativeTtl }
+        : null)
     ).catch((err) => ({
       name, type, status: 'error', ok: false, addresses: [], cname: [], ttl: 0,
       negative: false, resolver: null, transport: null, latencyMs: this.clock() - started,
@@ -202,12 +205,13 @@ export class DnsClient {
       this.lookup(input, { ...options, type: 'A' }),
       this.lookup(input, { ...options, type: 'AAAA' })
     ]);
+    const ttls = [a.ttl, aaaa.ttl].filter((v) => typeof v === 'number' && Number.isFinite(v));
     return {
       name: a.name || aaaa.name,
       blocked: a.blocked || aaaa.blocked,
       blockedBy: a.blockedBy || aaaa.blockedBy,
       ipv4: a.addresses, ipv6: aaaa.addresses,
-      ttl: Math.min(a.ttl ?? Infinity, aaaa.ttl ?? Infinity),
+      ttl: ttls.length ? Math.min(...ttls) : null,
       dnssec: [a.dnssec, aaaa.dnssec].filter(Boolean),
       results: { a, aaaa },
       latencyMs: Math.max(a.latencyMs, aaaa.latencyMs)

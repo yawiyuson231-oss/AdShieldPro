@@ -110,7 +110,13 @@ class CloudApiClient internal constructor(
     private fun url(path: String, block: (okhttp3.HttpUrl.Builder) -> Unit = {}): okhttp3.HttpUrl {
         val configured = baseUrl().trim().ifBlank { "https://unconfigured.invalid/" }
         val base = (if (configured.endsWith('/')) configured else "$configured/").toHttpUrl()
-        return base.newBuilder().addPathSegments(path.trimStart('/')).apply(block).build()
+        return base.newBuilder().addEncodedPathSegments(path.trimStart('/')).apply(block).build()
+    }
+
+    private fun seg(value: String): String {
+        val trimmed = value.trim()
+        require(trimmed.isNotEmpty() && trimmed != "." && trimmed != "..") { "invalid path identifier" }
+        return encodeRfc3986(trimmed, preserveSlash = false)
     }
 
     private suspend fun call(request: Request): String = withContext(Dispatchers.IO) {
@@ -189,28 +195,28 @@ class CloudApiClient internal constructor(
         decode<FolderResponseDto>(post("/v1/folders", json.encodeToString(FolderRequest(name, parentId)))).node
 
     override suspend fun rename(nodeId: String, name: String): NodeActionResponseDto =
-        decode(post("/v1/nodes/$nodeId/rename", json.encodeToString(mapOf("name" to name))))
+        decode(post("/v1/nodes/${seg(nodeId)}/rename", json.encodeToString(mapOf("name" to name))))
 
     override suspend fun move(nodeId: String, parentId: String?): NodeActionResponseDto =
-        decode(post("/v1/nodes/$nodeId/move", json.encodeToString(mapOf("parentId" to parentId))))
+        decode(post("/v1/nodes/${seg(nodeId)}/move", json.encodeToString(mapOf("parentId" to parentId))))
 
     override suspend fun copy(nodeId: String): NodeActionResponseDto =
-        decode(post("/v1/nodes/$nodeId/copy"))
+        decode(post("/v1/nodes/${seg(nodeId)}/copy"))
 
     override suspend fun trash(nodeId: String): NodeActionResponseDto =
-        decode(post("/v1/nodes/$nodeId/delete"))
+        decode(post("/v1/nodes/${seg(nodeId)}/delete"))
 
     override suspend fun restore(nodeId: String): NodeActionResponseDto =
-        decode(post("/v1/nodes/$nodeId/restore"))
+        decode(post("/v1/nodes/${seg(nodeId)}/restore"))
 
     override suspend fun purge(nodeId: String): NodeActionResponseDto =
-        decode(delete("/v1/nodes/$nodeId"))
+        decode(delete("/v1/nodes/${seg(nodeId)}"))
 
     override suspend fun versions(nodeId: String): List<NodeVersionDto> =
-        decode<VersionsResponseDto>(get("/v1/nodes/$nodeId/versions")).versions
+        decode<VersionsResponseDto>(get("/v1/nodes/${seg(nodeId)}/versions")).versions
 
     override suspend fun downloadUrl(nodeId: String): DownloadResponseDto =
-        decode(get("/v1/nodes/$nodeId/download"))
+        decode(get("/v1/nodes/${seg(nodeId)}/download"))
 
     override suspend fun duplicates(): List<DuplicateGroupDto> =
         decode<DuplicatesResponseDto>(get("/v1/duplicates")).groups
@@ -228,7 +234,7 @@ class CloudApiClient internal constructor(
     )
 
     override suspend fun uploadStatus(sessionId: String): UploadStatusResponseDto =
-        decode(get("/v1/uploads/$sessionId"))
+        decode(get("/v1/uploads/${seg(sessionId)}"))
 
     override suspend fun recordPart(
         sessionId: String,
@@ -236,14 +242,14 @@ class CloudApiClient internal constructor(
         size: Long,
         sha1: String
     ): UploadPartResponseDto = decode(
-        post("/v1/uploads/$sessionId/part/$partNumber", json.encodeToString(UploadPartRequest(size, sha1)))
+        post("/v1/uploads/${seg(sessionId)}/part/$partNumber", json.encodeToString(UploadPartRequest(size, sha1)))
     )
 
     override suspend fun completeUpload(sessionId: String): UploadCompleteResponseDto =
-        decode(post("/v1/uploads/$sessionId/complete"))
+        decode(post("/v1/uploads/${seg(sessionId)}/complete"))
 
     override suspend fun cancelUpload(sessionId: String): Boolean =
-        decode<UploadCancelResponseDto>(post("/v1/uploads/$sessionId/cancel")).cancelled
+        decode<UploadCancelResponseDto>(post("/v1/uploads/${seg(sessionId)}/cancel")).cancelled
 
     override suspend fun createShare(nodeId: String, expiresInSeconds: Long): CloudShareDto =
         decode<ShareCreateResponseDto>(
@@ -254,11 +260,11 @@ class CloudApiClient internal constructor(
         decode<ShareListResponseDto>(get("/v1/shares")).shares
 
     override suspend fun revokeShare(shareId: String): Boolean {
-        delete("/v1/shares/$shareId")
+        delete("/v1/shares/${seg(shareId)}")
         return true
     }
 
-    override suspend fun openShare(token: String): PublicShareDto = decode(get("/v1/share/$token"))
+    override suspend fun openShare(token: String): PublicShareDto = decode(get("/v1/share/${seg(token)}"))
 
     override suspend fun initBackup(kind: String, label: String, size: Long): BackupInitResponseDto =
         decode(post("/v1/backups/init", json.encodeToString(BackupInitRequest(kind, label, size))))
@@ -268,20 +274,20 @@ class CloudApiClient internal constructor(
         size: Long,
         sha256: String
     ): BackupCommitResponseDto = decode(
-        post("/v1/backups/$backupId/commit", json.encodeToString(BackupCommitRequest(size, sha256)))
+        post("/v1/backups/${seg(backupId)}/commit", json.encodeToString(BackupCommitRequest(size, sha256)))
     )
 
     override suspend fun backups(): List<BackupRowDto> =
         decode<BackupListResponseDto>(get("/v1/backups")).backups
 
     override suspend fun backupDetail(backupId: String): BackupDetailResponseDto =
-        decode(get("/v1/backups/$backupId"))
+        decode(get("/v1/backups/${seg(backupId)}"))
 
     override suspend fun restoreBackup(backupId: String): BackupRestoreResponseDto =
-        decode(post("/v1/backups/$backupId/restore"))
+        decode(post("/v1/backups/${seg(backupId)}/restore"))
 
     override suspend fun deleteBackup(backupId: String): Boolean {
-        delete("/v1/backups/$backupId")
+        delete("/v1/backups/${seg(backupId)}")
         return true
     }
 
@@ -320,3 +326,32 @@ fun defaultCloudJson(): Json = Json {
     encodeDefaults = true
     explicitNulls = false
 }
+
+/**
+ * RFC 3986 percent-encoder for Backblaze B2 `X-Bz-File-Name` headers (preserving `/`) and API path segments.
+ * Ensures spaces, parentheses, and non-ASCII UTF-8 bytes are safely encoded for OkHttp and B2 v2.
+ */
+internal fun encodeB2HeaderFileName(raw: String): String = encodeRfc3986(raw, preserveSlash = true)
+
+internal fun encodeRfc3986(value: String, preserveSlash: Boolean): String {
+    val bytes = value.toByteArray(Charsets.UTF_8)
+    val sb = StringBuilder(bytes.size)
+    for (byte in bytes) {
+        val b = byte.toInt() and 0xFF
+        val isUnreserved = (b in 'A'.code..'Z'.code) ||
+            (b in 'a'.code..'z'.code) ||
+            (b in '0'.code..'9'.code) ||
+            b == '-'.code || b == '_'.code || b == '.'.code || b == '~'.code ||
+            (preserveSlash && b == '/'.code)
+        if (isUnreserved) {
+            sb.append(b.toChar())
+        } else {
+            sb.append('%')
+            sb.append(HEX_UPPER[b ushr 4])
+            sb.append(HEX_UPPER[b and 0x0F])
+        }
+    }
+    return sb.toString()
+}
+
+private const val HEX_UPPER = "0123456789ABCDEF"

@@ -1372,6 +1372,7 @@ p { overflow-wrap: break-word; }
   function fitCanvas(canvas, onResize, maxDpr = 2) {
     const ctx = canvas.getContext('2d');
     const s = { ctx, w: 0, h: 0, dpr: 1 };
+    if (!ctx) return s;
     let initialized = false;
     const resize = () => {
       const r = canvas.getBoundingClientRect();
@@ -2221,4 +2222,3 @@ p { overflow-wrap: break-word; }
   </script>
 </body>
 </html>
-```

@@ -274,6 +274,8 @@ object DnsMediaPlaybackGuard {
      * safe. Feed and user rules both pass through this check.
      */
     fun explainUnsafe(rule: String): UnsafeRule? {
+        // Exception/allowlist rules never block playback.
+        if (rule.trim().startsWith("@@")) return null
         val pattern = patternOf(rule)
         if (pattern.isEmpty()) return null
 
@@ -285,10 +287,16 @@ object DnsMediaPlaybackGuard {
                     "Wildcard \"$pattern\" matches almost every host and would break playback."
                 )
             }
+            val tailAfterStar = pattern.substringAfterLast('*').removePrefix(".")
+            if (pattern.startsWith("*.") && tailAfterStar.isNotEmpty() && !tailAfterStar.contains('.')) {
+                return UnsafeRule(
+                    "WILDCARD_TOO_BROAD", pattern,
+                    "Wildcard \"$pattern\" blocks an entire top-level domain and would break playback."
+                )
+            }
             if (!pattern.startsWith("*.")) {
-                val suffix = pattern.substringAfterLast('*')
-                val suffixIsDomain = Regex("^[a-z0-9-]+(\\.[a-z0-9-]+)+$")
-                    .matches(suffix.removePrefix("."))
+                val suffixIsDomain = Regex("^[a-z0-9_-]+(\\.[a-z0-9_-]+)+$")
+                    .matches(tailAfterStar)
                 if (!suffixIsDomain) {
                     return UnsafeRule(
                         "SUBSTRING_WILDCARD", pattern,
@@ -297,7 +305,22 @@ object DnsMediaPlaybackGuard {
                     )
                 }
             }
-            val literalDomain = registrableDomain(literal)
+            val suffixDomain = normalizeDomain(tailAfterStar)
+            if (suffixDomain.isNotEmpty()) {
+                if (SHARED_CDN_ZONES.contains(suffixDomain)) {
+                    return UnsafeRule(
+                        "SHARED_CDN_BLANKET", pattern,
+                        "Wildcard \"$pattern\" covers shared CDN zone \"$suffixDomain\" and breaks unrelated playback."
+                    )
+                }
+                if (ENTITY_LEVEL_DOMAINS.contains(suffixDomain)) {
+                    return UnsafeRule(
+                        "ENTITY_LEVEL_RULE", pattern,
+                        "Wildcard \"$pattern\" blocks entity-level domain \"$suffixDomain\" and breaks playback."
+                    )
+                }
+            }
+            val literalDomain = registrableDomain(tailAfterStar.ifEmpty { literal })
             if (literalDomain.isNotEmpty() &&
                 PROTECTED_REGISTRABLE_DOMAINS.any { matchesHostOrSubdomain(literalDomain, it) }
             ) {

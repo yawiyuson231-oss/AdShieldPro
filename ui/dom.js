@@ -9,7 +9,11 @@
 
 export function h(tag, props = {}, ...children) {
   const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(props || {})) {
+  const entries = Object.entries(props || {});
+  if (String(tag).toLowerCase() === 'button' && !entries.some(([k]) => k === 'type')) {
+    el.setAttribute('type', 'button');
+  }
+  for (const [key, value] of entries) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'class' || key === 'className') el.className = value;
     else if (key === 'text') el.textContent = String(value);
@@ -140,9 +144,10 @@ export function drawSeries(canvas, seriesList, options = {}) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
-  const all = seriesList.flatMap((s) => s.points.map((p) => p.value));
-  const max = Math.max(options.minMax ?? 1, ...all);
-  const points = seriesList[0]?.points.length || 0;
+  const all = seriesList.flatMap((s) => s.points.map((p) => p.value)).filter(Number.isFinite);
+  let max = options.minMax ?? 1;
+  for (const v of all) if (v > max) max = v;
+  const points = seriesList.reduce((m, s) => Math.max(m, s.points?.length || 0), 0);
   if (!points) return;
 
   // Baseline grid
@@ -154,14 +159,18 @@ export function drawSeries(canvas, seriesList, options = {}) {
   }
 
   for (const series of seriesList) {
+    if (!series.points?.length) continue;
     const step = width / Math.max(1, series.points.length - 1);
+    const pointAt = (p, i) => ({
+      x: series.points.length === 1 ? width / 2 : i * step,
+      y: height - ((Number.isFinite(p.value) ? p.value : 0) / max) * (height - 8) - 2
+    });
     ctx.beginPath();
     series.points.forEach((p, i) => {
-      const x = i * step;
-      const y = height - (p.value / max) * (height - 8) - 2;
+      const { x, y } = pointAt(p, i);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    if (series.fill) {
+    if (series.fill && series.points.length > 1) {
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, series.fill);
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
@@ -174,8 +183,7 @@ export function drawSeries(canvas, seriesList, options = {}) {
       ctx.restore();
       ctx.beginPath();
       series.points.forEach((p, i) => {
-        const x = i * step;
-        const y = height - (p.value / max) * (height - 8) - 2;
+        const { x, y } = pointAt(p, i);
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
     }
@@ -216,12 +224,17 @@ export function download(filename, text, mime = 'application/json') {
 export function setBusy(button, busy, busyLabel = 'Working…') {
   if (!button) return;
   if (busy) {
-    button.dataset.label = button.textContent;
+    if (!button.dataset.label) button.dataset.label = button.textContent;
     button.textContent = busyLabel;
     button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
   } else {
-    if (button.dataset.label) button.textContent = button.dataset.label;
+    if (button.dataset.label) {
+      button.textContent = button.dataset.label;
+      delete button.dataset.label;
+    }
     button.disabled = false;
+    button.removeAttribute('aria-busy');
   }
 }
 

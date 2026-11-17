@@ -31,7 +31,7 @@ export async function usage(db, userId) {
   const trashed = await one(
     db,
     `SELECT COUNT(*) AS files, COALESCE(SUM(size_bytes), 0) AS bytes
-     FROM nodes WHERE user_id = ? AND deleted_at IS NOT NULL`,
+     FROM nodes WHERE user_id = ? AND kind = 'file' AND deleted_at IS NOT NULL`,
     userId
   )
   return {
@@ -85,26 +85,36 @@ export async function reconcile(db, b2, userId) {
   const prefix = `u/${userId}/`
   let total = 0
   let objects = 0
-  const reported = []
+  let startFileName = null
   let startFileId = null
   for (let page = 0; page < 50; page++) {
-    const result = await b2.listFileVersions({ prefix, maxFileCount: 1000, startFileId })
+    const result = await b2.listFileVersions({ prefix, maxFileCount: 1000, startFileName, startFileId })
     for (const file of result.files ?? []) {
       if (file.action !== 'upload') continue
       total += Number(file.size || file.contentLength || 0)
       objects += 1
-      reported.push({ fileId: file.fileId, size: Number(file.size || 0), key: file.fileName })
     }
-    if (!result.nextFileId) break
-    startFileId = result.nextFileId
+    if (!result.nextFileName && !result.nextFileId) break
+    startFileName = result.nextFileName || null
+    startFileId = result.nextFileId || null
   }
-  const rows = await many(
+  // Account for every distinct stored B2 object tracked by the database:
+  // live + trashed files (deduped across shallow copies), retained versions, and backups.
+  const distinctObjects = await many(
     db,
-    `SELECT COALESCE(SUM(size_bytes), 0) AS bytes, COUNT(*) AS files
-     FROM nodes WHERE user_id = ? AND deleted_at IS NULL AND kind = 'file'`,
-    userId
+    `SELECT b2_file_id, MAX(size_bytes) AS size_bytes FROM (
+       SELECT b2_file_id, size_bytes FROM nodes
+         WHERE user_id = ? AND kind = 'file' AND b2_file_id IS NOT NULL
+       UNION ALL
+       SELECT b2_file_id, size_bytes FROM versions
+         WHERE user_id = ? AND b2_file_id IS NOT NULL
+       UNION ALL
+       SELECT b2_file_id, size_bytes FROM backups
+         WHERE user_id = ? AND b2_file_id IS NOT NULL
+     ) GROUP BY b2_file_id`,
+    userId, userId, userId
   )
-  const dbBytes = Number(rows?.[0]?.bytes ?? 0)
+  const dbBytes = distinctObjects.reduce((sum, r) => sum + Number(r.size_bytes || 0), 0)
   await run(db, `UPDATE users SET used_bytes = ? WHERE id = ?`, total, userId)
   return {
     b2Bytes: total,

@@ -407,7 +407,7 @@ private fun WorldMonitorGlobeWebView(
         }
     }
 
-    DisposableEffect(lifecycleOwner, webViewRef) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> webViewRef?.onResume()
@@ -418,14 +418,20 @@ private fun WorldMonitorGlobeWebView(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            webViewRef?.let { wv ->
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            val wv = webViewRef
+            webViewRef = null
+            pageLoaded = false
+            pendingCommands.clear()
+            if (wv != null) {
                 wv.removeJavascriptInterface(WorldMonitorJsBridge.BRIDGE_NAME)
                 wv.stopLoading()
                 wv.destroy()
             }
-            webViewRef = null
-            pageLoaded = false
-            pendingCommands.clear()
         }
     }
 

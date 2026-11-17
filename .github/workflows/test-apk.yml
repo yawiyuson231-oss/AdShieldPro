@@ -73,24 +73,35 @@ jobs:
 
       - name: Resolve version, commit and pre-release tag
         id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SOURCE_REF: ${{ inputs.source_ref }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           VERSION_NAME="$(grep -oE 'versionName *= *"[^"]+"' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)"/\1/')"
           VERSION_CODE="$(grep -oE 'versionCode *= *[0-9]+' app/build.gradle.kts | head -1 | grep -oE '[0-9]+')"
           COMMIT="$(git rev-parse HEAD)"
           SHORT="$(git rev-parse --short HEAD)"
-          SOURCE_REF="${{ inputs.source_ref }}"
+          SOURCE_REF="${INPUT_SOURCE_REF:-}"
           if [ -z "$SOURCE_REF" ]; then SOURCE_REF="${GITHUB_REF}"; fi
-          if [ "${{ github.event_name }}" = "push" ]; then
+          case "$SOURCE_REF" in
+            *$'\n'*|*$'\r'*)
+              echo "::error::Invalid source_ref (newlines are not allowed)."
+              exit 1
+              ;;
+          esac
+          if [ "$EVENT_NAME" = "push" ]; then
             TAG="${GITHUB_REF_NAME}"
-          elif [ -n "${{ inputs.tag }}" ]; then
-            TAG="${{ inputs.tag }}"
+          elif [ -n "${INPUT_TAG:-}" ]; then
+            TAG="$INPUT_TAG"
           else
             TAG="test-v${VERSION_NAME}"
           fi
           # A tag matching release.yml's `v*` trigger would publish a real release and make the
           # test build the repository's Latest. Refuse instead of risking that.
           case "$TAG" in
+            *[!A-Za-z0-9._+-]*) echo "::error::Invalid tag '$TAG' (allowed characters: A-Za-z0-9._+-)."; exit 1 ;;
             v[0-9]*) echo "::error::Tag '$TAG' would trigger the real Release APK pipeline. Use a tag starting with 'test-'."; exit 1 ;;
             test-*) ;;
             *) echo "::error::Test-build tags must start with 'test-' (got '$TAG')."; exit 1 ;;
@@ -111,6 +122,9 @@ jobs:
       - name: Prepare release signing key
         env:
           KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
+          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
+          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
+          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -285,9 +299,9 @@ jobs:
       - name: Assert the published release is untouched
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.meta.outputs.tag }}"
           PRE="$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)"
           LATEST="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name || true)"
           echo "$TAG prerelease=$PRE latest=$LATEST"

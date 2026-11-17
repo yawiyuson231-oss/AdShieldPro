@@ -167,7 +167,7 @@ export function buildApp(env) {
     const name = cleanName(body.name)
     if (!name) return c.json({ error: 'invalid folder name' }, 400)
     const parentId = body.parentId || null
-    if (parentId && !(await ownsNode(c, parentId))) return c.json({ error: 'not found' }, 404)
+    if (parentId && !(await ownsFolder(c, parentId))) return c.json({ error: 'parent folder not found' }, 404)
     const id = newId('nd')
     await run(
       c.env.DB,
@@ -190,13 +190,17 @@ export function buildApp(env) {
     const parentId = body.parentId || null
     if (parentId) {
       if (parentId === node.id) return { status: 400, error: 'cannot move into itself' }
-      if (!(await ownsNode(c, parentId))) return { status: 404, error: 'target not found' }
+      if (!(await ownsFolder(c, parentId))) return { status: 404, error: 'target folder not found' }
+      if (node.kind === 'folder' && await isDescendantFolder(c, parentId, node.id)) {
+        return { status: 400, error: 'cannot move a folder into its own descendant' }
+      }
     }
     await run(c.env.DB, `UPDATE nodes SET parent_id = ?, updated_at = ? WHERE id = ?`, parentId, now(), node.id)
     return { status: 200, node: { id: node.id, parentId } }
   }))
 
   app.post('/v1/nodes/:id/copy', async (c) => nodeAction(c, 'copy', async (node) => {
+    if (node.deleted_at) return { status: 400, error: 'cannot copy a trashed item' }
     const id = newId('nd')
     await run(
       c.env.DB,
@@ -228,22 +232,50 @@ export function buildApp(env) {
     return { status: 200, restored: true }
   }))
 
-  /** Permanent delete: removes the B2 object first, then the row, then frees the quota. */
+  /** Permanent delete: removes unshared B2 objects (including versions), then rows, then frees quota. */
   app.delete('/v1/nodes/:id', async (c) => nodeAction(c, 'purge', async (node) => {
-    if (node.kind === 'file' && node.b2_file_id) {
-      await b2.deleteFileVersion({ fileName: node.b2_key, fileId: node.b2_file_id }).catch(() => null)
+    if (node.kind === 'folder') {
+      const child = await one(
+        c.env.DB, `SELECT id FROM nodes WHERE user_id = ? AND parent_id = ? LIMIT 1`, node.user_id, node.id
+      )
+      if (child) return { status: 409, error: 'folder is not empty' }
     }
+    const candidates = []
+    if (node.kind === 'file' && node.b2_file_id) {
+      candidates.push({ fileId: node.b2_file_id, key: node.b2_key, sizeBytes: Number(node.size_bytes || 0) })
+    }
+    const storedVersions = await many(
+      c.env.DB,
+      `SELECT b2_file_id, b2_key, size_bytes FROM versions WHERE node_id = ? AND b2_file_id IS NOT NULL`,
+      node.id
+    )
+    for (const v of storedVersions) {
+      candidates.push({ fileId: v.b2_file_id, key: v.b2_key, sizeBytes: Number(v.size_bytes || 0) })
+    }
+
     await run(c.env.DB, `DELETE FROM versions WHERE node_id = ?`, node.id)
     await run(c.env.DB, `DELETE FROM shares WHERE node_id = ?`, node.id)
     await run(c.env.DB, `DELETE FROM nodes WHERE id = ?`, node.id)
-    if (node.deleted_at == null && node.kind === 'file') {
+
+    // Deduplicate candidate B2 object IDs and only delete objects no remaining node/version references
+    // (shallow `/copy` shares b2_file_id with the source file).
+    let freedBytes = 0
+    const seenFileIds = new Set()
+    for (const item of candidates) {
+      if (!item.fileId || seenFileIds.has(item.fileId)) continue
+      seenFileIds.add(item.fileId)
+      if (await isObjectStillReferenced(c, node.user_id, item.fileId)) continue
+      await b2.deleteFileVersion({ fileName: item.key, fileId: item.fileId }).catch(() => null)
+      freedBytes += item.sizeBytes
+    }
+    if (freedBytes > 0) {
       await run(
         c.env.DB,
         `UPDATE users SET used_bytes = MAX(0, used_bytes - ?) WHERE id = ?`,
-        Number(node.size_bytes || 0), node.user_id
+        freedBytes, node.user_id
       )
     }
-    return { status: 200, purged: true }
+    return { status: 200, purged: true, freedBytes }
   }))
 
   app.get('/v1/nodes/:id/versions', async (c) => nodeAction(c, 'version_list', async (node) => ({
@@ -256,7 +288,8 @@ export function buildApp(env) {
   }), { readOnly: true }))
 
   app.get('/v1/nodes/:id/download', async (c) => nodeAction(c, 'download', async (node) => {
-    if (node.kind !== 'file') return { status: 400, error: 'folders cannot be downloaded' }
+    if (node.deleted_at) return { status: 404, error: 'file is in the trash' }
+    if (node.kind !== 'file' || !node.b2_key) return { status: 400, error: 'folders cannot be downloaded' }
     const token = await b2.getDownloadAuthorization({
       keyPrefix: node.b2_key,
       validDurationSeconds: DOWNLOAD_TTL_SECONDS
@@ -296,7 +329,7 @@ export function buildApp(env) {
       return c.json({ error: guard.error, detail: guard.detail }, guard.status)
     }
     const parentId = body.parentId || null
-    if (parentId && !(await ownsNode(c, parentId))) return c.json({ error: 'not found' }, 404)
+    if (parentId && !(await ownsFolder(c, parentId))) return c.json({ error: 'parent folder not found' }, 404)
 
     const { partSize, totalParts, multipart } = planUpload(declaredSize, Number(body.partSize))
     const nodeId = newId('nd')
@@ -413,6 +446,9 @@ export function buildApp(env) {
       const existing = await one(c.env.DB, `SELECT * FROM nodes WHERE id = ?`, session.node_id)
       return c.json({ node: mapNode(existing), alreadyCompleted: true })
     }
+    if (session.status !== 'open') {
+      return c.json({ error: 'session is not open' }, 409)
+    }
     const parts = await many(
       c.env.DB,
       `SELECT part_number, sha1, size_bytes FROM upload_parts WHERE session_id = ? ORDER BY part_number`,
@@ -444,9 +480,10 @@ export function buildApp(env) {
       sha1 = finished.contentSha1 ?? `sha1:${partSha1Array.join('')}`.slice(0, 120)
     } else {
       sha1 = parts[0]?.sha1 ?? 'none'
-      // A single-shot upload already landed in B2; look the object up to learn its real id.
-      const listed = await b2.listFileVersions({ prefix: session.b2_key, maxFileCount: 1 })
-      fileId = listed.files?.[0]?.fileId ?? null
+      // A single-shot upload already landed in B2; look the exact key up to learn its real id.
+      const listed = await b2.listFileVersions({ prefix: session.b2_key, maxFileCount: 10 })
+      const exact = (listed.files ?? []).find((f) => f.fileName === session.b2_key && f.action === 'upload')
+      fileId = exact?.fileId ?? null
     }
     if (!fileId) return c.json({ error: 'object was not committed by the storage provider' }, 502)
 
@@ -464,17 +501,20 @@ export function buildApp(env) {
         newId('ver'), existing.id, user.id, nextVersion, existing.size_bytes, existing.sha1 || '',
         existing.b2_file_id, existing.b2_key, now()
       )
-      await pruneVersions(c, existing.id)
+      const prunedBytes = await pruneVersions(c, existing.id, user.id)
       await run(
         c.env.DB,
         `UPDATE nodes SET size_bytes = ?, content_type = ?, sha1 = ?, b2_file_id = ?, b2_key = ?, updated_at = ?
          WHERE id = ?`,
         actualSize, session.content_type, sha1, fileId, session.b2_key, now(), existing.id
       )
-      const added = Math.max(0, actualSize - Number(existing.size_bytes || 0))
-      await run(c.env.DB, `UPDATE users SET used_bytes = used_bytes + ? WHERE id = ?`, added, user.id)
-      await run(c.env.DB, `UPDATE upload_sessions SET status = 'completed', node_id = ?, updated_at = ? WHERE id = ?`,
-        existing.id, now(), session.id)
+      await run(
+        c.env.DB,
+        `UPDATE users SET used_bytes = MAX(0, used_bytes + ? - ?) WHERE id = ?`,
+        actualSize, prunedBytes, user.id
+      )
+      await run(c.env.DB, `UPDATE upload_sessions SET status = 'completed', actual_size = ?, node_id = ?, updated_at = ? WHERE id = ?`,
+        actualSize, existing.id, now(), session.id)
       await audit(c.env.DB, { userId: user.id, action: 'upload_complete', detail: `${session.name} (new version)` })
       return c.json({ node: mapNode(await one(c.env.DB, `SELECT * FROM nodes WHERE id = ?`, existing.id)), replaced: true })
     }
@@ -499,6 +539,7 @@ export function buildApp(env) {
       c.env.DB, `SELECT * FROM upload_sessions WHERE id = ? AND user_id = ?`, c.req.param('id'), user.id
     )
     if (!session) return c.json({ error: 'not found' }, 404)
+    if (session.status === 'completed') return c.json({ error: 'upload already completed' }, 409)
     if (session.b2_file_id) {
       await b2.cancelLargeFile(session.b2_file_id).catch(() => null)
     }
@@ -514,18 +555,21 @@ export function buildApp(env) {
     const user = userOf(c)
     const body = await c.req.json().catch(() => ({}))
     const node = await ownedNode(c, body.nodeId)
-    if (!node) return c.json({ error: 'not found' }, 404)
+    if (!node || node.deleted_at) return c.json({ error: 'not found' }, 404)
+    if (node.kind !== 'file' || !node.b2_key) return c.json({ error: 'only stored files can be shared' }, 400)
     const ttl = clampTtl(Number(body.expiresInSeconds))
     const id = newId('sh')
     const token = randomToken()
+    const createdAt = now()
+    const expiresAt = ttl ? createdAt + ttl * 1000 : null
     await run(
       c.env.DB,
       `INSERT INTO shares (id, token, node_id, user_id, permission, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      id, token, node.id, user.id, 'read', ttl ? now() + ttl * 1000 : null, now()
+      id, token, node.id, user.id, 'read', expiresAt, createdAt
     )
     await audit(c.env.DB, { userId: user.id, action: 'share_create', detail: node.name })
     return c.json({
-      share: { id, token, url: `/v1/share/${token}`, expiresAt: ttl ? now() + ttl * 1000 : null, permission: 'read' }
+      share: { id, token, url: `/v1/share/${token}`, expiresAt, permission: 'read' }
     }, 201)
   })
 
@@ -535,7 +579,7 @@ export function buildApp(env) {
       c.env.DB,
       `SELECT s.id, s.token, s.node_id, s.expires_at, s.created_at, s.downloads, n.name, n.size_bytes
        FROM shares s JOIN nodes n ON n.id = s.node_id
-       WHERE s.user_id = ? AND s.revoked_at IS NULL ORDER BY s.created_at DESC`,
+       WHERE s.user_id = ? AND s.revoked_at IS NULL AND n.deleted_at IS NULL ORDER BY s.created_at DESC`,
       user.id
     )
     return c.json({ shares: rows })
@@ -555,10 +599,12 @@ export function buildApp(env) {
   app.get('/v1/share/:token', async (c) => {
     const share = await one(
       c.env.DB,
-      `SELECT s.*, n.name, n.size_bytes, n.content_type, n.b2_key, n.kind
+      `SELECT s.*, n.name, n.size_bytes, n.content_type, n.b2_key, n.kind, n.deleted_at
        FROM shares s JOIN nodes n ON n.id = s.node_id WHERE s.token = ?`, c.req.param('token')
     )
-    if (!share || share.revoked_at) return c.json({ error: 'link is not valid' }, 404)
+    if (!share || share.revoked_at || share.deleted_at || share.kind !== 'file' || !share.b2_key) {
+      return c.json({ error: 'link is not valid' }, 404)
+    }
     if (share.expires_at && share.expires_at < now()) {
       return c.json({ error: 'link has expired', expiredAt: share.expires_at }, 410)
     }
@@ -603,23 +649,41 @@ export function buildApp(env) {
       c.env.DB, `SELECT * FROM backups WHERE id = ? AND user_id = ?`, c.req.param('id'), user.id
     )
     if (!backup) return c.json({ error: 'not found' }, 404)
+    if (backup.sha256) {
+      return c.json({
+        backupId: backup.id, sizeBytes: backup.size_bytes, sha256: backup.sha256,
+        verified: true, alreadyCommitted: true
+      })
+    }
+    const claimed = String(body.sha256 || '').trim().toLowerCase()
+    if (!/^[0-9a-f]{64}$/.test(claimed)) {
+      return c.json({ error: 'a valid sha256 digest is required' }, 400)
+    }
     const token = await b2.getDownloadAuthorization({ keyPrefix: backup.b2_key, validDurationSeconds: 300 })
     const response = await fetch(b2.downloadUrl(backup.b2_key, token))
     if (!response.ok) return c.json({ error: 'backup payload is not readable' }, 502)
     const bytes = new Uint8Array(await response.arrayBuffer())
     const actualSha256 = await sha256Hex(bytes)
-    const claimed = String(body.sha256 || '')
     if (bytes.byteLength !== Number(body.size)) {
       return c.json({ error: 'size mismatch', expected: body.size, actual: bytes.byteLength }, 409)
     }
-    if (claimed && claimed !== actualSha256) {
+    if (claimed !== actualSha256) {
       return c.json({ error: 'integrity check failed', expected: claimed, actual: actualSha256 }, 409)
     }
-    const listed = await b2.listFileVersions({ prefix: backup.b2_key, maxFileCount: 1 })
+    const listed = await b2.listFileVersions({ prefix: backup.b2_key, maxFileCount: 10 })
+    const stored = (listed.files ?? []).find((f) => f.fileName === backup.b2_key && f.action === 'upload')
+    const guard = await assertWithinQuota(c.env.DB, user.id, bytes.byteLength)
+    if (!guard.ok) {
+      if (stored?.fileId) {
+        await b2.deleteFileVersion({ fileName: backup.b2_key, fileId: stored.fileId }).catch(() => null)
+      }
+      await audit(c.env.DB, { userId: user.id, action: 'quota_refused', detail: `backup ${bytes.byteLength}B` })
+      return c.json({ error: guard.error, detail: guard.detail }, guard.status)
+    }
     await run(
       c.env.DB,
       `UPDATE backups SET size_bytes = ?, sha256 = ?, b2_file_id = ? WHERE id = ?`,
-      bytes.byteLength, actualSha256, listed.files?.[0]?.fileId ?? null, backup.id
+      bytes.byteLength, actualSha256, stored?.fileId ?? null, backup.id
     )
     await run(c.env.DB, `UPDATE users SET used_bytes = used_bytes + ? WHERE id = ?`, bytes.byteLength, user.id)
     await audit(c.env.DB, { userId: user.id, action: 'backup_create', detail: `${backup.kind} ${bytes.byteLength}B` })
@@ -631,7 +695,7 @@ export function buildApp(env) {
     const rows = await many(
       c.env.DB,
       `SELECT id, kind, label, size_bytes, sha256, created_at, restored_at FROM backups
-       WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`, user.id
+       WHERE user_id = ? AND sha256 != '' ORDER BY created_at DESC LIMIT 100`, user.id
     )
     return c.json({ backups: rows })
   })
@@ -639,7 +703,7 @@ export function buildApp(env) {
   app.get('/v1/backups/:id', async (c) => {
     const user = userOf(c)
     const backup = await one(
-      c.env.DB, `SELECT * FROM backups WHERE id = ? AND user_id = ?`, c.req.param('id'), user.id
+      c.env.DB, `SELECT * FROM backups WHERE id = ? AND user_id = ? AND sha256 != ''`, c.req.param('id'), user.id
     )
     if (!backup) return c.json({ error: 'not found' }, 404)
     const token = await b2.getDownloadAuthorization({ keyPrefix: backup.b2_key, validDurationSeconds: 300 })
@@ -655,7 +719,7 @@ export function buildApp(env) {
   app.post('/v1/backups/:id/restore', async (c) => {
     const user = userOf(c)
     const backup = await one(
-      c.env.DB, `SELECT * FROM backups WHERE id = ? AND user_id = ?`, c.req.param('id'), user.id
+      c.env.DB, `SELECT * FROM backups WHERE id = ? AND user_id = ? AND sha256 != ''`, c.req.param('id'), user.id
     )
     if (!backup) return c.json({ error: 'not found' }, 404)
     const token = await b2.getDownloadAuthorization({ keyPrefix: backup.b2_key, validDurationSeconds: 300 })
@@ -689,9 +753,39 @@ export function buildApp(env) {
 
   // ---- helpers bound to the request context
 
-  async function ownsNode(c, id) {
-    const row = await one(c.env.DB, `SELECT id FROM nodes WHERE id = ? AND user_id = ?`, id, userOf(c).id)
+  async function ownsFolder(c, id) {
+    const row = await one(
+      c.env.DB,
+      `SELECT id FROM nodes WHERE id = ? AND user_id = ? AND kind = 'folder' AND deleted_at IS NULL`,
+      id, userOf(c).id
+    )
     return Boolean(row)
+  }
+
+  async function isDescendantFolder(c, candidateParentId, folderId) {
+    const userId = userOf(c).id
+    let current = candidateParentId
+    const visited = new Set([folderId])
+    for (let depth = 0; depth < 256 && current; depth++) {
+      if (visited.has(current)) return true
+      visited.add(current)
+      const row = await one(
+        c.env.DB, `SELECT parent_id FROM nodes WHERE id = ? AND user_id = ?`, current, userId
+      )
+      current = row?.parent_id ?? null
+    }
+    return false
+  }
+
+  async function isObjectStillReferenced(c, userId, fileId) {
+    const nodeRef = await one(
+      c.env.DB, `SELECT id FROM nodes WHERE user_id = ? AND b2_file_id = ? LIMIT 1`, userId, fileId
+    )
+    if (nodeRef) return true
+    const verRef = await one(
+      c.env.DB, `SELECT id FROM versions WHERE user_id = ? AND b2_file_id = ? LIMIT 1`, userId, fileId
+    )
+    return Boolean(verRef)
   }
 
   async function ownedNode(c, id) {
@@ -705,18 +799,21 @@ export function buildApp(env) {
     return Number(row?.v ?? 0) + 1
   }
 
-  /** Keeps the newest N versions and deletes the older objects so storage stays honest. */
-  async function pruneVersions(c, nodeId) {
+  /** Keeps the newest N versions, deletes unshared older objects, and returns bytes freed. */
+  async function pruneVersions(c, nodeId, userId) {
     const rows = await many(
       c.env.DB,
-      `SELECT id, b2_file_id, b2_key FROM versions WHERE node_id = ? ORDER BY version DESC`, nodeId
+      `SELECT id, b2_file_id, b2_key, size_bytes FROM versions WHERE node_id = ? ORDER BY version DESC`, nodeId
     )
+    let freed = 0
     for (const stale of rows.slice(MAX_VERSIONS_KEPT)) {
-      if (stale.b2_file_id) {
-        await b2.deleteFileVersion({ fileName: stale.b2_key, fileId: stale.b2_file_id }).catch(() => null)
-      }
       await run(c.env.DB, `DELETE FROM versions WHERE id = ?`, stale.id)
+      if (stale.b2_file_id && !(await isObjectStillReferenced(c, userId, stale.b2_file_id))) {
+        await b2.deleteFileVersion({ fileName: stale.b2_key, fileId: stale.b2_file_id }).catch(() => null)
+        freed += Number(stale.size_bytes || 0)
+      }
     }
+    return freed
   }
 
   async function nodeAction(c, action, handler, { readOnly = false } = {}) {
@@ -728,10 +825,11 @@ export function buildApp(env) {
     if (!node) return c.json({ error: 'not found' }, 404)
     const body = readOnly ? {} : await c.req.json().catch(() => ({}))
     const result = await handler(node, body)
-    if (!readOnly) {
+    const status = result.status ?? 200
+    if (!readOnly && status < 400) {
       await audit(c.env.DB, { userId: user.id, action, detail: node.name })
     }
-    return c.json(result, result.status ?? 200)
+    return c.json(result, status)
   }
 
   return app
@@ -739,8 +837,9 @@ export function buildApp(env) {
 
 export default {
   async fetch(request, env) {
-    // A test-mode Worker must never be reachable with a production bucket.
-    if (env.AUTH_MODE === 'test' && /backblazeb2\.com$/.test(String(env.B2_API_BASE || ''))) {
+    // A test-mode Worker must never be reachable with a production bucket (including default/trailing-slash URLs).
+    const apiBase = String(env.B2_API_BASE || 'https://api.backblazeb2.com')
+    if (env.AUTH_MODE === 'test' && /backblazeb2\.com(\/|$)/i.test(apiBase)) {
       return new Response(JSON.stringify({ error: 'refusing to run in test mode against production B2' }), {
         status: 500, headers: { 'Content-Type': 'application/json' }
       })
@@ -754,8 +853,9 @@ export function objectKey(userId, nodeId, name) {
 }
 
 export function cleanName(value) {
-  const raw = String(value ?? '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim()
-  return raw.slice(0, 200)
+  const raw = String(value ?? '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim().slice(0, 200)
+  if (!raw || raw === '.' || raw === '..') return ''
+  return raw
 }
 
 function randomToken() {

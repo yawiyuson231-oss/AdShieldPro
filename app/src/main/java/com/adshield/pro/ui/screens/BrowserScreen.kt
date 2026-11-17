@@ -116,6 +116,9 @@ fun BrowserScreen(
     val currentHost = remember(currentPageUrl) {
         runCatching { Uri.parse(currentPageUrl).host?.lowercase()?.removePrefix("www.") }.getOrNull() ?: ""
     }
+    val latestCurrentHost = rememberUpdatedState(currentHost)
+    val latestTorEnabled = rememberUpdatedState(torEnabled)
+    val latestTorStatus = rememberUpdatedState(torStatus)
     val isCurrentSiteAllowlisted = remember(currentHost, settings.browserSiteExceptions) {
         currentHost.isNotEmpty() && browserContentBlocker.isHostInExceptionSet(currentHost, settings.browserSiteExceptions)
     }
@@ -353,7 +356,12 @@ fun BrowserScreen(
                             view: WebView?,
                             request: WebResourceRequest?
                         ): Boolean {
-                            val target = request?.url?.toString() ?: return false
+                            val reqUri = request?.url ?: return false
+                            val scheme = reqUri.scheme?.lowercase() ?: return true
+                            if (scheme != "https" && scheme != "http" && reqUri.toString() != "about:blank") {
+                                return true
+                            }
+                            val target = reqUri.toString()
                             val sanitized = browserContentBlocker.sanitizeTrackingParameters(target)
                             strippedTrackers = browserContentBlocker.getStrippedTrackerParamCount()
                             if (sanitized != target) {
@@ -367,19 +375,32 @@ fun BrowserScreen(
                             view: WebView?,
                             request: WebResourceRequest?
                         ): WebResourceResponse? {
-                            val reqUrl = request?.url?.toString() ?: return null
+                            val reqUri = request?.url ?: return null
+                            val reqUrl = reqUri.toString()
+                            val liveSettings = latestSettings.value
                             val decision = browserContentBlocker.evaluateRequest(
                                 requestUrl = reqUrl,
-                                pageHost = currentHost,
-                                allowlistedSites = appSettings.browserSiteExceptions
+                                pageHost = latestCurrentHost.value,
+                                allowlistedSites = liveSettings.browserSiteExceptions
                             )
-                            blockedSubresources = browserContentBlocker.getBlockedSubresourceCount()
+                            val count = browserContentBlocker.getBlockedSubresourceCount()
+                            view?.post { blockedSubresources = count }
                             if (decision.shouldBlock) return browserContentBlocker.createEmptyBlockedResponse()
                             // Onion routing: fetch the allowed request through Orbot's SOCKS proxy.
                             // POST bodies and media streams are not interceptable on Android, so they
                             // still use the ordinary path — the UI states that limitation.
-                            if (torEnabled && request?.method.equals("GET", ignoreCase = true)) {
-                                onion.fetch(reqUrl, request?.requestHeaders ?: emptyMap())?.let { return it }
+                            val scheme = reqUri.scheme?.lowercase()
+                            val isHttp = scheme == "http" || scheme == "https"
+                            if (latestTorEnabled.value && isHttp && request.method.equals("GET", ignoreCase = true)) {
+                                val proxied = onion.fetch(
+                                    url = reqUrl,
+                                    headers = request.requestHeaders ?: emptyMap(),
+                                    port = latestTorStatus.value.socksPort
+                                )
+                                if (proxied != null) return proxied
+                                if (onion.isOnionHost(reqUrl)) {
+                                    return browserContentBlocker.createEmptyBlockedResponse()
+                                }
                             }
                             return null
                         }
@@ -394,12 +415,13 @@ fun BrowserScreen(
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             super.onPageFinished(view, url)
-                            if (appSettings.browserCosmeticFilteringEnabled && view != null) {
+                            val liveSettings = latestSettings.value
+                            if (liveSettings.browserCosmeticFilteringEnabled && view != null) {
                                 val host = runCatching { Uri.parse(url).host }.getOrNull()
                                 val script = browserContentBlocker.buildCosmeticFilterScript(
                                     pageHost = host,
-                                    allowlistedSites = appSettings.browserSiteExceptions,
-                                    customSelectors = appSettings.customCosmeticSelectors
+                                    allowlistedSites = liveSettings.browserSiteExceptions,
+                                    customSelectors = liveSettings.customCosmeticSelectors
                                 )
                                 if (script != null) {
                                     view.evaluateJavascript(script, null)
@@ -419,7 +441,7 @@ fun BrowserScreen(
                             isUserGesture: Boolean,
                             resultMsg: Message?
                         ): Boolean {
-                            if (appSettings.browserPopupBlockingEnabled && !isUserGesture) {
+                            if (latestSettings.value.browserPopupBlockingEnabled && !isUserGesture) {
                                 browserContentBlocker.recordPopupBlocked()
                                 blockedPopups = browserContentBlocker.getBlockedPopupCount()
                                 return false

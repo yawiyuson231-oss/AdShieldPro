@@ -47,6 +47,8 @@ class CloudBackupWorker @AssistedInject constructor(
                 )
             )
             Result.success()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (e: Exception) {
             intelligenceRecorder.emit(
                 IntelligenceEventFactory.automationJob(

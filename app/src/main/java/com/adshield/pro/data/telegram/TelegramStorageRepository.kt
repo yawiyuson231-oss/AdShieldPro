@@ -343,7 +343,12 @@ class TelegramStorageRepository @Inject constructor(
     ): TelegramStoredFile? {
         val current = requireConnected()
         val staged = files.stage(sourceUri, name, mimeType)
-        TelegramPolicy.validateUploadSize(staged.sizeBytes)
+        try {
+            TelegramPolicy.validateUploadSize(staged.sizeBytes)
+        } catch (t: Throwable) {
+            runCatching { files.delete(staged.path) }
+            throw t
+        }
         if (!forceDuplicate) {
             val duplicate = _storedFiles.value.firstOrNull { it.sha256 == staged.sha256 }
             if (duplicate != null) {

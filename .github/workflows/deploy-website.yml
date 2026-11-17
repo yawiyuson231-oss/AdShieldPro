@@ -26,8 +26,10 @@ on:
       - 'assets/**'
       - 'ui/**'
       - 'dns/**'
+      - 'guard/**'
       - 'aether/**'
       - 'security/**'
+      - 'scripts/stage-site.mjs'
       - 'omnishield-x-extension.zip'
       - '.github/workflows/deploy-website.yml'
 

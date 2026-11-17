@@ -108,9 +108,10 @@ object NewsFeedParser {
     fun tag(xml: String, name: String): String {
         if (xml.isEmpty()) return ""
         val escaped = Regex.escape(name)
-        // Self-closing first (Atom <link href="..."/> has no body).
-        val selfClosing = Regex("<$escaped\\b([^>]*)/>", RegexOption.IGNORE_CASE).find(xml)
-        val paired = Regex("<$escaped\\b[^>]*>(.*?)</$escaped\\s*>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
+        // Use (?=[\s/>]) rather than \b so `<title>` cannot match `<title:sub>` or `<title-short>`
+        // and `<content>` cannot match `<content:encoded>`.
+        val selfClosing = Regex("<$escaped(?=[\\s/>])([^>]*)/>", RegexOption.IGNORE_CASE).find(xml)
+        val paired = Regex("<$escaped(?=[\\s/>])[^>]*>(.*?)</$escaped\\s*>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
             .find(xml)
         if (paired != null && paired.groupValues[1].isNotBlank()) return unwrapCdata(paired.groupValues[1]).trim()
         if (selfClosing != null) return ""
@@ -121,10 +122,17 @@ object NewsFeedParser {
     fun attr(xml: String, tagName: String, attrName: String): String {
         val escapedTag = Regex.escape(tagName)
         val escapedAttr = Regex.escape(attrName)
-        val open = Regex("<$escapedTag\\b([^>]*)>", RegexOption.IGNORE_CASE).find(xml) ?: return ""
+        val open = Regex("<$escapedTag(?=[\\s/>])([^>]*)>", RegexOption.IGNORE_CASE).find(xml) ?: return ""
         val attrs = open.groupValues[1]
-        val m = Regex("$escapedAttr\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE).find(attrs) ?: return ""
+        val m = Regex("(?:^|\\s)$escapedAttr\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE).find(attrs) ?: return ""
         return decode(m.groupValues[1]).trim()
+    }
+
+    private fun isSafeArticleUrl(candidate: String): Boolean {
+        if (candidate.startsWith("https://", ignoreCase = true) ||
+            candidate.startsWith("http://", ignoreCase = true)
+        ) return true
+        return candidate.startsWith("/") && !candidate.startsWith("//")
     }
 
     /**
@@ -133,17 +141,17 @@ object NewsFeedParser {
      */
     private fun articleLink(block: String): String {
         val textLink = decode(tag(block, "link"))
-        if (textLink.startsWith("http", ignoreCase = true)) return textLink
-        if (textLink.startsWith("/")) return textLink
+        if (isSafeArticleUrl(textLink)) return textLink
         // Atom style: inspect every <link …> and prefer rel=alternate or no rel at all.
-        for (m in Regex("<link\\b([^>]*)>", RegexOption.IGNORE_CASE).findAll(block)) {
+        for (m in Regex("<link(?=[\\s/>])([^>]*)>", RegexOption.IGNORE_CASE).findAll(block)) {
             val attrs = m.groupValues[1]
-            val rel = Regex("rel\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE)
-                .find(attrs)?.groupValues?.get(1)?.lowercase()
+            val rel = Regex("(?:^|\\s)rel\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE)
+                .find(attrs)?.groupValues?.get(1)?.lowercase(Locale.US)
             if (rel == "self" || rel == "enclosure") continue
-            val href = Regex("href\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE)
+            val href = Regex("(?:^|\\s)href\\s*=\\s*[\"']([^\"']*)[\"']", RegexOption.IGNORE_CASE)
                 .find(attrs)?.groupValues?.get(1)
-            if (!href.isNullOrBlank()) return decode(href).trim()
+            val decoded = href?.let { decode(it).trim() }.orEmpty()
+            if (decoded.isNotEmpty() && isSafeArticleUrl(decoded)) return decoded
         }
         return ""
     }
@@ -151,16 +159,20 @@ object NewsFeedParser {
     /** Dedicated article image; returns null instead of a tracking pixel or a 1×1 spacer. */
     private fun imageUrl(block: String): String? {
         val candidates = ArrayList<String>(3)
-        Regex("<media:content\\b([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
+        Regex("<media:content(?=[\\s/>])([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
             attr(m.value, "media:content", "url").let { if (it.isNotBlank()) candidates += it }
         }
-        Regex("<media:thumbnail\\b([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
+        Regex("<media:thumbnail(?=[\\s/>])([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
             attr(m.value, "media:thumbnail", "url").let { if (it.isNotBlank()) candidates += it }
         }
-        Regex("<enclosure\\b([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
+        Regex("<enclosure(?=[\\s/>])([^>]*)>", RegexOption.IGNORE_CASE).findAll(block).forEach { m ->
             val type = attr(m.value, "enclosure", "type")
             val url = attr(m.value, "enclosure", "url")
-            if (url.startsWith("http", true) && (type.startsWith("image", true) || type.isBlank())) candidates += url
+            if ((url.startsWith("https://", true) || url.startsWith("http://", true)) &&
+                (type.startsWith("image", true) || type.isBlank())
+            ) {
+                candidates += url
+            }
         }
         return candidates.firstOrNull { it.startsWith("http://", true) || it.startsWith("https://", true) }
     }
@@ -178,21 +190,26 @@ object NewsFeedParser {
         return raw
     }
 
+    private fun isValidXmlCodePoint(cp: Int): Boolean =
+        cp in 1..0x10FFFF && cp !in 0xD800..0xDFFF
+
     /** Decodes the entities the news feeds actually emit, including numeric references. */
     fun decode(raw: String): String {
         if (raw.isEmpty()) return ""
         var s = unwrapCdata(raw)
-        s = s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-            .replace("&apos;", "'").replace("&#39;", "'").replace("&#x27;", "'")
-            .replace("&nbsp;", " ").replace("&hellip;", "…").replace("&mdash;", "—")
-            .replace("&ndash;", "–").replace("&rsquo;", "’").replace("&lsquo;", "‘")
-            .replace("&ldquo;", "“").replace("&rdquo;", "”").replace("&amp;", "&")
+        // Decode numeric and non-amp named entities BEFORE &amp; so `&amp;#60;` stays literal `&#60;`.
         s = Regex("&#x([0-9a-fA-F]+);").replace(s) { m ->
-            m.groupValues[1].toIntOrNull(16)?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: ""
+            m.groupValues[1].toIntOrNull(16)?.takeIf(::isValidXmlCodePoint)?.let { String(Character.toChars(it)) } ?: ""
         }
         s = Regex("&#(\\d+);").replace(s) { m ->
-            m.groupValues[1].toIntOrNull()?.takeIf { it in 1..0x10FFFF }?.let { String(Character.toChars(it)) } ?: ""
+            m.groupValues[1].toIntOrNull()?.takeIf(::isValidXmlCodePoint)?.let { String(Character.toChars(it)) } ?: ""
         }
+        s = s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&nbsp;", " ").replace("&hellip;", "…").replace("&mdash;", "—")
+            .replace("&ndash;", "–").replace("&rsquo;", "’").replace("&lsquo;", "‘")
+            .replace("&ldquo;", "“").replace("&rdquo;", "”")
+            .replace("&amp;", "&")
         return s.trim()
     }
 

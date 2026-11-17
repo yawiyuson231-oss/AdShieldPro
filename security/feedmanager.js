@@ -79,11 +79,13 @@ export function validateFeedText(text, descriptor = {}) {
 
   let dataLines = 0;
   for (const rawLine of String(text).split('\n')) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith('!') || line.startsWith('#') || line.startsWith('[')) continue;
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('!') || trimmed.startsWith('#') || trimmed.startsWith('[')) continue;
+    const line = trimmed.replace(/\s+#.*$/, '').trim();
+    if (!line) continue;
     dataLines++;
     if (/^\|\|[^\s^]*\^?(\$[^\s]*)?$/.test(line) || /^(@@)?\|\|[^\s]+$/.test(line)
-      || /^(0\.0\.0\.0|127\.0\.0\.1)\s+\S+$/.test(line) || /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(line)) {
+      || /^(0\.0\.0\.0|127\.0\.0\.1|::1?)\s+\S+/.test(line) || /^[a-z0-9_.-]+\.[a-z0-9-]{2,}$/i.test(line)) {
       stats.rules++;
     } else {
       stats.invalid++;
@@ -182,7 +184,8 @@ export class FeedManager {
       }
 
       if (response.status === 304) {
-        const meta = { ...(previous.installed ? previous : {}), checkedAt: new Date(this.clock()).toISOString() };
+        const { installed: _i, ageMs: _a, stale: _s, ...storedPrev } = previous.installed ? previous : {};
+        const meta = { ...storedPrev, checkedAt: new Date(this.clock()).toISOString() };
         await this._storeMeta(id, meta);
         this._emit({ kind: 'feed-update', feed: id, changed: false, reason: 'not-modified', at: this.clock() });
         return { ok: true, changed: false, reason: 'not-modified', meta };
@@ -232,15 +235,29 @@ export class FeedManager {
       lastModified
     };
 
+    const priorContent = previous.installed ? await this.storage.getItem(this._contentKey(id)) : null;
     try {
       await this.storage.setItem(this._contentKey(id), text);
       await this._storeMeta(id, meta);
     } catch (err) {
+      // Roll back content if writing metadata failed so the retained feed still verifies.
+      try {
+        if (previous.installed && priorContent !== null) {
+          await this.storage.setItem(this._contentKey(id), priorContent);
+        } else {
+          await this.storage.removeItem(this._contentKey(id));
+        }
+      } catch { /* best-effort rollback */ }
       return this._fail(id, previous, 'storage-error', err?.message || String(err));
     }
 
-    this._emit({ kind: 'feed-update', feed: id, changed: true, rules: stats.rules, hash: stats.hash, at: this.clock() });
-    return { ok: true, changed: true, meta };
+    const changed = !previous.installed || previous.hash !== stats.hash;
+    this._emit({
+      kind: 'feed-update', feed: id, changed,
+      ...(changed ? {} : { reason: 'unchanged' }),
+      rules: stats.rules, hash: stats.hash, at: this.clock()
+    });
+    return { ok: true, changed, ...(changed ? {} : { reason: 'unchanged' }), meta };
   }
 
   async _storeMeta(id, meta) {

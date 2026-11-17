@@ -382,8 +382,24 @@ class UpstreamDnsResolver @Inject constructor(
             if (!response.isSuccessful) {
                 throw IllegalStateException("DoH HTTP ${response.code}")
             }
-            val bytes = response.body?.bytes()
-                ?: throw IllegalStateException("Empty DoH response body")
+            val body = response.body ?: throw IllegalStateException("Empty DoH response body")
+            if (body.contentLength() > MAX_DNS_WIRE_BYTES) {
+                throw IllegalStateException("Oversized DoH DNS message (${body.contentLength()} bytes)")
+            }
+            val stream = body.byteStream()
+            val out = java.io.ByteArrayOutputStream(512)
+            val chunk = ByteArray(4096)
+            var total = 0
+            while (true) {
+                val read = stream.read(chunk)
+                if (read < 0) break
+                total += read
+                if (total > MAX_DNS_WIRE_BYTES) {
+                    throw IllegalStateException("Oversized DoH DNS message (>$MAX_DNS_WIRE_BYTES bytes)")
+                }
+                out.write(chunk, 0, read)
+            }
+            val bytes = out.toByteArray()
             if (bytes.size < 12) {
                 throw IllegalStateException("Truncated DoH DNS message (${bytes.size} bytes)")
             }
@@ -403,6 +419,8 @@ class UpstreamDnsResolver @Inject constructor(
         for (candidate in candidates) {
             try {
                 return queryDotOverAddress(rawDnsQuery, endpoint, candidate)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
             } catch (t: Throwable) {
                 lastFailure = t
             }
@@ -416,14 +434,18 @@ class UpstreamDnsResolver @Inject constructor(
         serverIp: String
     ): ByteArray {
         val rawSocket = Socket()
-        currentProtector?.invoke(rawSocket)
-        val targetIp = InetAddress.getByName(serverIp)
-        rawSocket.connect(InetSocketAddress(targetIp, endpoint.dotPort), 3500)
-        rawSocket.soTimeout = 3500
-
-        val sslFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
+        val sslSocket: SSLSocket = try {
+            currentProtector?.invoke(rawSocket)
+            val targetIp = InetAddress.getByName(serverIp)
+            rawSocket.connect(InetSocketAddress(targetIp, endpoint.dotPort), 3500)
+            rawSocket.soTimeout = 3500
+            val sslFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
+            sslFactory.createSocket(rawSocket, endpoint.dotHostname, endpoint.dotPort, true) as SSLSocket
+        } catch (t: Throwable) {
+            runCatching { rawSocket.close() }
+            throw t
+        }
         val dotHost = endpoint.dotHostname
-        val sslSocket = sslFactory.createSocket(rawSocket, dotHost, endpoint.dotPort, true) as SSLSocket
         sslSocket.use { tls ->
             tls.startHandshake()
             val session = tls.session
@@ -599,6 +621,7 @@ class UpstreamDnsResolver @Inject constructor(
          * millisecond the app waits before the failover provider is even tried.
          */
         private const val UDP_TIMEOUT_MS = 2500
+        private const val MAX_DNS_WIRE_BYTES = 65_535
 
         fun transactionIdOf(rawDnsMessage: ByteArray): Int {
             if (rawDnsMessage.size < 2) return -1
@@ -655,7 +678,7 @@ class UpstreamDnsResolver @Inject constructor(
             val failoverScope = if (config.failoverEnabled && config.protocol != DnsProtocol.UDP_TCP) {
                 "|plan=" + DnsProviderRegistry.queryPlan(config).joinToString(",") { it.providerId }
             } else ""
-            return "${config.protocol.name}@$endpoint$failoverScope|${query.cacheKey}"
+            return "${config.protocol.name}@$endpoint$failoverScope|dnssec=${config.dnssecMode.name}|${query.cacheKey}"
         }
     }
 }

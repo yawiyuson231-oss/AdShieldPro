@@ -81,8 +81,8 @@
 
   .grid { display: grid; gap: 14px; }
   .grid.k4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-  .grid.k3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .grid.k2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .grid.k3 { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+  .grid.k2 { grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
 
   .kpi {
     background: linear-gradient(180deg, #0c1930, #081120);

@@ -108,6 +108,9 @@ object IpPacketFraming {
             if (offset + 8 > effectiveLen) return null
             val hdrNext = raw[offset].toInt() and 0xFF
             val extLen = if (nextHeader == 44) {
+                // RFC 8200 §4.5: ignore non-first IPv6 fragments (13-bit Fragment Offset in bits 16..28)
+                val fragField = ((raw[offset + 2].toInt() and 0xFF) shl 8) or (raw[offset + 3].toInt() and 0xFF)
+                if ((fragField and 0xFFF8) != 0) return null
                 8 // Fragment header is fixed 8 bytes
             } else {
                 ((raw[offset + 1].toInt() and 0xFF) + 1) * 8
@@ -116,6 +119,7 @@ object IpPacketFraming {
             nextHeader = hdrNext
             offset += extLen
         }
+        if (nextHeader in IPV6_EXTENSION_HEADERS) return null
 
         return parseTransportLayer(
             ipVersion = 6,

@@ -45,7 +45,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
                         val vpnIntent = Intent(context, AdShieldVpnService::class.java).apply {
                             this.action = AdShieldVpnService.ACTION_START_VPN
                         }
-                        ContextCompat.startForegroundService(context, vpnIntent)
+                        runCatching { ContextCompat.startForegroundService(context, vpnIntent) }
                     }
                 }
             } finally {

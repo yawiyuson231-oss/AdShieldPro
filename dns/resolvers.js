@@ -223,6 +223,36 @@ export class ResolverHealth {
 /* DoH transports                                                      */
 /* ------------------------------------------------------------------ */
 
+function parseRrsigTimestamp(token) {
+  if (/^\d{14}$/.test(token)) {
+    const iso = `${token.slice(0, 4)}-${token.slice(4, 6)}-${token.slice(6, 8)}T${token.slice(8, 10)}:${token.slice(10, 12)}:${token.slice(12, 14)}Z`;
+    const ms = Date.parse(iso);
+    if (Number.isFinite(ms)) return new Date(ms).toISOString();
+  }
+  if (/^\d+$/.test(token)) {
+    const sec = Number(token);
+    if (Number.isFinite(sec)) return new Date(sec * 1000).toISOString();
+  }
+  return undefined;
+}
+
+function parseRrsigText(raw) {
+  const parts = String(raw ?? '').trim().split(/\s+/);
+  if (parts.length < 9) return { raw };
+  const [coveredRaw, algRaw, labelsRaw, origTtlRaw, expRaw, incRaw, keyTagRaw, signerRaw, ...sigParts] = parts;
+  return {
+    typeCovered: typeFromString(coveredRaw),
+    algorithm: Number(algRaw),
+    labels: Number(labelsRaw),
+    originalTtl: Number(origTtlRaw),
+    expiration: parseRrsigTimestamp(expRaw),
+    inception: parseRrsigTimestamp(incRaw),
+    keyTag: Number(keyTagRaw),
+    signerName: signerRaw.replace(/\.$/, ''),
+    signature: sigParts.join('')
+  };
+}
+
 function jsonToMessage(json) {
   /** Converts a DoH JSON reply into the generic message shape used platform-wide. */
   const toRr = (rr) => {
@@ -233,6 +263,7 @@ function jsonToMessage(json) {
     if (type === TYPE.CNAME || type === TYPE.NS || type === TYPE.PTR) return { ...base, data: { target: String(rr.data || '').replace(/\.$/, '') } };
     if (type === TYPE.TXT) return { ...base, data: { text: String(rr.data || '').replace(/^"|"$/g, '') } };
     if (type === TYPE.SOA) return { ...base, data: { text: rr.data } };
+    if (type === TYPE.RRSIG) return { ...base, data: parseRrsigText(rr.data) };
     return { ...base, data: { raw: rr.data } };
   };
   const answers = (json.Answer || []).map(toRr);
@@ -339,7 +370,8 @@ export class DohTransport {
     }
 
     if (!resolver.dohWire) throw new UnsupportedTransportError(`${resolver.name} offers no DoH endpoint usable from a browser`);
-    const query = encodeQuery({ name, type, dnssec: true });
+    // RFC 8484 §4.1: use ID 0 for HTTP cache compatibility and privacy.
+    const query = encodeQuery({ id: 0, name, type, dnssec: true });
     const url = `${resolver.dohWire}${resolver.dohWire.includes('?') ? '&' : '?'}dns=${toBase64Url(query.bytes)}`;
     const res = await this._withTimeout(url, {
       headers: { accept: 'application/dns-message' },
@@ -349,7 +381,9 @@ export class DohTransport {
     }, resolver.id);
     if (!res.ok) throw new Error(`HTTP ${res.status} from ${resolver.name}`);
     const buf = new Uint8Array(await res.arrayBuffer());
-    return { message: decodeMessage(buf), transport: 'DoH-WIRE' };
+    const message = decodeMessage(buf);
+    if (!message.flags?.qr) throw new Error(`Invalid DoH wire reply from ${resolver.name}: QR flag not set`);
+    return { message, transport: 'DoH-WIRE' };
   }
 }
 
@@ -457,6 +491,9 @@ export class ResolverPool {
 
     const preferred = preference?.length
       ? ordered.slice().sort((a, b) => {
+        const aOpen = this.health.isAvailable(a.id) ? 0 : 1;
+        const bOpen = this.health.isAvailable(b.id) ? 0 : 1;
+        if (aOpen !== bOpen) return aOpen - bOpen;
         const ai = preference.indexOf(a.id);
         const bi = preference.indexOf(b.id);
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -506,7 +543,6 @@ export class ResolverPool {
       );
     };
 
-    const SUCCESS = 'SUCCESS';
     const TIMEOUT = 'TIMEOUT';
 
     let lastError = null;
@@ -555,8 +591,18 @@ export class ResolverPool {
         return settled.result;
       }
 
-      lastError = settled.error;
-      // Both candidates of this pair have now been consumed either way.
+      // First finisher failed — still await the surviving competitor before moving on.
+      const other = settled.resolver.id === resolver.id ? second : pending;
+      const otherSettled = await other;
+      if (otherSettled.ok) {
+        this.racedCount = (this.racedCount || 0) + 1;
+        otherSettled.result.attempts = attempts;
+        otherSettled.result.raced = true;
+        return otherSettled.result;
+      }
+
+      lastError = otherSettled.error || settled.error;
+      // Both candidates of this pair have now failed.
       index += 2;
     }
 
@@ -570,15 +616,20 @@ export class ResolverPool {
   }
 
   _buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached }) {
-    const nx = message.rcode === 3;
-    const servfail = message.rcode === 2;
+    const rcode = Number(message.rcode ?? 0);
+    const nx = rcode === 3;
+    const servfail = rcode === 2;
+    const refused = rcode === 5;
+    const status = rcode === 0
+      ? 'ok'
+      : nx ? 'nxdomain' : servfail ? 'servfail' : refused ? 'refused' : 'rcode-error';
     const addrs = addressesOf(message, type);
     const dnssect = assessDnssec({ message, requested: true, resolverName: resolver.name });
     return {
       name,
       type: String(type).toUpperCase(),
-      status: nx ? 'nxdomain' : servfail ? 'servfail' : 'ok',
-      ok: !nx && !servfail,
+      status,
+      ok: rcode === 0,
       addresses: addrs.map((a) => a.address),
       cname: chainOf(message),
       ttl: nx ? negativeTtlFrom(message) : Math.max(0, minTtl(message, 60)),

@@ -145,7 +145,7 @@ export class OmniShieldFilterEngine {
     s = s.replace(/^www\./, '');
     s = s.replace(/\.+$/, '');                      // trailing dots
     if (!s) return '';
-    if (!/^[a-z0-9.-]+$/.test(s)) return '';
+    if (!/^[a-z0-9_.-]+$/.test(s)) return '';
     if (s.length > 253) return '';
     const labels = s.split('.');
     if (labels.some((l) => l.length === 0 || l.length > 63 || !LABEL_RE.test(l))) return '';
@@ -155,8 +155,34 @@ export class OmniShieldFilterEngine {
 
   /** True when a string is an IPv4/IPv6 literal (no DNS filtering applies). */
   static isIpLiteral(input) {
-    const s = (input || '').trim().replace(/^\[|\]$/g, '');
-    return /^\d{1,3}(\.\d{1,3}){3}$/.test(s) || /^[0-9a-f:]+$/i.test(s) && s.includes(':');
+    const s = String(input || '').trim().replace(/^\[|\]$/g, '');
+    if (!s) return false;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) {
+      return s.split('.').every((octet) => Number(octet) <= 255);
+    }
+    if (!s.includes(':') || !/^[0-9a-f:.]+$/i.test(s)) return false;
+    // Reject single-colon host:port (`foo:80` already blocked, also `a:b` or `127:1`),
+    // triple-colons, and leading/trailing single colons.
+    const dbl = s.split('::');
+    if (dbl.length > 2) return false;
+    if (/^:[^:]|[^:]:$/.test(s)) return false;
+    const isValidGroup = (g) => {
+      if (/^[0-9a-f]{1,4}$/i.test(g)) return true;
+      return /^\d{1,3}(\.\d{1,3}){3}$/.test(g) && g.split('.').every((o) => Number(o) <= 255);
+    };
+    if (dbl.length === 2) {
+      const left = dbl[0] ? dbl[0].split(':') : [];
+      const right = dbl[1] ? dbl[1].split(':') : [];
+      const hasV4 = right.length > 0 && right[right.length - 1].includes('.');
+      const maxGroups = hasV4 ? 6 : 7;
+      return left.length + right.length <= maxGroups
+        && left.every((g) => /^[0-9a-f]{1,4}$/i.test(g))
+        && right.every((g, i) => (i === right.length - 1 ? isValidGroup(g) : /^[0-9a-f]{1,4}$/i.test(g)));
+    }
+    const groups = s.split(':');
+    const hasV4 = groups[groups.length - 1].includes('.');
+    if (groups.length !== (hasV4 ? 7 : 8)) return false;
+    return groups.every((g, i) => (i === groups.length - 1 ? isValidGroup(g) : /^[0-9a-f]{1,4}$/i.test(g)));
   }
 
   _invalidate() {
@@ -198,6 +224,7 @@ export class OmniShieldFilterEngine {
     const total = text.length;
     let offset = 0;
     let added = 0;
+    let duplicates = 0;
     let firstChunk = true;
 
     while (offset < total) {
@@ -211,6 +238,7 @@ export class OmniShieldFilterEngine {
       const chunk = text.slice(offset, end);
       const result = this.loadFilterList(chunk, category, source, { firstChunk });
       added += result.added;
+      duplicates += result.duplicates;
       firstChunk = false;
       offset = end;
       if (options.onProgress) {
@@ -219,7 +247,7 @@ export class OmniShieldFilterEngine {
       if (offset < total) await new Promise((resolve) => setTimeout(resolve, 0));
     }
     this._invalidate();
-    return { added, source, bytes: total, chunks: Math.ceil(total / chunkChars) };
+    return { added, duplicates, source, bytes: total, chunks: Math.ceil(total / chunkChars) };
   }
 
   loadFilterList(text, category = 'ADS', source = 'unknown', options = {}) {
@@ -232,7 +260,7 @@ export class OmniShieldFilterEngine {
       duplicates: this.stats.duplicates,
       videoRejected: this.stats.videoRejected
     };
-    this.stats.sources++;
+    if (options.firstChunk !== false) this.stats.sources++;
     let added = 0;
 
     for (const rawLine of text.split('\n')) {
@@ -252,12 +280,18 @@ export class OmniShieldFilterEngine {
 
       let body = isException ? line.slice(2).trim() : line;
 
-      // hosts-file syntax: "0.0.0.0 domain" / "127.0.0.1 domain [alias...]"
-      if (/^(0\.0\.0\.0|127\.0\.0\.1|::1?|::ffff:0\.0\.0\.0)\s+\S+/.test(body)) {
+      // hosts-file syntax: "0.0.0.0 domain" / "127.0.0.1 domain [alias...] [# comment]"
+      if (/^(0\.0\.0\.0|127\.0\.0\.1|::1?|::ffff:0\.0\.0\.0)\s+\S+/i.test(body)) {
         this.stats.hostsFormat++;
-        const fields = body.split(/\s+/).slice(1);
+        const commentStripped = body.replace(/\s+#.*$/, '');
+        const fields = commentStripped.split(/\s+/).slice(1);
         for (const field of fields) {
-          if (field === 'localhost' || field === 'localhost.localdomain') continue;
+          if (!field || field.startsWith('#')) break;
+          if (field === 'localhost' || field === 'localhost.localdomain' || field === 'ip6-localhost' || field === 'ip6-loopback' || field === 'broadcasthost') continue;
+          if (!isException && this.videoSafe && explainVideoDanger(field)) {
+            this.stats.videoRejected++;
+            continue;
+          }
           if (this._addDomain(field, isException, category, source)) added++;
         }
         continue;
@@ -275,7 +309,7 @@ export class OmniShieldFilterEngine {
       if (caret >= 0) body = body.slice(0, caret);
       body = body.split('$')[0].trim();
 
-      if (body.includes('*')) {
+      if (/[*?]/.test(body)) {
         if (this._addWildcard(body, isException, category, source)) added++;
         continue;
       }
@@ -314,17 +348,25 @@ export class OmniShieldFilterEngine {
 
   _addWildcard(pattern, isException, category, source) {
     const normalized = pattern.trim().toLowerCase().replace(/^\|\|?/, '').replace(/\^$/, '');
-    if (!normalized.includes('*') || normalized.length < 3) { this.stats.invalid++; return false; }
+    if (!/[*?]/.test(normalized) || normalized.length < 3) { this.stats.invalid++; return false; }
     // Guard: a wildcard that matches "everything" is never accepted.
-    if (/^\*+$/.test(normalized) || normalized === '*.*') { this.stats.invalid++; return false; }
-    const escaped = normalized.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+    if (/^[*?.]+$/.test(normalized)) { this.stats.invalid++; return false; }
+    const escaped = normalized
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '[^/]*')
+      .replace(/\?/g, '[^/.]');
     const re = new RegExp(`^${escaped}$`);
     const entry = { re, category, source, pattern: normalized };
     const bucket = isException ? this.wildcardAllow : this.wildcardBlock;
-    if (bucket.some((w) => w.pattern === normalized)) { this.stats.duplicates++; return false; }
+    const isUser = source === 'user';
+    if (bucket.some((w) => w.pattern === normalized && (w.source === 'user') === isUser)) {
+      this.stats.duplicates++;
+      return false;
+    }
     bucket.push(entry);
     this.stats.wildcards++;
-    if (!isException) this.categoryCounts.set(category, (this.categoryCounts.get(category) || 0) + 1);
+    if (!isException && !isUser) this.categoryCounts.set(category, (this.categoryCounts.get(category) || 0) + 1);
+    this._invalidate();
     return true;
   }
 
@@ -336,7 +378,7 @@ export class OmniShieldFilterEngine {
     // Video Safety: an entity-level, substring or shared-CDN block rule takes
     // playback down. Refuse it and keep the reason, instead of silently breaking
     // every video the user watches.
-    if (!isAllow) {
+    if (!isAllow && this.videoSafe) {
       const danger = explainVideoDanger(pattern);
       if (danger) {
         this.rejectedRules.push({ rule: String(pattern), code: danger.code, detail: danger.detail });
@@ -345,9 +387,12 @@ export class OmniShieldFilterEngine {
       }
     }
     const cleaned = String(pattern || '')
+      .trim()
       .replace(/^@@/, '')
       .replace(/^\|\|?/, '')
-      .replace(/\^.*$/, '');
+      .replace(/\^.*$/, '')
+      .split('$')[0]
+      .trim();
     if (/[*?]/.test(cleaned)) {
       return this._addWildcard(cleaned, !!isAllow, isAllow ? 'USER_ALLOW' : 'USER_BLOCK', 'user');
     }
@@ -365,8 +410,27 @@ export class OmniShieldFilterEngine {
   }
 
   removeUserRule(pattern, isAllow) {
-    const cleaned = String(pattern || '').replace(/^@@/, '').replace(/^\|\|?/, '').replace(/\^.*$/, '');
+    const cleaned = String(pattern || '')
+      .trim()
+      .replace(/^@@/, '')
+      .replace(/^\|\|?/, '')
+      .replace(/\^.*$/, '')
+      .split('$')[0]
+      .trim();
+    if (/[*?]/.test(cleaned)) {
+      const normalized = cleaned.toLowerCase();
+      const bucket = isAllow ? this.wildcardAllow : this.wildcardBlock;
+      const beforeLen = bucket.length;
+      const next = bucket.filter((w) => !(w.source === 'user' && w.pattern === normalized));
+      if (next.length === beforeLen) return false;
+      if (isAllow) this.wildcardAllow = next;
+      else this.wildcardBlock = next;
+      this.stats.wildcards = Math.max(0, this.stats.wildcards - (beforeLen - next.length));
+      this._invalidate();
+      return true;
+    }
     const domain = OmniShieldFilterEngine.normalizeDomain(cleaned);
+    if (!domain) return false;
     // Both sets must be cleared: `||` would short-circuit after the first delete
     // and leave the suffix rule behind (which silently kept the domain allowed).
     const exact = isAllow ? this.customAllowExact : this.customBlockExact;
@@ -382,10 +446,14 @@ export class OmniShieldFilterEngine {
   setUserRules(rules = []) {
     this.customBlockExact.clear(); this.customBlockSuffix.clear();
     this.customAllowExact.clear(); this.customAllowSuffix.clear();
+    const prevWildcards = this.wildcardBlock.length + this.wildcardAllow.length;
     this.wildcardBlock = this.wildcardBlock.filter((w) => w.source !== 'user');
     this.wildcardAllow = this.wildcardAllow.filter((w) => w.source !== 'user');
+    const removedWildcards = prevWildcards - (this.wildcardBlock.length + this.wildcardAllow.length);
+    this.stats.wildcards = Math.max(0, this.stats.wildcards - removedWildcards);
     let ok = 0;
     for (const rule of rules) {
+      if (!rule) continue;
       if (this.addUserRule(rule.pattern ?? rule.rawPattern, rule.isAllow ?? rule.ruleType === 'ALLOW')) ok++;
     }
     this._invalidate();
@@ -398,7 +466,10 @@ export class OmniShieldFilterEngine {
 
   /** All suffixes of a domain, most specific first (includes the domain itself). */
   suffixesOf(domain) {
-    const parts = domain.split('.');
+    const clean = String(domain || '').trim();
+    if (!clean) return [];
+    const parts = clean.split('.');
+    if (parts.length <= 1) return [clean];
     const out = new Array(parts.length - 1);
     for (let i = 0; i < parts.length - 1; i++) out[i] = parts.slice(i).join('.');
     return out;
@@ -473,7 +544,7 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardAllow) {
-      if (w.re.test(domain)) {
+      if (w.source === 'user' && w.re.test(domain)) {
         return {
           domain, blocked: false, source: 'User Allowlist', action: 'ALLOW', matched: w.pattern,
           reasons: [`Wildcard allow rule "${w.pattern}" matches this host.`]
@@ -483,7 +554,7 @@ export class OmniShieldFilterEngine {
 
     // 2. User blocklist.
     for (const suffix of this._walk(domain)) {
-      if (this.customBlockExact.has(suffix)) {
+      if (this.customBlockExact.has(suffix) || this.customBlockSuffix.has(suffix)) {
         return {
           domain, blocked: true, source: 'User Blocklist', action: 'BLOCK', category: 'USER_BLOCK', matched: suffix,
           reasons: [`You explicitly blocked ${suffix}.`]
@@ -519,7 +590,7 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardAllow) {
-      if (w.re.test(domain)) {
+      if (w.source !== 'user' && w.re.test(domain)) {
         return {
           domain, blocked: false, source: 'List Exception', action: 'ALLOW', matched: w.pattern,
           reasons: [`Feed exception wildcard "${w.pattern}" matches this host.`]
@@ -569,7 +640,19 @@ export class OmniShieldFilterEngine {
       }
     }
     for (const w of this.wildcardBlock) {
-      if (w.re.test(domain)) {
+      if (w.source !== 'user' && w.re.test(domain)) {
+        if (this.videoSafe) {
+          const verdict = classifyVideoHost(domain);
+          if (verdict.protected) {
+            return {
+              domain, blocked: false, source: 'Video Safety', action: 'ALLOW', matched: w.pattern,
+              reasons: [
+                verdict.reason,
+                `Wildcard feed rule "${w.pattern}" would stop playback and was ignored for this media host.`
+              ]
+            };
+          }
+        }
         return {
           domain, blocked: true, source: w.source, action: 'BLOCK', category: w.category, matched: w.pattern,
           reasons: [`Wildcard rule "${w.pattern}" from ${w.source} matches this host.`]
@@ -594,11 +677,14 @@ export class OmniShieldFilterEngine {
   ruleCountByCategory() { return Object.fromEntries(this.categoryCounts); }
 
   breakdown() {
+    const userWildcards = this.wildcardBlock.filter((w) => w.source === 'user').length
+      + this.wildcardAllow.filter((w) => w.source === 'user').length;
+    const feedWildcards = (this.wildcardBlock.length + this.wildcardAllow.length) - userWildcards;
     return {
       blockDomains: this.filterSubdomains.size,
       exceptions: this.allowSubdomains.size,
-      wildcards: this.wildcardBlock.length + this.wildcardAllow.length,
-      userRules: this.customBlockExact.size + this.customAllowExact.size,
+      wildcards: feedWildcards,
+      userRules: this.customBlockExact.size + this.customAllowExact.size + userWildcards,
       safetyEntries: this.safetyAllow.size,
       videoSafeEntries: this.videoAllowSuffix.size,
       videoRulesRejected: this.stats.videoRejected,

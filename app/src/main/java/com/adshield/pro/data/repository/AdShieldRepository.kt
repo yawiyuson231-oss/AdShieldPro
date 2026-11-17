@@ -322,8 +322,18 @@ class AdShieldRepository @Inject constructor(
         // that is exactly what "the app lags" feels like. The counter is accumulated
         // in memory and flushed in a single write, at most once per second (plus a
         // final flush on shutdown), and immediately when the day rolls over.
+        var rolloverBatch: DailyStatBatch? = null
         val shouldFlush = synchronized(dailyStatLock) {
             if (pendingDayEpoch != epochDay) {
+                if (pendingDayTotal > 0L) {
+                    rolloverBatch = DailyStatBatch(
+                        epochDay = pendingDayEpoch,
+                        total = pendingDayTotal,
+                        blocked = pendingDayBlockedQueries,
+                        allowed = pendingDayAllowedQueries,
+                        cached = pendingDayCachedQueries
+                    )
+                }
                 pendingDayEpoch = epochDay
                 pendingDayTotal = 0L
                 pendingDayBlockedQueries = 0L
@@ -336,6 +346,7 @@ class AdShieldRepository @Inject constructor(
             pendingDayCachedQueries += if (fromCache) 1L else 0L
             now - lastDailyStatFlushMs >= DAILY_STAT_FLUSH_INTERVAL_MS
         }
+        rolloverBatch?.let { persistDailyBatch(it) }
         if (shouldFlush) flushDailyStats()
 
         // 3. Publish a real intelligence event for malware/phishing blocks. Routine ad/tracker
@@ -394,6 +405,10 @@ class AdShieldRepository @Inject constructor(
             lastDailyStatFlushMs = System.currentTimeMillis()
             snapshot
         }
+        persistDailyBatch(batch)
+    }
+
+    private suspend fun persistDailyBatch(batch: DailyStatBatch) {
         statsMutex.withLock {
             val existing = dao.getDailyStatForDay(batch.epochDay)
             val updated = if (existing == null) {
