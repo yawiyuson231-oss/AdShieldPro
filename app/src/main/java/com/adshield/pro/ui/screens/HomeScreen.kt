@@ -42,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,7 +52,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.adshield.pro.engine.platform.ProtectionSnoozeEngine
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -122,6 +130,7 @@ fun HomeScreen(
     onCheckForUpdates: () -> Unit,
     onToggleVpn: (Boolean) -> Unit,
     onPauseResumeVpn: () -> Unit,
+    onSnoozeVpnMinutes: (Int) -> Unit = {},
     onSelectProtectionMode: (ProtectionMode) -> Unit,
     onTriggerFilterSync: () -> Unit,
     onRunOptimizeNow: () -> Unit,
@@ -136,6 +145,18 @@ fun HomeScreen(
     val isConnected = vpnState.status == VpnStatus.CONNECTED
     val isPaused = vpnState.status == VpnStatus.PAUSED
     val isActiveOrPaused = isConnected || isPaused
+    var snoozeNowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val snoozeDeadline = settings.vpnSnoozeUntilEpochMs
+    val isSnoozed = isPaused && ProtectionSnoozeEngine.isSnoozeActive(snoozeDeadline, snoozeNowMs)
+    LaunchedEffect(isPaused, snoozeDeadline) {
+        snoozeNowMs = System.currentTimeMillis()
+        if (!isPaused || snoozeDeadline <= snoozeNowMs) return@LaunchedEffect
+        while (isActive) {
+            delay(1_000L)
+            snoozeNowMs = System.currentTimeMillis()
+            if (snoozeNowMs >= snoozeDeadline) break
+        }
+    }
     val overview = remember(allTimeTotal, allTimeBlocked, allTimeAllowed, vpnState.sessionTotalQueries, vpnState.sessionBlockedQueries, vpnState.sessionAllowedQueries, malwareBlocks, liveNetwork.threatsBlocked) {
         DashboardPresentation.overview(
             allTimeTotal, allTimeBlocked, allTimeAllowed,
@@ -268,6 +289,51 @@ fun HomeScreen(
                                 Text(if (isPaused) "Resume" else "Pause", maxLines = 1)
                             }
                         }
+                        if (isConnected) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Auto-resume:",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
+                                )
+                                ProtectionSnoozeEngine.PRESET_MINUTES.forEach { mins ->
+                                    FilterChip(
+                                        selected = false,
+                                        onClick = { onSnoozeVpnMinutes(mins) },
+                                        label = { Text("${mins}m", fontSize = 11.sp) }
+                                    )
+                                }
+                            }
+                        } else if (isSnoozed) {
+                            Spacer(Modifier.height(8.dp))
+                            Surface(
+                                color = WarningAmber.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Auto-resume: ${ProtectionSnoozeEngine.formatRemaining(snoozeDeadline, snoozeNowMs)}",
+                                        color = WarningAmber,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextButton(onClick = onPauseResumeVpn) {
+                                        Text("Resume now", fontSize = 11.sp, color = EmeraldPrimary)
+                                    }
+                                }
+                            }
+                        }
                         TextButton(onClick = onOpenLiveTab, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                             Text("Open live network dashboard", fontSize = 12.sp)
                         }
@@ -349,6 +415,7 @@ fun HomeScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             DetectionRow("DNS filter", if (isConnected) "Active" else "Standby", isConnected)
+                            DetectionRow("CNAME shield", if (settings.cnameUncloakingEnabled) "Enabled" else "Off", settings.cnameUncloakingEnabled)
                             DetectionRow("Threat lists", if (vpnState.loadedRuleCount > 0) "Loaded" else "Loading", vpnState.loadedRuleCount > 0)
                             DetectionRow("Browser shield", if (settings.browserCosmeticFilteringEnabled) "Enabled" else "Off", settings.browserCosmeticFilteringEnabled)
                             DetectionRow("Offline baseline", "Bundled", true)

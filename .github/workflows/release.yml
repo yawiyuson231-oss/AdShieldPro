@@ -248,6 +248,22 @@ jobs:
           \`$(cat "$APK.sha256")\`.
 
           ## What is in this build
+          - **New in 2.11.0 — CNAME-Cloaking Tracker Shield & Resolver Speed Benchmark:** inspects
+            upstream DNS CNAME answer chains in real time to block disguised first-party tracker
+            aliases (while respecting user allowlists and video-playback CDNs), plus a one-tap
+            concurrent DoH/DoT/UDP resolver latency benchmark with ranked results in Settings.
+          - **New in 2.11.0 — Dedicated Per-App Firewall & Split-Tunnel Manager:** search and filter
+            installed apps by live DNS traffic or override state and assign Filtered, Allow DNS,
+            Block DNS, or Bypass VPN (split-tunnel) per application, with one-tap bulk reset.
+          - **New in 2.11.0 — Shield Quick Settings Tile, Auto-Resume Timed Pause & Home Widget:**
+            no-ADB Quick Settings tile to toggle AdShield anywhere, 5/15/30/60-minute timed pause
+            with automatic Doze-aware resume (great for captive portals), and a resizable live
+            Home-Screen protection widget with blocked counter and 15-minute pause button.
+          - **New in 2.11.0 — Share-Sheet Link Cleaner & Instant Threat Check:** share any URL from
+            any app to AdShield Pro (or paste in Security → Links) to peel outbound tracking
+            redirects, strip 80+ global & platform-specific tracking parameters (preserving YouTube
+            timestamps, search queries, and product variants), run an instant on-device phishing
+            check, and copy, re-share, or open directly in Privacy Browser.
           - Security & reliability hardening across VPN/TCP-DNS/IPv6 packet framing, DoH/DoT and
             DNSSEC-scoped caching, video-safe wildcard filtering, Privacy Browser cosmetic/scheme
             guards and Tor \`.onion\` leak prevention, World Monitor tile & RSS/Atom feed isolation,

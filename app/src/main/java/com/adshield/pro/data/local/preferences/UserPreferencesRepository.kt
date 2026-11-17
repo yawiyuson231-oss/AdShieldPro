@@ -86,7 +86,10 @@ data class AppSettingsState(
     val scheduledScanIntervalHours: Int = 24,
     // --- Quick Settings Tiles for System Preferences ---
     val privateDnsTileConfig: PrivateDnsTileConfig = PrivateDnsTileConfig(),
-    val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig()
+    val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig(),
+    // --- CNAME-Cloaking Shield & Timed Auto-Resume Pause (Snooze) ---
+    val cnameUncloakingEnabled: Boolean = true,
+    val vpnSnoozeUntilEpochMs: Long = 0L
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -176,6 +179,10 @@ class UserPreferencesRepository @Inject constructor(
         // Quick Settings Tiles for System Preferences
         val PRIVATE_DNS_TILE_CONFIG_JSON = stringPreferencesKey("private_dns_tile_config_json")
         val USB_DEBUGGING_TILE_CONFIG_JSON = stringPreferencesKey("usb_debugging_tile_config_json")
+
+        // CNAME-Cloaking Shield & Timed Protection Snooze
+        val CNAME_UNCLOAKING_ENABLED = booleanPreferencesKey("cname_uncloaking_enabled")
+        val VPN_SNOOZE_UNTIL_MS = longPreferencesKey("vpn_snooze_until_epoch_ms")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -294,8 +301,35 @@ class UserPreferencesRepository @Inject constructor(
             scheduledScanEnabled = prefs[Keys.SCHEDULED_SCAN_ENABLED] ?: false,
             scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168),
             privateDnsTileConfig = privateDnsTileConfig,
-            usbDebuggingTileConfig = usbDebuggingTileConfig
+            usbDebuggingTileConfig = usbDebuggingTileConfig,
+            cnameUncloakingEnabled = prefs[Keys.CNAME_UNCLOAKING_ENABLED] ?: true,
+            vpnSnoozeUntilEpochMs = (prefs[Keys.VPN_SNOOZE_UNTIL_MS] ?: 0L).coerceAtLeast(0L)
         )
+    }
+
+    suspend fun setCnameUncloakingEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.CNAME_UNCLOAKING_ENABLED] = enabled }
+    }
+
+    suspend fun setVpnSnoozeUntilEpochMs(deadlineEpochMs: Long) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit {
+            it[Keys.VPN_SNOOZE_UNTIL_MS] = deadlineEpochMs.coerceAtLeast(0L)
+        }
+    }
+
+    suspend fun resetAllAppFirewallOverrides() {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { prefs ->
+            prefs[Keys.EXCLUDED_PACKAGES] = emptySet()
+            val currentPolicy = prefs[Keys.DNS_FIREWALL_POLICY]?.let { raw ->
+                runCatching { json.decodeFromString<DnsFirewallPolicy>(raw) }.getOrNull()
+            } ?: DnsFirewallPolicy()
+            prefs[Keys.DNS_FIREWALL_POLICY] = json.encodeToString(
+                currentPolicy.copy(appPolicies = emptyMap())
+            )
+        }
     }
 
     suspend fun setSearchProvider(provider: SearchProvider) {

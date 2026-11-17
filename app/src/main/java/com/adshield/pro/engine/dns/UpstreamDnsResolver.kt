@@ -197,6 +197,33 @@ class UpstreamDnsResolver @Inject constructor(
     }
 
     /**
+     * Sends a single uncached live wire query directly to [endpoint] for multi-resolver
+     * benchmarking. Does not read or populate [dnsCache] and does not trip circuit breakers on
+     * providers the user has not selected as active.
+     */
+    suspend fun probeEndpoint(
+        query: DnsPacketCodec.ParsedDnsQuery,
+        config: DnsResolverConfig,
+        endpoint: DnsProviderEndpoint
+    ): UpstreamResult = withContext(Dispatchers.IO) {
+        val startNanos = System.nanoTime()
+        val response = providerTransport?.query(query, config, endpoint)
+            ?: executeProviderQuery(query, config, endpoint)
+        val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
+        val latencyMs = ((System.nanoTime() - startNanos) / 1_000_000L)
+            .coerceIn(1L, Int.MAX_VALUE.toLong())
+            .toInt()
+        UpstreamResult(
+            responseBytes = response,
+            protocolUsed = "${config.protocol.name} (${endpoint.displayName})",
+            fromCache = false,
+            latencyMs = latencyMs,
+            providerId = endpoint.providerId,
+            dnssecStatus = inspection.dnssecStatus
+        )
+    }
+
+    /**
      * Resolves a parsed DNS query against the configured upstream resolver (or serves from TTL cache).
      */
     suspend fun resolve(

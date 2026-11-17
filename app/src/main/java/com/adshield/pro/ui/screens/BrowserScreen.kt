@@ -94,11 +94,16 @@ fun BrowserScreen(
     onRecordSearch: (String) -> Unit,
     onClearSearchHistory: () -> Unit,
     onFetchSearchSuggestions: (String, (List<String>) -> Unit) -> Unit,
-    onShowFeedback: (String) -> Unit
+    onShowFeedback: (String) -> Unit,
+    pendingExternalUrl: String? = null,
+    onConsumeExternalUrl: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    var urlInput by remember { mutableStateOf(settings.searchProvider.homeUrl) }
-    var currentPageUrl by remember { mutableStateOf(settings.searchProvider.homeUrl) }
+    val initialTarget = remember {
+        pendingExternalUrl?.takeIf { it.isNotBlank() } ?: settings.searchProvider.homeUrl
+    }
+    var urlInput by remember { mutableStateOf(initialTarget) }
+    var currentPageUrl by remember { mutableStateOf(initialTarget) }
     var pageLoadProgress by remember { mutableIntStateOf(100) }
     var blockedSubresources by remember { mutableLongStateOf(browserContentBlocker.getBlockedSubresourceCount()) }
     var blockedPopups by remember { mutableLongStateOf(browserContentBlocker.getBlockedPopupCount()) }
@@ -134,6 +139,17 @@ fun BrowserScreen(
             searchSuggestions = emptyList()
             webViewRef.value?.loadUrl(sanitized, mapOf("DNT" to "1", "Sec-GPC" to "1"))
         }.onFailure { onShowFeedback(it.message ?: "Enter a valid search or HTTPS address") }
+    }
+
+    LaunchedEffect(pendingExternalUrl, webViewRef.value) {
+        val target = pendingExternalUrl?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        val wv = webViewRef.value ?: return@LaunchedEffect
+        val sanitized = browserContentBlocker.sanitizeTrackingParameters(target)
+        urlInput = sanitized
+        currentPageUrl = sanitized
+        searchSuggestions = emptyList()
+        wv.loadUrl(sanitized, mapOf("DNT" to "1", "Sec-GPC" to "1"))
+        onConsumeExternalUrl()
     }
 
     LaunchedEffect(urlInput, settings.searchProvider, settings.searchSuggestionsEnabled) {

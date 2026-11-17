@@ -378,6 +378,65 @@ object DnsPacketCodec {
         return if (offset == message.size) types else null
     }
 
+    /**
+     * Extracts ordered, normalized CNAME canonical target hostnames (RFC 1035 TYPE 5, CLASS IN)
+     * from a DNS response's Answer section so CNAME-cloaked first-party trackers can be evaluated
+     * against the filter engine without touching non-CNAME records.
+     *
+     * Validates header flags (`QR == 1`, `OPCODE == 0`, `RCODE == 0`), exact `RDLENGTH` bounds,
+     * RFC 1035 compression pointers, and bounds output to at most [MAX_CNAME_CHAIN] targets.
+     */
+    fun extractCnameTargets(dnsResponse: ByteArray): List<String> {
+        if (dnsResponse.size < 12) return emptyList()
+        val flags = u16At(dnsResponse, 2)
+        // Must be a standard QUERY response (QR=1, OPCODE=0) with NOERROR (RCODE=0)
+        if ((flags and 0x8000) == 0 || (flags and 0x7800) != 0 || (flags and 0x000F) != 0) {
+            return emptyList()
+        }
+        val qdCount = u16At(dnsResponse, 4)
+        val anCount = u16At(dnsResponse, 6)
+        if (qdCount <= 0 || qdCount > 64 || anCount <= 0) return emptyList()
+
+        var offset = 12
+        var questionDomain: String? = null
+        repeat(qdCount) { idx ->
+            val qRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return emptyList()
+            if (idx == 0) {
+                questionDomain = qRead.domain.trimEnd('.').lowercase()
+            }
+            offset = qRead.nextOffset + 4
+            if (offset > dnsResponse.size) return emptyList()
+        }
+
+        val targets = LinkedHashSet<String>()
+        repeat(anCount.coerceAtMost(64)) {
+            if (offset >= dnsResponse.size) return targets.toList()
+            val ownerRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return targets.toList()
+            val rrHeader = ownerRead.nextOffset
+            if (rrHeader + 10 > dnsResponse.size) return targets.toList()
+            val rrType = u16At(dnsResponse, rrHeader)
+            val rrClass = u16At(dnsResponse, rrHeader + 2)
+            val rdLength = u16At(dnsResponse, rrHeader + 8)
+            val rdataStart = rrHeader + 10
+            val rdataEnd = rdataStart + rdLength
+            if (rdLength < 0 || rdataEnd > dnsResponse.size) return targets.toList()
+
+            if (rrType == TYPE_CNAME && rrClass == CLASS_IN && rdLength > 0 && targets.size < MAX_CNAME_CHAIN) {
+                val targetRead = readDomainName(dnsResponse, 0, rdataStart, dnsResponse.size)
+                if (targetRead != null && targetRead.nextOffset == rdataEnd) {
+                    val normalized = targetRead.domain.trimEnd('.').lowercase()
+                    if (normalized.isNotEmpty() && normalized.length <= 253 && normalized != questionDomain) {
+                        targets.add(normalized)
+                    }
+                }
+            }
+            offset = rdataEnd
+        }
+        return targets.toList()
+    }
+
+    private const val MAX_CNAME_CHAIN = 16
+
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
 

@@ -116,7 +116,8 @@ fun SecurityScreen(
     onClearScanHistory: () -> Unit,
     onBuildScanReport: suspend () -> String,
     onSetScheduledScan: (Boolean, Int) -> Unit,
-    onShowFeedback: (String) -> Unit
+    onShowFeedback: (String) -> Unit,
+    onCleanAndScanLink: (String) -> Unit = {}
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -144,7 +145,7 @@ fun SecurityScreen(
             0 -> ProtectionPostureTab(posture, vpnState, malwareBlocks, onAuditApps)
             1 -> AppAuditTab(appAudits, isAuditingApps, onAuditApps)
             2 -> FileScanTab(fileScanResult, isScanning, scanProgress, onScanUri, onQuarantineLastScanned, onDeleteScannedDocument)
-            3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl)
+            3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl, onCleanAndScanLink, onShowFeedback)
             else -> HistoryTab(
                 history = scanHistory,
                 summary = scanSummary,
@@ -573,7 +574,13 @@ private fun queryDisplayName(context: android.content.Context, uri: android.net.
 }
 
 @Composable
-private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolean, onScanUrl: (String) -> Unit) {
+private fun LinkScanTab(
+    result: UrlThreatScanner.UrlVerdict?,
+    isScanning: Boolean,
+    onScanUrl: (String) -> Unit,
+    onCleanAndScanLink: (String) -> Unit = {},
+    onShowFeedback: (String) -> Unit = {}
+) {
     var urlInput by rememberSaveable { mutableStateOf("") }
     val qrContext = LocalContext.current
     val qrScope = rememberCoroutineScope()
@@ -641,6 +648,43 @@ private fun LinkScanTab(result: UrlThreatScanner.UrlVerdict?, isScanning: Boolea
                         }
                         Text("Analyze Link")
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onCleanAndScanLink(urlInput) },
+                            enabled = urlInput.isNotBlank() && !isScanning,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Clean Trackers", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                val cm = qrContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                                    as? android.content.ClipboardManager
+                                val clipText = cm?.primaryClip?.getItemAt(0)?.coerceToText(qrContext)
+                                    ?.toString()?.trim().orEmpty()
+                                if (clipText.isBlank()) {
+                                    onShowFeedback("Clipboard is empty — copy or share a link first.")
+                                } else {
+                                    urlInput = clipText
+                                    onCleanAndScanLink(clipText)
+                                }
+                            },
+                            enabled = !isScanning,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Paste & Clean", style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                        }
+                    }
+                    Text(
+                        text = "Tip: You can also choose AdShield Pro → Clean & Scan Link from any app's Share Sheet.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = { qrPicker.launch("image/*") },

@@ -58,6 +58,7 @@ import com.adshield.pro.domain.model.AppExclusionInfo
 import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.engine.dns.DnsBenchmarkReport
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.ui.components.CompactStatusChip
 import com.adshield.pro.ui.components.StatusPill
@@ -77,10 +78,12 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
     onCloseAbout: () -> Unit,
     onOpenQuickTiles: () -> Unit = {},
+    onOpenAppFirewall: () -> Unit = {},
     hasQuickTilePermission: Boolean = false,
     settings: AppSettingsState,
     installedApps: List<AppExclusionInfo>,
     onUpdateResolverConfig: (DnsResolverConfig) -> Unit,
+    onToggleCnameUncloaking: (Boolean) -> Unit = {},
     onLoadInstalledApps: () -> Unit,
     onToggleAppExclusion: (String, Boolean) -> Unit,
     onSetAppDnsPolicy: (String, AppDnsPolicy) -> Unit,
@@ -90,6 +93,10 @@ fun SettingsScreen(
     dnsDiagnosticReport: DnsDiagnosticReport?,
     isRunningDnsDiagnostics: Boolean,
     onRunDnsDiagnostics: (String) -> Unit,
+    dnsBenchmarkReport: DnsBenchmarkReport? = null,
+    isRunningDnsBenchmark: Boolean = false,
+    onRunDnsBenchmark: (String) -> Unit = {},
+    onApplyBenchmarkedPreset: (DnsProviderPreset) -> Unit = {},
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
@@ -352,6 +359,32 @@ fun SettingsScreen(
                             }
                         )
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 12.dp)
+                        ) {
+                            Text(
+                                text = "CNAME-Cloaking Tracker Shield",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = "Inspects upstream DNS CNAME answer chains and blocks disguised first-party tracker aliases while preserving user allowlists and video-playback CDNs.",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.cnameUncloakingEnabled,
+                            onCheckedChange = onToggleCnameUncloaking
+                        )
+                    }
                 }
             }
         }
@@ -416,9 +449,85 @@ fun SettingsScreen(
                     )
                     Button(
                         onClick = { onRunDnsDiagnostics(diagnosticDomain) },
-                        enabled = !isRunningDnsDiagnostics,
+                        enabled = !isRunningDnsDiagnostics && !isRunningDnsBenchmark,
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(if (isRunningDnsDiagnostics) "Running real DNS query…" else "Run DNS diagnostics") }
+                    OutlinedButton(
+                        onClick = { onRunDnsBenchmark(diagnosticDomain) },
+                        enabled = !isRunningDnsBenchmark && !isRunningDnsDiagnostics,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (isRunningDnsBenchmark) {
+                                "Benchmarking ${settings.resolverConfig.protocol.name} resolvers…"
+                            } else {
+                                "Benchmark all ${settings.resolverConfig.protocol.name} resolvers"
+                            }
+                        )
+                    }
+                    dnsBenchmarkReport?.let { bench ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Resolver speed ranking (${bench.protocol.name} · ${bench.reachableCount}/${bench.entries.size} reachable)",
+                                    fontWeight = FontWeight.SemiBold,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                bench.fastestReachable?.takeIf { !it.isCurrentlySelected }?.let { fastest ->
+                                    Button(
+                                        onClick = { onApplyBenchmarkedPreset(fastest.preset) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Use fastest: ${fastest.providerName} (${fastest.latencyMs} ms)")
+                                    }
+                                }
+                                bench.entries.forEachIndexed { idx, entry ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                text = "${idx + 1}. ${entry.providerName}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = if (entry.isCurrentlySelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (entry.isCurrentlySelected) EmeraldPrimary else MaterialTheme.colorScheme.onSurface
+                                            )
+                                            val meta = if (entry.reachable) {
+                                                buildString {
+                                                    append("${entry.latencyMs} ms")
+                                                    entry.dnssecStatus?.let { append(" · ${it.name}") }
+                                                    if (entry.forwardsClientSubnet) append(" · ECS")
+                                                }
+                                            } else {
+                                                "Unreachable (${entry.errorMessage ?: "failed"})"
+                                            }
+                                            Text(
+                                                text = meta,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (entry.reachable) CyberCyan else WarningAmber
+                                            )
+                                        }
+                                        if (entry.isCurrentlySelected) {
+                                            StatusPill("Active", EmeraldPrimary)
+                                        } else if (entry.reachable) {
+                                            TextButton(onClick = { onApplyBenchmarkedPreset(entry.preset) }) {
+                                                Text("Use")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     dnsDiagnosticReport?.let { report ->
                         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp)) {
                             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -500,12 +609,13 @@ fun SettingsScreen(
                         Icon(Icons.Default.Apps, contentDescription = null, tint = EmeraldPrimary)
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
+                            val dnsOverrides = settings.dnsFirewallPolicy.appPolicies.count { it.value != AppDnsPolicy.DEFAULT }
                             Text(
-                                text = "Per-App VPN Controls (Split Tunneling)",
+                                text = "Per-App Firewall & Split-Tunnel",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "${settings.excludedAppPackages.size} app(s) currently excluded from VPN filtering",
+                                text = "${settings.excludedAppPackages.size} bypassed · $dnsOverrides per-app DNS rule(s)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -523,11 +633,11 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             onLoadInstalledApps()
-                            showAppExclusionDialog = true
+                            onOpenAppFirewall()
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Manage Per-App VPN & DNS Policies")
+                        Text("Open Per-App Firewall & Split-Tunnel")
                     }
                 }
             }
@@ -677,15 +787,15 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Quick Settings Tiles", style = MaterialTheme.typography.titleMedium)
+                            Text("Quick Settings Tiles & Widget", style = MaterialTheme.typography.titleMedium)
                             StatusPill(
-                                text = if (hasQuickTilePermission) "Ready" else "Quick Setup",
-                                color = if (hasQuickTilePermission) EmeraldPrimary else WarningAmber
+                                text = "Ready",
+                                color = EmeraldPrimary
                             )
                         }
                         Text(
                             if (hasQuickTilePermission) {
-                                "Private DNS ($cycleCount cycle steps) & USB Debugging ($usbAutoRevertSummary)"
+                                "AdShield VPN tile, Home Widget, Private DNS ($cycleCount steps) & USB Debugging ($usbAutoRevertSummary)"
                             } else {
                                 "Tap for quick permission setup (Wireless ADB / PC / Root) & add tiles"
                             },

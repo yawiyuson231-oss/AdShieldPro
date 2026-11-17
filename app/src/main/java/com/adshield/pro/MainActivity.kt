@@ -79,10 +79,13 @@ import com.adshield.pro.domain.intelligence.IntelligenceAction
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.engine.platform.ProtectionSnoozeController
 import com.adshield.pro.engine.platform.SystemPreferencesController
+import com.adshield.pro.ui.components.LinkCleanerDialog
 import com.adshield.pro.ui.model.DashboardPresentation
 import com.adshield.pro.ui.screens.ActivityScreen
 import com.adshield.pro.ui.screens.AdBlockerHubScreen
+import com.adshield.pro.ui.screens.AppFirewallScreen
 import com.adshield.pro.ui.screens.BatteryScreen
 import com.adshield.pro.ui.screens.CapabilitiesScreen
 import com.adshield.pro.ui.screens.CloudStorageScreen
@@ -136,26 +139,65 @@ class MainActivity : ComponentActivity() {
         val worldMonitorLaunchTrigger = mutableIntStateOf(
             if (intent?.getBooleanExtra("open_world_monitor", false) == true) 1 else 0
         )
+        val startVpnConsentTrigger = mutableIntStateOf(
+            if (savedInstanceState == null && intent?.action == ProtectionSnoozeController.ACTION_START_VPN_WITH_CONSENT) 1 else 0
+        )
+        val incomingSharedText = mutableStateOf(
+            if (savedInstanceState == null) extractSharedPlainText(intent) else null
+        )
         addOnNewIntentListener { newIntent ->
-            if (isQuickTilesIntent(newIntent)) {
-                setIntent(newIntent)
-                quickTilesLaunchTrigger.intValue += 1
-            } else if (newIntent.getBooleanExtra("open_world_monitor", false)) {
-                setIntent(newIntent)
-                worldMonitorLaunchTrigger.intValue += 1
+            when {
+                isQuickTilesIntent(newIntent) -> {
+                    setIntent(newIntent)
+                    quickTilesLaunchTrigger.intValue += 1
+                }
+                newIntent.action == ProtectionSnoozeController.ACTION_START_VPN_WITH_CONSENT -> {
+                    setIntent(newIntent)
+                    startVpnConsentTrigger.intValue += 1
+                }
+                newIntent.getBooleanExtra("open_world_monitor", false) -> {
+                    setIntent(newIntent)
+                    worldMonitorLaunchTrigger.intValue += 1
+                }
+                else -> {
+                    val shared = extractSharedPlainText(newIntent)
+                    if (shared != null) {
+                        setIntent(newIntent)
+                        incomingSharedText.value = shared
+                    }
+                }
             }
         }
         setContent {
             val viewModel: AdShieldViewModel = hiltViewModel()
             val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+            val sharedPayload = incomingSharedText.value
+            LaunchedEffect(sharedPayload) {
+                if (!sharedPayload.isNullOrBlank()) {
+                    viewModel.inspectSharedOrPastedLink(sharedPayload)
+                    incomingSharedText.value = null
+                }
+            }
             AdShieldProTheme(themePreference = settings.darkThemeMode) {
                 AdShieldMainApp(
                     viewModel = viewModel,
                     openQuickTilesTrigger = quickTilesLaunchTrigger.intValue,
-                    openWorldMonitorTrigger = worldMonitorLaunchTrigger.intValue
+                    openWorldMonitorTrigger = worldMonitorLaunchTrigger.intValue,
+                    startVpnConsentTrigger = startVpnConsentTrigger.intValue
                 )
             }
         }
+    }
+
+    private fun extractSharedPlainText(launchIntent: Intent?): String? {
+        if (launchIntent?.action != Intent.ACTION_SEND) return null
+        val mime = launchIntent.type?.lowercase().orEmpty()
+        if (!mime.startsWith("text/")) return null
+        return launchIntent.getCharSequenceExtra(Intent.EXTRA_TEXT)
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.take(8_192)
     }
 
     private fun isQuickTilesIntent(launchIntent: Intent?): Boolean {
@@ -173,14 +215,17 @@ class MainActivity : ComponentActivity() {
 fun AdShieldMainApp(
     viewModel: AdShieldViewModel,
     openQuickTilesTrigger: Int = 0,
-    openWorldMonitorTrigger: Int = 0
+    openWorldMonitorTrigger: Int = 0,
+    startVpnConsentTrigger: Int = 0
 ) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
     var showQuickTilesScreen by rememberSaveable { mutableStateOf(false) }
+    var showAppFirewallScreen by rememberSaveable { mutableStateOf(false) }
     var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
     var handledWorldMonitorTrigger by rememberSaveable { mutableIntStateOf(0) }
+    var handledStartConsentTrigger by rememberSaveable { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var worldMonitorOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
@@ -188,6 +233,7 @@ fun AdShieldMainApp(
     val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uiFeedback by viewModel.uiFeedbackMessage.collectAsStateWithLifecycle()
+    val sharedLinkInspection by viewModel.sharedLinkInspection.collectAsStateWithLifecycle()
 
     LaunchedEffect(openQuickTilesTrigger) {
         if (openQuickTilesTrigger > handledQuickTilesTrigger) {
@@ -195,6 +241,7 @@ fun AdShieldMainApp(
             connectorsOpen = false
             worldMonitorOpen = false
             showAboutScreen = false
+            showAppFirewallScreen = false
             currentTab = MainNavDestination.SETTINGS
             showQuickTilesScreen = true
         }
@@ -205,14 +252,16 @@ fun AdShieldMainApp(
             handledWorldMonitorTrigger = openWorldMonitorTrigger
             connectorsOpen = false
             showQuickTilesScreen = false
+            showAppFirewallScreen = false
             showAboutScreen = false
             currentTab = MainNavDestination.WORLD_MONITOR
         }
     }
 
-    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR) {
+    BackHandler(enabled = showAboutScreen || showQuickTilesScreen || showAppFirewallScreen || connectorsOpen || worldMonitorOpen || currentTab == MainNavDestination.WORLD_MONITOR) {
         when {
             connectorsOpen -> connectorsOpen = false
+            showAppFirewallScreen -> showAppFirewallScreen = false
             showQuickTilesScreen -> showQuickTilesScreen = false
             worldMonitorOpen -> worldMonitorOpen = false
             currentTab == MainNavDestination.WORLD_MONITOR -> currentTab = MainNavDestination.HOME
@@ -265,6 +314,30 @@ fun AdShieldMainApp(
         if (enable) launchVpnConsent() else viewModel.stopVpnService()
     }
 
+    LaunchedEffect(startVpnConsentTrigger) {
+        if (startVpnConsentTrigger > handledStartConsentTrigger) {
+            handledStartConsentTrigger = startVpnConsentTrigger
+            launchVpnConsent()
+        }
+    }
+
+    sharedLinkInspection?.let { inspection ->
+        LinkCleanerDialog(
+            inspection = inspection,
+            onDismiss = viewModel::dismissSharedLinkInspection,
+            onOpenInPrivacyBrowser = { cleanUrl ->
+                viewModel.openUrlInPrivacyBrowser(cleanUrl)
+                connectorsOpen = false
+                worldMonitorOpen = false
+                showQuickTilesScreen = false
+                showAppFirewallScreen = false
+                showAboutScreen = false
+                currentTab = MainNavDestination.AD_BLOCKER
+            },
+            onFeedback = viewModel::showFeedback
+        )
+    }
+
     if (showVpnConsentHelp) {
         AlertDialog(
             onDismissRequest = { showVpnConsentHelp = false },
@@ -310,7 +383,7 @@ fun AdShieldMainApp(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
-            if (!showAboutScreen && !showQuickTilesScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
+            if (!showAboutScreen && !showQuickTilesScreen && !showAppFirewallScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
                 CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
             }
         }
@@ -364,7 +437,10 @@ fun AdShieldMainApp(
                     onCloseAbout = { showAboutScreen = false },
                     showQuickTilesScreen = showQuickTilesScreen,
                     onOpenQuickTiles = { showQuickTilesScreen = true },
-                    onCloseQuickTiles = { showQuickTilesScreen = false }
+                    onCloseQuickTiles = { showQuickTilesScreen = false },
+                    showAppFirewallScreen = showAppFirewallScreen,
+                    onOpenAppFirewall = { showAppFirewallScreen = true },
+                    onCloseAppFirewall = { showAppFirewallScreen = false }
                 )
                 MainNavDestination.STATUS -> StatusDestination(viewModel)
             }
@@ -484,6 +560,7 @@ private fun HomeDestination(
         onCheckForUpdates = viewModel::checkForUpdates,
         onToggleVpn = onToggleVpn,
         onPauseResumeVpn = onPauseResumeVpn,
+        onSnoozeVpnMinutes = viewModel::snoozeVpnForMinutes,
         onSelectProtectionMode = viewModel::setProtectionMode,
         onTriggerFilterSync = viewModel::triggerManualFilterUpdate,
         onRunOptimizeNow = viewModel::runOneTapSmartBoost,
@@ -503,6 +580,7 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
     val sandboxResult by viewModel.sandboxTestResult.collectAsStateWithLifecycle()
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val isUpdatingFilters by viewModel.isUpdatingFilters.collectAsStateWithLifecycle()
+    val pendingBrowserUrl by viewModel.pendingBrowserUrl.collectAsStateWithLifecycle()
     AdBlockerHubScreen(
         sources = filterSources,
         rules = customRules,
@@ -531,7 +609,9 @@ private fun AdBlockerDestination(viewModel: AdShieldViewModel) {
         onRecordSearch = viewModel::recordSearch,
         onClearSearchHistory = viewModel::clearSearchHistory,
         onFetchSearchSuggestions = viewModel::fetchSearchSuggestions,
-        onShowFeedback = viewModel::showFeedback
+        onShowFeedback = viewModel::showFeedback,
+        pendingBrowserUrl = pendingBrowserUrl,
+        onConsumePendingBrowserUrl = viewModel::consumePendingBrowserUrl
     )
 }
 
@@ -660,7 +740,8 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         onClearScanHistory = viewModel::clearScanHistory,
         onBuildScanReport = viewModel::buildScanReport,
         onSetScheduledScan = viewModel::setScheduledScan,
-        onShowFeedback = viewModel::showFeedback
+        onShowFeedback = viewModel::showFeedback,
+        onCleanAndScanLink = viewModel::inspectSharedOrPastedLink
     )
 }
 
@@ -920,10 +1001,27 @@ private fun SettingsDestination(
     onCloseAbout: () -> Unit,
     showQuickTilesScreen: Boolean,
     onOpenQuickTiles: () -> Unit,
-    onCloseQuickTiles: () -> Unit
+    onCloseQuickTiles: () -> Unit,
+    showAppFirewallScreen: Boolean = false,
+    onOpenAppFirewall: () -> Unit = {},
+    onCloseAppFirewall: () -> Unit = {}
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val systemTilesStatus by viewModel.systemTilesStatus.collectAsStateWithLifecycle()
+    if (showAppFirewallScreen) {
+        val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
+        val liveTopApps by viewModel.liveTopApps.collectAsStateWithLifecycle()
+        AppFirewallScreen(
+            apps = installedApps,
+            liveTopApps = liveTopApps,
+            onBack = onCloseAppFirewall,
+            onRefreshApps = viewModel::loadInstalledApps,
+            onToggleAppExclusion = viewModel::toggleAppExclusion,
+            onSetAppDnsPolicy = viewModel::setAppDnsPolicy,
+            onResetAllOverrides = viewModel::resetAllAppFirewallOverrides
+        )
+        return
+    }
     if (showQuickTilesScreen) {
         val isGrantingRoot by viewModel.isGrantingQuickTilePermission.collectAsStateWithLifecycle()
         QuickSettingsTilesScreen(
@@ -957,16 +1055,20 @@ private fun SettingsDestination(
     val installedApps by viewModel.installedApps.collectAsStateWithLifecycle()
     val dnsDiagnosticReport by viewModel.dnsDiagnosticReport.collectAsStateWithLifecycle()
     val isRunningDnsDiagnostics by viewModel.isRunningDnsDiagnostics.collectAsStateWithLifecycle()
+    val dnsBenchmarkReport by viewModel.dnsBenchmarkReport.collectAsStateWithLifecycle()
+    val isRunningDnsBenchmark by viewModel.isRunningDnsBenchmark.collectAsStateWithLifecycle()
     val protectionStatus by viewModel.protectionStatus.collectAsStateWithLifecycle()
     SettingsScreen(
         showAboutScreen = showAboutScreen,
         onOpenAbout = onOpenAbout,
         onCloseAbout = onCloseAbout,
         onOpenQuickTiles = onOpenQuickTiles,
+        onOpenAppFirewall = onOpenAppFirewall,
         hasQuickTilePermission = systemTilesStatus.hasWriteSecureSettingsPermission,
         settings = settings,
         installedApps = installedApps,
         onUpdateResolverConfig = viewModel::updateDnsResolverConfig,
+        onToggleCnameUncloaking = viewModel::setCnameUncloakingEnabled,
         onLoadInstalledApps = viewModel::loadInstalledApps,
         onToggleAppExclusion = viewModel::toggleAppExclusion,
         onSetAppDnsPolicy = viewModel::setAppDnsPolicy,
@@ -976,6 +1078,10 @@ private fun SettingsDestination(
         dnsDiagnosticReport = dnsDiagnosticReport,
         isRunningDnsDiagnostics = isRunningDnsDiagnostics,
         onRunDnsDiagnostics = viewModel::runDnsDiagnostics,
+        dnsBenchmarkReport = dnsBenchmarkReport,
+        isRunningDnsBenchmark = isRunningDnsBenchmark,
+        onRunDnsBenchmark = viewModel::runDnsBenchmark,
+        onApplyBenchmarkedPreset = viewModel::applyBenchmarkedPreset,
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.VpnService
 import androidx.core.content.ContextCompat
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
+import com.adshield.pro.engine.platform.ProtectionSnoozeController
 import com.adshield.pro.engine.platform.SystemPreferencesController
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +25,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var systemPreferencesController: SystemPreferencesController
+    @Inject lateinit var snoozeController: ProtectionSnoozeController
 
     override fun onReceive(context: Context, intent: Intent?) {
         val action = intent?.action ?: return
@@ -37,8 +39,11 @@ class BootCompletedReceiver : BroadcastReceiver() {
                 runCatching {
                     systemPreferencesController.reconcileAutoRevertTimers()
                 }
+                val stillSnoozed = runCatching {
+                    snoozeController.reconcileOnBoot()
+                }.getOrDefault(false)
                 val settings = preferencesRepository.getSettingsSnapshot()
-                if (settings.vpnShouldRemainActive && settings.autoStartOnBoot) {
+                if (!stillSnoozed && settings.vpnShouldRemainActive && settings.autoStartOnBoot) {
                     // Verify VPN consent is still granted before starting foreground service
                     val prepareIntent = VpnService.prepare(context)
                     if (prepareIntent == null) {
@@ -48,6 +53,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
                         runCatching { ContextCompat.startForegroundService(context, vpnIntent) }
                     }
                 }
+                ProtectionSnoozeController.notifySurfacesChanged(context)
             } finally {
                 pendingResult.finish()
             }

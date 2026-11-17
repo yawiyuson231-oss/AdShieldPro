@@ -57,13 +57,19 @@ import com.adshield.pro.engine.battery.BatterySession
 import com.adshield.pro.engine.aether.LiveNetworkModel
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
+import com.adshield.pro.engine.browser.LinkSanitizer
 import com.adshield.pro.engine.browser.SearchSuggestionClient
 import com.adshield.pro.engine.platform.DeviceProfiler
+import com.adshield.pro.engine.platform.ProtectionSnoozeController
+import com.adshield.pro.engine.platform.ProtectionSnoozeEngine
 import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.engine.platform.SystemTileEngine
+import com.adshield.pro.engine.dns.DnsBenchmarkReport
+import com.adshield.pro.engine.dns.DnsResolverBenchmark
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
 import com.adshield.pro.engine.dns.runDiagnostics
+import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import com.adshield.pro.engine.optimizer.SystemOptimizerEngine
@@ -112,6 +118,12 @@ enum class StatsChartRange(val label: String, val days: Int) {
     MONTHLY_30D("30 Days", 30)
 }
 
+data class SharedLinkInspection(
+    val sanitized: LinkSanitizer.SharedTextSanitizeResult,
+    val verdict: UrlThreatScanner.UrlVerdict? = null,
+    val isScanning: Boolean = false
+)
+
 @HiltViewModel
 class AdShieldViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
@@ -127,7 +139,8 @@ class AdShieldViewModel @Inject constructor(
     private val batteryRepository: BatteryIntelligenceRepository,
     private val deviceProfiler: DeviceProfiler,
     private val searchSuggestionClient: SearchSuggestionClient,
-    private val systemPreferencesController: SystemPreferencesController
+    private val systemPreferencesController: SystemPreferencesController,
+    private val snoozeController: ProtectionSnoozeController
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -180,6 +193,17 @@ class AdShieldViewModel @Inject constructor(
     val dnsDiagnosticReport: StateFlow<DnsDiagnosticReport?> = _dnsDiagnosticReport.asStateFlow()
     private val _isRunningDnsDiagnostics = MutableStateFlow(false)
     val isRunningDnsDiagnostics: StateFlow<Boolean> = _isRunningDnsDiagnostics.asStateFlow()
+
+    private val _dnsBenchmarkReport = MutableStateFlow<DnsBenchmarkReport?>(null)
+    val dnsBenchmarkReport: StateFlow<DnsBenchmarkReport?> = _dnsBenchmarkReport.asStateFlow()
+    private val _isRunningDnsBenchmark = MutableStateFlow(false)
+    val isRunningDnsBenchmark: StateFlow<Boolean> = _isRunningDnsBenchmark.asStateFlow()
+
+    private val _sharedLinkInspection = MutableStateFlow<SharedLinkInspection?>(null)
+    val sharedLinkInspection: StateFlow<SharedLinkInspection?> = _sharedLinkInspection.asStateFlow()
+
+    private val _pendingBrowserUrl = MutableStateFlow<String?>(null)
+    val pendingBrowserUrl: StateFlow<String?> = _pendingBrowserUrl.asStateFlow()
 
     /**
      * Live working status. The ticker only re-evaluates the pipeline; every value inside the
@@ -501,6 +525,7 @@ class AdShieldViewModel @Inject constructor(
     // --- VPN Lifecycle Controls ---
 
     fun startVpnService() {
+        viewModelScope.launch { runCatching { snoozeController.clearSnooze() } }
         val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
             action = AdShieldVpnService.ACTION_START_VPN
         }
@@ -508,6 +533,7 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun stopVpnService() {
+        viewModelScope.launch { runCatching { snoozeController.clearSnooze() } }
         val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
             action = AdShieldVpnService.ACTION_STOP_VPN
         }
@@ -515,17 +541,37 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun pauseVpnService() {
+        viewModelScope.launch { runCatching { snoozeController.clearSnooze() } }
         val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
             action = AdShieldVpnService.ACTION_PAUSE_VPN
         }
         appContext.startService(intent)
     }
 
-    fun resumeVpnService() {
-        val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
-            action = AdShieldVpnService.ACTION_RESUME_VPN
+    fun snoozeVpnForMinutes(minutes: Int) {
+        val clamped = ProtectionSnoozeEngine.clampMinutes(minutes)
+        viewModelScope.launch {
+            val deadline = snoozeController.snoozeProtection(
+                minutes = clamped,
+                currentStatus = vpnState.value.status
+            )
+            val timeLabel = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(deadline))
+            showFeedback("Protection paused for ${clamped}m — auto-resumes at $timeLabel.")
         }
-        appContext.startService(intent)
+    }
+
+    fun resumeVpnService() {
+        viewModelScope.launch {
+            val resumed = snoozeController.resumeNow()
+            if (!resumed) {
+                val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
+                    action = AdShieldVpnService.ACTION_RESUME_VPN
+                }
+                runCatching { appContext.startService(intent) }
+            }
+            showFeedback("DNS protection resumed.")
+        }
     }
 
     // --- Protection Modes ---
@@ -565,6 +611,54 @@ class AdShieldViewModel @Inject constructor(
             } finally {
                 _isRunningDnsDiagnostics.value = false
             }
+        }
+    }
+
+    fun runDnsBenchmark(domain: String = DnsResolverBenchmark.DEFAULT_PROBE_DOMAIN) {
+        if (_isRunningDnsBenchmark.value) return
+        viewModelScope.launch {
+            _isRunningDnsBenchmark.value = true
+            try {
+                val report = DnsResolverBenchmark.run(
+                    resolver = upstreamDnsResolver,
+                    config = settingsState.value.resolverConfig,
+                    domainInput = domain
+                )
+                _dnsBenchmarkReport.value = report
+                val winner = report.fastestReachable
+                if (winner != null) {
+                    showFeedback("Fastest resolver: ${winner.providerName} (${winner.latencyMs} ms)")
+                } else {
+                    showFeedback("No resolvers responded over ${report.protocol.label}.")
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (error: Throwable) {
+                showFeedback("DNS benchmark failed: ${error.message ?: error.javaClass.simpleName}")
+            } finally {
+                _isRunningDnsBenchmark.value = false
+            }
+        }
+    }
+
+    fun applyBenchmarkedPreset(preset: DnsProviderPreset) {
+        val current = settingsState.value.resolverConfig
+        updateDnsResolverConfig(current.copy(preset = preset))
+        _dnsBenchmarkReport.value?.let { existing ->
+            _dnsBenchmarkReport.value = existing.copy(
+                entries = existing.entries.map { it.copy(isCurrentlySelected = it.preset == preset) }
+            )
+        }
+    }
+
+    fun setCnameUncloakingEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setCnameUncloakingEnabled(enabled)
+            upstreamDnsResolver.clearCache()
+            showFeedback(
+                if (enabled) "CNAME-cloaking tracker shield enabled."
+                else "CNAME-cloaking tracker shield disabled."
+            )
         }
     }
 
@@ -772,15 +866,112 @@ class AdShieldViewModel @Inject constructor(
 
     fun setAppDnsPolicy(packageName: String, policy: AppDnsPolicy) {
         viewModelScope.launch {
+            val wasExcluded = packageName in settingsState.value.excludedAppPackages
+            if (wasExcluded && policy != AppDnsPolicy.DEFAULT) {
+                // Ensure app routes through the local DNS tunnel so its DNS policy takes effect.
+                preferencesRepository.toggleExcludedAppPackage(packageName, false)
+            }
             val current = settingsState.value.dnsFirewallPolicy
             val updated = current.appPolicies.toMutableMap().apply {
                 if (policy == AppDnsPolicy.DEFAULT) remove(packageName) else put(packageName, policy)
             }
             preferencesRepository.updateDnsFirewallPolicy(current.copy(appPolicies = updated))
             upstreamDnsResolver.clearCache()
-            loadInstalledApps()
+            val refreshed = preferencesRepository.getSettingsSnapshot()
+            _installedApps.value = repository.getInstalledApps(
+                refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
+            )
+            if (wasExcluded && policy != AppDnsPolicy.DEFAULT) {
+                reloadTunnelIfConnected()
+            }
             showFeedback("${packageName}: ${policy.label}")
         }
+    }
+
+    fun resetAllAppFirewallOverrides() {
+        viewModelScope.launch {
+            val hadExclusions = settingsState.value.excludedAppPackages.isNotEmpty()
+            preferencesRepository.resetAllAppFirewallOverrides()
+            upstreamDnsResolver.clearCache()
+            val refreshed = preferencesRepository.getSettingsSnapshot()
+            _installedApps.value = repository.getInstalledApps(
+                refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
+            )
+            if (hadExclusions) {
+                reloadTunnelIfConnected()
+            }
+            showFeedback("Reset all per-app split-tunnel and DNS firewall overrides.")
+        }
+    }
+
+    // --- Share-Sheet Link Cleaner & Instant Threat Check ---
+
+    fun inspectSharedOrPastedLink(rawText: String) {
+        val trimmed = rawText.trim()
+        if (trimmed.isEmpty()) {
+            showFeedback("Nothing to clean — paste or share a link first.")
+            return
+        }
+        val sanitized = LinkSanitizer.sanitizeSharedText(trimmed, unwrapRedirects = true)
+        val primary = sanitized.primaryLink
+        _sharedLinkInspection.value = SharedLinkInspection(
+            sanitized = sanitized,
+            verdict = null,
+            isScanning = primary != null
+        )
+        if (primary == null) return
+
+        viewModelScope.launch {
+            try {
+                val verdict = securityEngine.scanUrl(primary.cleanedUrl)
+                // Only apply if user hasn't dismissed or started another link check.
+                if (_sharedLinkInspection.value?.sanitized?.originalText == sanitized.originalText) {
+                    _sharedLinkInspection.value = SharedLinkInspection(
+                        sanitized = sanitized,
+                        verdict = verdict,
+                        isScanning = false
+                    )
+                }
+                val record = SecurityScanRecord(
+                    id = System.currentTimeMillis(),
+                    kind = ScanKind.URL,
+                    target = primary.cleanedUrl.take(120),
+                    threatLevel = when (verdict.threatLevel) {
+                        UrlThreatScanner.ThreatLevel.DANGEROUS -> SecurityLevel.DANGEROUS
+                        UrlThreatScanner.ThreatLevel.SUSPICIOUS -> SecurityLevel.SUSPICIOUS
+                        else -> SecurityLevel.CLEAN
+                    },
+                    riskScore = verdict.riskScore,
+                    threatName = verdict.findings.firstOrNull(),
+                    findings = verdict.findings,
+                    recommendation = verdict.recommendation,
+                    timestampEpochMs = System.currentTimeMillis()
+                )
+                scanJournalStore.record(record)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (_: Throwable) {
+                _sharedLinkInspection.value = _sharedLinkInspection.value?.copy(isScanning = false)
+            }
+        }
+    }
+
+    fun dismissSharedLinkInspection() {
+        _sharedLinkInspection.value = null
+    }
+
+    fun openUrlInPrivacyBrowser(url: String) {
+        val clean = LinkSanitizer.sanitize(url.trim(), unwrapRedirects = true).cleanedUrl
+        if (clean.startsWith("https://", ignoreCase = true) || clean.startsWith("http://", ignoreCase = true)) {
+            _pendingBrowserUrl.value = clean
+            _sharedLinkInspection.value = null
+        } else {
+            showFeedback("Only valid HTTP(S) links can be opened in Privacy Browser.")
+        }
+    }
+
+    fun consumePendingBrowserUrl() {
+        _pendingBrowserUrl.value = null
     }
 
     fun setTransportProtected(transport: NetworkTransportPolicy, protected: Boolean) {

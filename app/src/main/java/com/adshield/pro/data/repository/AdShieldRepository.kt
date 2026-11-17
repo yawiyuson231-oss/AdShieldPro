@@ -242,6 +242,7 @@ class AdShieldRepository @Inject constructor(
                 ruleCount = filterEngine.getCurrentSnapshot().totalLoadedRules,
                 timestampEpochMs = System.currentTimeMillis()
             )?.let { intelligenceRecorder.record(it) }
+            com.adshield.pro.engine.platform.ProtectionSnoozeController.notifySurfacesChanged(context)
         }
     }
 
@@ -876,6 +877,7 @@ class AdShieldRepository @Inject constructor(
         val excludedAppPackages: Set<String>,
         val resolverConfig: DnsResolverConfig? = null,
         val dnsFirewallPolicy: DnsFirewallPolicy? = null,
+        val cnameUncloakingEnabled: Boolean? = null,
         val privateDnsTileConfig: PrivateDnsTileConfig? = null,
         val usbDebuggingTileConfig: UsbDebuggingTileConfig? = null
     )
@@ -890,6 +892,7 @@ class AdShieldRepository @Inject constructor(
             excludedAppPackages = settings.excludedAppPackages,
             resolverConfig = settings.resolverConfig,
             dnsFirewallPolicy = settings.dnsFirewallPolicy,
+            cnameUncloakingEnabled = settings.cnameUncloakingEnabled,
             privateDnsTileConfig = settings.privateDnsTileConfig.copy(
                 autoRevertTargetMode = null,
                 autoRevertTargetHostname = null,
@@ -908,6 +911,7 @@ class AdShieldRepository @Inject constructor(
             prefs.setProtectionMode(backup.protectionMode)
             backup.resolverConfig?.let { prefs.updateResolverConfig(it) }
             backup.dnsFirewallPolicy?.let { prefs.updateDnsFirewallPolicy(it) }
+            backup.cnameUncloakingEnabled?.let { prefs.setCnameUncloakingEnabled(it) }
             backup.privateDnsTileConfig?.let { restored ->
                 prefs.updatePrivateDnsTileConfig {
                     restored.copy(

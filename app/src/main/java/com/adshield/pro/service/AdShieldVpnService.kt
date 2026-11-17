@@ -22,11 +22,14 @@ import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.engine.dns.CnameCloakingInspector
 import com.adshield.pro.engine.dns.DnsPacketCodec
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
+import com.adshield.pro.engine.platform.ProtectionSnoozeController
+import com.adshield.pro.engine.platform.ProtectionSnoozeEngine
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +65,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var snoozeController: ProtectionSnoozeController
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -96,6 +100,8 @@ class AdShieldVpnService : VpnService() {
                 runCatching {
                     runBlocking {
                         withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
+                            snoozeController.cancelResumeAlarm()
+                            preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
                             preferencesRepository.setVpnShouldRemainActive(false)
                         }
                     }
@@ -112,6 +118,7 @@ class AdShieldVpnService : VpnService() {
             }
             ACTION_RESUME_VPN -> {
                 isPaused = false
+                serviceScope.launch { runCatching { snoozeController.clearSnooze() } }
                 if (vpnInterface != null && tunnelJob?.isActive == true) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED)
                     updateForegroundNotification()
@@ -130,6 +137,7 @@ class AdShieldVpnService : VpnService() {
                 return START_STICKY
             }
             else -> {
+                serviceScope.launch { runCatching { snoozeController.clearSnooze() } }
                 startForegroundWithNotification()
                 startVpnTunnel()
                 return START_STICKY
@@ -365,6 +373,23 @@ class AdShieldVpnService : VpnService() {
     ): ByteArray {
         val currentSettings = preferencesRepository.getSettingsSnapshot()
 
+        // Opportunistically end timed pause on the very first packet after its deadline even if
+        // Doze deferred AlarmManager's inexact wake-up slightly.
+        if (isPaused && ProtectionSnoozeEngine.isSnoozeDue(
+                snoozeUntilEpochMs = currentSettings.vpnSnoozeUntilEpochMs,
+                vpnShouldRemainActive = true,
+                nowEpochMs = System.currentTimeMillis()
+            )
+        ) {
+            isPaused = false
+            runCatching { snoozeController.clearSnooze() }
+            repository.updateVpnStatus(
+                status = VpnStatus.CONNECTED,
+                networkLabel = detectCurrentNetworkLabel()
+            )
+            updateForegroundNotification()
+        }
+
         // If protection is temporarily paused by user, forward directly to encrypted upstream DNS
         if (isPaused) {
             val upstream = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
@@ -419,6 +444,48 @@ class AdShieldVpnService : VpnService() {
 
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
+
+        // Inspect returned CNAME answer chains so disguised first-party tracker aliases
+        // (e.g. metrics.site.example -> collector.adtech.example) are blocked cleanly.
+        val cnameDecision = CnameCloakingInspector.inspect(
+            questionDomain = query.questionDomain,
+            questionEvaluation = evaluation,
+            dnsResponse = upstreamResult.responseBytes,
+            filterEngine = filterRuleEngine,
+            enabled = currentSettings.cnameUncloakingEnabled,
+            bypassDomainFilters = decision.bypassDomainFilters
+        )
+        if (cnameDecision.shouldBlock) {
+            val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
+            val blockedBytes = DnsPacketCodec.buildBlockedResponse(
+                query = query,
+                sinkholeZeroIp = mode.blockSinkholeZeroIp
+            )
+            val ruleLabel = if (cnameDecision.cloakedTarget != null &&
+                cnameDecision.matchedRule != null &&
+                cnameDecision.matchedRule != cnameDecision.cloakedTarget
+            ) {
+                "${cnameDecision.cloakedTarget} (${cnameDecision.matchedRule})"
+            } else {
+                cnameDecision.cloakedTarget ?: cnameDecision.matchedRule
+            }
+            repository.recordDnsQueryEvent(
+                domain = query.questionDomain,
+                queryType = query.qTypeName,
+                isBlocked = true,
+                category = cnameDecision.matchedCategory,
+                matchedRule = ruleLabel,
+                sourceList = cnameDecision.sourceName,
+                latencyMs = upstreamResult.latencyMs,
+                protocolUsed = if (mode.blockSinkholeZeroIp) "CNAME Sinkhole 0.0.0.0" else "CNAME NXDOMAIN",
+                fromCache = upstreamResult.fromCache,
+                appPackageName = app?.packageName,
+                appName = app?.label
+            )
+            maybeRefreshNotificationCounter()
+            return blockedBytes
+        }
+
         repository.recordDnsQueryEvent(
             domain = query.questionDomain,
             queryType = query.qTypeName,
@@ -516,12 +583,17 @@ class AdShieldVpnService : VpnService() {
     }
 
     private var lastNotificationUpdateMs = 0L
+    private var lastWidgetUpdateMs = 0L
 
     private fun maybeRefreshNotificationCounter() {
         val now = System.currentTimeMillis()
         if (now - lastNotificationUpdateMs >= 4000L) {
             lastNotificationUpdateMs = now
             updateForegroundNotification()
+        }
+        if (now - lastWidgetUpdateMs >= 12_000L) {
+            lastWidgetUpdateMs = now
+            runCatching { AdShieldWidgetProvider.refreshAll(applicationContext) }
         }
     }
 
@@ -578,7 +650,13 @@ class AdShieldVpnService : VpnService() {
         }
 
         val title = if (isPaused) {
-            "AdShield Pro — Protection Paused"
+            val deadline = preferencesRepository.cachedSettingsOrNull()?.vpnSnoozeUntilEpochMs ?: 0L
+            val nowMs = System.currentTimeMillis()
+            if (ProtectionSnoozeEngine.isSnoozeActive(deadline, nowMs)) {
+                "AdShield Pro — Paused (${ProtectionSnoozeEngine.formatRemainingCompact(deadline, nowMs)} left)"
+            } else {
+                "AdShield Pro — Protection Paused"
+            }
         } else {
             "AdShield Pro Active (${state.activeMode.title})"
         }
@@ -618,6 +696,8 @@ class AdShieldVpnService : VpnService() {
         runCatching {
             runBlocking {
                 withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
+                    snoozeController.cancelResumeAlarm()
+                    preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
                     preferencesRepository.setVpnShouldRemainActive(false)
                 }
             }
