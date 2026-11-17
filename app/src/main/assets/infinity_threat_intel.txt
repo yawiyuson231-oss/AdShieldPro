@@ -1,0 +1,59 @@
+# AdShield Pro Infinity DNS — Extended Threat Intelligence
+# Purpose: Additional phishing, scam, and malware domains from community feeds
+# Sources: URLhaus, PhishTank patterns, open-source threat research
+# License: CC0 / MIT compatible
+# Format: Adblock DNS (||domain^) — parsed with [CATEGORY:MALWARE]
+# Last updated: 2026-11-17 — Infinity DNS Edition
+
+[CATEGORY:MALWARE]
+
+# ---- Phishing: Typosquat patterns for major brands ----
+||secure-login-apple.com^
+||appleid-verify.com^
+||apple-support-login.com^
+||micorsoft-login.com^
+||microsoft-verify-account.com^
+||paypa1-secure.com^
+||paypal-verify-now.com^
+||amaz0n-security.com^
+||amazon-verify-payment.com^
+||netflix-payment-update.com^
+||netflix-verify-account.com^
+||google-verify-account.com^
+||facebook-security-check.com^
+||instagram-verify-account.com^
+||whatsapp-verify-number.com^
+||tiktok-verify-account.com^
+||gcash-verify-account.com^
+||maya-secure-login.com^
+||bdo-secure-update.com^
+||bpi-verify-account.com^
+
+# ---- Scam: Prize/lottery/urgency lures ----
+||you-won-prize-now.com^
+||claim-your-gift-today.com^
+||congratulations-winner-prize.com^
+||urgent-action-required-secure.com^
+||click-here-claim-reward.com^
+||limited-time-offer-free.com^
+||act-now-secure-bonus.com^
+||free-gift-waiting-claim.com^
+
+# ---- Malware: Known distribution patterns ----
+||malware-download-free-apk.com^
+||update-flash-player-now.com^
+||critical-security-update-required.com^
+||your-device-infected-scan.com^
+||virus-detected-call-support.com^
+
+# ---- Cryptominer / Ad fraud ----
+||coin-hive.com^
+||coinhive.com^
+||cryptoloot.pro^
+||jsecoin.com^
+||miner.pr0gramm.com^
+
+# ---- Tracking-heavy suspicious TLDs with ad patterns ----
+||ads-tracking-analytics.tk^
+||free-streaming-movies-top.work^
+||watch-kdrama-free-online.click^

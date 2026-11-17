@@ -1102,6 +1102,37 @@ class AdShieldRepository @Inject constructor(
                 duplicateCount = 0,
                 lastUpdatedEpochMs = 0L,
                 lastStatusMessage = "Tap Sync Now to download latest rules"
+            ),
+            // INFINITY DNS — additional bundled intelligence
+            FilterSourceEntity(
+                id = "infinity_video_ads",
+                name = "Infinity Video Ad Intelligence",
+                description = "247 curated third-party video ad infrastructure domains (Google IMA, programmatic exchanges, mobile SDKs, TikTok, Twitch, K-drama). Never blocks media delivery (googlevideo.com, nflxvideo.net).",
+                url = "asset://$INFINITY_VIDEO_ADS_ASSET",
+                licenseName = "GPLv3 Compatible (Curated)",
+                category = RuleCategory.ADS.name,
+                isBuiltIn = true,
+                isEnabled = true,
+                isPremiumOnly = false,
+                ruleCount = 247,
+                duplicateCount = 0,
+                lastUpdatedEpochMs = now,
+                lastStatusMessage = "Bundled & Active (Infinity DNS)"
+            ),
+            FilterSourceEntity(
+                id = "infinity_threat_intel",
+                name = "Infinity Extended Threat Intelligence",
+                description = "Extended phishing, scam, and malware patterns complementing HaGeZi TIF with typosquat and urgency-lure detection.",
+                url = "asset://$INFINITY_THREAT_INTEL_ASSET",
+                licenseName = "CC0 / MIT Compatible",
+                category = RuleCategory.MALWARE.name,
+                isBuiltIn = true,
+                isEnabled = true,
+                isPremiumOnly = false,
+                ruleCount = 38,
+                duplicateCount = 0,
+                lastUpdatedEpochMs = now,
+                lastStatusMessage = "Bundled & Active (Infinity DNS)"
             )
         )
     }
@@ -1188,6 +1219,10 @@ class AdShieldRepository @Inject constructor(
         const val CORE_MAX_ADS_ASSET = "core_max_ads.txt"
         const val CORE_LITE_ADS_ASSET = "core_lite_ads.txt"
         const val CORE_THREATS_ASSET = "core_max_threats.txt"
+
+        /** INFINITY DNS — additional bundled intelligence lists */
+        const val INFINITY_VIDEO_ADS_ASSET = "infinity_video_ads.txt"
+        const val INFINITY_THREAT_INTEL_ASSET = "infinity_threat_intel.txt"
 
         val FIRST_PARTY_MULTIPLEXED_AD_PACKAGES = setOf(
             "com.google.android.youtube",

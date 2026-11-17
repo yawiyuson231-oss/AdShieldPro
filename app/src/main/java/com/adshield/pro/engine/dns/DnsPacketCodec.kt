@@ -363,6 +363,90 @@ object DnsPacketCodec {
         return if (offset == message.size) types else null
     }
 
+    // ---- INFINITY DNS: CNAME & Extended Record Inspection ----
+
+    /**
+     * Extracts all CNAME targets from a DNS response.
+     * Returns null on malformed data, empty list if no CNAME records.
+     */
+    fun extractCnameTargets(message: ByteArray): List<String>? {
+        if (message.size < 12) return null
+        val qd = u16At(message, 4)
+        val records = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
+        if (qd != 1 || records > 4096) return null
+        var offset = 12
+        val question = readDomainName(message, 0, offset, message.size) ?: return null
+        offset = question.nextOffset + 4
+        if (offset > message.size) return null
+        val cnames = mutableListOf<String>()
+        repeat(records) {
+            val name = readDomainName(message, 0, offset, message.size) ?: return null
+            offset = name.nextOffset
+            if (offset + 10 > message.size) return null
+            val type = u16At(message, offset)
+            val rdLength = u16At(message, offset + 8)
+            val rdataOffset = offset + 10
+            if (type == TYPE_CNAME && rdataOffset + rdLength <= message.size && rdLength >= 2) {
+                val target = readDomainName(message, 0, rdataOffset, message.size)
+                if (target != null && target.domain.isNotEmpty()) {
+                    cnames.add(target.domain.lowercase().trimEnd('.'))
+                }
+            }
+            offset = rdataOffset + rdLength
+            if (offset > message.size) return null
+        }
+        return if (offset == message.size) cnames else null
+    }
+
+    /**
+     * Extracts TTL values for all answer records.
+     * Useful for TTL-aware caching and fast-flux detection.
+     */
+    fun extractAllTtls(message: ByteArray): List<Int>? {
+        if (message.size < 12) return null
+        val qd = u16At(message, 4)
+        val totalRecords = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
+        if (qd != 1 || totalRecords > 4096) return null
+        var offset = 12
+        val question = readDomainName(message, 0, offset, message.size) ?: return null
+        offset = question.nextOffset + 4
+        val ttls = mutableListOf<Int>()
+        repeat(totalRecords) {
+            val name = readDomainName(message, 0, offset, message.size) ?: return null
+            offset = name.nextOffset
+            if (offset + 10 > message.size) return null
+            val ttl = ByteBuffer.wrap(message, offset + 4, 4).int
+            ttls.add(ttl)
+            val rdLength = u16At(message, offset + 8)
+            offset += 10 + rdLength
+            if (offset > message.size) return null
+        }
+        return if (offset == message.size) ttls else null
+    }
+
+    /**
+     * Detects suspicious DNS response patterns:
+     * - Very short TTLs (fast-flux)
+     * - Excessive record count
+     * - Mixed unexpected record types
+     */
+    fun detectSuspiciousResponse(message: ByteArray): List<String> {
+        val issues = mutableListOf<String>()
+        if (message.size < 12) {
+            issues.add("Response too short")
+            return issues
+        }
+        val ttls = extractAllTtls(message)
+        if (ttls != null) {
+            if (ttls.any { it in 1..10 }) issues.add("Very short TTL (1-10s) — possible fast-flux")
+            if (ttls.size > 20) issues.add("Excessive record count (${ttls.size})")
+            val types = inspectResponseRecordTypes(message)
+            if (types != null && types.size > 4) issues.add("Many record types in single response")
+        }
+        if (message.size > 4096) issues.add("Unusually large response (${message.size} bytes)")
+        return issues
+    }
+
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
 
