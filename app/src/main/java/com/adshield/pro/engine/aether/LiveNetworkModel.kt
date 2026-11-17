@@ -57,7 +57,8 @@ object LiveNetworkModel {
         val topBlocked: List<DomainBlockCount>,
         val recentEvents: List<LiveEvent>,
         val connectionHealth: ConnectionHealth,
-        val emptyReason: String?
+        val emptyReason: String?,
+        val bypassSignals: List<com.adshield.pro.engine.dns.VideoBypassDetector.BypassSignal> = emptyList()
     )
 
     data class ConnectionHealth(
@@ -72,7 +73,8 @@ object LiveNetworkModel {
         logs: List<DnsActivityRecord>,
         topApps: List<AppDnsActivity>,
         topBlocked: List<DomainBlockCount>,
-        appLabels: Map<String, String> = emptyMap()
+        appLabels: Map<String, String> = emptyMap(),
+        bypassSignals: List<com.adshield.pro.engine.dns.VideoBypassDetector.BypassSignal> = emptyList()
     ): NetworkSnapshot {
         val connected = runtime.status == VpnStatus.CONNECTED
         val total = logs.size.toLong()
@@ -136,7 +138,8 @@ object LiveNetworkModel {
             topBlocked = topBlocked,
             recentEvents = events,
             connectionHealth = health(connected, runtime, latencies),
-            emptyReason = emptyReason
+            emptyReason = emptyReason,
+            bypassSignals = bypassSignals
         )
     }
 

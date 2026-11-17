@@ -64,6 +64,20 @@ class AdaptiveLearningEngine @Inject constructor() {
 
     fun offsetFor(category: String): Float = profile.perCategoryOffset[category] ?: 0f
 
+    // Per-session 24h allowlist for user-approved false positives (expired via InfinityDnsCache negative TTL)
+    private val sessionAllowlist = mutableMapOf<String, Long>() // domain -> expiryMs
+    fun addSessionAllow(domain: String, ttlMs: Long = 24 * 3600_000L) {
+        synchronized(sessionAllowlist) { sessionAllowlist[domain.lowercase().trim().trimEnd('.')] = System.currentTimeMillis() + ttlMs }
+    }
+    fun isSessionAllowed(domain: String): Boolean {
+        val expiry = synchronized(sessionAllowlist) { sessionAllowlist[domain.lowercase().trim().trimEnd('.')] } ?: return false
+        if (System.currentTimeMillis() > expiry) {
+            synchronized(sessionAllowlist) { sessionAllowlist.remove(domain.lowercase().trim().trimEnd('.')) }
+            return false
+        }
+        return true
+    }
+
     /**
      * Adjust a DomainIntelligence score by learned offsets.
      * Returns the adjusted score in 0..100. Never flips CLEAN→MALWARE on its own;

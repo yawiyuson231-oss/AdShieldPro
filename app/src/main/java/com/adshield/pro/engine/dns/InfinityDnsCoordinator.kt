@@ -159,14 +159,31 @@ class InfinityDnsCoordinator @Inject constructor(
             }
         }
 
-        // Video ad intelligence (for telemetry — not auto-blocking unknown video infra)
+        // Time-boxed throttle: only block ad infra within 3s of video init to avoid mid-stream kill
+        com.adshield.pro.engine.aether.VideoSessionTracker.onDnsQuery(domain)
+        // Video ad intelligence with time-boxed check
         val videoResult = if (domain.contains("doubleclick") || domain.contains("ad") ||
-            domain.contains("vast") || domain.contains("tracking")
+            domain.contains("vast") || domain.contains("tracking") || domain.contains("imasdk")
         ) {
             videoAdIntelligence.analyze(domain).also {
                 if (it.isVideoAdInfrastructure) pipeline.add("video:${it.compatibilityRisk.label}")
             }
         } else null
+
+        // If video ad infra but outside time window, downgrade to telemetry-only
+        if (videoResult != null && videoResult.isVideoAdInfrastructure && videoResult.shouldBlock) {
+            if (!com.adshield.pro.engine.aether.VideoSessionTracker.shouldBlockAdInfra(domain)) {
+                pipeline.add("video:throttled-outside-window")
+                // fall through to allowed instead of blocking
+            } else {
+                // Check session allowlist for user-approved false positives
+                if (adaptiveLearning.isSessionAllowed(domain)) {
+                    pipeline.add("video:session-allowed")
+                    val elapsed = (System.nanoTime() - startNs) / 1000
+                    return InfinityDecision(domain, false, primaryEval, compatCheck, null, videoResult, threatResult, null, false, elapsed, pipeline)
+                }
+            }
+        }
 
         val elapsed = (System.nanoTime() - startNs) / 1000
 

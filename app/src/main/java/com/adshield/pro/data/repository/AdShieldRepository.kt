@@ -745,6 +745,13 @@ class AdShieldRepository @Inject constructor(
                         tempFile.copyTo(cacheFile, overwrite = true)
                         tempFile.delete()
 
+                        // Community pack signature check: verify SHA-256 of body against optional x-content-sha256 header
+                        resp.header("x-content-sha256")?.let { expectedSha ->
+                            val actualSha = sha256Hex(bodyStr)
+                            if (!actualSha.equals(expectedSha.lowercase(), ignoreCase = true)) {
+                                throw SecurityException("Community pack signature mismatch for ${source.id}")
+                            }
+                        }
                         val expiresHeader = resp.header("Expires")
                         val lastModHeader = resp.header("Last-Modified")
                         if (!expiresHeader.isNullOrBlank()) {

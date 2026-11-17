@@ -365,10 +365,14 @@ class AdShieldVpnService : VpnService() {
         attribution
     }.getOrNull()
 
+    private val appDnsCounts = mutableMapOf<String, Int>()
+    private val appTotalCounts = mutableMapOf<String, Int>()
+
     private suspend fun processDnsQuery(
         query: DnsPacketCodec.ParsedDnsQuery,
         app: AppAttribution?
     ): ByteArray {
+        app?.packageName?.let { pkg -> appDnsCounts[pkg] = (appDnsCounts[pkg] ?: 0) + 1; appTotalCounts[pkg] = (appTotalCounts[pkg] ?: 0) + 1 }
         val currentSettings = preferencesRepository.getSettingsSnapshot()
 
         // If protection is temporarily paused by user, forward directly to encrypted upstream DNS

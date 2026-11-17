@@ -412,6 +412,31 @@ fun HomeScreen(
                 )
             }
 
+            if (liveNetwork.bypassSignals.isNotEmpty()) {
+                item(key = "bypass-banner") {
+                    CyberPanel(title = "⚠ QUIC/DoH bypass detected", subtitle = "App is bypassing DNS — video ads will return unless excluded from Private DNS") {
+                        liveNetwork.bypassSignals.forEach { sig ->
+                            Text(sig.message, color = WarningAmber, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            item(key = "video-intel") {
+                CyberPanel(title = "Video Intelligence", subtitle = "Pre-roll / CNAME uncloaked today") {
+                    val ytBlocked = recentLogs.count { it.isBlocked && (it.domain.contains("doubleclick") || it.domain.contains("2mdn")) }.toLong()
+                    val cnameBlocked = recentLogs.count { it.sourceList.contains("CNAME") }.toLong()
+                    val stitched = recentLogs.count { it.domain.contains("googlevideo") && !it.isBlocked }
+                    ResponsiveMetrics(columns = 3, metrics = listOf(
+                        MetricSpec("Pre-roll blocked", formatInteger(ytBlocked), "doubleclick/2mdn/IMA", AlertRed),
+                        MetricSpec("CNAME uncloaked", formatInteger(cnameBlocked), "first-party → ad infra", WarningAmber),
+                        MetricSpec("Stitched (DNS-exempt)", formatInteger(stitched.toLong()), "same-host, not blockable", EmeraldPrimary)
+                    ))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Blocked = third-party ad hosts; Stitched = ad bytes inside googlevideo.com/fbcdn.net — DNS cannot distinguish, Privacy Browser overlay hide applies.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                }
+            }
+
             item(key = "privacy") {
                 CyberPanel(title = "Privacy & coverage", subtitle = "What this build actually does — not a certification claim") {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

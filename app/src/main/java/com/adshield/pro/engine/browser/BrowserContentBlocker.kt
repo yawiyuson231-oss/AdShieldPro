@@ -56,6 +56,11 @@ class BrowserContentBlocker @Inject constructor(
             sessionBlockedSubresources.incrementAndGet()
             return InterceptionDecision(true, "Video SDK spoof (IMA3/VAST) — overlay blocked, no CA", requestUrl)
         }
+        // VAST ad_rule stripping — turn mid-roll into direct content fetch (Privacy Browser only)
+        if (shouldStripVastAdRule(requestUrl)) {
+            val stripped = stripVastAdRule(requestUrl)
+            return InterceptionDecision(false, "VAST ad_rule stripped → $stripped")
+        }
         val uri = runCatching { URI(requestUrl) }.getOrNull()
             ?: return InterceptionDecision(false, "Malformed URI")
         val scheme = uri.scheme?.lowercase() ?: return InterceptionDecision(false, "No scheme")
@@ -146,6 +151,17 @@ class BrowserContentBlocker @Inject constructor(
         return lower.contains("imasdk.googleapis.com/js/sdkloader/ima3.js") ||
             lower.contains("imasdk.googleapis.com/js/sdkloader/ima3_dai.js") ||
             (lower.contains("doubleclick.net") && lower.contains("vast") && lower.contains(".xml"))
+    }
+
+    fun shouldStripVastAdRule(requestUrl: String): Boolean {
+        val lower = requestUrl.lowercase()
+        return lower.contains("doubleclick.net/gampad/ads") && lower.contains("ad_rule=1")
+    }
+
+    fun stripVastAdRule(url: String): String {
+        return url.replace(Regex("&ad_rule=1"), "")
+            .replace(Regex("\\?ad_rule=1&"), "?")
+            .replace(Regex("\\?ad_rule=1$"), "")
     }
 
     fun createEmptyBlockedResponse(): WebResourceResponse {
