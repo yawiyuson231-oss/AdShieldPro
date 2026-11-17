@@ -87,6 +87,7 @@ fun SettingsScreen(
     onSetTransportProtected: (NetworkTransportPolicy, Boolean) -> Unit,
     protectionStatus: ProtectionPipelineStatus? = null,
     onSetEmergencyAllowlistOnly: (Boolean) -> Unit,
+    onSetVideoPlatformEnabled: (String, Boolean) -> Unit = { _, _ -> },
     onSetHeuristicBlockingEnabled: (Boolean) -> Unit = {},
     dnsDiagnosticReport: DnsDiagnosticReport?,
     infinityCacheStats: String? = null,
