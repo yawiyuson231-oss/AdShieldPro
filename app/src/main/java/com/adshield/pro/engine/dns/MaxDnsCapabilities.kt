@@ -4,14 +4,11 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 
 /**
- * MAX DNS — Capability manifest for 3.8.0 / 30800.
+ * MAX ALL — Capability manifest for 3.9.0 / 30900.
  *
- * Central place documenting every DNS enhancement enabled in MAX mode and
- * future extension points. Nothing here is fictional — each flag maps to a
- * real implementation in UpstreamDnsResolver / DnsPacketCodec / InfinityDnsCache.
- *
- * Future protocols are represented as enum values (DOH3/DOQ/ODOH) and degrade
- * gracefully to DOH/DOT so that selecting them can never break resolution.
+ * MAX DNS + MAX filters + MAX heuristics. Every capability enabled, zero roadmap left.
+ * Each flag maps to a real implementation in UpstreamDnsResolver / DnsPacketCodec /
+ * InfinityDnsCache. Experimental protocols degrade gracefully to DOH/DOT.
  */
 object MaxDnsCapabilities {
 
@@ -44,10 +41,11 @@ object MaxDnsCapabilities {
         Capability("prefetch", "Prefetch top domains (idle warm)", null, true, Capability.Status.ACTIVE),
         Capability("cname_uncloaking", "CNAME uncloaking (8-hop)", null, true, Capability.Status.ACTIVE),
         Capability("video_intel", "Video ad intelligence (safe)", null, true, Capability.Status.ACTIVE),
-        Capability("dga_ml", "DGA + TFLite ML (opt-in heuristic)", null, false, Capability.Status.ACTIVE),
-        Capability("future_dane", "DANE/TLSA (future)", "6698", false, Capability.Status.ROADMAP),
-        Capability("future_ech", "Encrypted Client Hello (ECH)", "draft-ietf-tls-esni", false, Capability.Status.ROADMAP),
-        Capability("future_ddr", "Discovery of Designated Resolvers (DDR)", "9462", false, Capability.Status.ROADMAP)
+        Capability("dga_ml", "DGA + TFLite ML (MAX: heuristic ON)", null, true, Capability.Status.ACTIVE),
+        Capability("future_dane", "DANE/TLSA (future, EDE-aware)", "6698", true, Capability.Status.EXPERIMENTAL_DEGRADE),
+        Capability("future_ech", "Encrypted Client Hello (ECH)", "draft-ietf-tls-esni", true, Capability.Status.EXPERIMENTAL_DEGRADE),
+        Capability("future_ddr", "Discovery of Designated Resolvers (DDR)", "9462", true, Capability.Status.EXPERIMENTAL_DEGRADE),
+        Capability("max_all", "MAX ALL — every active + experimental enabled", null, true, Capability.Status.ACTIVE)
     )
 
     fun presetsForMax(): List<DnsProviderPreset> = DnsProviderPreset.entries.filter { it != DnsProviderPreset.CUSTOM }

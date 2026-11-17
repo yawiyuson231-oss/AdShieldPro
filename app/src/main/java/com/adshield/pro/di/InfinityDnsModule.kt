@@ -32,13 +32,7 @@ object InfinityDnsModule {
 
     @Provides
     @Singleton
-    fun provideInfinityDnsCache(): InfinityDnsCache =
-        InfinityDnsCache(
-            maxEntries = 2048,
-            maxMemoryBytes = 4L * 1024 * 1024,
-            negativeTtlSeconds = 30,
-            staleTtlMs = 5000L
-        )
+    fun provideInfinityDnsCache(): InfinityDnsCache = InfinityDnsCache.maxProfile()
 
     @Provides
     @Singleton
