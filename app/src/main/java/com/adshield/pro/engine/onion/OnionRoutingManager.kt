@@ -162,12 +162,7 @@ class OnionRoutingManager(private val context: Context) {
                 .mapValues { (_, values) -> values.joinToString(", ") }
                 .toMutableMap()
             responseHeaders["Access-Control-Allow-Origin"] = "*"
-            val body = response.body
-            val rawStream = body?.byteStream()
-            if (rawStream == null) {
-                response.close()
-                return null
-            }
+            val rawStream = response.body.byteStream()
             val closingStream = object : java.io.FilterInputStream(rawStream) {
                 override fun close() {
                     try {

@@ -382,7 +382,7 @@ class UpstreamDnsResolver @Inject constructor(
             if (!response.isSuccessful) {
                 throw IllegalStateException("DoH HTTP ${response.code}")
             }
-            val body = response.body ?: throw IllegalStateException("Empty DoH response body")
+            val body = response.body
             if (body.contentLength() > MAX_DNS_WIRE_BYTES) {
                 throw IllegalStateException("Oversized DoH DNS message (${body.contentLength()} bytes)")
             }

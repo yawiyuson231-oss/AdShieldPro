@@ -137,7 +137,7 @@ class SecurityAndReliabilityRegressionTest {
         )
         val query = DnsPacketCodec.parseQuery(raw)!!
         val reportOnly = DnsResolverConfig(dnssecMode = DnssecMode.REPORT_ONLY)
-        val strict = DnsResolverConfig(dnssecMode = DnssecMode.STRICT)
+        val strict = DnsResolverConfig(dnssecMode = DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS)
         assertNotEquals(
             UpstreamDnsResolver.buildCacheKey(query, reportOnly),
             UpstreamDnsResolver.buildCacheKey(query, strict)

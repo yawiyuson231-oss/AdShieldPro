@@ -178,7 +178,7 @@ object GitHubApkDownload {
             if (!response.request.url.isHttps || !isTrustedGitHubAssetHost(response.request.url.host)) {
                 throw java.io.IOException("Redirected to untrusted update host; download refused.")
             }
-            val body = response.body ?: throw java.io.IOException("APK download was empty.")
+            val body = response.body
             val limit = 250L * 1024L * 1024L
             if (body.contentLength() > limit) throw java.io.IOException("APK exceeds the download size limit.")
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
