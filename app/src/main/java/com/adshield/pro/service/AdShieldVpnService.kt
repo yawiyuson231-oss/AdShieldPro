@@ -394,7 +394,20 @@ class AdShieldVpnService : VpnService() {
         // are not routed through this service and therefore are not governed by these controls.
         infinityCoordinator.setHeuristicBlockingEnabled(currentSettings.heuristicBlockingEnabled)
         val infinityDecision = infinityCoordinator.evaluatePreUpstream(query.questionDomain)
-        val evaluation = if (infinityDecision.isBlocked) infinityDecision.primaryVerdict else filterRuleEngine.evaluate(query.questionDomain)
+        // Per-platform video ad toggle: if the block came from a disabled platform's video infra, treat as allowed (never break playback for a disabled platform)
+        var effectiveDecision = infinityDecision
+        if (infinityDecision.isBlocked) {
+            val plat = runCatching { com.adshield.pro.engine.dns.VideoAdIntelligence().analyze(query.questionDomain).platformHints.firstOrNull()?.name?.lowercase() }.getOrNull()
+            val platDisabled = when (plat) {
+                "youtube" -> !currentSettings.videoPlatformYoutubeEnabled
+                "tiktok" -> !currentSettings.videoPlatformTiktokEnabled
+                "twitch" -> !currentSettings.videoPlatformTwitchEnabled
+                "facebook", "instagram" -> !currentSettings.videoPlatformMetaEnabled
+                else -> false
+            }
+            if (platDisabled) effectiveDecision = infinityDecision.copy(isBlocked = false)
+        }
+        val evaluation = if (effectiveDecision.isBlocked) effectiveDecision.primaryVerdict else filterRuleEngine.evaluate(query.questionDomain)
         val decision = DnsFirewallPolicyDecider.evaluate(
             evaluation = evaluation,
             appPackageName = app?.packageName,

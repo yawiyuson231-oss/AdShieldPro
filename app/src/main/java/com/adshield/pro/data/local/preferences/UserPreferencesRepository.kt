@@ -87,7 +87,12 @@ data class AppSettingsState(
     // --- Quick Settings Tiles for System Preferences ---
     val privateDnsTileConfig: PrivateDnsTileConfig = PrivateDnsTileConfig(),
     val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig(),
-    val heuristicBlockingEnabled: Boolean = false
+    val heuristicBlockingEnabled: Boolean = false,
+    val videoPlatformYoutubeEnabled: Boolean = true,
+    val videoPlatformTiktokEnabled: Boolean = true,
+    val videoPlatformTwitchEnabled: Boolean = true,
+    val videoPlatformMetaEnabled: Boolean = true,
+    val videoPlatformKdramaEnabled: Boolean = true
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -177,6 +182,11 @@ class UserPreferencesRepository @Inject constructor(
         // Quick Settings Tiles for System Preferences
         val PRIVATE_DNS_TILE_CONFIG_JSON = stringPreferencesKey("private_dns_tile_config_json")
         val USB_DEBUGGING_TILE_CONFIG_JSON = stringPreferencesKey("usb_debugging_tile_config_json")
+        val VIDEO_PLATFORM_YOUTUBE = booleanPreferencesKey("video_platform_youtube")
+        val VIDEO_PLATFORM_TIKTOK = booleanPreferencesKey("video_platform_tiktok")
+        val VIDEO_PLATFORM_TWITCH = booleanPreferencesKey("video_platform_twitch")
+        val VIDEO_PLATFORM_META = booleanPreferencesKey("video_platform_meta")
+        val VIDEO_PLATFORM_KDRAMA = booleanPreferencesKey("video_platform_kdrama")
         val ADAPTIVE_LEARNING_JSON = stringPreferencesKey("adaptive_learning_json")
         val HEURISTIC_BLOCKING = booleanPreferencesKey("heuristic_blocking_enabled")
         val FILTER_LAST_MODIFIED = stringPreferencesKey("filter_last_modified_map_json")
@@ -299,7 +309,12 @@ class UserPreferencesRepository @Inject constructor(
             scheduledScanIntervalHours = (prefs[Keys.SCHEDULED_SCAN_HOURS] ?: 24).coerceIn(12, 168),
             privateDnsTileConfig = privateDnsTileConfig,
             usbDebuggingTileConfig = usbDebuggingTileConfig,
-            heuristicBlockingEnabled = heuristicBlockingEnabled
+            heuristicBlockingEnabled = heuristicBlockingEnabled,
+            videoPlatformYoutubeEnabled = videoPlatformYoutubeEnabled,
+            videoPlatformTiktokEnabled = videoPlatformTiktokEnabled,
+            videoPlatformTwitchEnabled = videoPlatformTwitchEnabled,
+            videoPlatformMetaEnabled = videoPlatformMetaEnabled,
+            videoPlatformKdramaEnabled = videoPlatformKdramaEnabled
         )
     }
 
@@ -621,6 +636,18 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setHeuristicBlockingEnabled(enabled: Boolean) {
         invalidateSettingsCache()
         context.adShieldDataStore.edit { it[Keys.HEURISTIC_BLOCKING] = enabled }
+    }
+    suspend fun setVideoPlatformEnabled(platform: String, enabled: Boolean) {
+        val key = when (platform) {
+            "youtube" -> Keys.VIDEO_PLATFORM_YOUTUBE
+            "tiktok" -> Keys.VIDEO_PLATFORM_TIKTOK
+            "twitch" -> Keys.VIDEO_PLATFORM_TWITCH
+            "meta" -> Keys.VIDEO_PLATFORM_META
+            "kdrama" -> Keys.VIDEO_PLATFORM_KDRAMA
+            else -> return
+        }
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[key] = enabled }
     }
     suspend fun saveFilterLastModified(mapJson: String) { context.adShieldDataStore.edit { it[Keys.FILTER_LAST_MODIFIED] = mapJson } }
     suspend fun loadFilterLastModified(): String? = context.adShieldDataStore.data.map { it[Keys.FILTER_LAST_MODIFIED] }.first()

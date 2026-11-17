@@ -24,7 +24,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class CnameIntelligenceEngine @Inject constructor(
-    private val filterEngine: FilterRuleEngine
+    private val filterEngine: FilterRuleEngine,
+    private val videoAdIntelligence: VideoAdIntelligence? = null
 ) {
 
     data class CnameRecord(
@@ -224,6 +225,16 @@ class CnameIntelligenceEngine @Inject constructor(
                     cloakedCategory = eval.matchedCategory
                     cloakedSource = eval.sourceName
                     break
+                }
+                // Video-ad infra CNAME uncloaking: first-party → video ad exchange/SDK
+                if (videoAdIntelligence != null) {
+                    val v = videoAdIntelligence.analyze(record.canonical)
+                    if (v.isVideoAdInfrastructure && v.shouldBlock) {
+                        isCloaked = true
+                        cloakedCategory = RuleCategory.ADS
+                        cloakedSource = "Video Ad CNAME Intelligence"
+                        break
+                    }
                 }
                 // Also check against known cloaked tracker set
                 val canonicalRegistrable = registrableDomain(record.canonical)

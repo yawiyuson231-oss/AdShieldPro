@@ -828,6 +828,12 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
+    fun setVideoPlatformEnabled(platform: String, enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setVideoPlatformEnabled(platform, enabled)
+            showFeedback("${platform.replaceFirstChar { it.uppercase() }} video ad infra ${if (enabled) "enabled" else "allowed (playback never blocked)"}")
+        }
+    }
     fun setHeuristicBlockingEnabled(enabled: Boolean) {
         viewModelScope.launch {
             preferencesRepository.setHeuristicBlockingEnabled(enabled)

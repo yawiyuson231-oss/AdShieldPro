@@ -955,6 +955,7 @@ private fun SettingsDestination(
         onSetTransportProtected = viewModel::setTransportProtected,
         protectionStatus = protectionStatus,
         onSetEmergencyAllowlistOnly = viewModel::setEmergencyAllowlistOnly,
+        onSetVideoPlatformEnabled = viewModel::setVideoPlatformEnabled,
         onSetHeuristicBlockingEnabled = viewModel::setHeuristicBlockingEnabled,
         infinityCacheStats = "Infinity cache: " + viewModel.infinityCacheStats(),
         performanceMetrics = viewModel.performanceSummary(),

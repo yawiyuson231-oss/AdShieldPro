@@ -73,9 +73,10 @@ object InfinityDnsModule {
     @Provides
     @Singleton
     fun provideCnameIntelligenceEngine(
-        filterEngine: FilterRuleEngine
+        filterEngine: FilterRuleEngine,
+        videoAdIntelligence: VideoAdIntelligence
     ): CnameIntelligenceEngine =
-        CnameIntelligenceEngine(filterEngine)
+        CnameIntelligenceEngine(filterEngine, videoAdIntelligence)
 
     @Provides @Singleton fun provideTfliteDomainClassifier(): TfliteDomainClassifier = TfliteDomainClassifier()
     @Provides @Singleton fun provideAdaptiveLearningEngine(): AdaptiveLearningEngine = AdaptiveLearningEngine()

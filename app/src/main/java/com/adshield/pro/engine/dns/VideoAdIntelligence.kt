@@ -419,6 +419,7 @@ class VideoAdIntelligence @Inject constructor() {
     /**
      * Get platform-specific ad domains that are safe to block.
      */
+    fun platformForDomain(domain: String): VideoPlatform? = detectPlatform(domain.lowercase())
     fun getPlatformAdDomains(platform: VideoPlatform): Set<String> {
         return when (platform) {
             VideoPlatform.YOUTUBE -> GOOGLE_VIDEO_ADS.filter { it.contains("doubleclick") || it.contains("2mdn") || it.contains("imasdk") }.toSet()

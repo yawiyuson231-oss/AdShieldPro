@@ -484,6 +484,24 @@ fun SettingsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Video Platforms — Ad Infra Toggles", style = MaterialTheme.typography.titleMedium)
+                    Text("One switch per platform. Off = that platform's video ad infra is allowed (playback is never broken — media domains like googlevideo.com stay protected even when on). Uses the same 222-domain intelligence + CNAME uncloaking, gated by these switches.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    PlatformToggleRow("YouTube pre-roll infra", "doubleclick.net / 2mdn.net / imasdk", settings.videoPlatformYoutubeEnabled, { onSetVideoPlatformEnabled("youtube", it) })
+                    PlatformToggleRow("TikTok analytics & ads", "byteoversea.com / analytics.tiktok.com", settings.videoPlatformTiktokEnabled, { onSetVideoPlatformEnabled("tiktok", it) })
+                    PlatformToggleRow("Twitch ads", "ads.twitch.tv / spade", settings.videoPlatformTwitchEnabled, { onSetVideoPlatformEnabled("twitch", it) })
+                    PlatformToggleRow("Meta sponsored", "an.facebook.com / ads.instagram", settings.videoPlatformMetaEnabled, { onSetVideoPlatformEnabled("meta", it) })
+                    PlatformToggleRow("K-drama VAST", "viki.com / kakao.com ads", settings.videoPlatformKdramaEnabled, { onSetVideoPlatformEnabled("kdrama", it) })
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Network & Emergency DNS Policies", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "These policies govern DNS queries only. Non-DNS traffic bypasses the local tunnel. Passthrough still uses the configured upstream resolver.",
@@ -944,5 +962,13 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun PlatformToggleRow(label: String, hint: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) { Text(label, style = MaterialTheme.typography.bodyLarge); Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
