@@ -52,6 +52,10 @@ class BrowserContentBlocker @Inject constructor(
         pageHost: String?,
         allowlistedSites: Set<String>
     ): InterceptionDecision {
+        if (shouldSpoofVideoSdk(requestUrl)) {
+            sessionBlockedSubresources.incrementAndGet()
+            return InterceptionDecision(true, "Video SDK spoof (IMA3/VAST) — overlay blocked, no CA", requestUrl)
+        }
         val uri = runCatching { URI(requestUrl) }.getOrNull()
             ?: return InterceptionDecision(false, "Malformed URI")
         val scheme = uri.scheme?.lowercase() ?: return InterceptionDecision(false, "No scheme")
@@ -137,6 +141,13 @@ class BrowserContentBlocker @Inject constructor(
     /**
      * Creates an empty, harmless WebResourceResponse to substitute for blocked ad/tracker requests.
      */
+    fun shouldSpoofVideoSdk(requestUrl: String): Boolean {
+        val lower = requestUrl.lowercase()
+        return lower.contains("imasdk.googleapis.com/js/sdkloader/ima3.js") ||
+            lower.contains("imasdk.googleapis.com/js/sdkloader/ima3_dai.js") ||
+            (lower.contains("doubleclick.net") && lower.contains("vast") && lower.contains(".xml"))
+    }
+
     fun createEmptyBlockedResponse(): WebResourceResponse {
         return WebResourceResponse(
             "text/plain",
@@ -149,6 +160,11 @@ class BrowserContentBlocker @Inject constructor(
             ),
             ByteArrayInputStream(ByteArray(0))
         )
+    }
+
+    fun createVideoSdkSpoofResponse(): WebResourceResponse {
+        val js = "window.google = window.google || {}; window.google.ima = { AdDisplayContainer: function(){}, AdsLoader: function(){ this.addEventListener=function(){}; this.requestAds=function(){}; }, settings: { setVpaidMode:function(){}} };"
+        return WebResourceResponse("application/javascript", "UTF-8", ByteArrayInputStream(js.toByteArray(Charsets.UTF_8)))
     }
 
     /**
@@ -191,6 +207,25 @@ class BrowserContentBlocker @Inject constructor(
                 }
                 applyStyle();
                 document.addEventListener('DOMContentLoaded', applyStyle);
+                // Video overlay + pre-roll skip — Privacy Browser only, never system-wide.
+                // Hides YT/TikTok/FB overlay slots and auto-skips skippable IMA3/VAST when the player exposes duration.
+                const videoOverlaySelectors = 'ytd-ad-slot-renderer,.ytp-ad-module,.video-ads,.ytp-ad-overlay-container,[data-ad-slot]';
+                const observer = new MutationObserver(() => {
+                    document.querySelectorAll(videoOverlaySelectors).forEach(el => {
+                        el.style.display = 'none';
+                        el.style.visibility = 'hidden';
+                    });
+                    document.querySelectorAll('video').forEach(v => {
+                        const adEl = v.closest('.ad-showing') || document.querySelector('.ad-showing video');
+                        const target = adEl || (v.duration && v.duration < 45 && document.querySelector('.ytp-ad-player-overlay') ? v : null);
+                        if (target && target.duration && isFinite(target.duration)) {
+                            try { target.currentTime = target.duration; target.muted = true; } catch(e) {}
+                            const skipBtn = document.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern');
+                            if (skipBtn) skipBtn.click();
+                        }
+                    });
+                });
+                try { observer.observe(document.documentElement, { childList: true, subtree: true }); } catch(e) {}
             })();
         """.trimIndent()
     }

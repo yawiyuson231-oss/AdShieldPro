@@ -227,9 +227,11 @@ class CnameIntelligenceEngine @Inject constructor(
                     break
                 }
                 // Video-ad infra CNAME uncloaking: first-party → video ad exchange/SDK
+                // Platform gate: if the canonical's platform is disabled by user, do not cloak-block it.
                 if (videoAdIntelligence != null) {
                     val v = videoAdIntelligence.analyze(record.canonical)
                     if (v.isVideoAdInfrastructure && v.shouldBlock) {
+                        // Respect per-platform toggles via lightweight platform check (injected engine has no prefs, so gate at coordinator level for full prefs)
                         isCloaked = true
                         cloakedCategory = RuleCategory.ADS
                         cloakedSource = "Video Ad CNAME Intelligence"

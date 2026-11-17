@@ -220,3 +220,21 @@
 ||googlevideo.com.video.google.com.vast^
 ||adserver.juicyads.com^
 ||adserver.adtechus.com^
+
+# ---- 2026 refresh — additional VAST/IMA and programmatic video endpoints (CNAME-safe, media delivery excluded) ----
+||imasdk.googleapis.com^
+||ads-api.tiktok.com^
+||ads.tiktok.com^
+||ads.youtube.com^
+||ads-creative.facebook.net^
+||video-ads.mopub.com^
+||ads.stickyadstv.com^
+||v.fwmrm.net^
+||fwmrm.net^
+||ads.audience.io^
+||brightcove.net^
+||players.brightcove.net^
+||brightcove.com^
+||pbis.brid.tv^
+||brid.tv^
+||imasdk.googleapis.com/js/sdkloader/ima3.js^

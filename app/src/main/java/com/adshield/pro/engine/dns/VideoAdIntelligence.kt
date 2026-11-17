@@ -117,12 +117,14 @@ class VideoAdIntelligence @Inject constructor() {
         val TIKTOK_AD_INFRA = setOf(
             "analytics.tiktok.com",
             "ads.tiktok.com",
+            "ads-api.tiktok.com",
             "business-api.tiktok.com",
             "log.byteoversea.com",
             "log.tiktokv.com",
             "mcs.tiktokv.com",
             "mon.musical.ly",
-            "impression.tiktok.com"
+            "impression.tiktok.com",
+            "ads-creative.facebook.net"
         )
 
         /** Facebook/Instagram ad infrastructure */
@@ -202,7 +204,12 @@ class VideoAdIntelligence @Inject constructor() {
             "ads.kakao.com",
             "ad.doubleclick.net",
             "dramacool.*",
-            "asianwiki.ads.*"
+            "asianwiki.ads.*",
+            // 2026 refresh
+            "players.brightcove.net",
+            "brightcove.net",
+            "brid.tv",
+            "pbis.brid.tv"
         )
 
         /** Video analytics & measurement (Nielsen, Comscore, etc.) */
