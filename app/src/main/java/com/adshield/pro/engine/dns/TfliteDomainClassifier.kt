@@ -45,9 +45,9 @@ class TfliteDomainClassifier @Inject constructor() {
     private val FALLBACK_WEIGHTS = floatArrayOf(
         0.31f, 0.42f, 0.28f, 0.55f, 0.33f, 0.71f, 0.64f, 0.38f, 0.60f, 0.82f, 0.47f, 0.44f, 0.58f
     )
-    private const val FALLBACK_BIAS = -1.85f
-    private const val THRESHOLD_AD = 0.68f
-    private const val THRESHOLD_MALWARE = 0.78f
+    private val FALLBACK_BIAS = -1.85f
+    private val THRESHOLD_AD = 0.68f
+    private val THRESHOLD_MALWARE = 0.78f
 
     /**
      * Model asset presence probe. Real TFLite path checks `assets/ml/domain_classifier.tflite`.
@@ -98,7 +98,7 @@ class TfliteDomainClassifier @Inject constructor() {
         val bias = loadedBias ?: FALLBACK_BIAS
         var logit = bias
         for (i in v.indices) logit += v[i] * weights[i]
-        val score = 1f / (1f + kotlin.math.exp(-logit).toFloat())
+        val score = 1f / (1f + kotlin.math.exp(-logit.toDouble()).toFloat())
         return toResult(score, usedTflite = false)
     }
 

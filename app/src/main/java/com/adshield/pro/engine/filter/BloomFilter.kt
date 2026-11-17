@@ -55,8 +55,8 @@ class BloomFilter private constructor(
             var h1 = 0L; var h2 = 0L
             for (i in 0 until 8) h1 = (h1 shl 8) or (md[i].toLong() and 0xFF)
             for (i in 8 until 16) h2 = (h2 shl 8) or (md[i].toLong() and 0xFF)
-            if (h1 == 0L) h1 = 0x9E3779B97F4A7C15L
-            if (h2 == 0L) h2 = 0xBF58476D1CE4E5B9L
+            if (h1 == 0L) h1 = 0x9E3779B97F4A7C15UL.toLong()
+            if (h2 == 0L) h2 = 0xBF58476D1CE4E5B9UL.toLong()
             return h1 to h2
         }
     }

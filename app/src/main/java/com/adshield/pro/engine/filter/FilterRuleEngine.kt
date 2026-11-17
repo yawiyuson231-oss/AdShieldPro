@@ -139,7 +139,7 @@ class FilterRuleEngine @Inject constructor() {
     ): FilterSnapshot {
         val previous = snapshotRef.get()
         val bf = bloom ?: if (subdomainRules.size + exactRules.size > 1000) {
-            runCatching { BloomFilter.fromDomains((subdomainRules.keys + exactRules.keys).asSequence().distinct()) }.getOrNull()
+            runCatching { BloomFilter.fromDomains((subdomainRules.keys + exactRules.keys).asSequence().distinct().asIterable()) }.getOrNull()
         } else null
         snapshotRef.set(
             previous.copy(

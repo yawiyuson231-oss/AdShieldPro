@@ -463,8 +463,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Infinity Diagnostics & Cache", style = MaterialTheme.typography.titleMedium)
                     if (protectionStatus != null) {
-                        val m = protectionStatus.dnsHealth
-                        Text("Provider health: " + (if (m.isEmpty()) "measuring…" else m.joinToString { it.providerId + " " + String.format("%.0f%%", it.successRate*100) }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Health score: ${protectionStatus.healthScore}/100 · ${protectionStatus.headline}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     infinityCacheStats?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = CyberCyan) }
                     performanceMetrics?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

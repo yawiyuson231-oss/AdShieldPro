@@ -396,17 +396,17 @@ class UpstreamDnsResolver @Inject constructor(
     private fun executeDoQQuery(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
         if (!isDoQAvailable()) {
             android.util.Log.w("InfinityDNS", "DoQ experimental — degrading to DoH for ${endpoint.displayName}")
-            return executeDohQuery(query, endpoint)
+            return queryDoh(query.rawPayload, endpoint.dohUrl)
         }
-        return executeDohQuery(query, endpoint)
+        return queryDoh(query.rawPayload, endpoint.dohUrl)
     }
     private fun isDoH3Available(): Boolean = false
     private fun executeDoH3Query(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
         if (!isDoH3Available()) {
             android.util.Log.w("InfinityDNS", "DoH3 experimental — degrading to DoH for ${endpoint.displayName}")
-            return executeDohQuery(query, endpoint)
+            return queryDoh(query.rawPayload, endpoint.dohUrl)
         }
-        return executeDohQuery(query, endpoint)
+        return queryDoh(query.rawPayload, endpoint.dohUrl)
     }
 
     /** MAX DNS wire enhancements: EDNS padding (RFC 8467), QNAME minimization note, ECS anonymization. */
