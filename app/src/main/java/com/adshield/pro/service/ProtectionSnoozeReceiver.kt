@@ -102,7 +102,8 @@ class ProtectionSnoozeReceiver : BroadcastReceiver() {
 
     private suspend fun refreshWidgetWithFollowUp(appCtx: Context) {
         AdShieldWidgetProvider.updateInstalledWidgetsNow(appCtx, repository, preferencesRepository)
-        delay(500L)
+        runCatching { AdShieldTileService.requestSync(appCtx) }
+        delay(350L)
         AdShieldWidgetProvider.updateInstalledWidgetsNow(appCtx, repository, preferencesRepository)
     }
 

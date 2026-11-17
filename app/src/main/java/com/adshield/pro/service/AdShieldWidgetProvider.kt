@@ -18,6 +18,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -101,20 +102,22 @@ class AdShieldWidgetProvider : AppWidgetProvider() {
             repository: AdShieldRepository,
             preferencesRepository: UserPreferencesRepository
         ) {
-            val settings = runCatching { preferencesRepository.getSettingsSnapshot() }.getOrNull()
             val runtime = repository.vpnRuntimeState.value
-            val totals = runCatching { repository.getAllTimeTotalsNow() }.getOrDefault(0L to 0L)
+            val settings = preferencesRepository.getSettingsSnapshot()
+            val allTimeBlocked = runCatching { repository.allTimeBlockedQueriesFlow.first() }.getOrDefault(0L)
+            val allTimeTotal = runCatching { repository.allTimeTotalQueriesFlow.first() }.getOrDefault(0L)
 
             val presentation = ProtectionSnoozeEngine.presentWidget(
                 vpnStatus = runtime.status,
-                vpnShouldRemainActive = settings?.vpnShouldRemainActive ?: false,
-                snoozeUntilEpochMs = settings?.vpnSnoozeUntilEpochMs ?: 0L,
+                vpnShouldRemainActive = settings.vpnShouldRemainActive,
+                snoozeUntilEpochMs = settings.vpnSnoozeUntilEpochMs,
                 sessionBlocked = runtime.sessionBlockedQueries,
                 sessionTotal = runtime.sessionTotalQueries,
-                allTimeBlocked = totals.first,
-                allTimeTotal = totals.second,
-                modeTitle = settings?.protectionMode?.title ?: "Standard Mode",
-                protocolName = settings?.resolverConfig?.protocol?.name ?: "DOH"
+                allTimeBlocked = allTimeBlocked,
+                allTimeTotal = allTimeTotal,
+                modeTitle = settings.protectionMode.title,
+                protocolName = settings.resolverConfig.protocol.name,
+                nowEpochMs = System.currentTimeMillis()
             )
 
             val openAppPending = PendingIntent.getActivity(
@@ -126,54 +129,35 @@ class AdShieldWidgetProvider : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val (badgeBg, badgeColor) = when (presentation.statusTone) {
+                StatusTone.ACTIVE -> R.drawable.bg_widget_pill_active to 0xFF34D399.toInt()
+                StatusTone.PAUSED -> R.drawable.bg_widget_pill_paused to 0xFFFBBF24.toInt()
+                StatusTone.ALERT -> R.drawable.bg_widget_pill_paused to 0xFFF87171.toInt()
+                StatusTone.INACTIVE -> R.drawable.bg_widget_pill_inactive to 0xFF94A3B8.toInt()
+            }
+            val primaryBg = if (presentation.primaryAction == WidgetAction.STOP_VPN) {
+                R.drawable.bg_widget_btn_danger
+            } else {
+                R.drawable.bg_widget_btn_primary
+            }
+
             for (id in appWidgetIds) {
                 val views = RemoteViews(context.packageName, R.layout.widget_adshield)
-                views.setTextViewText(R.id.widget_status_pill, presentation.statusBadge)
-                views.setInt(
-                    R.id.widget_status_pill,
-                    "setBackgroundResource",
-                    when (presentation.statusTone) {
-                        StatusTone.ACTIVE -> R.drawable.bg_widget_pill_active
-                        StatusTone.PAUSED -> R.drawable.bg_widget_pill_paused
-                        StatusTone.INACTIVE -> R.drawable.bg_widget_pill_inactive
-                    }
-                )
-                views.setTextColor(
-                    R.id.widget_status_pill,
-                    when (presentation.statusTone) {
-                        StatusTone.ACTIVE -> 0xFF10B981.toInt()
-                        StatusTone.PAUSED -> 0xFFF59E0B.toInt()
-                        StatusTone.INACTIVE -> 0xFF94A3B8.toInt()
-                    }
-                )
+                views.setTextViewText(R.id.widget_status_badge, presentation.statusBadge)
+                views.setTextColor(R.id.widget_status_badge, badgeColor)
+                views.setInt(R.id.widget_status_badge, "setBackgroundResource", badgeBg)
                 views.setTextViewText(R.id.widget_subtitle, presentation.subtitle)
                 views.setTextViewText(R.id.widget_blocked_count, presentation.blockedCountLabel)
                 views.setTextViewText(R.id.widget_rate_label, presentation.totalAndRateLabel)
 
-                views.setTextViewText(R.id.widget_btn_primary, presentation.primaryButtonLabel)
-                views.setInt(
-                    R.id.widget_btn_primary,
-                    "setBackgroundResource",
-                    if (presentation.primaryAction == WidgetAction.STOP_VPN) {
-                        R.drawable.bg_widget_btn_danger
-                    } else {
-                        R.drawable.bg_widget_btn_primary
-                    }
-                )
-                views.setTextColor(
-                    R.id.widget_btn_primary,
-                    if (presentation.primaryAction == WidgetAction.STOP_VPN) {
-                        0xFFF87171.toInt()
-                    } else {
-                        0xFF061523.toInt()
-                    }
-                )
+                views.setTextViewText(R.id.widget_btn_primary, presentation.primaryActionLabel)
+                views.setInt(R.id.widget_btn_primary, "setBackgroundResource", primaryBg)
                 views.setOnClickPendingIntent(
                     R.id.widget_btn_primary,
                     pendingForAction(context, presentation.primaryAction, openAppPending)
                 )
 
-                views.setTextViewText(R.id.widget_btn_secondary, presentation.secondaryButtonLabel)
+                views.setTextViewText(R.id.widget_btn_secondary, presentation.secondaryActionLabel)
                 views.setOnClickPendingIntent(
                     R.id.widget_btn_secondary,
                     pendingForAction(context, presentation.secondaryAction, openAppPending)
