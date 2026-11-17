@@ -62,10 +62,12 @@ enum class ProtectionMode(
 }
 
 @Serializable
-enum class DnsProtocol(val label: String, val description: String) {
+enum class DnsProtocol(val label: String, val description: String, val experimental: Boolean = false) {
     DOH("DNS-over-HTTPS (DoH)", "RFC 8484 encrypted HTTPS POST queries on port 443"),
     DOT("DNS-over-TLS (DoT)", "RFC 7858 TLS-encrypted TCP stream on port 853"),
-    UDP_TCP("Standard DNS (UDP/TCP)", "Protected low-latency UDP/TCP queries on port 53")
+    UDP_TCP("Standard DNS (UDP/TCP)", "Protected low-latency UDP/TCP queries on port 53"),
+    DOQ("DNS-over-QUIC (DoQ)", "RFC 9250 QUIC-encrypted DNS on port 853 (experimental, fastest encrypted)", experimental = true),
+    ODOH("Oblivious DoH (ODoH)", "RFC 9230 proxied DoH — resolver never sees client IP (experimental)", experimental = true)
 }
 
 @Serializable

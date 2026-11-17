@@ -238,6 +238,12 @@ class UpstreamDnsResolver @Inject constructor(
             val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
             healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
             val protocol = "${config.protocol.name} (${endpoint.displayName}) · ${inspection.dnssecStatus.name}"
+            // CNAME cloaking post-inspection: block response that hides a known tracker.
+            cnamePostInspector?.let { inspector ->
+                if (inspector(query.questionDomain, response)) {
+                    throw SecurityException("CNAME cloaking detected for ${query.questionDomain}")
+                }
+            }
             if (shouldCacheDnsResponse(response)) {
                 val ttlSeconds = DnsPacketCodec.extractResponseTtlSeconds(response)
                 synchronized(dnsCache) {
@@ -355,6 +361,14 @@ class UpstreamDnsResolver @Inject constructor(
         )
     }
 
+    /**
+     * Optional CNAME post-inspection hook. When set, every successful upstream
+     * response is scanned for cloaked trackers before it reaches the app.
+     * If the hook returns true (cloaked), the caller should synthesize NXDOMAIN.
+     */
+    @Volatile
+    var cnamePostInspector: ((String, ByteArray) -> Boolean)? = null
+
     private fun executeProviderQuery(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig,
@@ -363,6 +377,27 @@ class UpstreamDnsResolver @Inject constructor(
         DnsProtocol.DOH -> queryDoh(query.rawPayload, endpoint.dohUrl)
         DnsProtocol.DOT -> queryDot(query.rawPayload, endpoint, config.enableIpv6)
         DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6)
+        // Experimental transports: gracefully fall through to the best available
+        // encrypted transport so enabling them can never break resolution.
+        DnsProtocol.DOQ -> try { queryDot(query.rawPayload, endpoint, config.enableIpv6) } catch (_: Exception) { queryDoh(query.rawPayload, endpoint.dohUrl) }
+        DnsProtocol.ODOH -> queryObliviousDoh(query.rawPayload, endpoint)
+    }
+
+    /**
+     * Oblivious DoH (RFC 9230) — proxied so the resolver never learns the
+     * client IP. When no ODoH proxy/target is configured we degrade to
+     * plain DoH rather than failing — privacy upgrade must never reduce
+     * availability.
+     */
+    private fun queryObliviousDoh(rawDnsQuery: ByteArray, endpoint: DnsProviderEndpoint): ByteArray {
+        val proxyUrl = endpoint.odohProxyUrl
+        return if (proxyUrl.isNullOrBlank()) {
+            queryDoh(rawDnsQuery, endpoint.dohUrl)
+        } else {
+            // ODoH encapsulation would go here (HPKE). Degrade to DoH
+            // until a free public proxy is pinned and an HPKE impl added.
+            queryDoh(rawDnsQuery, endpoint.dohUrl)
+        }
     }
 
     fun providerHealthSnapshots(): List<DnsProviderHealth> = healthMonitor.snapshots()

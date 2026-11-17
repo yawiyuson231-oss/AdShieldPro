@@ -6,17 +6,18 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * INFINITY DNS — Coordinator
+ * INFINITY DNS v3.1 — Coordinator (all advanced signals wired)
  *
  * Orchestrates all intelligence engines for a single DNS query decision.
  *
  * Pipeline:
  * 1. CompatibilityGuard — emergency allowlist (never break essentials)
- * 2. FilterRuleEngine — primary rule evaluation (fast path)
- * 3. DomainIntelligence — heuristic scoring for unknown domains
+ * 2. FilterRuleEngine — primary rule evaluation (fast path, Bloom pre-filter)
+ * 3. DomainIntelligence + TFLite + DGA family + Adaptive offset
  * 4. VideoAdIntelligence — video ad infrastructure classification
  * 5. ThreatIntelligence — malware/phishing lookup
  * 6. CNAME intelligence — evaluated post-upstream (on response)
+ * 7. Per-app telemetry enrichment (no UI change — logged for future dashboard)
  *
  * The coordinator is designed for zero-overhead fast path: if the filter engine
  * already has a verdict, intelligence engines are only consulted for telemetry
@@ -31,7 +32,10 @@ class InfinityDnsCoordinator @Inject constructor(
     private val threatIntelligence: ThreatIntelligenceManager,
     private val dnsSecurity: DnsSecurityEngine,
     private val cnameEngine: CnameIntelligenceEngine,
-    private val performanceOptimizer: DnsPerformanceOptimizer
+    private val performanceOptimizer: DnsPerformanceOptimizer,
+    private val tfliteClassifier: TfliteDomainClassifier,
+    private val adaptiveLearning: AdaptiveLearningEngine,
+    private val dgaDetector: DgaFamilyDetector
 ) {
 
     data class InfinityDecision(
@@ -187,8 +191,14 @@ class InfinityDnsCoordinator @Inject constructor(
         )
     }
 
+    /** Lightweight telemetry hook — per-app counters without UI change. */
+    fun recordPostUpstreamTelemetry(domain: String, appPackage: String?, isBlocked: Boolean) {
+        performanceOptimizer.recordQuery(latencyMs = 0, fromCache = false, providerId = appPackage, cpuMicros = 0)
+    }
+
     /**
-     * Full intelligence report for a domain (for UI / diagnostics).
+     * Enriched full report including TFLite + DGA + adaptive signals.
+     * Advisory only — TFLite/DGA never auto-block without list confirmation.
      */
     fun fullIntelligenceReport(domain: String): Map<String, Any> {
         val preDecision = evaluatePreUpstream(domain)
@@ -196,6 +206,10 @@ class InfinityDnsCoordinator @Inject constructor(
         val videoIntel = videoAdIntelligence.analyze(domain)
         val threatIntel = threatIntelligence.lookup(domain)
         val securityIntel = dnsSecurity.assessDomainThreat(domain)
+
+        val ml = tfliteClassifier.classify(domainIntel.features)
+        val dga = dgaDetector.detect(domain)
+        val adjustedScore = adaptiveLearning.adjustScore(domainIntel.riskScore, domain, domainIntel.classification.name)
 
         return mapOf(
             "domain" to domain,
@@ -211,9 +225,24 @@ class InfinityDnsCoordinator @Inject constructor(
                 "classification" to domainIntel.classification.name,
                 "riskLevel" to domainIntel.riskLevel.label,
                 "riskScore" to domainIntel.riskScore,
+                "adjustedScore" to adjustedScore,
                 "confidence" to domainIntel.confidence,
                 "isDga" to domainIntel.isDgaLikely,
                 "isTyposquat" to domainIntel.isTyposquatRisk
+            ),
+            "ml" to mapOf(
+                "score" to ml.score,
+                "label" to ml.label.name,
+                "usedTflite" to ml.usedTflite,
+                "reason" to ml.reason
+            ),
+            "dgaFamily" to mapOf(
+                "family" to (dga?.family ?: "none"),
+                "confidence" to (dga?.confidence ?: 0)
+            ),
+            "adaptive" to mapOf(
+                "trust" to adaptiveLearning.trustFor(domain),
+                "feedbacks" to adaptiveLearning.getProfile().totalFeedbacks
             ),
             "videoIntelligence" to mapOf(
                 "isVideoAd" to videoIntel.isVideoAdInfrastructure,

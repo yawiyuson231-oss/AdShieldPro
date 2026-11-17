@@ -1,12 +1,15 @@
 package com.adshield.pro.di
 
+import com.adshield.pro.engine.dns.AdaptiveLearningEngine
 import com.adshield.pro.engine.dns.CnameIntelligenceEngine
 import com.adshield.pro.engine.dns.CompatibilityGuard
+import com.adshield.pro.engine.dns.DgaFamilyDetector
 import com.adshield.pro.engine.dns.DnsPerformanceOptimizer
 import com.adshield.pro.engine.dns.DnsSecurityEngine
 import com.adshield.pro.engine.dns.DomainIntelligenceEngine
 import com.adshield.pro.engine.dns.InfinityDnsCache
 import com.adshield.pro.engine.dns.ThreatIntelligenceManager
+import com.adshield.pro.engine.dns.TfliteDomainClassifier
 import com.adshield.pro.engine.dns.VideoAdIntelligence
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import dagger.Module
@@ -72,4 +75,8 @@ object InfinityDnsModule {
         filterEngine: FilterRuleEngine
     ): CnameIntelligenceEngine =
         CnameIntelligenceEngine(filterEngine)
+
+    @Provides @Singleton fun provideTfliteDomainClassifier(): TfliteDomainClassifier = TfliteDomainClassifier()
+    @Provides @Singleton fun provideAdaptiveLearningEngine(): AdaptiveLearningEngine = AdaptiveLearningEngine()
+    @Provides @Singleton fun provideDgaFamilyDetector(): DgaFamilyDetector = DgaFamilyDetector()
 }

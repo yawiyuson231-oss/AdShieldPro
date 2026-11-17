@@ -12,7 +12,11 @@ data class DnsProviderEndpoint(
     val dotHostname: String,
     val dotPort: Int,
     val ipv4Addresses: List<String>,
-    val ipv6Addresses: List<String>
+    val ipv6Addresses: List<String>,
+    /** Oblivious DoH proxy URL (RFC 9230). Null = no proxy — degrade to plain DoH. */
+    val odohProxyUrl: String? = null,
+    /** QUIC port for DoQ (RFC 9250). Defaults to 853 same as DoT. */
+    val quicPort: Int = 853
 )
 
 /**

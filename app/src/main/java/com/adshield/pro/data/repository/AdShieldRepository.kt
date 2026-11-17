@@ -688,12 +688,31 @@ class AdShieldRepository @Inject constructor(
                     if (!source.url.startsWith("https://", ignoreCase = true)) {
                         throw SecurityException("Insecure non-HTTPS URL rejected")
                     }
-                    val req = Request.Builder()
+                    val builder = Request.Builder()
                         .url(source.url)
                         .header("User-Agent", "AdShieldPro/2.0 (Android; DNS-Filter-Updater)")
-                        .build()
+                    // Incremental update: send stored ETag so server can reply 304 Not Modified
+                    if (source.etagOrHash.isNotBlank() && source.etagOrHash.length >= 8) {
+                        // etagOrHash stores either ETag header or content hash; try as ETag first
+                        val etag = if (source.etagOrHash.startsWith("\"") || source.etagOrHash.startsWith("W/")) {
+                            source.etagOrHash
+                        } else null
+                        if (etag != null) builder.header("If-None-Match", etag)
+                    }
+                    val req = builder.build()
 
                     filterDownloadClient.newCall(req).execute().use { resp ->
+                        if (resp.code == 304) {
+                            // Not modified — keep cached rules, just refresh timestamp
+                            dao.upsertFilterSource(
+                                source.copy(
+                                    lastUpdatedEpochMs = now,
+                                    lastStatusMessage = "Up to date (${source.ruleCount} rules, 304 Not Modified)"
+                                )
+                            )
+                            updatedSourcesCount++
+                            return@use
+                        }
                         if (!resp.isSuccessful) {
                             throw IllegalStateException("HTTP ${resp.code}")
                         }
@@ -718,7 +737,8 @@ class AdShieldRepository @Inject constructor(
                         tempFile.copyTo(cacheFile, overwrite = true)
                         tempFile.delete()
 
-                        val hash = sha256Hex(bodyStr).take(16)
+                        val etagHeader = resp.header("ETag")?.takeIf { it.isNotBlank() }
+                        val hash = etagHeader ?: sha256Hex(bodyStr).take(16)
                         dao.upsertFilterSource(
                             source.copy(
                                 ruleCount = parsed.totalValidRules,
