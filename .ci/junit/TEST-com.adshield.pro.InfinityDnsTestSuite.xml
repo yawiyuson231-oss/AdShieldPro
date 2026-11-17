@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.InfinityDnsTestSuite" tests="70" skipped="0" failures="2" errors="0" timestamp="2026-11-17T12:54:03.951Z" hostname="runnervmccnms" time="0.058">
+  <properties/>
+  <testcase name="domainIntel_levenshtein" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="security_dnssecAssessment" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="cname_doesNotBlockLegitimateCdn" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.004"/>
+  <testcase name="integration_fullPipeline_videoAdBlockedMediaAllowed" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.003"/>
+  <testcase name="cache_memoryBounded" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.002"/>
+  <testcase name="codec_extractCnameNoCname" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="cache_lruEviction" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="compat_protectedDomainsNotBlocked" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cache_expiration" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cache_negativeCaching" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_emergencyAllowlist" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="security_responseAnomalyDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="threatIntel_cleanDomainNotThreat" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="domainIntel_highRiskTld" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.005"/>
+  <testcase name="cache_basicPutAndGet" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="domainIntel_shouldBlockLogic" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="cname_parsesSimpleRecord" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="codec_extractCnameTargets" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="threatIntel_parseHostsLine" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="threatIntel_stats" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="cname_thirdPartyDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="threatIntel_subdomainInheritance" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="codec_extractAllTtls" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_bankingProtection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="domainIntel_punycodeDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="domainIntel_typosquat" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="perf_recordAndMetrics" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.004">
+    <failure message="java.lang.AssertionError: expected:&lt;3&gt; but was:&lt;2&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;3&gt; but was:&lt;2&gt;
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:647)
+	at org.junit.Assert.assertEquals(Assert.java:633)
+	at com.adshield.pro.InfinityDnsTestSuite.perf_recordAndMetrics(InfinityDnsTestSuite.kt:651)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.runRequest(JUnitTestExecutor.java:174)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:84)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:47)
+	at org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestDefinitionProcessor.processTestDefinition(AbstractJUnitTestDefinitionProcessor.java:65)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.processTestDefinition(SuiteTestDefinitionProcessor.java:53)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.processTestDefinition(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:178)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+</failure>
+  </testcase>
+  <testcase name="integration_performanceWithCache" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001">
+    <failure message="java.lang.AssertionError: expected:&lt;2&gt; but was:&lt;1&gt;" type="java.lang.AssertionError">java.lang.AssertionError: expected:&lt;2&gt; but was:&lt;1&gt;
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at com.adshield.pro.InfinityDnsTestSuite.integration_performanceWithCache(InfinityDnsTestSuite.kt:857)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:115)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.runRequest(JUnitTestExecutor.java:174)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:84)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestExecutor.accept(JUnitTestExecutor.java:47)
+	at org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestDefinitionProcessor.processTestDefinition(AbstractJUnitTestDefinitionProcessor.java:65)
+	at org.gradle.api.internal.tasks.testing.SuiteTestDefinitionProcessor.processTestDefinition(SuiteTestDefinitionProcessor.java:53)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.internal.dispatch.MethodInvocation.invokeOn(MethodInvocation.java:77)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:28)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:19)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:88)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.processTestDefinition(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:178)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:126)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:122)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:72)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+</failure>
+  </testcase>
+  <testcase name="perf_batteryOptimization" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="videoAd_programmaticExchange" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.011"/>
+  <testcase name="domainIntel_dgaLikely" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.002"/>
+  <testcase name="videoAd_protectedMediaNotBlocked" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="videoAd_unknownDomainNotBlocked" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cname_detectsCloaking" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="videoAd_tiktokTracking" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="videoAd_batchAnalysis" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="codec_detectSuspiciousResponse" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="videoAd_twitchAds" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cname_suspiciousChainDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="perf_networkTransitionAdvice" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="perf_percentileCalculation" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="codec_normalResponseNotSuspicious" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cname_registrableDomain" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_validateBlockRule" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="security_phishingDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.002"/>
+  <testcase name="compat_streamingProtection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_categoryFiltering" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="security_cleanDomainNotThreat" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_messagingProtection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="domainIntel_cleanDomain" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="domainIntel_adInfrastructure" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="security_hijackDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="codec_malformedReturnsNull" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="security_dnsLeakDetection" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="domainIntel_entropyCalculation" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="integration_infinityVideoAdsLoaded" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cache_metrics" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="videoAd_mobileSdk" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="videoAd_googleInfrastructure" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="compat_nonProtectedNotFlagged" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cache_evictExpired" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cname_chainAnalysis" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="perf_reset" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="threatIntel_directLookup" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="integration_threatIntelListLoaded" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="cache_staleWhileRevalidate" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="perf_recommendations" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="domainIntel_longDomain" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.001"/>
+  <testcase name="integration_domainIntelDoesNotBlockClean" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <testcase name="perf_cacheHitRate" classname="com.adshield.pro.InfinityDnsTestSuite" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

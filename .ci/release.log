@@ -14,8 +14,8 @@ TDLib native runtime: 12 checksum-verified libraries present
 Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libcryptox.so, libdatastore_shared_counter.so, libsslx.so, libtdjni.so. Run with --info option to learn more.
 
 > Task :app:mergeReleaseArtProfile
-> Task :app:extractReleaseNativeSymbolTables
 > Task :app:generateReleaseBuildConfig
+> Task :app:extractReleaseNativeSymbolTables
 > Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
 > Task :app:generateReleaseResources FROM-CACHE
 > Task :app:packageReleaseResources
@@ -35,8 +35,8 @@ Unable to strip the following libraries, packaging them as they are: libandroidx
 > Task :app:generateReleaseAssets UP-TO-DATE
 > Task :app:mergeReleaseAssets
 > Task :app:processReleaseManifestForPackage
-> Task :app:extractReleaseVersionControlInfo
 > Task :app:mergeReleaseResources
+> Task :app:extractReleaseVersionControlInfo
 > Task :app:collectReleaseDependencies
 > Task :app:sdkReleaseDependencyData
 > Task :app:validateSigningRelease
@@ -131,6 +131,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 6m 1s
+BUILD SUCCESSFUL in 5m 43s
 58 actionable tasks: 52 executed, 6 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
