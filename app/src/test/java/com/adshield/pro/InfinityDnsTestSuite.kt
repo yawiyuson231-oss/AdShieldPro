@@ -649,7 +649,8 @@ class InfinityDnsTestSuite {
         optimizer.recordQuery(0, true, null) // cache hit
         val metrics = optimizer.getMetrics()
         assertEquals(3, metrics.queriesPerSecond.let { optimizer.getMetrics().providerLatencies.size.let { 2 } }) // provider count
-        assertEquals(75.0, optimizer.getMetrics().providerLatencies["cloudflare"]?.let { 75.0 } ?: 0.0, delta = 0.1)
+        val latency = optimizer.getMetrics().providerLatencies["cloudflare"]?.let { 75.0 } ?: 0.0
+        assertEquals(75.0, latency, 0.1)
     }
 
     @Test
