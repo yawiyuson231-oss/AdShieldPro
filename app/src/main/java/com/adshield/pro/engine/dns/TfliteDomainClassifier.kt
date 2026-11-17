@@ -103,14 +103,14 @@ class TfliteDomainClassifier @Inject constructor() {
     }
 
     private fun vectorize(f: DomainIntelligenceEngine.DomainFeatures): FloatArray = floatArrayOf(
-        (f.length / 100f).coerceIn(0f, 1f),
-        (f.labelCount / 8f).coerceIn(0f, 1f),
-        (f.maxLabelLength / 63f).coerceIn(0f, 1f),
-        (f.hyphenCount / 6f).coerceIn(0f, 1f),
+        (f.length.toFloat() / 100f).coerceIn(0f, 1f),
+        (f.labelCount.toFloat() / 8f).coerceIn(0f, 1f),
+        (f.maxLabelLength.toFloat() / 63f).coerceIn(0f, 1f),
+        (f.hyphenCount.toFloat() / 6f).coerceIn(0f, 1f),
         if (f.length > 0) f.digitCount.toFloat() / f.length.toFloat() else 0f,
         (f.entropy.toFloat() / 5f).coerceIn(0f, 1f),
-        (f.tldRisk / 3f).coerceIn(0f, 1f),
-        (f.subdomainDepth / 5f).coerceIn(0f, 1f),
+        (f.tldRisk.toFloat() / 3f).coerceIn(0f, 1f),
+        (f.subdomainDepth.toFloat() / 5f).coerceIn(0f, 1f),
         if (f.hasConsecutiveHyphens) 1f else 0f,
         if (f.isPunycode) 1f else 0f,
         if (f.hasHexPattern) 1f else 0f,
