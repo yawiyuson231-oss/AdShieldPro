@@ -83,6 +83,9 @@ import com.adshield.pro.domain.model.SystemTilesLiveStatus
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
 import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.engine.platform.SystemTileEngine
+import android.appwidget.AppWidgetManager
+import com.adshield.pro.service.AdShieldTileService
+import com.adshield.pro.service.AdShieldWidgetProvider
 import com.adshield.pro.service.PrivateDnsTileService
 import com.adshield.pro.service.UsbDebuggingTileService
 import com.adshield.pro.ui.components.StatusPill
@@ -211,6 +214,85 @@ fun QuickSettingsTilesScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // 0. AdShield VPN Shield Tile & Live Home-Screen Widget (zero ADB/root required)
+            item(key = "adshield-shield-tile-widget-card", contentType = "shield-tile") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "AdShield VPN Tile & Home Widget",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            StatusPill(text = "No ADB Needed", color = EmeraldPrimary)
+                        }
+                        Text(
+                            text = "Toggle local DNS protection in one tap from Android Quick Settings, or pin the resizable AdShield home-screen widget with live blocked counts and a 15-minute auto-resume pause.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                Button(
+                                    onClick = {
+                                        requestAddSystemTile(
+                                            context = context,
+                                            serviceClass = AdShieldTileService::class.java,
+                                            labelRes = R.string.tile_adshield_label,
+                                            iconRes = R.drawable.ic_tile_adshield,
+                                            onMessage = onFeedback
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Add Shield Tile", maxLines = 1)
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val mgr = AppWidgetManager.getInstance(context)
+                                    val provider = ComponentName(context, AdShieldWidgetProvider::class.java)
+                                    val pinned = if (mgr.isRequestPinAppWidgetSupported) {
+                                        runCatching { mgr.requestPinAppWidget(provider, null, null) }.getOrDefault(false)
+                                    } else {
+                                        false
+                                    }
+                                    onFeedback(
+                                        if (pinned) {
+                                            "Confirm the system prompt to place the AdShield widget on your Home Screen."
+                                        } else {
+                                            "Long-press your Home Screen → Widgets → AdShield Pro to add the live widget."
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Pin Widget", maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+
             // 1. Quick Setup Permission & Add Tiles Card
             item(key = "setup-card", contentType = "setup") {
                 val showFullSetup = !status.hasWriteSecureSettingsPermission || showSetupDetailsWhenReady

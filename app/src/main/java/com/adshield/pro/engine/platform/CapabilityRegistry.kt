@@ -992,6 +992,54 @@ object CapabilityRegistry {
             listOf("Digitraffic coastal AIS and NOAA NDBC buoys are supported; commercial global AIS requires external WebSocket/API licensing"),
             listOf("Global satellite AIS requires a licensed backend or user AISStream WebSocket proxy; live real-time satellite video of arbitrary Earth locations does not publicly exist"),
             "n/a — commercial backend / physical sensor restriction"
+        ),
+        cap(
+            "dns-cname-uncloaking", "CNAME-cloaking answer-chain tracker shield",
+            CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/CnameCloakingInspector.kt", listOf(PERM_VPN, PERM_INTERNET),
+            listOf("RFC 1035 TYPE 5 CNAME resource records parsed from upstream DNS Answer sections and evaluated against FilterRuleEngine"),
+            listOf("Requires one upstream resolution before inspecting the returned alias chain; honours user allowlists and exempts DnsMediaPlaybackGuard playback domains"),
+            "FeatureExpansion211TestSuite.testCnameExtractionHandlesCompressedChainsAndRejectsMalformedWire and FeatureExpansion211TestSuite.testCnameCloakingBlocksTrackerAliasesWhileRespectingAllowlistAndMediaSafety"
+        ),
+        cap(
+            "dns-resolver-benchmark", "Concurrent multi-provider DoH/DoT/UDP resolver latency benchmark",
+            CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResolverBenchmark.kt", listOf(PERM_INTERNET),
+            listOf("Uncached EDNS0+DO DNS A queries sent directly to each preset resolver endpoint over the active protocol"),
+            listOf("Reflects point-in-time round-trip latency from the current network; encrypted probes never fall back to plaintext"),
+            "FeatureExpansion211TestSuite.testDnsResolverBenchmarkRanksLiveProbesAndHandlesFailures"
+        ),
+        cap(
+            "per-app-firewall-manager", "Dedicated Per-App Firewall & Split-Tunnel Manager with live traffic badges",
+            CapabilityArea.DNS_PROTECTION,
+            CapabilityStatus.IMPLEMENTED, "ui/screens/AppFirewallScreen.kt", listOf(PERM_VPN, "android.permission.QUERY_ALL_PACKAGES"),
+            listOf("PackageManager installed apps, VpnService.Builder.addDisallowedApplication, DnsFirewallPolicy appPolicies, and live UID-attributed DNS counters"),
+            listOf("Split-tunnel removes an app from the VPN completely; DNS modes (Filtered, Allow DNS, Block DNS) govern DNS lookups only and do not block direct raw-IP sockets"),
+            "FeatureExpansion211TestSuite.testAppFirewallSummaryAndFilteringModes"
+        ),
+        cap(
+            "qs-tile-vpn-shield-and-snooze", "One-tap AdShield VPN Quick Settings tile & auto-resume timed pause",
+            CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "service/AdShieldTileService.kt", listOf(PERM_VPN, "android.permission.BIND_QUICK_SETTINGS_TILE"),
+            listOf("VpnService consent state, live VpnRuntimeState, DataStore snooze deadline, and AlarmManager.setAndAllowWhileIdle triggers"),
+            listOf("First activation requires standard Android VPN consent dialog; Doze may defer inexact wake-ups briefly when screen is off, supplemented by opportunistic resume on the next DNS packet"),
+            "FeatureExpansion211TestSuite.testProtectionSnoozeLifecycleAndTilePresentation"
+        ),
+        cap(
+            "home-widget-shield", "Resizable Home-Screen live protection & quick-snooze widget",
+            CapabilityArea.PLATFORM,
+            CapabilityStatus.IMPLEMENTED, "service/AdShieldWidgetProvider.kt", listOf(PERM_VPN),
+            listOf("Live VpnRuntimeState session counters, Room daily_stats totals, and DataStore mode/protocol/snooze state rendered via RemoteViews"),
+            listOf("Counter broadcasts during active traffic are throttled to protect battery; launcher pin requests fall back to manual widget-picker instructions when unsupported"),
+            "FeatureExpansion211TestSuite.testHomeWidgetPresentationAcrossStates"
+        ),
+        cap(
+            "share-sheet-link-sanitizer", "Android Share-Sheet & in-app Link Cleaner with redirect peeling and threat check",
+            CapabilityArea.PRIVACY_BROWSER,
+            CapabilityStatus.IMPLEMENTED, "engine/browser/LinkSanitizer.kt", emptyList(),
+            listOf("Plain-text ACTION_SEND intents, clipboard/pasted URLs, static redirect-wrapper rules, host-aware tracker parameter tables, and local UrlThreatScanner"),
+            listOf("Peels URL-embedded redirect wrappers offline without making HTTP requests to opaque shorteners (bit.ly/t.co) so the target server is never pinged before user consent"),
+            "FeatureExpansion211TestSuite.testLinkSanitizerStripsTrackersUnwrapsRedirectsAndPreservesFunctionalParams and FeatureExpansion211TestSuite.testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes"
         )
     )
 

@@ -48,6 +48,12 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Share-Sheet Link Cleaner & Instant Threat Check -->
+            <intent-filter android:label="@string/share_clean_link_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -82,6 +88,21 @@
                 android:value="local_dns_ad_and_tracker_filtering_vpn" />
         </service>
 
+        <!-- One-tap AdShield VPN Shield Quick Settings Tile (no ADB required) -->
+        <service
+            android:name=".service.AdShieldTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_adshield"
+            android:label="@string/tile_adshield_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="true" />
+        </service>
+
         <!-- Quick Settings Tiles for System Preferences -->
         <service
             android:name=".service.PrivateDnsTileService"
@@ -109,6 +130,26 @@
             android:name=".service.AutoRevertReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Auto-resume receiver for timed protection pauses (snooze) -->
+        <receiver
+            android:name=".service.ProtectionSnoozeReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Live Home-Screen Protection Widget -->
+        <receiver
+            android:name=".service.AdShieldWidgetProvider"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/adshield_widget_info" />
+        </receiver>
 
         <!-- Boot Receiver for restoring VPN protection after device restart -->
         <receiver

@@ -99,39 +99,16 @@ class BrowserContentBlocker @Inject constructor(
     }
 
     /**
-     * Strips known cross-site tracking query parameters (gclid, fbclid, utm_*, etc.) from URLs.
+     * Strips known cross-site tracking query parameters (gclid, fbclid, utm_*, si, igshid, etc.)
+     * from URLs using [LinkSanitizer], preserving functional parameters such as YouTube timestamps
+     * (`?t=`), search queries, and pagination.
      */
     fun sanitizeTrackingParameters(rawUrl: String): String {
-        val uri = runCatching { URI(rawUrl) }.getOrNull() ?: return rawUrl
-        val rawQuery = uri.rawQuery
-        if (uri.isOpaque || rawQuery.isNullOrEmpty()) return rawUrl
-
-        val pairs = rawQuery.split('&').filter { it.isNotEmpty() }
-        val keptPairs = ArrayList<String>(pairs.size)
-        var removedCount = 0L
-
-        for (pair in pairs) {
-            val paramName = pair.substringBefore('=').lowercase()
-            if (paramName in TRACKING_QUERY_PARAMS ||
-                paramName.startsWith("utm_") ||
-                paramName.startsWith("hsa_")
-            ) {
-                removedCount++
-            } else {
-                keptPairs.add(pair)
-            }
+        val result = LinkSanitizer.sanitize(rawUrl, unwrapRedirects = false)
+        if (result.removedParams.isNotEmpty()) {
+            sessionTrackersStripped.addAndGet(result.removedParams.size.toLong())
         }
-
-        if (removedCount == 0L) return rawUrl
-        sessionTrackersStripped.addAndGet(removedCount)
-
-        val baseWithoutQueryAndFrag = rawUrl.substringBefore('?').substringBefore('#')
-        val fragment = uri.rawFragment?.let { "#$it" } ?: ""
-        return if (keptPairs.isEmpty()) {
-            "$baseWithoutQueryAndFrag$fragment"
-        } else {
-            "$baseWithoutQueryAndFrag?${keptPairs.joinToString("&")}$fragment"
-        }
+        return result.cleanedUrl
     }
 
     /**
@@ -235,24 +212,6 @@ class BrowserContentBlocker @Inject constructor(
     }
 
     companion object {
-        private val TRACKING_QUERY_PARAMS = setOf(
-            "fbclid",
-            "gclid",
-            "gclsrc",
-            "dclid",
-            "msclkid",
-            "ttclid",
-            "twclid",
-            "yclid",
-            "mc_cid",
-            "mc_eid",
-            "_ga",
-            "_gl",
-            "igshid",
-            "vero_id",
-            "rb_clickid"
-        )
-
         private val THIRD_PARTY_AD_PATH_PATTERNS = listOf(
             "/pagead/",
             "/ads/ads.js",

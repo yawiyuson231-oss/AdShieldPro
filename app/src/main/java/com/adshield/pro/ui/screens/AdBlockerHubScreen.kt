@@ -67,9 +67,16 @@ fun AdBlockerHubScreen(
     onRecordSearch: (String) -> Unit,
     onClearSearchHistory: () -> Unit,
     onFetchSearchSuggestions: (String, (List<String>) -> Unit) -> Unit,
-    onShowFeedback: (String) -> Unit
+    onShowFeedback: (String) -> Unit,
+    pendingBrowserUrl: String? = null,
+    onConsumePendingBrowserUrl: () -> Unit = {}
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(pendingBrowserUrl) {
+        if (!pendingBrowserUrl.isNullOrBlank()) {
+            selectedSubTab = 2
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Surface(
@@ -158,7 +165,9 @@ fun AdBlockerHubScreen(
                     onRecordSearch = onRecordSearch,
                     onClearSearchHistory = onClearSearchHistory,
                     onFetchSearchSuggestions = onFetchSearchSuggestions,
-                    onShowFeedback = onShowFeedback
+                    onShowFeedback = onShowFeedback,
+                    pendingExternalUrl = pendingBrowserUrl,
+                    onConsumeExternalUrl = onConsumePendingBrowserUrl
                 )
             }
         }
