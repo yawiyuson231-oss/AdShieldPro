@@ -708,6 +708,7 @@ class AdShieldRepository @Inject constructor(
                         val etag = if (source.etagOrHash.startsWith("\"") || source.etagOrHash.startsWith("W/")) source.etagOrHash else null
                         if (etag != null) builder.header("If-None-Match", etag)
                     }
+                    val req = builder.build()
 
                     filterDownloadClient.newCall(req).execute().use { resp ->
                         if (resp.code == 304) {

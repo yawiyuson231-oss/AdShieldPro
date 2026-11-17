@@ -32,7 +32,7 @@ class InfinityDnsCache(
             staleTtlMs = 8000L
         )
         fun standard() = InfinityDnsCache()
-    } {
+    }
 
     data class CacheEntry(
         val key: String,

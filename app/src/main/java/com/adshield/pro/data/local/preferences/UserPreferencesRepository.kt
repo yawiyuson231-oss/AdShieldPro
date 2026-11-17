@@ -261,6 +261,13 @@ class UserPreferencesRepository @Inject constructor(
             runCatching { json.decodeFromString<UsbDebuggingTileConfig>(raw) }.getOrDefault(UsbDebuggingTileConfig())
         } ?: UsbDebuggingTileConfig()
 
+        val heuristicBlockingEnabled = prefs[Keys.HEURISTIC_BLOCKING] ?: true
+        val videoPlatformYoutubeEnabled = prefs[Keys.VIDEO_PLATFORM_YOUTUBE] ?: true
+        val videoPlatformTiktokEnabled = prefs[Keys.VIDEO_PLATFORM_TIKTOK] ?: true
+        val videoPlatformTwitchEnabled = prefs[Keys.VIDEO_PLATFORM_TWITCH] ?: true
+        val videoPlatformMetaEnabled = prefs[Keys.VIDEO_PLATFORM_META] ?: true
+        val videoPlatformKdramaEnabled = prefs[Keys.VIDEO_PLATFORM_KDRAMA] ?: true
+
         return AppSettingsState(
             vpnShouldRemainActive = prefs[Keys.VPN_ACTIVE] ?: false,
             autoStartOnBoot = prefs[Keys.AUTO_START_BOOT] ?: true,
