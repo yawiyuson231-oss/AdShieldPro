@@ -483,12 +483,43 @@ object DnsPacketCodec {
 
     /**
      * Parses RFC 8914 Extended DNS Error (OPT option 15) if present.
-     * Returns null when absent or malformed; otherwise (infoCode, extraText).
+     * Best-effort scan of OPT RDATA; returns null when absent/malformed.
      */
     fun parseExtendedDnsError(message: ByteArray): Pair<Int, String>? {
         if (message.size < 12) return null
-        // Scan OPT RDATA for option 15 — best-effort, non-critical
-        return null // stub for future full parsing; diagnostics can still report raw
+        return runCatching {
+            val qd = u16At(message, 4); val an = u16At(message, 6); val ns = u16At(message, 8); val ar = u16At(message, 10)
+            if (ar == 0) return null
+            var off = 12
+            val qName = readDomainName(message, 0, off, message.size) ?: return null
+            off = qName.nextOffset + 4
+            repeat(an + ns) {
+                val n = readDomainName(message, 0, off, message.size) ?: return null
+                off = n.nextOffset; if (off + 10 > message.size) return null
+                val rdLen = u16At(message, off + 8); off += 10 + rdLen; if (off > message.size) return null
+            }
+            repeat(ar) {
+                val n = readDomainName(message, 0, off, message.size) ?: return null
+                off = n.nextOffset; if (off + 10 > message.size) return null
+                val type = u16At(message, off); val rdLen = u16At(message, off + 8)
+                val rdata = off + 10; if (rdata + rdLen > message.size) return null
+                if (type == 41) {
+                    var o = rdata; val end = rdata + rdLen
+                    while (o + 4 <= end) {
+                        val opt = u16At(message, o); val oLen = u16At(message, o + 2)
+                        if (o + 4 + oLen > end) break
+                        if (opt == 15 && oLen >= 2) {
+                            val code = u16At(message, o + 4)
+                            val text = if (oLen > 2) String(message, o + 6, oLen - 2, Charsets.UTF_8).take(200) else ""
+                            return code to text
+                        }
+                        o += 4 + oLen
+                    }
+                }
+                off = rdata + rdLen
+            }
+            null
+        }.getOrNull()
     }
 
     private fun u16At(bytes: ByteArray, offset: Int): Int =

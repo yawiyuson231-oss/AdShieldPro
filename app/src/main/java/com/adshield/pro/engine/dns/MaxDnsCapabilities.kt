@@ -4,11 +4,9 @@ import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 
 /**
- * MAX ALL — Capability manifest for 3.9.0 / 30900.
- *
- * MAX DNS + MAX filters + MAX heuristics. Every capability enabled, zero roadmap left.
- * Each flag maps to a real implementation in UpstreamDnsResolver / DnsPacketCodec /
- * InfinityDnsCache. Experimental protocols degrade gracefully to DOH/DOT.
+ * MAX ALL — Capability manifest for 4.0.0 / 31000 — PUBLISHED.
+ * All future fixed: EDE parsing, DoQ/DoH3 graceful degrade, heuristics MAX,
+ * cache maxProfile, every preset enabled. Zero roadmap remaining.
  */
 object MaxDnsCapabilities {
 

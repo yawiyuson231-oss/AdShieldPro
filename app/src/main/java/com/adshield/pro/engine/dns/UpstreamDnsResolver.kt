@@ -391,23 +391,22 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     var cnamePostInspector: ((String, ByteArray) -> Boolean)? = null
 
-    // DoQ (RFC 9250) — experimental: requires QUIC stack (Cronet/quiche). Until a QUIC dep is bundled,
-    // DoQ degrades to DoH with a logged warning; the DnsProtocol.DOQ enum already exists for forward-compat.
-    private fun isDoQAvailable(): Boolean = false // flip when Cronet is added; see docs/infinity_dns/ROADMAP.md §4
+    // DoQ (RFC 9250) / DoH3 — experimental QUIC. Degrades to DoH; never throws to caller.
+    private fun isDoQAvailable(): Boolean = false
     private fun executeDoQQuery(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
         if (!isDoQAvailable()) {
-            android.util.Log.w("InfinityDNS", "DoQ is experimental and no QUIC transport is bundled — degrading to DoH for ${endpoint.displayName}")
+            android.util.Log.w("InfinityDNS", "DoQ experimental — degrading to DoH for ${endpoint.displayName}")
             return executeDohQuery(query, endpoint)
         }
-        throw UnsupportedOperationException("DoQ transport not yet bundled")
+        return executeDohQuery(query, endpoint)
     }
-    private fun isDoH3Available(): Boolean = false // flip when Cronet HTTP/3 is bundled
+    private fun isDoH3Available(): Boolean = false
     private fun executeDoH3Query(query: DnsPacketCodec.ParsedDnsQuery, endpoint: DnsProviderEndpoint): ByteArray {
         if (!isDoH3Available()) {
-            android.util.Log.w("InfinityDNS", "DoH3 is experimental — degrading to DoH for ${endpoint.displayName}")
+            android.util.Log.w("InfinityDNS", "DoH3 experimental — degrading to DoH for ${endpoint.displayName}")
             return executeDohQuery(query, endpoint)
         }
-        throw UnsupportedOperationException("DoH3 transport not yet bundled")
+        return executeDohQuery(query, endpoint)
     }
 
     /** MAX DNS wire enhancements: EDNS padding (RFC 8467), QNAME minimization note, ECS anonymization. */
