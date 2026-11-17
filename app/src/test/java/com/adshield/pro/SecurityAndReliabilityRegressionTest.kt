@@ -42,15 +42,17 @@ class SecurityAndReliabilityRegressionTest {
                 ".bad\${alert(1)}",
                 "body { display: block !important; } .x",
                 "@import url(https://evil.example/x.css)",
-                "[data-track=\${window.pwn}]"
+                "[data-track=\${window.pwn}]",
+                "[data-tag=foo`bar]"
             )
         )
         assertNotNull(script)
         val js = script!!
         assertTrue(js.contains(".legit-sponsored-slot"))
-        // Template placeholder must be escaped as \${ so JS never evaluates it.
-        assertFalse(js.contains(".bad\${alert(1)}"))
-        assertTrue(js.contains("\\\${window.pwn}"))
+        // Template placeholders and brace breakouts are rejected outright; backticks are escaped.
+        assertFalse(js.contains("alert(1)"))
+        assertFalse(js.contains("window.pwn"))
+        assertTrue(js.contains("[data-tag=foo\\`bar]"))
         assertFalse(js.contains("body { display: block"))
         assertFalse(js.contains("@import"))
     }
