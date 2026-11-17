@@ -45,6 +45,9 @@ jobs:
       - name: Check the extension archive is inside Chrome's static-rule limit
         run: node scripts/build-extension.mjs --check
 
+      - name: Check staged site assembly and internal links
+        run: node scripts/stage-site.mjs --check-only
+
       - name: Summarise the bundled rule set
         run: |
           set -euo pipefail

@@ -5,12 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#02060b">
   <meta name="color-scheme" content="dark">
-  <meta name="description" content="AdShield Pro adds on-device DNS filtering, custom protection rules and privacy tools to Android. Open source. No root required.">
+  <meta name="description" content="AdShield Pro brings on-device encrypted DNS filtering (DoH, DoT, DoQ), custom allow/block rules, scheduled profiles and privacy tools to Android. Open source. No root required.">
   <meta property="og:title" content="AdShield Pro — Block the noise. Protect your digital world.">
-  <meta property="og:description" content="Open-source Android privacy protection with on-device DNS filtering, custom rules and device maintenance tools. No root required.">
+  <meta property="og:description" content="Open-source Android privacy protection with on-device encrypted DNS filtering, custom rules, Quick Settings control, and companion web platform. No root required.">
   <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AdShield Pro">
+  <meta property="og:url" content="https://yawiyuson231-oss.github.io/AdShieldPro/">
+  <meta property="og:image" content="https://yawiyuson231-oss.github.io/AdShieldPro/app-icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="AdShield Pro shield emblem">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="AdShield Pro — Private DNS protection for Android">
+  <meta name="twitter:description" content="Open-source Android privacy protection with on-device encrypted DNS filtering, custom rules, and companion web platform. No root required.">
+  <meta name="twitter:image" content="https://yawiyuson231-oss.github.io/AdShieldPro/app-icon-512.png">
+  <link rel="canonical" href="https://yawiyuson231-oss.github.io/AdShieldPro/">
   <title>AdShield Pro — Private DNS protection for Android</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 54'%3E%3Cpath d='M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z' fill='%2314e8a2'/%3E%3Ccircle cx='24' cy='26.5' r='8.4' fill='none' stroke='%2302060b' stroke-width='3.8'/%3E%3Cpath d='m18.2 20.7 11.6 11.6' stroke='%2302060b' stroke-width='3.8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="app-icon-512.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "AdShield Pro",
+    "operatingSystem": "Android 10+",
+    "applicationCategory": "SecurityApplication",
+    "softwareVersion": "2.11.0",
+    "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+    "url": "https://yawiyuson231-oss.github.io/AdShieldPro/",
+    "downloadUrl": "https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
@@ -692,9 +718,33 @@ p { overflow-wrap: break-word; }
 .badge { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid var(--line-strong); border-radius: 99px; background: rgba(20, 232, 162, .08); color: var(--neon); font: 600 .72rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .badge svg { width: 15px; height: 15px; flex: none; }
 .download .section-lead { margin-inline: auto; }
-.download-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; margin: 24px 0 0; color: var(--dim); font-size: .9rem; }
+.download-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; margin: 20px 0 0; color: var(--dim); font-size: .9rem; }
 .download-links a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line-strong); transition: color .3s, border-color .3s; }
 .download-links a:hover { color: var(--neon); border-color: var(--neon); }
+.release-verify {
+  margin-top: 22px; width: 100%; max-width: 600px;
+  padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px;
+  background: rgba(6, 18, 30, .66); text-align: left;
+  display: grid; gap: 8px;
+}
+.release-verify-meta {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
+  color: var(--dim); font: 500 .72rem var(--font-mono);
+}
+.release-verify-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.release-verify code {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(2, 8, 14, .7); color: var(--neon); font: 500 .72rem var(--font-mono);
+}
+.copy-btn {
+  flex: none; min-height: 34px; padding: 6px 11px; border-radius: 8px;
+  border: 1px solid var(--line-strong); background: rgba(20, 232, 162, .08);
+  color: var(--neon); font: 600 .7rem var(--font-mono); cursor: pointer;
+  transition: background .25s, border-color .25s, color .25s;
+}
+.copy-btn:hover { background: rgba(20, 232, 162, .18); border-color: var(--neon); color: #fff; }
+.copy-btn.is-copied { background: rgba(20, 232, 162, .24); border-color: var(--emerald); color: #fff; }
 .mini-phone-wrap { position: relative; display: grid; place-items: center; min-height: 440px; min-width: 0; width: 100%; overflow: hidden; }
 .mini-orbit { position: absolute; width: min(380px, calc(100% - 24px)); aspect-ratio: 1; border-radius: 50%; border: 1px dashed rgba(34, 228, 255, .25); animation: spin 40s linear infinite; }
 .mini-orbit::before, .mini-orbit::after { content: ""; position: absolute; top: 50%; left: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 14px var(--cyan); }
@@ -766,8 +816,14 @@ p { overflow-wrap: break-word; }
 @keyframes done-blink { 0%, 68% { opacity: 0; } 75%, 95% { opacity: 1; } 100% { opacity: 0; } }
 
 /* =========================================================
-   Responsive Breakpoints (1180px -> 980px -> 768px -> 480px -> 360px)
+   Responsive Breakpoints (1220px -> 1060px -> 640px -> 390px)
    ========================================================= */
+@media (max-width: 1220px) {
+  .nav { gap: 2px; font-size: .85rem; }
+  .nav a:not(.btn) { padding: 8px 10px; }
+  .nav a:not(.btn)::after { left: 10px; right: 10px; }
+}
+
 @media (max-width: 1180px) {
   .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .demo-body { grid-template-columns: minmax(0, 1fr); }
@@ -775,7 +831,7 @@ p { overflow-wrap: break-word; }
   .demo-log { min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1060px) {
   :root { --header-h: 66px; }
   .header-cta { display: none; }
   .nav-toggle {
@@ -807,6 +863,9 @@ p { overflow-wrap: break-word; }
   .nav a:not(.btn)::after { left: 12px; right: auto; width: 30px; }
   .nav-mobile-cta { display: inline-flex; margin-top: 10px; width: 100%; }
   .site-header.menu-open { background: rgba(3, 9, 16, .97); }
+}
+
+@media (max-width: 980px) {
 
   .hero { padding-top: calc(var(--header-h) + 32px); min-height: auto; }
   .hero-inner { grid-template-columns: minmax(0, 1fr); text-align: center; gap: 36px; }
@@ -903,6 +962,16 @@ p { overflow-wrap: break-word; }
   .b-fill { stroke-dashoffset: 40; }
 }
   </style>
+  <noscript>
+    <style>
+      .loader, .scroll-progress { display: none !important; }
+      .is-loading .site-header { transform: none !important; background: rgba(3, 9, 16, .88); border-bottom-color: var(--line); }
+      .hero-fade, .hero-stage, .scroll-cue, [data-reveal], .word, .hero-logo .char, .b-list li {
+        opacity: 1 !important; transform: none !important; filter: none !important;
+      }
+      .shield-check { stroke-dashoffset: 0 !important; }
+    </style>
+  </noscript>
 </head>
 <body class="is-loading">
   <a class="skip-link" href="#main">Skip to content</a>
@@ -962,14 +1031,14 @@ p { overflow-wrap: break-word; }
         <a href="#features" data-nav>Protection</a>
         <a href="#demo" data-nav>How it works</a>
         <a href="#download" data-nav>Download</a>
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro">GitHub</a>
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases">Releases</a>
         <a href="app/" data-nav>Web platform</a>
-        <a class="btn btn-primary btn-sm nav-mobile-cta" href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Releases</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">GitHub</a>
+        <a class="btn btn-primary btn-sm nav-mobile-cta" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
           <svg aria-hidden="true"><use href="#i-download"/></svg><span>Get APK</span>
         </a>
       </nav>
-      <a class="btn btn-primary btn-sm header-cta magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">
+      <a class="btn btn-primary btn-sm header-cta magnetic" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
         <svg aria-hidden="true"><use href="#i-download"/></svg><span>Get APK</span>
       </a>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
@@ -988,18 +1057,18 @@ p { overflow-wrap: break-word; }
             <span class="hero-logo" data-split-chars>ADSHIELD <span class="hero-logo-accent">PRO</span></span>
             <span class="hero-tagline" data-split-words>Block the noise. <em>Protect your digital world.</em></span>
           </h1>
-          <p class="hero-intro hero-fade" style="--d:900ms">Experience smarter Android privacy protection with powerful DNS filtering, customizable protection rules, and intelligent device maintenance tools.</p>
+          <p class="hero-intro hero-fade" style="--d:900ms">On-device encrypted DNS protection for Android — with DNS-over-HTTPS, DNS-over-TLS and DNS-over-QUIC, custom allow and block rules, scheduled Quiet Hours profiles, Quick Settings control, and a local-first companion web platform.</p>
           <div class="actions hero-fade" style="--d:1050ms">
-            <a class="btn btn-primary magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">
-              <svg aria-hidden="true"><use href="#i-download"/></svg><span>Download free APK</span>
+            <a class="btn btn-primary magnetic" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
+              <svg aria-hidden="true"><use href="#i-download"/></svg><span data-apk-cta>Download APK · v2.11.0</span>
             </a>
-            <a class="btn btn-ghost glow-border magnetic" href="#features"><span>Explore features</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
-            <a class="btn btn-ghost glow-border magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro">
+            <a class="btn btn-ghost glow-border magnetic" href="app/"><span>Web platform</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-ghost glow-border magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">
               <svg aria-hidden="true"><use href="#i-github"/></svg><span>View on GitHub</span>
             </a>
           </div>
           <ul class="hero-meta hero-fade" style="--d:1200ms" aria-label="Highlights">
-            <li>Open source</li><li>No root required</li><li>DNS activity stays on your device</li>
+            <li>Open source (GPL-3.0)</li><li>Android 10+ · No root</li><li>DNS activity stays on your device</li>
           </ul>
         </div>
 
@@ -1052,8 +1121,8 @@ p { overflow-wrap: break-word; }
     <!-- Capability marquee -->
     <div class="marquee" aria-hidden="true">
       <div class="marquee-track">
-        <span>DNS filtering</span><span>Custom allow &amp; block rules</span><span>Privacy browser</span><span>Local activity</span><span>Smart Boost</span><span>No root required</span><span>Open source</span>
-        <span>DNS filtering</span><span>Custom allow &amp; block rules</span><span>Privacy browser</span><span>Local activity</span><span>Smart Boost</span><span>No root required</span><span>Open source</span>
+        <span>DoH · DoT · DNS-over-QUIC</span><span>Custom allow &amp; block rules</span><span>Scheduled Quiet Hours</span><span>Quick Settings tile</span><span>Privacy browser</span><span>Local activity diagnostics</span><span>No root required</span><span>Open source</span>
+        <span>DoH · DoT · DNS-over-QUIC</span><span>Custom allow &amp; block rules</span><span>Scheduled Quiet Hours</span><span>Quick Settings tile</span><span>Privacy browser</span><span>Local activity diagnostics</span><span>No root required</span><span>Open source</span>
       </div>
     </div>
 
@@ -1180,36 +1249,36 @@ p { overflow-wrap: break-word; }
             <div class="card-icon icon-dns" aria-hidden="true">
               <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16"/><ellipse class="spin-x" cx="24" cy="24" rx="7" ry="16"/><path d="M8 24h32"/><path class="slash" d="M10 38 38 10"/></svg>
             </div>
-            <h3>Smart DNS Ad Blocking</h3>
-            <p>Filter requests to domains found in your enabled blocklists — across apps and browsers.</p>
+            <h3>Encrypted DNS Filtering</h3>
+            <p>Filter domains from your enabled lists and forward allowed queries over DoH, DoT, or DNS-over-QUIC (RFC 9250).</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-eye" aria-hidden="true">
               <svg viewBox="0 0 48 48"><path d="M4 24s7-12 20-12 20 12 20 12-7 12-20 12S4 24 4 24Z"/><circle class="pupil" cx="24" cy="24" r="5"/><path class="lid" d="M6 8 42 40"/></svg>
             </div>
             <h3>Privacy &amp; Tracker Protection</h3>
-            <p>Block connections to many known tracker domains included in your filter lists.</p>
+            <p>Block connections to many known ad, tracker, and threat domains included in your active lists.</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-sliders" aria-hidden="true">
               <svg viewBox="0 0 48 48"><path d="M8 14h32M8 24h32M8 34h32"/><circle class="k1" cx="16" cy="14" r="4"/><circle class="k2" cx="32" cy="24" r="4"/><circle class="k3" cx="20" cy="34" r="4"/></svg>
             </div>
-            <h3>Custom Filtering Rules</h3>
-            <p>Choose protection modes, manage filter lists, and add your own allow or block rules.</p>
+            <h3>Custom Rules &amp; Schedules</h3>
+            <p>Switch protection modes, schedule automatic Quiet Hours profiles, and add your own allow or block rules.</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-browser" aria-hidden="true">
               <svg viewBox="0 0 48 48"><rect x="5" y="9" width="38" height="30" rx="5"/><path d="M5 17h38"/><circle cx="10" cy="13" r="1"/><circle cx="14" cy="13" r="1"/><rect x="19" y="26" width="10" height="8" rx="1.5"/><path class="shackle" d="M21 26v-3a3 3 0 0 1 6 0v3"/></svg>
             </div>
             <h3>Privacy Browser</h3>
-            <p>Open the built-in browser for a focused browsing experience alongside protection tools.</p>
+            <p>Use the built-in browser with DuckDuckGo default search and optional private session cleanup.</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-chart" aria-hidden="true">
               <svg viewBox="0 0 48 48"><path d="M6 40h36"/><path class="line" d="M8 32l9-10 7 6 8-12 8 6"/><circle class="dot" cx="40" cy="22" r="2.5"/></svg>
             </div>
-            <h3>Local Activity Monitoring</h3>
-            <p>Review DNS activity and protection statistics available on your device.</p>
+            <h3>Local Activity &amp; Block Reasons</h3>
+            <p>Inspect recent DNS lookups on your device, see which rule matched, and allowlist false positives in one tap.</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-boost" aria-hidden="true">
@@ -1222,8 +1291,8 @@ p { overflow-wrap: break-word; }
             <div class="card-icon icon-phone" aria-hidden="true">
               <svg viewBox="0 0 48 48"><rect x="13" y="4" width="22" height="40" rx="5"/><path d="M21 9h6"/><path class="check" d="m18 25 4.5 4.5L31 21"/></svg>
             </div>
-            <h3>No Root Required</h3>
-            <p>Uses Android’s local VPN interface for DNS protection without rooting your phone.</p>
+            <h3>Quick Settings &amp; No Root</h3>
+            <p>Toggle or pause protection from Android’s Quick Settings shade using the local DNS VPN interface — no root needed.</p>
           </article>
           <article class="card" data-reveal data-tilt>
             <div class="card-icon icon-code" aria-hidden="true">
@@ -1302,24 +1371,37 @@ p { overflow-wrap: break-word; }
           <div class="download-logo" data-reveal="zoom">
             <svg viewBox="0 0 120 140" aria-hidden="true"><use href="#i-shield-solid"/></svg>
           </div>
-          <span class="badge" data-reveal><svg aria-hidden="true"><use href="#i-github"/></svg> Open source · Free</span>
+          <span class="badge" data-reveal><svg aria-hidden="true"><use href="#i-github"/></svg> <span data-release-badge>v2.11.0 · Open source · Android 10+</span></span>
           <h2 id="download-title" class="section-title section-title--xl" data-split-words>Ready to put <em>privacy first?</em></h2>
-          <p class="section-lead" data-reveal>Get the latest AdShield Pro APK from the official GitHub release. Free, open source, and no root required.</p>
+          <p class="section-lead" data-reveal data-release-lead>Download the signed AdShield Pro 2.11.0 release directly from GitHub, or open the companion browser platform with no install.</p>
           <div class="actions actions--center" data-reveal>
-            <a class="btn btn-primary btn-lg magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">
-              <svg aria-hidden="true"><use href="#i-download"/></svg><span>Download APK</span>
+            <a class="btn btn-primary btn-lg magnetic" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
+              <svg aria-hidden="true"><use href="#i-download"/></svg><span data-apk-cta>Download APK · v2.11.0</span>
             </a>
-            <a class="btn btn-ghost btn-lg glow-border magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro">
-              <svg aria-hidden="true"><use href="#i-github"/></svg><span>Source code</span>
+            <a class="btn btn-ghost btn-lg glow-border magnetic" href="app/">
+              <span>Web platform</span><svg aria-hidden="true"><use href="#i-arrow"/></svg>
             </a>
           </div>
+          <div class="release-verify" data-reveal aria-label="Signed APK checksum verification">
+            <div class="release-verify-meta">
+              <span data-apk-meta>AdShieldPro-2.11.0-release.apk · 56.2 MB</span>
+              <span>SHA-256 checksum</span>
+            </div>
+            <div class="release-verify-row">
+              <code id="apk-sha256" title="c54609cc63056d8b7705f252666ade80940fce8e7a59b254f8c31a4826a8288c">c54609cc63056d8b7705f252666ade80940fce8e7a59b254f8c31a4826a8288c</code>
+              <button type="button" class="copy-btn" data-copy-sha aria-label="Copy APK SHA-256 checksum">Copy</button>
+            </div>
+          </div>
           <p class="download-links" data-reveal>
-            <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest">Latest release</a>
+            <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest" rel="noopener">Latest release</a>
+            <span aria-hidden="true">·</span>
+            <a data-sha-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk.sha256" rel="noopener">.sha256 file</a>
             <span aria-hidden="true">·</span>
             <a href="app/">Web platform (browser)</a>
-            <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases">Release notes</a>
             <span aria-hidden="true">·</span>
-            <a href="https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md">Privacy policy</a>
+            <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Release notes</a>
+            <span aria-hidden="true">·</span>
+            <a href="privacy.html">Privacy policy</a>
           </p>
         </div>
 
@@ -1349,9 +1431,10 @@ p { overflow-wrap: break-word; }
       </a>
       <span class="footer-copy">© <span id="year">2026</span> AdShield Pro · Built with privacy in mind.</span>
       <nav aria-label="Footer links">
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md">Privacy policy</a>
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases">Release notes</a>
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro">Source code</a>
+        <a href="app/">Web platform</a>
+        <a href="privacy.html">Privacy policy</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Release notes</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">Source code</a>
       </nav>
     </div>
   </footer>
@@ -1394,8 +1477,8 @@ p { overflow-wrap: break-word; }
     return s;
   }
 
-  function createLoop(el, draw, alwaysAnimate = false) {
-    let raf = 0, last = 0, running = false, visible = false, paused = false;
+  function createLoop(el, draw, forceAnimate = false) {
+    let raf = 0, last = 0, running = false, visible = false, paused = false, userForced = forceAnimate;
     const frame = (t) => {
       if (!running) return;
       const dt = last ? Math.min(t - last, 50) : 16;
@@ -1404,7 +1487,7 @@ p { overflow-wrap: break-word; }
       if (running) raf = requestAnimationFrame(frame);
     };
     const update = () => {
-      const should = visible && !paused && !document.hidden && (alwaysAnimate || !state.reduced);
+      const should = visible && !paused && !document.hidden && (userForced || !state.reduced);
       if (should && !running) { running = true; last = 0; raf = requestAnimationFrame(frame); }
       else if (!should && running) { running = false; cancelAnimationFrame(raf); }
       if (visible && !running) draw(0, performance.now());
@@ -1415,7 +1498,11 @@ p { overflow-wrap: break-word; }
     reduceListeners.add(update);
     return {
       update,
-      setPaused(p) { paused = p; update(); },
+      setPaused(p, fromUser = false) {
+        paused = p;
+        if (fromUser) userForced = !p;
+        update();
+      },
       get running() { return running; },
       destroy() { running = false; cancelAnimationFrame(raf); io.disconnect(); document.removeEventListener('visibilitychange', update); reduceListeners.delete(update); }
     };
@@ -1448,6 +1535,8 @@ p { overflow-wrap: break-word; }
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
   document.querySelectorAll('[data-split-chars]').forEach((el) => {
+    const cleanText = el.textContent.replace(/\s+/g, ' ').trim();
+    if (cleanText && !el.hasAttribute('aria-label')) el.setAttribute('aria-label', cleanText);
     let idx = 0;
     const walk = (node) => {
       for (const child of [...node.childNodes]) {
@@ -1458,6 +1547,7 @@ p { overflow-wrap: break-word; }
             else {
               const span = document.createElement('span');
               span.className = 'char';
+              span.setAttribute('aria-hidden', 'true');
               span.style.setProperty('--i', idx++);
               span.textContent = ch;
               frag.appendChild(span);
@@ -1560,19 +1650,91 @@ p { overflow-wrap: break-word; }
       }
     });
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 980 && nav.classList.contains('is-open')) closeMenu();
+      if (window.innerWidth > 1060 && nav.classList.contains('is-open')) closeMenu();
     }, { passive: true });
+  }
+
+  const copyShaBtn = document.querySelector('[data-copy-sha]');
+  const shaCodeEl = document.getElementById('apk-sha256');
+  if (copyShaBtn && shaCodeEl) {
+    let copyTimer = 0;
+    copyShaBtn.addEventListener('click', async () => {
+      const value = shaCodeEl.textContent.trim();
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(value);
+          copied = true;
+        }
+      } catch { /* fall back to range selection */ }
+      if (!copied) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(shaCodeEl);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          copied = document.execCommand('copy');
+          sel.removeAllRanges();
+        } catch { copied = false; }
+      }
+      copyShaBtn.textContent = copied ? 'Copied' : 'Select hash';
+      copyShaBtn.classList.toggle('is-copied', copied);
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => {
+        copyShaBtn.textContent = 'Copy';
+        copyShaBtn.classList.remove('is-copied');
+      }, 2200);
+    });
+  }
+
+  // Progressive sync: keep direct APK URL, version, size and SHA-256 aligned with future GitHub releases.
+  const RELEASE_PREFIX = 'https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/';
+  if (typeof fetch === 'function' && /^https?:$/.test(location.protocol)) {
+    fetch('https://api.github.com/repos/yawiyuson231-oss/AdShieldPro/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((rel) => {
+        if (!rel || !Array.isArray(rel.assets) || typeof rel.tag_name !== 'string') return;
+        const tag = /^v\d+\.\d+(?:\.\d+)?$/.test(rel.tag_name) ? rel.tag_name : null;
+        const apk = rel.assets.find((a) => typeof a.name === 'string' && a.name.endsWith('.apk')
+          && typeof a.browser_download_url === 'string' && a.browser_download_url.startsWith(RELEASE_PREFIX));
+        if (!tag || !apk) return;
+        const shaAsset = rel.assets.find((a) => a.name === `${apk.name}.sha256`
+          && typeof a.browser_download_url === 'string' && a.browser_download_url.startsWith(RELEASE_PREFIX));
+        const digestMatch = typeof apk.digest === 'string' ? /^sha256:([0-9a-f]{64})$/.exec(apk.digest) : null;
+        document.querySelectorAll('[data-apk-link]').forEach((a) => a.setAttribute('href', apk.browser_download_url));
+        document.querySelectorAll('[data-apk-cta]').forEach((s) => { s.textContent = `Download APK · ${tag}`; });
+        const badge = document.querySelector('[data-release-badge]');
+        if (badge) badge.textContent = `${tag} · Open source · Android 10+`;
+        const lead = document.querySelector('[data-release-lead]');
+        if (lead) lead.textContent = `Download the signed AdShield Pro ${tag.slice(1)} release directly from GitHub, or open the companion browser platform with no install.`;
+        const meta = document.querySelector('[data-apk-meta]');
+        if (meta && Number.isFinite(apk.size)) {
+          meta.textContent = `${apk.name} · ${(apk.size / 1048576).toFixed(1)} MB`;
+        }
+        if (shaCodeEl && digestMatch) {
+          shaCodeEl.textContent = digestMatch[1];
+          shaCodeEl.setAttribute('title', digestMatch[1]);
+        }
+        const shaLink = document.querySelector('[data-sha-link]');
+        if (shaLink) {
+          shaLink.setAttribute('href', shaAsset ? shaAsset.browser_download_url : 'https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest');
+        }
+      })
+      .catch(() => { /* keep statically verified release metadata */ });
   }
 
   const secObserver = new IntersectionObserver((entries) => {
     for (const e of entries) {
       if (e.isIntersecting) {
-        const id = `#${e.target.id}`;
+        const id = e.target.id === 'top' ? '' : `#${e.target.id}`;
         navLinks.forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === id));
       }
     }
   }, { rootMargin: '-40% 0px -50% 0px' });
-  ['showcase', 'features', 'demo', 'download'].forEach((id) => {
+  ['top', 'showcase', 'features', 'demo', 'download'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) secObserver.observe(el);
   });
@@ -1764,7 +1926,7 @@ p { overflow-wrap: break-word; }
     ctx.globalAlpha = 1;
   }
 
-  AS.createLoop(stage, draw, true);
+  AS.createLoop(stage, draw, false);
 
   stage.querySelectorAll('[data-depth]').forEach((el) => el.style.setProperty('--depth', el.dataset.depth));
   if (hero) {
@@ -1863,8 +2025,12 @@ p { overflow-wrap: break-word; }
     const [domain, blocked] = DOMAINS[di++ % DOMAINS.length];
     const isBlocked = blocked && protectionOn;
     const li = document.createElement('li');
-    li.innerHTML = `<b class="tag ${isBlocked ? 'tag--block' : 'tag--allow'}">${isBlocked ? 'BLOCKED' : 'ALLOWED'}</b><code></code>`;
-    li.querySelector('code').textContent = domain;
+    const badge = document.createElement('b');
+    badge.className = `tag ${isBlocked ? 'tag--block' : 'tag--allow'}`;
+    badge.textContent = isBlocked ? 'BLOCKED' : 'ALLOWED';
+    const code = document.createElement('code');
+    code.textContent = domain;
+    li.append(badge, code);
     logEl.prepend(li);
     while (logEl.children.length > 6) logEl.lastElementChild.remove();
   }
@@ -1967,7 +2133,8 @@ p { overflow-wrap: break-word; }
       net: vertical ? { x: w / 2, y: h * 0.81 } : { x: w - Math.max(66, w * 0.1), y: h * 0.52 },
       sr: Math.min(w, h) * (vertical ? 0.12 : 0.12)
     };
-    if (!reqs.length && seqIndex === 0) spawn();
+    if (AS.state.reduced) seedReducedPreview();
+    else if (!reqs.length && seqIndex === 0) spawn();
     draw(0);
   }
 
@@ -2018,9 +2185,14 @@ p { overflow-wrap: break-word; }
 
   function addLog(r, isBlocked) {
     const li = document.createElement('li');
-    li.innerHTML = `<b class="tag ${isBlocked ? 'tag--block' : 'tag--allow'}">${isBlocked ? 'BLOCKED' : 'ALLOWED'}</b><code></code><small></small>`;
-    li.querySelector('code').textContent = r.domain;
-    li.querySelector('small').textContent = `${APPS[r.app]} · ${scenario === 'off' ? 'Protection off' : CATS[r.cat].name}`;
+    const badge = document.createElement('b');
+    badge.className = `tag ${isBlocked ? 'tag--block' : 'tag--allow'}`;
+    badge.textContent = isBlocked ? 'BLOCKED' : 'ALLOWED';
+    const code = document.createElement('code');
+    code.textContent = r.domain;
+    const small = document.createElement('small');
+    small.textContent = `${APPS[r.app]} · ${scenario === 'off' ? 'Protection off' : CATS[r.cat].name}`;
+    li.append(badge, code, small);
     logEl.prepend(li);
     while (logEl.children.length > 7) logEl.lastElementChild.remove();
   }
@@ -2194,14 +2366,41 @@ p { overflow-wrap: break-word; }
     }
   }
 
-  loop = AS.createLoop(wrap, draw, true);
+  function seedReducedPreview() {
+    if (!L || !AS.state.reduced || logEl.children.length) return;
+    for (let i = 0; i < 4; i++) {
+      const [app, domain, cat] = SEQ[seqIndex++ % SEQ.length];
+      decide({ app, domain, cat, t: 1, phase: 'in', speed: 0.6 });
+    }
+    reqs = [];
+    parts = [];
+    pulses = [];
+    shieldFlash = 0;
+  }
+
+  loop = AS.createLoop(wrap, draw, false);
+  const syncPauseControl = (reduced) => {
+    if (reduced) {
+      pauseBtn.setAttribute('aria-pressed', 'true');
+      pauseBtn.setAttribute('aria-label', 'Play simulation');
+      loop.setPaused(true, false);
+      seedReducedPreview();
+      draw(0);
+    }
+  };
+  syncPauseControl(AS.state.reduced);
+  AS.onReduce(syncPauseControl);
 
   function reset() {
     reqs = []; parts = []; pulses = []; check = null;
     seqIndex = 0; spawnIn = 600; blocked = 0; allowed = 0; shieldFlash = 0;
     blockedEl.textContent = '0'; allowedEl.textContent = '0';
     logEl.replaceChildren();
-    spawn();
+    if (AS.state.reduced && pauseBtn.getAttribute('aria-pressed') === 'true') {
+      seedReducedPreview();
+    } else {
+      spawn();
+    }
     draw(0);
   }
 
@@ -2216,7 +2415,7 @@ p { overflow-wrap: break-word; }
     const paused = pauseBtn.getAttribute('aria-pressed') !== 'true';
     pauseBtn.setAttribute('aria-pressed', paused);
     pauseBtn.setAttribute('aria-label', paused ? 'Resume simulation' : 'Pause simulation');
-    loop.setPaused(paused);
+    loop.setPaused(paused, true);
   });
 })();
   </script>

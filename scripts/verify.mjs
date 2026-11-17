@@ -34,12 +34,12 @@ const FORBIDDEN_CLAIMS = [
 
 const MODULE_FILES = [
   'app.js', 'engine.js', 'ui/dom.js',
-  'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/resolvers.js',
+  'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/chain.js', 'dns/resolvers.js',
   'guard/video-safety.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
   'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
   'security/monitor.js', 'security/firewall-ai.js', 'security/feedmanager.js',
-  'security/backup.js', 'security/privacy.js', 'security/sha256.js', 'security/storage.js'
+  'security/backup.js', 'security/privacy.js', 'security/power.js', 'security/sha256.js', 'security/storage.js'
 ];
 
 export function verify() {
@@ -91,8 +91,22 @@ export function verify() {
   add('service worker precache targets exist', missingPrecache.length === 0, missingPrecache.join(', '));
   add('service worker does not cache DoH', /url\.origin !== self\.location\.origin/.test(sw));
 
-  /* 5. No HTML injection sinks in UI code. */
-  const uiSources = { 'app.js': appSource, 'ui/dom.js': read('ui/dom.js') };
+  /* 5. No HTML injection sinks in UI and marketing site code. */
+  const sitePages = ['docs/index.html', 'docs/privacy.html', 'docs/404.html'];
+  for (const page of sitePages) {
+    add(`site page: ${page}`, exists(page) && statSync(abs(page)).size > 500,
+      exists(page) ? `${statSync(abs(page)).size} bytes` : 'missing');
+  }
+  add('site asset: docs/.nojekyll', exists('docs/.nojekyll'));
+  add('site asset: docs/robots.txt', exists('docs/robots.txt') && statSync(abs('docs/robots.txt')).size > 20);
+  add('site asset: docs/sitemap.xml', exists('docs/sitemap.xml') && statSync(abs('docs/sitemap.xml')).size > 100);
+  add('site asset: docs/app-icon-512.png', exists('docs/app-icon-512.png') && statSync(abs('docs/app-icon-512.png')).size > 1000);
+
+  const uiSources = {
+    'app.js': appSource,
+    'ui/dom.js': read('ui/dom.js'),
+    ...Object.fromEntries(sitePages.filter(exists).map((p) => [p, read(p)]))
+  };
   const sinks = [];
   for (const [file, source] of Object.entries(uiSources)) {
     if (/\.innerHTML\s*=/.test(source)) sinks.push(`${file}: innerHTML assignment`);
@@ -103,8 +117,19 @@ export function verify() {
   }
   add('no DOM XSS sinks in UI layer', sinks.length === 0, sinks.join('; '));
 
+  const marketingHtml = exists('docs/index.html') ? read('docs/index.html') : '';
+  const privacyHtml = exists('docs/privacy.html') ? read('docs/privacy.html') : '';
+  add('marketing and app pages provide noscript fallbacks',
+    /<noscript>/.test(marketingHtml) && /<noscript>/.test(html));
+  add('marketing, privacy and app pages declare canonical and Open Graph metadata',
+    [marketingHtml, privacyHtml, html].every((src) =>
+      /rel="canonical"/.test(src) && /property="og:url"/.test(src) && /property="og:image"/.test(src)));
+  const shaMatch = /id="apk-sha256"[^>]*title="([0-9a-f]{64})"[^>]*>([0-9a-f]{64})<\/code>/.exec(marketingHtml);
+  add('marketing page publishes a valid 64-hex APK SHA-256 checksum',
+    !!shaMatch && shaMatch[1] === shaMatch[2], shaMatch ? `${shaMatch[2].slice(0, 12)}…` : 'missing or mismatched');
+
   /* 6. No fabricated claims in user-visible copy. */
-  const visible = [html, appSource, read('ui/dom.js')].join('\n').toLowerCase();
+  const visible = [html, appSource, read('ui/dom.js'), marketingHtml, privacyHtml].join('\n').toLowerCase();
   const hits = FORBIDDEN_CLAIMS.filter((phrase) => visible.includes(phrase));
   add('no fabricated security claims', hits.length === 0, hits.join('; '));
 
@@ -232,8 +257,19 @@ export function verify() {
   add('the assembler verifies every service-worker precache target',
     /checkPrecache/.test(read('scripts/stage-site.mjs')) && /is not self-sufficient/.test(read('scripts/stage-site.mjs')));
 
-  /* 10. Package scripts point at real test globs. */
+  /* 10. Package scripts and version lockstep. */
   const pkg = JSON.parse(read('package.json'));
+  const ver = pkg.version;
+  const verChecks = [
+    [`index.html`, html.includes(`v${ver}`)],
+    [`app.js:appVersion`, appSource.includes(`appVersion: '${ver}'`)],
+    [`app.js:exportedBy`, appSource.includes(`OmniShield X web platform v${ver}`)],
+    [`sw.js:VERSION`, sw.includes(`omnishield-x-v${ver}`)],
+    [`docs/WEB_PLATFORM.md`, exists('docs/WEB_PLATFORM.md') && read('docs/WEB_PLATFORM.md').includes(`(v${ver})`)]
+  ];
+  const drifted = verChecks.filter(([, ok]) => !ok).map(([name]) => name);
+  add('web platform version strings stay in lockstep', drifted.length === 0,
+    drifted.length ? `expected v${ver} in: ${drifted.join(', ')}` : `v${ver}`);
   add('package has test script', !!pkg.scripts?.test, pkg.scripts?.test);
   add('package has verify script', !!pkg.scripts?.verify, pkg.scripts?.verify);
   add('no runtime dependencies', !pkg.dependencies || Object.keys(pkg.dependencies).length === 0,

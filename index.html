@@ -2,12 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050b16">
 <meta name="description" content="OmniShield X — AETHER: local-first DNS security, ad/tracker filtering and transparent threat intelligence. Everything runs in your browser.">
 <meta name="color-scheme" content="dark">
+<meta property="og:title" content="OmniShield X — AETHER Browser Security Platform">
+<meta property="og:description" content="Local-first DNS resolution lab, explainable AETHER reputation scoring, behavioural firewall analysis, and HaGeZi filter rules — running in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AdShield Pro">
+<meta property="og:url" content="https://yawiyuson231-oss.github.io/AdShieldPro/app/">
+<meta property="og:image" content="https://yawiyuson231-oss.github.io/AdShieldPro/app-icon-512.png">
+<link rel="canonical" href="https://yawiyuson231-oss.github.io/AdShieldPro/app/">
 <title>OmniShield X — AETHER AI Evolution</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡</text></svg>">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../app-icon-512.png">
 <style>
   :root {
     --bg: #050b16; --surface: #0a1426; --surface2: #101f3a; --surface3: #16294a;
@@ -52,15 +61,22 @@
   nav.tabs {
     display: flex; gap: 6px; flex-wrap: wrap; padding: 10px clamp(14px, 4vw, 40px);
     border-bottom: 1px solid var(--line-soft); background: #071020cc;
-    position: sticky; top: 77px; z-index: 19; backdrop-filter: blur(8px);
+    position: sticky; top: var(--top-h, 77px); z-index: 19; backdrop-filter: blur(8px);
   }
   nav.tabs button {
     background: none; border: 1px solid transparent; color: var(--dim);
     padding: 7px 14px; border-radius: 999px; cursor: pointer; font-size: 13.5px;
-    font-family: inherit; transition: .15s;
+    font-family: inherit; transition: .15s; flex: none;
   }
   nav.tabs button:hover { color: var(--text); border-color: var(--line); }
   nav.tabs button.active { color: #fff; border-color: var(--blue); background: #2e7dff22; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+  .pill.home-link { text-decoration: none; color: var(--glow); border-color: #2e7dff55; background: #2e7dff12; }
+  .pill.home-link:hover { color: #fff; border-color: var(--glow); background: #2e7dff26; }
+  .noscript-note {
+    max-width: 1180px; margin: 16px auto 0; padding: 14px 18px;
+    border: 1px solid #ffb02066; border-radius: 12px; background: #ffb02014; color: #f2dcb6; font-size: 14px;
+  }
 
   main { padding: clamp(14px, 3.5vw, 34px); max-width: 1180px; margin: 0 auto; }
   .page { display: grid; gap: 16px; }
@@ -192,11 +208,11 @@
   .toast.ok { border-left-color: var(--ok); } .toast.warn { border-left-color: var(--amber); } .toast.bad { border-left-color: var(--red); }
   @keyframes slide-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
   .skip-link {
-    position: absolute; left: -9999px; top: 0; z-index: 10;
-    background: #1c2b47; color: #e8f0ff; padding: 8px 14px; border-radius: 0 0 8px 0;
+    position: fixed; left: -9999px; top: 8px; z-index: 100;
+    background: #1c2b47; color: #e8f0ff; padding: 8px 14px; border-radius: 0 8px 8px 0;
     text-decoration: none; font-weight: 600;
   }
-  .skip-link:focus { left: 0; outline: 3px solid #5aa2ff; }
+  .skip-link:focus { left: 8px; outline: 3px solid #5aa2ff; }
   .page:focus { outline: none; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
@@ -207,10 +223,18 @@
 
   details summary { cursor: pointer; color: var(--glow); font-size: 13px; }
   details[open] summary { margin-bottom: 8px; }
+  footer.site .foot-links {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; margin-top: 8px;
+  }
+  footer.site .foot-links a { color: var(--glow); text-decoration: none; border-bottom: 1px solid #2e7dff55; }
+  footer.site .foot-links a:hover { color: #fff; border-color: var(--glow); }
 
   @media (max-width: 700px) {
     h1 { font-size: 16px; }
-    nav.tabs { top: 69px; }
+    nav.tabs {
+      top: var(--top-h, 69px);
+      flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+    }
     .bar-row { grid-template-columns: 100px 1fr 46px; font-size: 11.5px; }
     .kv { grid-template-columns: 1fr; }
     .kv dt { margin-top: 6px; }
@@ -221,12 +245,16 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="top">
   <div class="shield" aria-hidden="true">🛡</div>
-  <h1>OmniShield X <small>AETHER AI Evolution · v5.0.2 · local-first DNS security platform</small></h1>
+  <h1>OmniShield X <small>AETHER AI Evolution · v5.0.3 · local-first DNS security platform</small></h1>
   <div class="top-actions">
+    <a class="pill home-link" href="../">← AdShield Pro</a>
     <span class="pill info" id="boot-status" role="status" aria-live="polite"><span class="dot"></span> starting</span>
     <span class="pill" id="net-status" role="status" aria-live="polite">network: unknown</span>
   </div>
 </header>
+<noscript>
+  <p class="noscript-note">OmniShield X runs local filtering and DNS diagnostics in JavaScript inside your browser. Enable JavaScript to use the interactive platform, or return to <a href="../">AdShield Pro home &amp; Android APK download</a>.</p>
+</noscript>
 
 <nav class="tabs" aria-label="Sections">
   <button type="button" data-page="dashboard" class="active" aria-current="page">Dashboard</button>
@@ -259,7 +287,7 @@
       <p>Type any hostname. Every point of the score is attributed to a named signal with its evidence.
       AETHER never blocks on its own: enforcement stays with the deterministic filter rules, and you can always override.</p>
       <div class="row" style="margin-top:12px">
-        <input type="text" id="aether-input" placeholder="example.com · ads.doubleclick.net · paypa1.com" autocomplete="off" spellcheck="false">
+        <input type="text" id="aether-input" aria-label="Hostname to analyse with AETHER" placeholder="example.com · ads.doubleclick.net · paypa1.com" autocomplete="off" spellcheck="false">
         <button class="primary" id="aether-go">Analyse</button>
         <button id="aether-demo">Try a known shape</button>
       </div>
@@ -276,8 +304,8 @@
       <p>Runs the real pipeline: filter → cache → DoH (JSON or RFC 8484 wire) → DNSSEC assessment.
       If the network is unavailable, it says so instead of inventing an answer.</p>
       <div class="row" style="margin-top:12px">
-        <input type="text" id="dns-input" placeholder="example.com" autocomplete="off" spellcheck="false">
-        <select id="dns-type" style="width:auto">
+        <input type="text" id="dns-input" aria-label="Hostname to resolve" placeholder="example.com" autocomplete="off" spellcheck="false">
+        <select id="dns-type" aria-label="DNS record type" style="width:auto">
           <option value="dual">A + AAAA</option>
           <option value="A">A (IPv4)</option>
           <option value="AAAA">AAAA (IPv6)</option>
@@ -313,7 +341,7 @@
     <div class="card" id="fw-inspect">
       <h2>Inspect a destination</h2>
       <div class="row">
-        <input type="text" id="fw-input" placeholder="c2.example (must exist in observations)" autocomplete="off" spellcheck="false">
+        <input type="text" id="fw-input" aria-label="Destination hostname to inspect" placeholder="c2.example (must exist in observations)" autocomplete="off" spellcheck="false">
         <button id="fw-go">Inspect</button>
       </div>
       <div id="fw-inspect-out"></div>
@@ -325,7 +353,7 @@
     <div class="card">
       <h2>Requests processed <span class="pill" id="mon-live">live</span></h2>
       <p class="small muted">Every value below is measured from activity on this device. There is no synthetic traffic: if you have not resolved anything, the chart is flat.</p>
-      <canvas class="spark" id="mon-chart" height="90"></canvas>
+      <canvas class="spark" id="mon-chart" height="90" role="img" aria-label="Measured DNS request activity chart"></canvas>
       <div id="mon-legend" class="row small" style="margin-top:6px"></div>
     </div>
     <div class="grid k2">
@@ -380,14 +408,14 @@
       <p>Export a backup from the Android app (<i>Settings → Configuration Backup</i>), import it here to audit
       every custom rule, then export it again. Same JSON schema both ways; nothing is uploaded.</p>
       <div class="row" style="margin-top:10px">
-        <input type="file" id="import-file" accept=".json,application/json">
+        <input type="file" id="import-file" aria-label="Choose Android backup JSON file" accept=".json,application/json">
         <button class="primary" id="import-btn">Import</button>
         <button id="export-btn" disabled>Export merged config</button>
       </div>
       <div id="import-status"></div>
       <div id="sync-table-wrap" hidden style="margin-top:14px" class="scroll-x">
         <table>
-          <thead><tr><th>Rule</th><th>Type</th><th>Match</th><th>Enabled</th><th>Comment</th></tr></thead>
+          <thead><tr><th>Rule</th><th>Type</th><th>Match</th><th>Enabled</th><th>Comment</th><th>Action</th></tr></thead>
           <tbody id="rules-body"></tbody>
         </table>
       </div>
@@ -401,7 +429,7 @@
       static declarative-net-request block rules generated from the bundled ad/tracker feeds, plus cosmetic
       hiding on top sites. The archive is reproducible — rerunning the builder produces identical bytes.</p>
       <ul style="padding-left:20px; margin-top:8px">
-        <li>Download <code>omnishield-x-extension.zip</code> from this site's root and unzip it.</li>
+        <li>Download <code>omnishield-x-extension.zip</code> using the link below and unzip it.</li>
         <li>Open <code>chrome://extensions</code> → enable <b>Developer mode</b> → <b>Load unpacked</b> → select the folder.</li>
         <li>Pin the 🛡 icon. The popup shows per-tab counts from the browser's own matched-rule events when
         the browser exposes them (unpacked installs do); otherwise it prints “—” and the reason instead of a zero.</li>
@@ -426,7 +454,13 @@
 </main>
 
 <footer class="site">
-  OmniShield X · AETHER AI Evolution · rule feeds by HaGeZi (GPLv3) · everything on this page runs locally in your browser
+  <div>OmniShield X · AETHER AI Evolution · rule feeds by HaGeZi (GPLv3) · everything on this page runs locally in your browser</div>
+  <nav class="foot-links" aria-label="Site links">
+    <a href="../">AdShield Pro home</a>
+    <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest" rel="noopener">Android APK</a>
+    <a href="../privacy.html">Privacy policy</a>
+    <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">Source code</a>
+  </nav>
 </footer>
 
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>

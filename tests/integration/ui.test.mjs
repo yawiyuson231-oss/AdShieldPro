@@ -414,6 +414,42 @@ test('imported backup content is rendered as text, never as markup (XSS regressi
   });
 });
 
+test('backup import preserves disabled rules, EXACT match semantics, and comments', () => {
+  const backup = {
+    customRules: [
+      { rawPattern: 'disabled.tracker.example', ruleType: 'BLOCK', matchType: 'SUFFIX', isEnabled: false, comment: 'keep paused' },
+      { rawPattern: 'only.exact.example', ruleType: 'BLOCK', matchType: 'EXACT', isEnabled: true, comment: 'apex only' }
+    ],
+    protectionMode: 'BALANCED',
+    browserSiteExceptions: [],
+    excludedAppPackages: []
+  };
+  const file = new win.File([JSON.stringify(backup)], 'android-backup.json', { type: 'application/json' });
+  const input = $('#import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new win.Event('change', { bubbles: true }));
+
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        assert.equal(app.state.engine.evaluate('disabled.tracker.example').blocked, false, 'disabled rule must not block');
+        assert.equal(app.state.engine.evaluate('only.exact.example').blocked, true, 'EXACT rule must block apex');
+        assert.equal(app.state.engine.evaluate('cdn.only.exact.example').blocked, false, 'EXACT rule must not block subdomains');
+
+        const exported = app.buildState();
+        const disabled = exported.customRules.find((r) => r.pattern === 'disabled.tracker.example');
+        const exact = exported.customRules.find((r) => r.pattern === 'only.exact.example');
+        assert.equal(disabled?.isEnabled, false, 'disabled state must survive export/snapshot');
+        assert.equal(disabled?.comment, 'keep paused');
+        assert.equal(exact?.matchType, 'EXACT', 'EXACT matchType must survive export/snapshot');
+        assert.equal(exact?.comment, 'apex only');
+        assert.equal($('#export-btn').disabled, false);
+        resolve();
+      } catch (err) { reject(err); }
+    }, 120);
+  });
+});
+
 test('privacy report suppresses small buckets and states it leaves nothing behind', () => {
   app.navigate('privacy');
   const out = text('#privacy-out') + text('#privacy-note');

@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.2';
+const VERSION = 'omnishield-x-v5.0.3';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RULES_CACHE = `${VERSION}-rules`;
 
@@ -22,6 +22,7 @@ const SHELL_ASSETS = [
   './engine.js',
   './manifest.webmanifest',
   './assets/icon.svg',
+  './assets/extension-facts.json',
   './assets/core_supplement_ads.txt',
   './assets/core_supplement_aggressive.txt',
   './ui/dom.js',

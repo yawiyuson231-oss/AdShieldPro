@@ -374,7 +374,7 @@ export class OmniShieldFilterEngine {
    * Adds a user custom rule. Accepts `||domain^`, `@@||domain^`, plain domain.
    * @returns {boolean} false when the pattern could not be parsed
    */
-  addUserRule(pattern, isAllow) {
+  addUserRule(pattern, isAllow, matchType = 'SUFFIX') {
     // Video Safety: an entity-level, substring or shared-CDN block rule takes
     // playback down. Refuse it and keep the reason, instead of silently breaking
     // every video the user watches.
@@ -393,17 +393,19 @@ export class OmniShieldFilterEngine {
       .replace(/\^.*$/, '')
       .split('$')[0]
       .trim();
-    if (/[*?]/.test(cleaned)) {
+    const normalizedMatch = String(matchType || 'SUFFIX').toUpperCase();
+    if (/[*?]/.test(cleaned) || normalizedMatch === 'WILDCARD') {
       return this._addWildcard(cleaned, !!isAllow, isAllow ? 'USER_ALLOW' : 'USER_BLOCK', 'user');
     }
     const domain = OmniShieldFilterEngine.normalizeDomain(cleaned);
     if (!domain) return false;
+    const exactOnly = normalizedMatch === 'EXACT';
     if (isAllow) {
       this.customAllowExact.add(domain);
-      this.customAllowSuffix.add(domain);
+      if (!exactOnly) this.customAllowSuffix.add(domain);
     } else {
       this.customBlockExact.add(domain);
-      this.customBlockSuffix.add(domain);
+      if (!exactOnly) this.customBlockSuffix.add(domain);
     }
     this._invalidate();
     return true;
@@ -553,8 +555,14 @@ export class OmniShieldFilterEngine {
     }
 
     // 2. User blocklist.
+    if (this.customBlockExact.has(domain)) {
+      return {
+        domain, blocked: true, source: 'User Blocklist', action: 'BLOCK', category: 'USER_BLOCK', matched: domain,
+        reasons: [`You explicitly blocked ${domain}.`]
+      };
+    }
     for (const suffix of this._walk(domain)) {
-      if (this.customBlockExact.has(suffix) || this.customBlockSuffix.has(suffix)) {
+      if (this.customBlockSuffix.has(suffix)) {
         return {
           domain, blocked: true, source: 'User Blocklist', action: 'BLOCK', category: 'USER_BLOCK', matched: suffix,
           reasons: [`You explicitly blocked ${suffix}.`]

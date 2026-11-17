@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02060b">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="AdShield Pro and OmniShield X privacy policy and Google Play Data Safety disclosure. On-device DNS filtering, no developer analytics, no root required.">
+  <meta property="og:title" content="Privacy Policy — AdShield Pro">
+  <meta property="og:description" content="How AdShield Pro and the OmniShield X web platform handle DNS lookups, local logs, custom rules, and optional user-selected providers.">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="AdShield Pro">
+  <meta property="og:url" content="https://yawiyuson231-oss.github.io/AdShieldPro/privacy.html">
+  <meta property="og:image" content="https://yawiyuson231-oss.github.io/AdShieldPro/app-icon-512.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="AdShield Pro shield emblem">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Privacy Policy — AdShield Pro">
+  <meta name="twitter:description" content="On-device DNS filtering, local activity controls, and Google Play Data Safety summary for AdShield Pro.">
+  <meta name="twitter:image" content="https://yawiyuson231-oss.github.io/AdShieldPro/app-icon-512.png">
+  <link rel="canonical" href="https://yawiyuson231-oss.github.io/AdShieldPro/privacy.html">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 54'%3E%3Cpath d='M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z' fill='%2314e8a2'/%3E%3Ccircle cx='24' cy='26.5' r='8.4' fill='none' stroke='%2302060b' stroke-width='3.8'/%3E%3Cpath d='m18.2 20.7 11.6 11.6' stroke='%2302060b' stroke-width='3.8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="app-icon-512.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+  <title>Privacy Policy — AdShield Pro</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #02060b;
+      --surface: rgba(10, 24, 40, .72);
+      --line: rgba(120, 255, 220, .13);
+      --line-strong: rgba(120, 255, 220, .28);
+      --text: #eefcf8;
+      --muted: #a6bec0;
+      --dim: #738c95;
+      --emerald: #14e8a2;
+      --cyan: #22e4ff;
+      --neon: #8dffdc;
+      --grad: linear-gradient(120deg, var(--emerald), var(--cyan));
+      --container: 960px;
+      --gutter: clamp(16px, 4vw, 40px);
+      --font-display: "Space Grotesk", Inter, ui-sans-serif, system-ui, sans-serif;
+      --font-body: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { background: var(--bg); scroll-behavior: smooth; scroll-padding-top: 84px; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text); font: 16px/1.7 var(--font-body);
+      background:
+        radial-gradient(45% 32% at 15% 6%, rgba(20, 232, 162, .11), transparent 70%),
+        radial-gradient(38% 28% at 88% 12%, rgba(34, 228, 255, .09), transparent 70%),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--neon); text-underline-offset: 3px; }
+    a:hover { color: #fff; }
+    :focus-visible { outline: 2px solid var(--neon); outline-offset: 3px; border-radius: 6px; }
+    .container { width: min(var(--container), calc(100% - var(--gutter) * 2)); margin-inline: auto; }
+    .skip-link {
+      position: fixed; left: 16px; top: -60px; z-index: 200;
+      padding: 10px 16px; border-radius: 10px; background: var(--emerald); color: #021a12;
+      font-weight: 700; text-decoration: none; transition: top .2s;
+    }
+    .skip-link:focus { top: 16px; }
+
+    header.site-header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(3, 9, 16, .84);
+      -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+    .header-inner {
+      min-height: 68px; display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: space-between; gap: 12px 20px; padding-block: 10px;
+    }
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+      color: var(--text); font: 700 1.08rem var(--font-display); letter-spacing: -.02em;
+    }
+    .brand b { margin-left: 3px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .brand svg { width: 28px; height: 32px; flex: none; }
+    .header-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: .9rem; }
+    .header-nav a { color: var(--muted); text-decoration: none; padding: 6px 8px; border-radius: 8px; }
+    .header-nav a:hover { color: var(--text); }
+    .header-nav a.cta {
+      color: #01170f; background: var(--grad); font: 700 .76rem var(--font-display);
+      letter-spacing: .08em; text-transform: uppercase; padding: 9px 14px; border-radius: 10px;
+    }
+
+    main { padding-block: clamp(36px, 6vw, 72px); }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      color: var(--neon); font: 600 .72rem var(--font-mono); letter-spacing: .16em; text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 12px var(--emerald); }
+    h1 {
+      font-family: var(--font-display); font-size: clamp(1.9rem, 4.6vw, 3.1rem);
+      line-height: 1.1; letter-spacing: -.03em; margin: 14px 0 14px;
+    }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--dim);
+      font: 500 .8rem var(--font-mono); margin: 0 0 28px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
+      padding: clamp(20px, 3.5vw, 32px); margin-bottom: 18px;
+    }
+    h2 {
+      font-family: var(--font-display); font-size: clamp(1.2rem, 2.4vw, 1.5rem);
+      margin: 0 0 12px; letter-spacing: -.02em; color: var(--text);
+    }
+    h3 {
+      font-family: var(--font-display); font-size: 1.05rem;
+      margin: 20px 0 8px; color: var(--neon);
+    }
+    p { margin: 0 0 12px; color: var(--muted); }
+    p:last-child, ul:last-child, ol:last-child { margin-bottom: 0; }
+    ul, ol { margin: 0 0 12px; padding-left: 22px; color: var(--muted); }
+    li { margin-bottom: 8px; }
+    li strong { color: var(--text); }
+    code {
+      font: 500 .86em var(--font-mono); color: var(--neon);
+      background: rgba(20, 232, 162, .08); padding: 2px 6px; border-radius: 6px;
+    }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; min-width: 600px; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; color: var(--muted); }
+    th { color: var(--neon); font: 600 .72rem var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+    td strong { color: var(--text); }
+
+    footer.site-footer {
+      border-top: 1px solid var(--line); padding-block: 24px 32px;
+      color: var(--dim); font-size: .86rem;
+    }
+    .footer-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+    .footer-links a { color: var(--muted); text-decoration: none; }
+    .footer-links a:hover { color: var(--neon); }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="./" aria-label="AdShield Pro home">
+        <svg viewBox="0 0 48 54" aria-hidden="true">
+          <defs>
+            <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#8dffdc"/><stop offset=".5" stop-color="#14e8a2"/><stop offset="1" stop-color="#22e4ff"/>
+            </linearGradient>
+          </defs>
+          <path d="M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z" fill="none" stroke="url(#g-brand)" stroke-width="4"/>
+          <circle cx="24" cy="26.5" r="8.4" fill="none" stroke="url(#g-brand)" stroke-width="3.6"/>
+          <path d="m18.2 20.7 11.6 11.6" fill="none" stroke="url(#g-brand)" stroke-linecap="round" stroke-width="3.6"/>
+        </svg>
+        <span>AdShield<b>Pro</b></span>
+      </a>
+      <nav class="header-nav" aria-label="Site navigation">
+        <a href="./">Home</a>
+        <a href="app/">Web platform</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">GitHub</a>
+        <a class="cta" href="./#download">Download APK</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="container">
+    <div class="eyebrow">Privacy &amp; Data Safety</div>
+    <h1>Privacy Policy &amp; Google Play Data Safety Disclosure</h1>
+    <p class="meta">
+      <span>Effective date: November 17, 2026</span>
+      <span>Application: AdShield Pro (<code>com.adshield.pro</code>)</span>
+      <span>Companion web app: OmniShield X (<code>/app/</code>)</span>
+    </p>
+
+    <section class="card" aria-labelledby="s1">
+      <h2 id="s1">1. Core Privacy Commitment</h2>
+      <p>AdShield Pro is engineered as a local, on-device privacy and DNS filtering firewall for Android, paired with a static browser-only companion platform.</p>
+      <ul>
+        <li><strong>No Root Required:</strong> AdShield Pro operates exclusively in standard Android user space.</li>
+        <li><strong>No Developer Analytics or Data Sale:</strong> Neither the Android app nor the website includes developer analytics, advertising SDKs, crash-tracking SDKs, or developer-operated collection endpoints, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud, and media hosts) receive the requests needed to provide their service and are governed by their own privacy policies.</li>
+        <li><strong>No HTTPS Interception or Root Certificates:</strong> AdShield Pro never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="s2">
+      <h2 id="s2">2. How Android <code>VpnService</code> Is Used</h2>
+      <p>AdShield Pro uses Android’s <code>android.net.VpnService</code> API strictly to establish a local on-device virtual DNS interface (<code>10.215.173.1/30</code> and <code>fd00:ad5:1e1d::1/126</code>):</p>
+      <ol>
+        <li><strong>DNS-Only Routing:</strong> Only traffic destined for the virtual DNS addresses (<code>10.215.173.2/32</code> and <code>fd00:ad5:1e1d::2/128</code>) is routed into the local TUN interface. Non-DNS TCP, UDP, and QUIC application traffic flows directly over your physical Wi-Fi or mobile data connection without passing through a remote VPN server.</li>
+        <li><strong>Local Rule Evaluation:</strong> Each DNS query is evaluated locally in memory against your enabled blocklists, scheduled profile rules, and custom allow/block rules. Blocked domains are answered on-device with <code>NXDOMAIN</code> or a <code>0.0.0.0</code> / <code>::</code> sinkhole. Allowed domains are forwarded using your chosen protocol: encrypted <strong>DNS-over-HTTPS (DoH, RFC 8484)</strong>, <strong>DNS-over-TLS (DoT, RFC 7858)</strong>, or <strong>DNS-over-QUIC (DoQ, RFC 9250)</strong>, or unencrypted UDP/TCP port 53 when selected. If DoH, DoT, or DoQ is unavailable, the app returns DNS <code>SERVFAIL</code> instead of silently downgrading to plaintext.</li>
+        <li><strong>Resilience Controls (Local):</strong> Per-app DNS policies, per-network policies, scheduled Quiet Hours profiles, emergency allowlist-only mode, optional failover between resolvers you select, and DNSSEC evidence reporting are evaluated locally and stored only in on-device DataStore (and optional local backup files you export yourself).</li>
+        <li><strong>Local File Scanning:</strong> File scanning runs on-device over files you select using signature and structural checks; no file content, hash, or verdict is uploaded.</li>
+      </ol>
+    </section>
+
+    <section class="card" aria-labelledby="s3">
+      <h2 id="s3">3. Upstream Encrypted DNS Providers</h2>
+      <p>When a DNS query is allowed by your local filtering rules (or run manually in the web platform’s DNS Lab), it is resolved by your selected upstream DNS provider:</p>
+      <ul>
+        <li><strong>Cloudflare (<code>1.1.1.1</code>)</strong> — <a href="https://developers.cloudflare.com/1.1.1.1/privacy/public-dns-resolver/" rel="noopener">Cloudflare 1.1.1.1 Privacy Commitment</a></li>
+        <li><strong>Quad9 (<code>9.9.9.9</code>)</strong> — <a href="https://www.quad9.net/privacy/policy/" rel="noopener">Quad9 Privacy Policy</a></li>
+        <li><strong>AdGuard DNS</strong> — <a href="https://adguard-dns.io/en/privacy.html" rel="noopener">AdGuard DNS Privacy Notice</a></li>
+        <li><strong>Google Public DNS (<code>8.8.8.8</code>)</strong> — <a href="https://developers.google.com/speed/public-dns/privacy" rel="noopener">Google Public DNS Privacy Notice</a></li>
+        <li><strong>Custom DNS Resolver</strong> — Subject to the privacy policy of the operator you configure.</li>
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="s4">
+      <h2 id="s4">4. Local Activity Logging, Browser, Files &amp; User Deletion Controls</h2>
+      <ul>
+        <li><strong>Optional Local Logging:</strong> Per-domain DNS query logs are stored exclusively on your device and can be toggled off at any time in the Activity tab.</li>
+        <li><strong>Automatic Retention Pruning:</strong> Local DNS logs are automatically purged after your selected retention window (1–90 days).</li>
+        <li><strong>One-Tap Deletion:</strong> Tapping <strong>Clear History</strong> in the Activity tab permanently deletes local DNS logs and historical statistics. Security → History provides a separate control for persisted scan reports.</li>
+        <li><strong>Platform Backups:</strong> App-private data is excluded from Android cloud backup and device transfer. Manual JSON exports omit DNS query history, scan reports, storage passwords, search history, and download history.</li>
+        <li><strong>Companion Web Platform (<code>/app/</code>):</strong> Runs locally in your browser using static files. Configuration snapshots and salted, k-anonymous aggregate counters remain in your browser storage until you clear them; no data is transmitted to a project backend.</li>
+      </ul>
+
+      <h3>4A. Private Search and Built-In Browser</h3>
+      <p>DuckDuckGo is the default search provider; Google can be selected. Search queries go over HTTPS to the selected provider. Search suggestions are off by default. Private mode disables WebView cookies, DOM storage, and cache and clears session data on exit, without claiming network anonymity.</p>
+
+      <h3>4B. SAF Files, Security Reports, and Duplicates</h3>
+      <p>Files and folders are accessed only after you grant an Android Storage Access Framework URI. AdShield Pro does not request all-files access and cannot read other apps’ private sandboxes. Scans, duplicate checks, and hashes run locally.</p>
+
+      <h3>4C. Nextcloud / WebDAV and Optional Storage Providers</h3>
+      <p>No cloud storage provider is connected by default. If you configure one, account metadata stays in local Room storage and passwords are encrypted with an Android Keystore AES-GCM key. Transfers go directly between your device and the server you authorized.</p>
+
+      <h3>4D. Direct-Media Downloads</h3>
+      <p>Inspecting or downloading a permitted direct HTTPS media URL contacts that media host directly and stores download history locally in Room until you delete it. AdShield Pro does not bypass authentication, DRM, or site restrictions.</p>
+    </section>
+
+    <section class="card" aria-labelledby="s5">
+      <h2 id="s5">5. Google Play Data Safety Summary</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Data Category</th>
+              <th scope="col">Collected Off-Device?</th>
+              <th scope="col">Shared with Third Parties?</th>
+              <th scope="col">Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Web browsing / DNS queries</td>
+              <td><strong>No developer collection</strong> (processed locally; allowed queries go to your selected resolver)</td>
+              <td><strong>Only user-selected DNS resolver</strong></td>
+              <td>Local filtering and DNS resolution</td>
+            </tr>
+            <tr>
+              <td>Search text / suggestions</td>
+              <td><strong>No developer collection</strong> (sent only when searching; suggestions opt-in)</td>
+              <td><strong>Selected DuckDuckGo or Google provider</strong></td>
+              <td>User-requested search</td>
+            </tr>
+            <tr>
+              <td>Files, filenames &amp; security hashes</td>
+              <td><strong>No developer collection</strong> (local by default; cloud transfer only on user action)</td>
+              <td><strong>User-authorized WebDAV/Nextcloud or share target</strong></td>
+              <td>File management, scanning &amp; storage</td>
+            </tr>
+            <tr>
+              <td>Cloud account / password</td>
+              <td><strong>No developer collection</strong> (password encrypted locally via Android Keystore)</td>
+              <td><strong>User-authorized storage provider</strong></td>
+              <td>User-requested cloud connection</td>
+            </tr>
+            <tr>
+              <td>Direct media URL / download metadata</td>
+              <td><strong>No developer collection</strong> (history local; URL sent to host on user action)</td>
+              <td><strong>User-selected media host</strong></td>
+              <td>User-requested download</td>
+            </tr>
+            <tr>
+              <td>Installed app list (<code>QUERY_ALL_PACKAGES</code>)</td>
+              <td><strong>No</strong> (never leaves device)</td>
+              <td><strong>No</strong></td>
+              <td>Per-app DNS controls and local audit</td>
+            </tr>
+            <tr>
+              <td>Diagnostics / crash-tracking SDKs</td>
+              <td><strong>None included</strong></td>
+              <td><strong>No</strong></td>
+              <td>Zero third-party tracking SDKs</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Source document in version control: <a href="https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md" rel="noopener"><code>docs/PRIVACY_POLICY.md</code> on GitHub</a>.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© <span id="year">2026</span> AdShield Pro · GPL-3.0-or-later</span>
+      <nav class="footer-links" aria-label="Footer links">
+        <a href="./">Home</a>
+        <a href="app/">Web platform</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Releases</a>
+        <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">Source code</a>
+      </nav>
+    </div>
+  </footer>
+  <script>
+    (() => {
+      const y = document.getElementById('year');
+      if (y) y.textContent = String(new Date().getFullYear());
+    })();
+  </script>
+</body>
+</html>
