@@ -216,7 +216,9 @@ async function rebuildEngine() {
   }
   await loadInstalledFeeds(engine);
   state.customRules.forEach((rule) => {
-    if (rule.enabled !== false) rule.applied = engine.addUserRule(rule.pattern, rule.isAllow);
+    rule.applied = rule.enabled !== false
+      ? engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType)
+      : false;
   });
   state.engine = engine;
   state.aether.attachEngine(engine);
@@ -264,6 +266,12 @@ function handleObservation(event) {
 /* Configuration persistence                                           */
 /* ------------------------------------------------------------------ */
 
+function normalizeMatchType(raw, pattern = '') {
+  const value = String(raw || '').trim().toUpperCase();
+  if (value === 'EXACT' || value === 'WILDCARD' || value === 'SUFFIX') return value;
+  return /[*?]/.test(String(pattern || '')) ? 'WILDCARD' : 'SUFFIX';
+}
+
 function buildState({ includeModel = false } = {}) {
   const aetherState = state.aether ? state.aether.exportState() : null;
   if (aetherState) {
@@ -272,10 +280,22 @@ function buildState({ includeModel = false } = {}) {
   }
   return {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: '5.0.2',
+    appVersion: '5.0.3',
     savedAt: new Date().toISOString(),
     settings: { ...state.settings },
-    customRules: state.customRules.map((r) => ({ pattern: r.pattern, isAllow: r.isAllow, rawPattern: r.pattern, ruleType: r.isAllow ? 'ALLOW' : 'BLOCK', matchType: 'SUFFIX', isEnabled: true })),
+    customRules: state.customRules.map((r) => {
+      const matchType = normalizeMatchType(r.matchType, r.pattern);
+      const comment = typeof r.comment === 'string' ? r.comment : '';
+      return {
+        pattern: r.pattern,
+        isAllow: !!r.isAllow,
+        rawPattern: r.pattern,
+        ruleType: r.isAllow ? 'ALLOW' : 'BLOCK',
+        matchType,
+        isEnabled: r.enabled !== false,
+        ...(comment ? { comment } : {})
+      };
+    }),
     aether: aetherState,
     firewall: state.firewall ? { policies: state.firewall.snapshot().policies, config: state.firewall.config } : null,
     // Android backup fields are preserved verbatim when a backup was imported.
@@ -288,7 +308,7 @@ function buildState({ includeModel = false } = {}) {
 function applyUserRules() {
   for (const rule of state.customRules) {
     if (rule.enabled === false) { rule.applied = false; continue; }
-    rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow);
+    rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
   }
 }
 
@@ -298,11 +318,16 @@ function applySavedState(saved = {}) {
   }
   if (Array.isArray(saved.customRules)) {
     state.customRules = saved.customRules
-      .map((r) => ({
-        pattern: String(r.pattern ?? r.rawPattern ?? '').trim(),
-        isAllow: r.isAllow ?? r.ruleType === 'ALLOW',
-        enabled: r.isEnabled !== false
-      }))
+      .map((r) => {
+        const pattern = String(r.pattern ?? r.rawPattern ?? '').trim();
+        return {
+          pattern,
+          isAllow: r.isAllow ?? r.ruleType === 'ALLOW',
+          matchType: normalizeMatchType(r.matchType, pattern),
+          enabled: r.isEnabled !== false,
+          comment: typeof r.comment === 'string' ? r.comment : ''
+        };
+      })
       .filter((r) => r.pattern);
   }
   if (saved.aether && state.aether) state.aether.importState(saved.aether);
@@ -880,6 +905,7 @@ function renderDnsResult(out, result, type) {
     const cacheLabel = a.cached && aaaa.cached ? 'hit' : (a.cached || aaaa.cached ? 'partial hit' : 'miss');
     const primaryReasons = a.reasons?.length ? a.reasons : (aaaa.reasons || []);
     const cnameSource = a.cname?.length ? a : (aaaa.cname?.length ? aaaa : null);
+    const video = classifyVideoHost(result.name);
     mount(out,
       h('div', { class: `verdict ${cls}` },
         h('h3', { text: `${result.name} — ${result.blocked ? 'blocked' : a.ok || aaaa.ok ? 'resolved' : 'not resolved'}` }),
@@ -890,6 +916,13 @@ function renderDnsResult(out, result, type) {
           ...primaryReasons.map((r) => h('li', { text: r }))
         )
       ),
+      (video.protected || video.adIntent)
+        ? h('div', { class: 'row', style: { marginTop: '8px' } },
+          video.protected ? pill('media playback host — never blocked as an advert', 'ok') : null,
+          video.adIntent ? pill('third-party advert host — safe to block', 'warn') : null,
+          h('span', { class: 'small muted', text: video.reason })
+        )
+        : null,
       h('h3', { text: 'Per-family detail' }),
       table(['Query', 'Status', 'Resolver', 'Transport', 'DNSSEC', 'Latency'], [
         ['A', a.status, a.resolver?.name ?? '—', a.transport ?? '—', a.dnssec?.status ?? '—', `${a.latencyMs} ms`],
@@ -1456,18 +1489,22 @@ function renderSync() {
       )
     );
   }
+  const exportBtn = document.getElementById('export-btn');
+  if (exportBtn) exportBtn.disabled = !(state.importedBackup || state.customRules.length > 0);
   const wrap = document.getElementById('rules-body');
   if (wrap) {
     ui.clear(wrap);
     if (!state.customRules.length) {
-      wrap.appendChild(h('tr', {}, h('td', { colspan: 5, class: 'empty' }, 'No custom rules yet. Allow or block a domain from AETHER, or import an Android backup.')));
+      wrap.appendChild(h('tr', {}, h('td', { colspan: 6, class: 'empty' }, 'No custom rules yet. Allow or block a domain from AETHER, or import an Android backup.')));
     }
     for (const rule of state.customRules) {
+      const matchLabel = normalizeMatchType(rule.matchType, rule.pattern).toLowerCase();
       wrap.appendChild(h('tr', {},
         h('td', { class: 'mono', text: rule.pattern }),
         h('td', {}, pill(rule.isAllow ? 'ALLOW' : 'BLOCK', rule.isAllow ? 'ok' : 'bad')),
-        h('td', { text: 'suffix' }),
+        h('td', { text: matchLabel }),
         h('td', { text: rule.enabled === false ? 'off' : (rule.applied === false ? 'ignored' : 'on') }),
+        h('td', { class: 'small muted', text: rule.comment || '—' }),
         h('td', {},
           h('button', {
             class: 'sm ghost', text: 'Remove',
@@ -1505,10 +1542,16 @@ function importAndroidBackup(file) {
         const pattern = String(rule.rawPattern ?? rule.pattern ?? '').trim();
         if (!pattern) continue;
         const isAllow = rule.ruleType === 'ALLOW' || rule.isAllow === true;
+        const matchType = normalizeMatchType(rule.matchType, pattern);
         const enabled = rule.isEnabled !== false;
-        if (state.customRules.some((r) => r.pattern === pattern && r.isAllow === isAllow)) continue;
-        const didApply = enabled ? state.engine.addUserRule(pattern, isAllow) : false;
-        state.customRules.push({ pattern, isAllow, enabled, applied: didApply });
+        const comment = typeof rule.comment === 'string' ? rule.comment : '';
+        const existing = state.customRules.find((r) => r.pattern === pattern && r.isAllow === isAllow && normalizeMatchType(r.matchType, r.pattern) === matchType);
+        if (existing) {
+          if (comment && !existing.comment) existing.comment = comment;
+          continue;
+        }
+        const didApply = enabled ? state.engine.addUserRule(pattern, isAllow, matchType) : false;
+        state.customRules.push({ pattern, isAllow, matchType, enabled, comment, applied: didApply });
         if (didApply) applied++;
       }
       state.aether.reputation.cache.clear();
@@ -1537,7 +1580,7 @@ function exportMergedConfig() {
     ...(state.importedBackup || {}),
     ...buildState({ includeModel: true }),
     exportedAt: new Date().toISOString(),
-    exportedBy: 'OmniShield X web platform v5.0.2'
+    exportedBy: 'OmniShield X web platform v5.0.3'
   };
   download('omnishield-x-config.json', JSON.stringify(payload, null, 2));
   toast('Merged configuration exported.', 'ok');
@@ -1699,6 +1742,16 @@ function registerServiceWorker() {
 /* ------------------------------------------------------------------ */
 
 function wireEvents() {
+  const topHeader = document.querySelector('header.top');
+  if (topHeader && typeof ResizeObserver === 'function') {
+    const syncTopHeight = () => {
+      const hPx = Math.round(topHeader.getBoundingClientRect().height);
+      if (hPx > 0) document.documentElement.style.setProperty('--top-h', `${hPx}px`);
+    };
+    syncTopHeight();
+    new ResizeObserver(syncTopHeight).observe(topHeader);
+  }
+
   const aetherInput = document.getElementById('aether-input');
   document.getElementById('aether-go').addEventListener('click', () => analyseDomain(aetherInput.value));
   aetherInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') analyseDomain(aetherInput.value); });
@@ -1783,9 +1836,11 @@ function wireEvents() {
     }
   });
   document.getElementById('import-btn').addEventListener('click', () => {
-    const file = document.getElementById('import-file').files?.[0];
-    if (!file) { mount('#import-status', note('Choose a JSON backup exported from the Android app first.', 'warn')); return; }
-    importAndroidBackup(file);
+    const input = document.getElementById('import-file');
+    const file = input.files?.[0];
+    if (file) { importAndroidBackup(file); return; }
+    if (state.importedBackup) { input.click(); return; }
+    mount('#import-status', note('Choose a JSON backup exported from the Android app first.', 'warn'));
   });
   document.getElementById('export-btn').addEventListener('click', exportMergedConfig);
 }

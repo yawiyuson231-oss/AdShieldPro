@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://yawiyuson231-oss.github.io/AdShieldPro/sitemap.xml

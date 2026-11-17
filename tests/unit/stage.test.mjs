@@ -11,7 +11,7 @@ import { strict as assert } from 'node:assert';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { stageSite, checkPrecache, APP_ROOT_FILES, APP_DIRS } from '../../scripts/stage-site.mjs';
+import { stageSite, checkPrecache, checkSiteLinks, APP_ROOT_FILES, APP_DIRS } from '../../scripts/stage-site.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
@@ -47,10 +47,18 @@ test('the real repository stages into a deployable tree', () => {
     const result = stageSite({ out: join(out, 'site') });
     assert.ok(result.precache >= 20, `expected the full precache list, got ${result.precache}`);
     assert.ok(existsSync(join(result.out, 'index.html')), 'marketing site keeps the root');
-    for (const file of ['index.html', 'app.js', 'engine.js', 'sw.js', 'manifest.webmanifest']) {
+    for (const file of ['privacy.html', '404.html', '.nojekyll', 'robots.txt', 'sitemap.xml', 'app-icon-512.png']) {
+      assert.ok(existsSync(join(result.out, file)), `${file} must be staged at the site root`);
+    }
+    assert.ok(!existsSync(join(result.out, 'design')), 'internal design references must not ship');
+    assert.ok(result.linksChecked >= 20, `expected internal links to be audited, got ${result.linksChecked}`);
+    for (const file of ['index.html', 'app.js', 'engine.js', 'sw.js', 'manifest.webmanifest', 'omnishield-x-extension.zip']) {
       assert.ok(existsSync(join(result.appDir, file)), `${file} must be staged under /app/`);
     }
     assert.ok(existsSync(join(result.appDir, 'assets/core_lite_ads.txt')), 'the rule feed must ship');
+    assert.ok(existsSync(join(result.appDir, 'assets/extension-facts.json')), 'extension facts must ship');
+    const precache = checkPrecache(result.appDir);
+    assert.ok(precache.listed.includes('./assets/extension-facts.json'), 'sw.js must precache extension facts for offline use');
     assert.ok(!existsSync(join(result.appDir, 'tests')), 'tests must never be published');
     assert.ok(!existsSync(join(result.appDir, 'node_modules')), 'node_modules must never be published');
     assert.ok(!existsSync(join(result.appDir, 'package.json')), 'dev metadata must never be published');
@@ -97,6 +105,24 @@ test('the assembler refuses a repository without a marketing site', () => {
   try {
     rmSync(join(dir, 'docs'), { recursive: true, force: true });
     assert.throws(() => stageSite({ out: '_site', root: dir }), /docs\/index\.html/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('broken internal links or anchors fail the site assembly', () => {
+  const dir = fixture();
+  try {
+    writeFileSync(join(dir, 'docs/index.html'), '<h1>AdShield Pro</h1><a href="missing-page.html">broken</a>');
+    assert.throws(() => stageSite({ out: '_site', root: dir }), /broken internal links.*missing-page\.html/i);
+
+    writeFileSync(join(dir, 'docs/index.html'), '<h1 id="top">AdShield Pro</h1><a href="#nope">bad anchor</a>');
+    const siteOut = join(dir, 'manual');
+    mkdirSync(siteOut, { recursive: true });
+    cpSync(join(dir, 'docs/index.html'), join(siteOut, 'index.html'));
+    const report = checkSiteLinks(siteOut);
+    assert.equal(report.ok, false);
+    assert.match(report.error, /missing #nope/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

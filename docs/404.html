@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02060b">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex">
+  <title>Page Not Found — AdShield Pro</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 54'%3E%3Cpath d='M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z' fill='%2314e8a2'/%3E%3Ccircle cx='24' cy='26.5' r='8.4' fill='none' stroke='%2302060b' stroke-width='3.8'/%3E%3Cpath d='m18.2 20.7 11.6 11.6' stroke='%2302060b' stroke-width='3.8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #02060b;
+      --surface: rgba(10, 24, 40, .75);
+      --line: rgba(120, 255, 220, .2);
+      --text: #eefcf8;
+      --muted: #9fb6b8;
+      --dim: #6f8790;
+      --emerald: #14e8a2;
+      --cyan: #22e4ff;
+      --neon: #8dffdc;
+      --grad: linear-gradient(120deg, var(--emerald), var(--cyan));
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--bg); color: var(--text); }
+    body {
+      display: grid; place-items: center; padding: 24px;
+      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background:
+        radial-gradient(45% 40% at 20% 18%, rgba(20, 232, 162, .13), transparent 70%),
+        radial-gradient(42% 36% at 82% 80%, rgba(34, 228, 255, .11), transparent 70%),
+        var(--bg);
+    }
+    :focus-visible { outline: 2px solid var(--neon); outline-offset: 3px; border-radius: 8px; }
+    main {
+      width: min(560px, 100%); text-align: center; padding: clamp(28px, 6vw, 48px);
+      background: var(--surface); border: 1px solid var(--line); border-radius: 24px;
+      box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .85);
+    }
+    .mark { width: 58px; height: 66px; margin: 0 auto 16px; display: block; filter: drop-shadow(0 0 18px rgba(20, 232, 162, .5)); }
+    .code {
+      display: inline-block; padding: 5px 12px; border-radius: 99px;
+      border: 1px solid var(--line); color: var(--neon);
+      font: 700 .75rem ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .16em;
+    }
+    h1 { font-size: clamp(1.7rem, 5vw, 2.4rem); line-height: 1.12; letter-spacing: -.03em; margin: 16px 0 10px; }
+    p { margin: 0 0 24px; color: var(--muted); }
+    .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 48px;
+      padding: 12px 20px; border-radius: 13px; text-decoration: none;
+      font-weight: 700; font-size: .84rem; letter-spacing: .08em; text-transform: uppercase;
+      border: 1px solid var(--line); color: var(--text); background: rgba(255, 255, 255, .04);
+    }
+    .btn:hover { border-color: var(--cyan); background: rgba(34, 228, 255, .08); }
+    .btn-primary { color: #01170f; background: var(--grad); border-color: transparent; }
+    .btn-primary:hover { background: var(--grad); filter: brightness(1.06); }
+    .links { margin-top: 22px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; font-size: .88rem; color: var(--dim); }
+    .links a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); }
+    .links a:hover { color: var(--neon); border-color: var(--neon); }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <svg class="mark" viewBox="0 0 48 54" aria-hidden="true">
+      <defs>
+        <linearGradient id="g-brand" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8dffdc"/><stop offset=".5" stop-color="#14e8a2"/><stop offset="1" stop-color="#22e4ff"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 2 44 10v15c0 13-8 21-20 27C12 46 4 38 4 25V10L24 2Z" fill="none" stroke="url(#g-brand)" stroke-width="4"/>
+      <circle cx="24" cy="26.5" r="8.4" fill="none" stroke="url(#g-brand)" stroke-width="3.6"/>
+      <path d="m18.2 20.7 11.6 11.6" fill="none" stroke="url(#g-brand)" stroke-linecap="round" stroke-width="3.6"/>
+    </svg>
+    <span class="code">HTTP 404 · NXDOMAIN</span>
+    <h1>That page could not be found.</h1>
+    <p>The link may have moved or never existed. Jump back to AdShield Pro, open the browser security platform, or grab the latest signed Android APK.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="./" data-site-rel="">AdShield Pro Home</a>
+      <a class="btn" href="app/" data-site-rel="app/">Open Web Platform</a>
+    </div>
+    <nav class="links" aria-label="Helpful links">
+      <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest" rel="noopener">Download APK</a>
+      <span aria-hidden="true">·</span>
+      <a href="privacy.html" data-site-rel="privacy.html">Privacy policy</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">GitHub</a>
+    </nav>
+  </main>
+  <script>
+    (() => {
+      // Resolve site-relative targets cleanly even when 404.html is served from a deep path.
+      const base = location.pathname.startsWith('/AdShieldPro/') ? '/AdShieldPro/' : '/';
+      document.querySelectorAll('[data-site-rel]').forEach((link) => {
+        link.setAttribute('href', base + link.getAttribute('data-site-rel'));
+      });
+    })();
+  </script>
+</body>
+</html>

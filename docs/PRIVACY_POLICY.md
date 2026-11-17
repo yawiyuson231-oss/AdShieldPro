@@ -1,6 +1,6 @@
 # AdShield Pro / OMNISHIELD X INFINITY — Privacy Policy & Google Play Data Safety Disclosure
 
-**Effective Date:** November 4, 2026
+**Effective Date:** November 17, 2026
 
 **Application:** AdShield Pro (`com.adshield.pro`)
 
@@ -21,7 +21,7 @@ AdShield Pro uses the Android `android.net.VpnService` API strictly to establish
 1. **DNS-Only Routing:** Only traffic destined for the virtual DNS addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) is routed into the local TUN interface. All non-DNS TCP, UDP, and QUIC application traffic flows directly over your physical Wi-Fi or mobile data interface without passing through a remote VPN server.
 2. **Local Rule Evaluation:** Each DNS query is evaluated locally in memory against your enabled blocklists and custom rules.
    - **Blocked Domains:** Immediately answered on-device with `NXDOMAIN` or `0.0.0.0` / `::` sinkhole in `< 1 ms`.
-   - **Allowed Domains:** Forwarded using the protocol you select: encrypted **DNS-over-HTTPS (DoH, RFC 8484)** or **DNS-over-TLS (DoT, RFC 7858)**, or unencrypted UDP/TCP port 53. If DoH or DoT is unavailable, the app returns DNS `SERVFAIL` instead of silently downgrading that query to plaintext.
+   - **Allowed Domains:** Forwarded using the protocol you select: encrypted **DNS-over-HTTPS (DoH, RFC 8484)**, **DNS-over-TLS (DoT, RFC 7858)**, or **DNS-over-QUIC (DoQ, RFC 9250)**, or unencrypted UDP/TCP port 53. If DoH, DoT, or DoQ is unavailable, the app returns DNS `SERVFAIL` instead of silently downgrading that query to plaintext.
 3. **Resilience Controls (Local):** Per-app DNS policies, per-network (Wi-Fi / mobile data / Ethernet / other) policies, an emergency allowlist-only mode, optional failover between providers **you** select, and DNSSEC evidence reporting are all evaluated on-device from local settings. These settings never leave the device, are stored only in on-device DataStore, and are included in the local configuration backup you export yourself. Enabling failover means additional providers you selected may receive queries when the primary fails; an encrypted protocol never falls back to plaintext.
 4. **Local File Scanning:** File scanning runs entirely on-device over files you choose using signature and structural checks; no YARA rule engine is bundled, and no file content, hash or verdict is uploaded.
 

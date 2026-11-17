@@ -1,4 +1,4 @@
-# OmniShield X web platform — AETHER AI Evolution (v5.0.1)
+# OmniShield X web platform — AETHER AI Evolution (v5.0.3)
 
 > Part of the [AdShield Pro repository](../README.md). The Android app lives in
 > [`app/`](../app); this document covers the browser platform that sits beside it.

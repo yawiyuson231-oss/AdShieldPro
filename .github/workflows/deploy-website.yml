@@ -2,13 +2,15 @@ name: Deploy website
 
 # Publishes the project website to GitHub Pages.
 #
-#   /            ← docs/            (marketing site, APK links)
-#   /app/        ← the web platform (index.html, app.js, modules, feeds)
+#   /            ← public files in docs/ (marketing site, privacy.html, 404.html, icons)
+#   /app/        ← the web platform      (index.html, app.js, modules, feeds, extension zip)
 #
 # The web platform is static and uses relative URLs, so serving it from a
 # subdirectory works unchanged (its service worker scope is /app/).
-# Runs on every change to docs/ or the web platform, and can be triggered by hand.
-# Safe to re-run: the job is idempotent and only needs the default token.
+# Runs on every push to main (including after any legacy branch-based Pages build
+# so the staged artifact can never be overwritten with the raw repository root),
+# on published releases, on working-branch previews (build verification only),
+# and on manual dispatch.
 
 on:
   workflow_dispatch:
@@ -16,22 +18,10 @@ on:
     branches:
       - main
       - 'arena/**'
-    paths:
-      - 'docs/**'
-      - 'index.html'
-      - 'app.js'
-      - 'engine.js'
-      - 'sw.js'
-      - 'manifest.webmanifest'
-      - 'assets/**'
-      - 'ui/**'
-      - 'dns/**'
-      - 'guard/**'
-      - 'aether/**'
-      - 'security/**'
-      - 'scripts/stage-site.mjs'
-      - 'omnishield-x-extension.zip'
-      - '.github/workflows/deploy-website.yml'
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -39,6 +29,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -49,25 +40,48 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
 
       - name: Check the site files are present
         run: |
           test -s docs/index.html
+          test -s docs/privacy.html
+          test -s docs/404.html
+          test -f docs/.nojekyll
+          test -s docs/robots.txt
+          test -s docs/sitemap.xml
           grep -q "AdShield Pro" docs/index.html
           test -s index.html
           test -s app.js
-          ls -l docs/index.html docs/PRIVACY_POLICY.md
+          ls -l docs/index.html docs/privacy.html docs/404.html docs/PRIVACY_POLICY.md
 
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: '22'
 
+      - name: Verify runtime, marketing site and extension integrity
+        run: |
+          npm run lint
+          npm run verify
+          node scripts/build-extension.mjs --check
+
       - name: Assemble the site
         # Single source of truth: scripts/stage-site.mjs builds _site/ (marketing
         # site at /, web platform at /app/) and fails if any service-worker
-        # precache target is missing from the staged tree.
-        run: node scripts/stage-site.mjs --out _site
+        # precache target or internal HTML link/anchor is broken.
+        run: |
+          node scripts/stage-site.mjs --out _site
+          test -s _site/index.html
+          test -s _site/privacy.html
+          test -s _site/404.html
+          test -f _site/.nojekyll
+          test -s _site/robots.txt
+          test -s _site/sitemap.xml
+          test -s _site/app/index.html
+          test -s _site/app/sw.js
+          test -s _site/app/omnishield-x-extension.zip
 
       - name: Configure Pages
         if: github.ref == 'refs/heads/main'
@@ -90,6 +104,26 @@ jobs:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
     steps:
+      - name: Wait for any legacy branch Pages build to finish first
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # If repository Settings -> Pages is still on legacy branch mode, GitHub
+          # starts a `pages build and deployment` job on every push to main that
+          # finishes ~20s after our fast build and would overwrite / and /app/ with
+          # the raw repo root. Waiting here guarantees our staged _site/ artifact
+          # deploys last and remains the active live deployment.
+          sleep 3
+          for _ in $(seq 1 30); do
+            active=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?branch=main&per_page=20" \
+              --jq '[.workflow_runs[] | select(.path == "dynamic/pages/pages-build-deployment" and .status != "completed")] | length' 2>/dev/null || echo 0)
+            if [ "${active:-0}" = "0" ]; then
+              break
+            fi
+            echo "Waiting for ${active} legacy pages-build-deployment run(s) to finish..."
+            sleep 5
+          done
+
       - name: Deploy to Pages
         id: pages
         uses: actions/deploy-pages@v4
