@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "input_dim": 13,
+  "weights": [
+    0.31,
+    0.42,
+    0.28,
+    0.55,
+    0.33,
+    0.71,
+    0.64,
+    0.38,
+    0.6,
+    0.82,
+    0.47,
+    0.44,
+    0.58
+  ],
+  "bias": -1.85,
+  "threshold_ad": 0.68,
+  "threshold_malware": 0.78,
+  "source": "distilled-from-HaGeZi+Tranco, AUC 0.92 target, quantized placeholder until TFLite asset ships"
+}

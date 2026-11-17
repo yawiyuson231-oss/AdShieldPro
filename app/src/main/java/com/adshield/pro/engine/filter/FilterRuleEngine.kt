@@ -47,7 +47,8 @@ class FilterRuleEngine @Inject constructor() {
         val builtInAllowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST,
         val filterListSubdomains: Map<String, FilterListEntry> = emptyMap(),
         val filterListExact: Map<String, FilterListEntry> = emptyMap(),
-        val filterListWildcards: List<WildcardEntry> = emptyList()
+        val filterListWildcards: List<WildcardEntry> = emptyList(),
+        val bloomFilter: BloomFilter? = null
     ) {
         val totalLoadedRules: Int
             get() = customAllowExact.size +
@@ -133,15 +134,20 @@ class FilterRuleEngine @Inject constructor() {
         subdomainRules: Map<String, FilterListEntry>,
         exactRules: Map<String, FilterListEntry>,
         wildcardRules: List<WildcardEntry>,
-        allowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST
+        allowSubdomains: Set<String> = DEFAULT_SAFE_ALLOWLIST,
+        bloom: BloomFilter? = null
     ): FilterSnapshot {
         val previous = snapshotRef.get()
+        val bf = bloom ?: if (subdomainRules.size + exactRules.size > 1000) {
+            runCatching { BloomFilter.fromDomains((subdomainRules.keys + exactRules.keys).asSequence().distinct()) }.getOrNull()
+        } else null
         snapshotRef.set(
             previous.copy(
                 builtInAllowSubdomains = DEFAULT_SAFE_ALLOWLIST + allowSubdomains,
                 filterListSubdomains = subdomainRules,
                 filterListExact = exactRules,
-                filterListWildcards = wildcardRules
+                filterListWildcards = wildcardRules,
+                bloomFilter = bf
             )
         )
         return previous
@@ -240,20 +246,25 @@ class FilterRuleEngine @Inject constructor() {
             )
         }
 
-        // 7. Filter List Exact Match
-        snap.filterListExact[domain]?.let { entry ->
-            if (activeCategories.contains(entry.category)) {
-                videoExemption(domain)?.let { return it }
-                return buildResult(domain, true, domain, entry.category, RuleMatchType.EXACT, entry.sourceName, 50, startNs)
+        // 7/8. Bloom pre-filter — negative means definitely not in filter lists, skip both probes.
+        val bloomMaybe = snap.bloomFilter == null || runCatching {
+            snap.bloomFilter.mightContain(domain) || suffixes.any { snap.bloomFilter!!.mightContain(it) }
+        }.getOrDefault(true)
+        if (bloomMaybe) {
+            // 7. Filter List Exact Match
+            snap.filterListExact[domain]?.let { entry ->
+                if (activeCategories.contains(entry.category)) {
+                    videoExemption(domain)?.let { return it }
+                    return buildResult(domain, true, domain, entry.category, RuleMatchType.EXACT, entry.sourceName, 50, startNs)
+                }
             }
-        }
-
-        // 8. Filter List Subdomain Suffix Walk (O(label_count) hash lookups)
-        for (suffix in suffixes) {
-            val entry = snap.filterListSubdomains[suffix]
-            if (entry != null && activeCategories.contains(entry.category)) {
-                videoExemption(suffix)?.let { return it }
-                return buildResult(domain, true, "||$suffix^", entry.category, RuleMatchType.SUBDOMAIN, entry.sourceName, 50, startNs)
+            // 8. Filter List Subdomain Suffix Walk (O(label_count) hash lookups)
+            for (suffix in suffixes) {
+                val entry = snap.filterListSubdomains[suffix]
+                if (entry != null && activeCategories.contains(entry.category)) {
+                    videoExemption(suffix)?.let { return it }
+                    return buildResult(domain, true, "||$suffix^", entry.category, RuleMatchType.SUBDOMAIN, entry.sourceName, 50, startNs)
+                }
             }
         }
 

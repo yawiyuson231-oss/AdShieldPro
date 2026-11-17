@@ -55,7 +55,8 @@ class TfliteDomainClassifier @Inject constructor() {
      * visible through AssetManager.
      */
     fun isModelAvailable(): Boolean = try {
-        javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.tflite") != null
+        javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.tflite") != null ||
+            javaClass.classLoader?.getResourceAsStream("ml/domain_classifier.json") != null
     } catch (_: Exception) { false }
 
     fun classify(features: DomainIntelligenceEngine.DomainFeatures): MlResult {

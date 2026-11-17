@@ -10,6 +10,7 @@ import com.adshield.pro.engine.dns.DomainIntelligenceEngine
 import com.adshield.pro.engine.dns.InfinityDnsCache
 import com.adshield.pro.engine.dns.ThreatIntelligenceManager
 import com.adshield.pro.engine.dns.TfliteDomainClassifier
+import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.dns.VideoAdIntelligence
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import dagger.Module
@@ -79,4 +80,9 @@ object InfinityDnsModule {
     @Provides @Singleton fun provideTfliteDomainClassifier(): TfliteDomainClassifier = TfliteDomainClassifier()
     @Provides @Singleton fun provideAdaptiveLearningEngine(): AdaptiveLearningEngine = AdaptiveLearningEngine()
     @Provides @Singleton fun provideDgaFamilyDetector(): DgaFamilyDetector = DgaFamilyDetector()
+
+    @Provides @Singleton fun provideUpstreamDnsResolver(
+        healthMonitor: com.adshield.pro.engine.dns.DnsProviderHealthMonitor,
+        infinityCache: InfinityDnsCache,
+    ): UpstreamDnsResolver = UpstreamDnsResolver(healthMonitor, infinityCache)
 }

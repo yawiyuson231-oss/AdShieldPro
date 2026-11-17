@@ -82,4 +82,25 @@ class AdaptiveLearningEngine @Inject constructor() {
 
     fun export(): LearnedProfile = profile
     fun import(p: LearnedProfile) { profile = p.copy(updatedAtMs = System.currentTimeMillis()) }
+
+    fun toJson(): String {
+        val sb = StringBuilder("{\"v\":1,\"fb\":"); sb.append(profile.totalFeedbacks)
+        sb.append(",\"ts\":"); sb.append(profile.updatedAtMs)
+        sb.append(",\"off\":{")
+        profile.perCategoryOffset.entries.forEachIndexed { i, e -> if (i > 0) sb.append(','); sb.append('"').append(e.key).append("\":").append(e.value) }
+        sb.append("},\"trust\":{")
+        profile.domainTrust.entries.forEachIndexed { i, e -> if (i > 0) sb.append(','); sb.append('"').append(e.key).append("\":").append(e.value) }
+        sb.append("}}"); return sb.toString()
+    }
+    fun fromJson(raw: String): Boolean = runCatching {
+        val off = Regex("\"off\":\\{([^}]*)\\}").find(raw)?.groupValues?.get(1) ?: ""
+        val trust = Regex("\"trust\":\\{([^}]*)\\}").find(raw)?.groupValues?.get(1) ?: ""
+        fun parseMap(s: String): Map<String, Float> = s.split(',').mapNotNull { kv ->
+            val p = kv.split(':'); if (p.size != 2) null else p[0].trim().trim('"') to (p[1].trim().toFloatOrNull() ?: return@mapNotNull null)
+        }.toMap().filterKeys { it.isNotEmpty() }
+        val fb = Regex("\"fb\":(\\d+)").find(raw)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val ts = Regex("\"ts\":(\\d+)").find(raw)?.groupValues?.get(1)?.toLongOrNull() ?: System.currentTimeMillis()
+        profile = LearnedProfile(parseMap(off), parseMap(trust), fb, ts)
+        true
+    }.getOrDefault(false)
 }

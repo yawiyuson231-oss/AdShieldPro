@@ -176,6 +176,7 @@ class UserPreferencesRepository @Inject constructor(
         // Quick Settings Tiles for System Preferences
         val PRIVATE_DNS_TILE_CONFIG_JSON = stringPreferencesKey("private_dns_tile_config_json")
         val USB_DEBUGGING_TILE_CONFIG_JSON = stringPreferencesKey("usb_debugging_tile_config_json")
+        val ADAPTIVE_LEARNING_JSON = stringPreferencesKey("adaptive_learning_json")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -602,5 +603,15 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.USB_DEBUGGING_TILE_CONFIG_JSON] = json.encodeToString(updated)
         }
         return result
+    }
+
+    // --- Adaptive Learning persistence (Infinity DNS v3.1) ---
+    suspend fun saveAdaptiveLearning(jsonBlob: String) {
+        context.adShieldDataStore.edit { it[Keys.ADAPTIVE_LEARNING_JSON] = jsonBlob }
+    }
+    suspend fun loadAdaptiveLearning(): String? =
+        context.adShieldDataStore.data.map { it[Keys.ADAPTIVE_LEARNING_JSON] }.first()
+    suspend fun clearAdaptiveLearning() {
+        context.adShieldDataStore.edit { it.remove(Keys.ADAPTIVE_LEARNING_JSON) }
     }
 }

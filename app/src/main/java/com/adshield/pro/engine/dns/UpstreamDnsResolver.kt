@@ -46,7 +46,8 @@ private typealias AttemptOutcome = Pair<DnsProviderEndpoint, Result<UpstreamDnsR
  */
 @Singleton
 class UpstreamDnsResolver @Inject constructor(
-    private val healthMonitor: DnsProviderHealthMonitor
+    private val healthMonitor: DnsProviderHealthMonitor,
+    private val infinityCache: InfinityDnsCache? = null
 ) {
     internal fun interface ProviderTransport {
         fun query(
@@ -205,6 +206,15 @@ class UpstreamDnsResolver @Inject constructor(
     ): UpstreamResult = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val cacheKey = buildCacheKey(query, config)
+        // Prefer InfinityDnsCache (bounded, TTL-aware, stale-while-revalidate) when available.
+        infinityCache?.get(cacheKey, now)?.let { hit ->
+            return@withContext UpstreamResult(
+                responseBytes = DnsPacketCodec.rewriteTransactionId(hit.response, query.transactionId),
+                protocolUsed = if (hit.isStale) "InfinityCache (Stale)" else "InfinityCache (Cached)",
+                fromCache = true,
+                latencyMs = 0
+            )
+        }
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
         if (cached != null) {
             if (cached.expiresAtEpochMs > now) {
@@ -246,15 +256,19 @@ class UpstreamDnsResolver @Inject constructor(
             }
             if (shouldCacheDnsResponse(response)) {
                 val ttlSeconds = DnsPacketCodec.extractResponseTtlSeconds(response)
-                synchronized(dnsCache) {
-                    dnsCache.put(
-                        cacheKey,
-                        CachedDnsEntry(
-                            wireResponse = response.copyOf(),
-                            expiresAtEpochMs = System.currentTimeMillis() + ttlSeconds * 1000L,
-                            protocolOrigin = protocol
+                if (infinityCache != null) {
+                    infinityCache.put(cacheKey, response, ttlSeconds = ttlSeconds, protocol = protocol)
+                } else {
+                    synchronized(dnsCache) {
+                        dnsCache.put(
+                            cacheKey,
+                            CachedDnsEntry(
+                                wireResponse = response.copyOf(),
+                                expiresAtEpochMs = System.currentTimeMillis() + ttlSeconds * 1000L,
+                                protocolOrigin = protocol
+                            )
                         )
-                    )
+                    }
                 }
             }
             return UpstreamResult(

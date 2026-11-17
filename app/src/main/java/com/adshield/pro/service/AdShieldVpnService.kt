@@ -24,6 +24,7 @@ import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsPacketCodec
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
+import com.adshield.pro.engine.dns.InfinityDnsCoordinator
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -62,6 +63,7 @@ class AdShieldVpnService : VpnService() {
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var filterRuleEngine: FilterRuleEngine
     @Inject lateinit var upstreamDnsResolver: UpstreamDnsResolver
+    @Inject lateinit var infinityCoordinator: InfinityDnsCoordinator
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var vpnInterface: ParcelFileDescriptor? = null
@@ -84,6 +86,10 @@ class AdShieldVpnService : VpnService() {
             protectTcp = { socket -> protect(socket) },
             protectUdp = { datagramSocket -> protect(datagramSocket) }
         )
+        // Wire Infinity CNAME live hook — cloaked trackers blocked post-upstream, no UI change.
+        upstreamDnsResolver.cnamePostInspector = { domain, response ->
+            runCatching { infinityCoordinator.evaluatePostUpstream(domain, response).shouldBlock }.getOrDefault(false)
+        }
         registerNetworkCallback()
     }
 
