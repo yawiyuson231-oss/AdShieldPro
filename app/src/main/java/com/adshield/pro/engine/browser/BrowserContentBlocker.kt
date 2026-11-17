@@ -167,13 +167,32 @@ class BrowserContentBlocker @Inject constructor(
 
         val combinedSelectors = (DEFAULT_COSMETIC_SELECTORS + customSelectors)
             .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.contains('<') && !it.contains('\'') && !it.contains('"') }
+            .filter { selector ->
+                selector.isNotEmpty() &&
+                    !selector.contains('<') &&
+                    !selector.contains('>') &&
+                    !selector.contains('\'') &&
+                    !selector.contains('"') &&
+                    !selector.contains('{') &&
+                    !selector.contains('}') &&
+                    !selector.contains(';') &&
+                    !selector.contains('\r') &&
+                    !selector.contains('\n') &&
+                    !selector.contains('\u0000') &&
+                    !selector.contains("/*") &&
+                    !selector.contains("*/") &&
+                    !selector.contains("@import", ignoreCase = true)
+            }
             .distinct()
+        if (combinedSelectors.isEmpty()) return null
 
         val cssRuleString = combinedSelectors.joinToString(", ") +
             " { display: none !important; visibility: hidden !important; height: 0 !important; min-height: 0 !important; pointer-events: none !important; }"
 
-        val escapedCss = cssRuleString.replace("\\", "\\\\").replace("`", "\\`")
+        val escapedCss = cssRuleString
+            .replace("\\", "\\\\")
+            .replace("`", "\\`")
+            .replace("\${", "\\\${")
 
         return """
             (function() {
@@ -207,10 +226,11 @@ class BrowserContentBlocker @Inject constructor(
     }
 
     fun isHostInExceptionSet(host: String, allowlistedSites: Set<String>): Boolean {
-        val clean = host.lowercase().removePrefix("www.")
+        val clean = host.trim().lowercase().trimEnd('.').removePrefix("www.")
+        if (clean.isEmpty()) return false
         return allowlistedSites.any { exc ->
-            val cleanExc = exc.lowercase().removePrefix("www.")
-            clean == cleanExc || clean.endsWith(".$cleanExc")
+            val cleanExc = exc.trim().lowercase().trimEnd('.').removePrefix("www.")
+            cleanExc.isNotEmpty() && (clean == cleanExc || clean.endsWith(".$cleanExc"))
         }
     }
 

@@ -235,12 +235,23 @@ val fetchTdlibNative = tasks.register("fetchTdlibNative") {
         val archive = File(cache, "tdlib-$pinnedCommit.tar.gz")
         if (!archive.isFile || archive.length() < 1_000_000L) {
             logger.lifecycle("Fetching pinned TDLib native runtime ($pinnedCommit) from GitHub")
+            val archivePart = File(cache, "tdlib-$pinnedCommit.tar.gz.part")
+            archivePart.delete()
             val connection = URI(archiveUrl).toURL().openConnection()
             connection.connectTimeout = 30_000
             connection.readTimeout = 180_000
             connection.setRequestProperty("User-Agent", "AdShieldPro-gradle")
-            connection.getInputStream().use { input ->
-                archive.outputStream().use { output -> input.copyTo(output, 128 * 1024) }
+            try {
+                connection.getInputStream().use { input ->
+                    archivePart.outputStream().use { output -> input.copyTo(output, 128 * 1024) }
+                }
+                if (archive.exists()) archive.delete()
+                check(archivePart.renameTo(archive)) {
+                    "Could not move downloaded TDLib archive into place: ${archive.absolutePath}"
+                }
+            } catch (t: Throwable) {
+                archivePart.delete()
+                throw t
             }
         }
         destination.mkdirs()
@@ -253,7 +264,11 @@ val fetchTdlibNative = tasks.register("fetchTdlibNative") {
             "tar", "-xzf", archive.absolutePath, "-C", extractDir.absolutePath
         ).redirectErrorStream(true).start()
         val tarOutput = process.inputStream.bufferedReader().readText()
-        require(process.waitFor() == 0) { "Could not unpack TDLib archive: $tarOutput" }
+        val tarExit = process.waitFor()
+        if (tarExit != 0) {
+            archive.delete()
+            error("Could not unpack TDLib archive (exit $tarExit): $tarOutput")
+        }
         val sourceRoot = File(
             extractDir,
             "lib-tdlib-android-$pinnedCommit/src/main/jniLibs"

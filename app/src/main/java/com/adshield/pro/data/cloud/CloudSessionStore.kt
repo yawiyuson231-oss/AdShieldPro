@@ -111,7 +111,8 @@ class CloudSessionStore @Inject constructor(
 
     private fun decrypt(encoded: String): String {
         val payload = Base64.decode(encoded, Base64.NO_WRAP)
-        require(payload.size > 13) { "invalid encrypted session" }
+        // 12-byte GCM IV + 16-byte authentication tag minimum
+        require(payload.size >= 28) { "invalid encrypted session" }
         val iv = payload.copyOfRange(0, 12)
         val encrypted = payload.copyOfRange(12, payload.size)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

@@ -24,10 +24,14 @@ class DirectDownloadRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: AdShieldDao
 ) {
-    private val manager = context.getSystemService(DownloadManager::class.java)
+    private val manager: DownloadManager? = context.getSystemService(DownloadManager::class.java)
     val downloads: Flow<List<DirectDownload>> = dao.observeDirectDownloads().map { rows -> rows.map(::toDomain) }
 
+    private fun requireManager(): DownloadManager =
+        manager ?: error("Android DownloadManager is unavailable on this device")
+
     suspend fun enqueue(media: InspectedMedia, destination: Uri, allowMetered: Boolean): DirectDownload = withContext(Dispatchers.IO) {
+        val mgr = requireManager()
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
         val request = DownloadManager.Request(Uri.parse(media.finalUrl))
@@ -38,7 +42,7 @@ class DirectDownloadRepository @Inject constructor(
             .setAllowedOverMetered(allowMetered)
             .setAllowedOverRoaming(false)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        val systemId = manager.enqueue(request)
+        val systemId = mgr.enqueue(request)
         val entity = DirectDownloadEntity(
             id = id,
             systemDownloadId = systemId,
@@ -59,9 +63,10 @@ class DirectDownloadRepository @Inject constructor(
     }
 
     suspend fun refreshActive() = withContext(Dispatchers.IO) {
+        val mgr = manager ?: return@withContext
         dao.getActiveDirectDownloads().forEach { record ->
             val systemId = record.systemDownloadId ?: return@forEach
-            manager.query(DownloadManager.Query().setFilterById(systemId))?.use { cursor ->
+            mgr.query(DownloadManager.Query().setFilterById(systemId))?.use { cursor ->
                 if (!cursor.moveToFirst()) {
                     dao.upsertDirectDownload(
                         record.copy(status = DirectDownloadStatus.FAILED.name, error = "Android DownloadManager no longer has this job", updatedAtEpochMs = System.currentTimeMillis())
@@ -93,7 +98,7 @@ class DirectDownloadRepository @Inject constructor(
 
     suspend fun cancel(record: DirectDownload) = withContext(Dispatchers.IO) {
         val systemId = record.systemDownloadId ?: error("This download has no active system job")
-        val removed = manager.remove(systemId)
+        val removed = requireManager().remove(systemId)
         if (removed <= 0) error("Android did not cancel the job; it may already be finished")
         val current = dao.getDirectDownload(record.id) ?: return@withContext
         dao.upsertDirectDownload(
@@ -102,7 +107,7 @@ class DirectDownloadRepository @Inject constructor(
     }
 
     suspend fun deleteHistory(record: DirectDownload) = withContext(Dispatchers.IO) {
-        record.systemDownloadId?.let { runCatching { manager.remove(it) } }
+        record.systemDownloadId?.let { id -> manager?.let { mgr -> runCatching { mgr.remove(id) } } }
         dao.deleteDirectDownload(record.id)
     }
 

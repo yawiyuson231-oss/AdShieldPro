@@ -71,7 +71,7 @@ class WorldMonitorAssetAndTileServer(
         val host = uri.host?.lowercase(Locale.US) ?: return blockedResponse("Missing host")
 
         if (request.method.equals("OPTIONS", ignoreCase = true) &&
-            (host == ASSET_HOST || isAllowedTileHost(host))
+            (host == ASSET_HOST || isAllowedTileRequest(host, uri.path))
         ) {
             return WebResourceResponse(
                 "text/plain",
@@ -96,7 +96,7 @@ class WorldMonitorAssetAndTileServer(
         }
 
         // 2. Allowlisted public imagery / elevation / weather tile hosts with disk caching
-        if (isAllowedTileHost(host)) {
+        if (isAllowedTileRequest(host, uri.path)) {
             return proxyCachedTile(uri)
         }
 
@@ -111,38 +111,42 @@ class WorldMonitorAssetAndTileServer(
                 .header("User-Agent", "OmniShieldX-WorldMonitor/2035.2 (Android; TileCache)")
                 .get()
                 .build()
-            val response = tileClient.newCall(req).execute()
-            if (!response.isSuccessful) {
-                response.close()
-                return WebResourceResponse(
-                    "text/plain",
-                    "UTF-8",
-                    response.code.coerceIn(400, 599),
-                    response.message.ifBlank { "Upstream Error" },
-                    CORS_HEADERS,
-                    ByteArrayInputStream(ByteArray(0))
+            tileClient.newCall(req).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return WebResourceResponse(
+                        "text/plain",
+                        "UTF-8",
+                        response.code.coerceIn(400, 599),
+                        response.message.ifBlank { "Upstream Error" },
+                        CORS_HEADERS,
+                        ByteArrayInputStream(ByteArray(0))
+                    )
+                }
+                val body = response.body
+                val declaredLen = body.contentLength()
+                if (declaredLen > MAX_TILE_BYTES) {
+                    return blockedResponse("Tile payload too large")
+                }
+                val contentType = response.header("Content-Type")
+                    ?.substringBefore(';')
+                    ?.trim()
+                    ?.ifBlank { null }
+                    ?: resolveMimeType(uri.path.orEmpty(), "application/octet-stream")
+                val bytes = readBoundedBytes(body.byteStream(), MAX_TILE_BYTES)
+                    ?: return blockedResponse("Tile payload exceeded limit")
+
+                WebResourceResponse(
+                    contentType,
+                    null,
+                    200,
+                    "OK",
+                    CORS_HEADERS + mapOf(
+                        "Cross-Origin-Resource-Policy" to "cross-origin",
+                        "Cache-Control" to "public, max-age=604800"
+                    ),
+                    ByteArrayInputStream(bytes)
                 )
             }
-            val body = response.body
-            val contentType = response.header("Content-Type")
-                ?.substringBefore(';')
-                ?.trim()
-                ?.ifBlank { null }
-                ?: resolveMimeType(uri.path.orEmpty(), "application/octet-stream")
-            val bytes = body.bytes()
-            response.close()
-
-            WebResourceResponse(
-                contentType,
-                null,
-                200,
-                "OK",
-                CORS_HEADERS + mapOf(
-                    "Cross-Origin-Resource-Policy" to "cross-origin",
-                    "Cache-Control" to "public, max-age=604800"
-                ),
-                ByteArrayInputStream(bytes)
-            )
         } catch (_: Exception) {
             WebResourceResponse(
                 "text/plain",
@@ -158,6 +162,7 @@ class WorldMonitorAssetAndTileServer(
     companion object {
         const val ASSET_HOST = "appassets.androidplatform.net"
         const val ENTRY_URL = "https://appassets.androidplatform.net/assets/worldmonitor/index.html"
+        private const val MAX_TILE_BYTES = 16 * 1024 * 1024
 
         private val CORS_HEADERS = mapOf(
             "Access-Control-Allow-Origin" to "*",
@@ -178,6 +183,36 @@ class WorldMonitorAssetAndTileServer(
         internal fun isAllowedTileHost(host: String): Boolean {
             val h = host.lowercase(Locale.US)
             return ALLOWED_TILE_SUFFIXES.any { suffix -> h == suffix || h.endsWith(".$suffix") }
+        }
+
+        /**
+         * Enforces bucket/path scoping on shared cloud hosts (`s3.amazonaws.com` is permitted only
+         * for AWS Terrain Tiles under `/elevation-tiles-prod/` or virtual-hosted `elevation-tiles-prod.s3.amazonaws.com`).
+         */
+        internal fun isAllowedTileRequest(host: String, rawPath: String?): Boolean {
+            val h = host.lowercase(Locale.US)
+            if (!isAllowedTileHost(h)) return false
+            if (h == "s3.amazonaws.com" || h.endsWith(".s3.amazonaws.com")) {
+                val path = rawPath.orEmpty()
+                if (path.contains("..")) return false
+                if (h == "elevation-tiles-prod.s3.amazonaws.com") return true
+                return h == "s3.amazonaws.com" && path.startsWith("/elevation-tiles-prod/")
+            }
+            return true
+        }
+
+        private fun readBoundedBytes(stream: java.io.InputStream, maxBytes: Int): ByteArray? {
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(16 * 1024)
+            var total = 0
+            while (true) {
+                val read = stream.read(buf)
+                if (read < 0) break
+                total += read
+                if (total > maxBytes) return null
+                out.write(buf, 0, read)
+            }
+            return out.toByteArray()
         }
 
         internal fun resolveMimeType(path: String, fallback: String?): String {

@@ -133,11 +133,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val quickTilesLaunchTrigger = mutableIntStateOf(if (isQuickTilesIntent(intent)) 1 else 0)
-        val openWorldMonitorOnLaunch = intent?.getBooleanExtra("open_world_monitor", false) == true
+        val worldMonitorLaunchTrigger = mutableIntStateOf(
+            if (intent?.getBooleanExtra("open_world_monitor", false) == true) 1 else 0
+        )
         addOnNewIntentListener { newIntent ->
             if (isQuickTilesIntent(newIntent)) {
                 setIntent(newIntent)
                 quickTilesLaunchTrigger.intValue += 1
+            } else if (newIntent.getBooleanExtra("open_world_monitor", false)) {
+                setIntent(newIntent)
+                worldMonitorLaunchTrigger.intValue += 1
             }
         }
         setContent {
@@ -147,7 +152,7 @@ class MainActivity : ComponentActivity() {
                 AdShieldMainApp(
                     viewModel = viewModel,
                     openQuickTilesTrigger = quickTilesLaunchTrigger.intValue,
-                    initialOpenWorldMonitor = openWorldMonitorOnLaunch
+                    openWorldMonitorTrigger = worldMonitorLaunchTrigger.intValue
                 )
             }
         }
@@ -168,15 +173,16 @@ class MainActivity : ComponentActivity() {
 fun AdShieldMainApp(
     viewModel: AdShieldViewModel,
     openQuickTilesTrigger: Int = 0,
-    initialOpenWorldMonitor: Boolean = false
+    openWorldMonitorTrigger: Int = 0
 ) {
     val context = LocalContext.current
     var currentTab by rememberSaveable { mutableStateOf(MainNavDestination.HOME) }
     var showAboutScreen by rememberSaveable { mutableStateOf(false) }
     var showQuickTilesScreen by rememberSaveable { mutableStateOf(false) }
     var handledQuickTilesTrigger by rememberSaveable { mutableIntStateOf(0) }
+    var handledWorldMonitorTrigger by rememberSaveable { mutableIntStateOf(0) }
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
-    var worldMonitorOpen by rememberSaveable { mutableStateOf(initialOpenWorldMonitor) }
+    var worldMonitorOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
     val connectorViewModel: ConnectorViewModel = hiltViewModel()
     val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
@@ -191,6 +197,16 @@ fun AdShieldMainApp(
             showAboutScreen = false
             currentTab = MainNavDestination.SETTINGS
             showQuickTilesScreen = true
+        }
+    }
+
+    LaunchedEffect(openWorldMonitorTrigger) {
+        if (openWorldMonitorTrigger > handledWorldMonitorTrigger) {
+            handledWorldMonitorTrigger = openWorldMonitorTrigger
+            connectorsOpen = false
+            showQuickTilesScreen = false
+            showAboutScreen = false
+            currentTab = MainNavDestination.WORLD_MONITOR
         }
     }
 
@@ -272,8 +288,10 @@ fun AdShieldMainApp(
                     showVpnConsentHelp = false
                     try {
                         context.startActivity(Intent(Settings.ACTION_VPN_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    } catch (e: Exception) {
-                        context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    } catch (_: Exception) {
+                        runCatching {
+                            context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
                     }
                 }) { Text("Open VPN Settings") }
             }
@@ -367,7 +385,7 @@ fun AdShieldMainApp(
                 )
             }
 
-            if (worldMonitorOpen) {
+            if (worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
                 WorldMonitorDestination(onBack = { worldMonitorOpen = false })
             }
         }

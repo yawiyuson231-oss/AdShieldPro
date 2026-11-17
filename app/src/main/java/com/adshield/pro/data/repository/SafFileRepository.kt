@@ -99,8 +99,10 @@ class SafFileRepository @Inject constructor(
         ) ?: error("The storage provider could not create the destination file")
         try {
             val input = resolver.openInputStream(source) ?: error("Cannot read the import source")
-            val output = resolver.openOutputStream(created, "wt") ?: error("Cannot write the imported file")
-            input.use { sourceStream -> output.use { destination -> sourceStream.copyTo(destination, 128 * 1024) } }
+            input.use { sourceStream ->
+                val output = resolver.openOutputStream(created, "wt") ?: error("Cannot write the imported file")
+                output.use { destination -> sourceStream.copyTo(destination, 128 * 1024) }
+            }
         } catch (failure: Throwable) {
             runCatching { DocumentsContract.deleteDocument(resolver, created) }
             throw failure
@@ -134,6 +136,8 @@ class SafFileRepository @Inject constructor(
                     scanHistory.record(persisted)
                     records += persisted
                 }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
             } catch (_: Throwable) {
                 errors++
             }

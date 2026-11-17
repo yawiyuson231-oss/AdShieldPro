@@ -87,6 +87,9 @@ class ApkAnalyzer {
                     }
                 }
             }
+            if (!isSigned) {
+                isSigned = hasApkSigBlockV2Plus(file)
+            }
         }
 
         // --- Permission risk scoring ---
@@ -266,22 +269,25 @@ class ApkAnalyzer {
         val flags = buf.int
         val stringsStart = buf.int
         val stylesStart = buf.int
-        if (stringCount < 0 || stringCount > 60_000 || styleCount < 0) return emptyList()
+        if (stringCount < 0 || stringCount > 60_000 || styleCount < 0 || stringsStart < 0) return emptyList()
         val isUtf8 = (flags and (1 shl 8)) != 0
 
         val offsets = IntArray(stringCount)
         for (i in 0 until stringCount) {
-            if (chunkOffset + 28 + i * 4 + 4 > data.size) return emptyList()
-            offsets[i] = buf.getInt(chunkOffset + 28 + i * 4)
+            val entryPos = chunkOffset.toLong() + 28L + i.toLong() * 4L
+            if (entryPos < 0L || entryPos + 4L > data.size.toLong()) return emptyList()
+            offsets[i] = buf.getInt(entryPos.toInt())
         }
 
         val result = ArrayList<String>(stringCount)
         for (i in 0 until stringCount) {
-            val abs = chunkOffset + stringsStart + offsets[i]
-            if (abs < 0 || abs >= data.size) {
+            val off = offsets[i]
+            val absLong = chunkOffset.toLong() + stringsStart.toLong() + off.toLong()
+            if (off < 0 || absLong < 0L || absLong >= data.size.toLong()) {
                 result.add("")
                 continue
             }
+            val abs = absLong.toInt()
             val str = if (isUtf8) decodeUtf8PoolString(data, abs) else decodeUtf16PoolString(data, abs)
             result.add(str ?: "")
         }
@@ -292,7 +298,7 @@ class ApkAnalyzer {
 
     private fun decodeUtf16PoolString(data: ByteArray, pos: Int): String? {
         var p = pos
-        if (p + 2 > data.size) return null
+        if (p < 0 || p + 2 > data.size) return null
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         var len = buf.getShort(p).toInt() and 0xFFFF
         p += 2
@@ -301,7 +307,7 @@ class ApkAnalyzer {
             len = ((len and 0x7FFF) shl 16) or (buf.getShort(p).toInt() and 0xFFFF)
             p += 2
         }
-        if (len < 0 || p + len * 2 + 2 > data.size) return null
+        if (len < 0 || p.toLong() + len.toLong() * 2L + 2L > data.size.toLong()) return null
         val chars = CharArray(len)
         for (i in 0 until len) {
             chars[i] = buf.getChar(p + i * 2)
@@ -311,7 +317,7 @@ class ApkAnalyzer {
 
     private fun decodeUtf8PoolString(data: ByteArray, pos: Int): String? {
         var p = pos
-        if (p >= data.size) return null
+        if (p < 0 || p >= data.size) return null
         // utf16 length (u8 or u8*2), then utf8 length (u8 or u8*2), then bytes, then NUL
         var b = data[p].toInt() and 0xFF
         p++
@@ -320,6 +326,7 @@ class ApkAnalyzer {
             b = ((b and 0x7F) shl 8) or (data[p].toInt() and 0xFF)
             p++
         }
+        if (p >= data.size) return null
         // b is utf16 char count; skip
         var len = data[p].toInt() and 0xFF
         p++
@@ -328,9 +335,38 @@ class ApkAnalyzer {
             len = ((len and 0x7F) shl 8) or (data[p].toInt() and 0xFF)
             p++
         }
-        if (len < 0 || p + len > data.size) return null
+        if (len < 0 || p.toLong() + len.toLong() > data.size.toLong()) return null
         return String(data, p, len, Charsets.UTF_8)
     }
+
+    /** Detects APK Signature Scheme v2/v3/v4 signing blocks ("APK Sig Block 42") before ZIP EOCD. */
+    private fun hasApkSigBlockV2Plus(file: File): Boolean = runCatching {
+        val len = file.length()
+        if (len < 54L) return@runCatching false
+        java.io.RandomAccessFile(file, "r").use { raf ->
+            val tailLen = minOf(len, 65_557L).toInt()
+            val tail = ByteArray(tailLen)
+            raf.seek(len - tailLen)
+            raf.readFully(tail)
+            // Locate ZIP End of Central Directory (0x06054b50) scanning backward.
+            var eocd = -1
+            for (i in tailLen - 22 downTo 0) {
+                if (tail[i] == 0x50.toByte() && tail[i + 1] == 0x4b.toByte() &&
+                    tail[i + 2] == 0x05.toByte() && tail[i + 3] == 0x06.toByte()
+                ) {
+                    eocd = i
+                    break
+                }
+            }
+            if (eocd < 0) return@runCatching false
+            val cdOffset = ByteBuffer.wrap(tail, eocd + 16, 4).order(ByteOrder.LITTLE_ENDIAN).int.toLong() and 0xFFFFFFFFL
+            if (cdOffset < 32L || cdOffset > len) return@runCatching false
+            val magic = ByteArray(16)
+            raf.seek(cdOffset - 16L)
+            raf.readFully(magic)
+            String(magic, Charsets.US_ASCII) == "APK Sig Block 42"
+        }
+    }.getOrDefault(false)
 
     private fun readBounded(input: InputStream, maxBytes: Long): ByteArray {
         val out = ByteArrayOutputStream()

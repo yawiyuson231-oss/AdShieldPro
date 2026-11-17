@@ -142,11 +142,14 @@ export class ReputationEngine {
    * @param {{engine?:object, firstSeenAt?:number, now?:number, allowlist?:Iterable<string>}} [context]
    */
   analyze(domain, context = {}) {
-    const name = String(domain || '').toLowerCase();
-    const cacheKey = `${name}|${context.engine ? context.engine._generation : 0}|${this.classifier?.operatingThreshold ?? ''}`;
+    const name = String(domain || '').trim().toLowerCase().replace(/\.+$/, '');
+    const recencyBucket = Number.isFinite(context.firstSeenAt)
+      ? Math.max(-1, Math.min(24, Math.floor((this.clock() - context.firstSeenAt) / 36e5)))
+      : '';
+    const cacheKey = `${name}|${context.engine ? context.engine._generation : 0}|${this.classifier?.operatingThreshold ?? ''}|${recencyBucket}`;
     if (this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey);
-      return { ...cached, cached: true };
+      return { ...cached, signals: cached.signals.map((s) => ({ ...s })), cached: true };
     }
 
     const signals = [];
@@ -300,7 +303,12 @@ export class ReputationEngine {
     this.stats.byVerdict[verdict.id] = (this.stats.byVerdict[verdict.id] || 0) + 1;
 
     if (this.cache.size >= this.cacheLimit) this.cache.delete(this.cache.keys().next().value);
-    this.cache.set(cacheKey, report);
+    this.cache.set(cacheKey, {
+      ...report,
+      signals: report.signals.map((s) => ({ ...s })),
+      guardrails: report.guardrails.map((g) => ({ ...g })),
+      floors: report.floors.map((f) => ({ ...f }))
+    });
     return report;
   }
 
@@ -345,13 +353,35 @@ export class ReputationEngine {
 
   loadJSON(json) {
     if (!json || json.version !== 1) return false;
-    if (json.weights) this.weights = { ...this.weights, ...json.weights };
-    if (json.feedback) {
-      for (const [id, v] of Object.entries(json.feedback)) {
-        this.feedback[id] = { falsePositives: v.falsePositives || 0, confirmations: v.confirmations || 0 };
+    if (json.weights && typeof json.weights === 'object') {
+      for (const [id, val] of Object.entries(json.weights)) {
+        if (Object.prototype.hasOwnProperty.call(SIGNAL_WEIGHTS, id) && Number.isFinite(val) && val >= 0 && val <= 100) {
+          this.weights[id] = val;
+        }
       }
     }
-    if (json.stats) this.stats = { ...this.stats, ...json.stats };
+    if (json.feedback && typeof json.feedback === 'object') {
+      for (const [id, v] of Object.entries(json.feedback)) {
+        if (!Object.prototype.hasOwnProperty.call(SIGNAL_WEIGHTS, id) || !v || typeof v !== 'object') continue;
+        const fp = Number(v.falsePositives);
+        const cf = Number(v.confirmations);
+        this.feedback[id] = {
+          falsePositives: Number.isFinite(fp) && fp >= 0 ? Math.floor(fp) : 0,
+          confirmations: Number.isFinite(cf) && cf >= 0 ? Math.floor(cf) : 0
+        };
+      }
+    }
+    if (json.stats && typeof json.stats === 'object') {
+      if (Number.isFinite(json.stats.analysed) && json.stats.analysed >= 0) this.stats.analysed = Math.floor(json.stats.analysed);
+      if (Number.isFinite(json.stats.feedbackEvents) && json.stats.feedbackEvents >= 0) this.stats.feedbackEvents = Math.floor(json.stats.feedbackEvents);
+      if (json.stats.byVerdict && typeof json.stats.byVerdict === 'object') {
+        const clean = {};
+        for (const [k, v] of Object.entries(json.stats.byVerdict)) {
+          if (Number.isFinite(v) && v >= 0) clean[k] = Math.floor(v);
+        }
+        this.stats.byVerdict = clean;
+      }
+    }
     this.cache.clear();
     return true;
   }

@@ -47,6 +47,8 @@ class IntelligenceRetentionWorker @AssistedInject constructor(
                 )
             )
             Result.success()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (t: Throwable) {
             recoreFailure(startedAt, t)
             if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()

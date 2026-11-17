@@ -89,8 +89,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(request);
-        const cache = await caches.open(SHELL_CACHE);
-        cache.put('./index.html', fresh.clone()).catch(() => {});
+        if (fresh.ok && (fresh.headers.get('content-type') || '').includes('text/html')) {
+          const copy = fresh.clone();
+          event.waitUntil(
+            caches.open(SHELL_CACHE).then((cache) => cache.put('./index.html', copy)).catch(() => {})
+          );
+        }
         return fresh;
       } catch {
         const cache = await caches.open(SHELL_CACHE);
@@ -106,12 +110,16 @@ self.addEventListener('fetch', (event) => {
       const cache = await caches.open(RULES_CACHE);
       const cached = await cache.match(request, { ignoreSearch: true });
       const network = fetch(request)
-        .then((response) => {
-          if (response.ok) cache.put(request, response.clone()).catch(() => {});
+        .then(async (response) => {
+          if (response.ok) await cache.put(request, response.clone()).catch(() => {});
           return response;
         })
         .catch(() => null);
-      return cached || (await network) || new Response('', { status: 504, statusText: 'offline and not cached' });
+      if (cached) {
+        event.waitUntil(network);
+        return cached;
+      }
+      return (await network) || new Response('', { status: 504, statusText: 'offline and not cached' });
     })());
     return;
   }
@@ -121,14 +129,20 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(SHELL_CACHE);
     const cached = await cache.match(request, { ignoreSearch: true });
     if (cached) {
-      fetch(request).then((response) => {
-        if (response.ok) cache.put(request, response.clone()).catch(() => {});
-      }).catch(() => {});
+      event.waitUntil(
+        fetch(request).then((response) => {
+          if (response.ok) return cache.put(request, response.clone()).catch(() => {});
+          return undefined;
+        }).catch(() => {})
+      );
       return cached;
     }
     try {
       const response = await fetch(request);
-      if (response.ok) cache.put(request, response.clone()).catch(() => {});
+      if (response.ok) {
+        const copy = response.clone();
+        event.waitUntil(cache.put(request, copy).catch(() => {}));
+      }
       return response;
     } catch {
       return new Response('offline', { status: 504, statusText: 'offline' });

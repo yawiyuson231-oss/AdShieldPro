@@ -292,6 +292,8 @@ object WebDavXml {
         val document = parse(input)
         val responses = document.getElementsByTagNameNS("DAV:", "response")
         val requestPath = requestUrl.encodedPath.trimEnd('/')
+        val decodedRequestPath = percentDecodePath(requestPath).trimEnd('/')
+        val basePath = "$decodedRequestPath/"
         val objects = ArrayList<CloudObject>()
         var available: Long? = null
         var used: Long? = null
@@ -299,13 +301,12 @@ object WebDavXml {
             val response = responses.item(index) as Element
             val href = directChildText(response, "href") ?: continue
             val rawPath = runCatching { URI(href).rawPath }.getOrNull() ?: continue
-            val decodedHref = URLDecoder.decode(rawPath, Charsets.UTF_8.name())
-            if (decodedHref.trimEnd('/') == URLDecoder.decode(requestPath, Charsets.UTF_8.name()).trimEnd('/')) {
+            val decodedHref = percentDecodePath(rawPath)
+            if (decodedHref.trimEnd('/') == decodedRequestPath) {
                 available = textInDescendants(response, "quota-available-bytes")?.toLongOrNull()?.takeIf { it >= 0 } ?: available
                 used = textInDescendants(response, "quota-used-bytes")?.toLongOrNull()?.takeIf { it >= 0 } ?: used
                 continue
             }
-            val basePath = URLDecoder.decode(requestPath, Charsets.UTF_8.name()).trimEnd('/') + "/"
             if (!decodedHref.startsWith(basePath)) continue
             val relative = decodedHref.removePrefix(basePath).trim('/')
             if (relative.isBlank() || relative.split('/').any { it == ".." }) continue
@@ -332,11 +333,35 @@ object WebDavXml {
         return WebDavListing(
             objects = objects.sortedWith(compareByDescending<CloudObject> { it.isDirectory }.thenBy { it.name.lowercase() }),
             quota = WebDavQuota(
-                totalBytes = if (available != null && used != null) available + used else null,
+                totalBytes = if (available != null && used != null) {
+                    if (Long.MAX_VALUE - available < used) Long.MAX_VALUE else available + used
+                } else null,
                 availableBytes = available,
                 usedBytes = used
             )
         )
+    }
+
+    /** RFC 3986 percent-decoder that preserves literal `+` in filenames (unlike URLDecoder). */
+    internal fun percentDecodePath(raw: String): String {
+        val out = java.io.ByteArrayOutputStream(raw.length)
+        var i = 0
+        while (i < raw.length) {
+            val ch = raw[i]
+            if (ch == '%' && i + 2 < raw.length) {
+                val hi = raw[i + 1].digitToIntOrNull(16)
+                val lo = raw[i + 2].digitToIntOrNull(16)
+                if (hi != null && lo != null) {
+                    out.write((hi shl 4) or lo)
+                    i += 3
+                    continue
+                }
+            }
+            val utf8 = ch.toString().toByteArray(Charsets.UTF_8)
+            out.write(utf8, 0, utf8.size)
+            i++
+        }
+        return String(out.toByteArray(), Charsets.UTF_8)
     }
 
     fun parseShareUrl(input: InputStream): String {

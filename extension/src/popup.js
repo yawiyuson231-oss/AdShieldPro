@@ -3,6 +3,8 @@ const el = (id) => document.getElementById(id);
 
 function render({ supported, tab, total, reason }) {
   if (supported) {
+    el('tab').classList.remove('na');
+    el('total').classList.remove('na');
     el('tab').textContent = String(tab ?? 0);
     el('total').textContent = String(total ?? 0);
     el('note').textContent = 'Counted from this extension\'s own matched-rule events.';

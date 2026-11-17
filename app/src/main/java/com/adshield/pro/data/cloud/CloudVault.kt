@@ -88,8 +88,8 @@ class CloudVault @Inject constructor(
     fun unlock(passphrase: CharArray): Boolean {
         val salt = storage.salt() ?: return false
         val verifier = storage.verifier() ?: return false
-        if (verifier.size <= NONCE_BYTES) return false
-        val iterations = storage.iterations()
+        if (verifier.size < NONCE_BYTES + GCM_TAG_BITS / 8) return false
+        val iterations = storage.iterations().coerceIn(1_000, 2_000_000)
         val key = derive(passphrase, salt, iterations)
         val verified = runCatching {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -126,7 +126,7 @@ class CloudVault @Inject constructor(
 
     fun decrypt(payload: ByteArray): ByteArray {
         val key = masterKey ?: error("vault is locked")
-        require(payload.size > NONCE_BYTES + GCM_TAG_BITS / 8) { "encrypted payload is truncated" }
+        require(payload.size >= NONCE_BYTES + GCM_TAG_BITS / 8) { "encrypted payload is truncated" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
             Cipher.DECRYPT_MODE,

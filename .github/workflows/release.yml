@@ -59,17 +59,26 @@ jobs:
 
       - name: Resolve version and tag
         id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
           VERSION_NAME="$(grep -oE 'versionName *= *"[^"]+"' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)"/\1/')"
           VERSION_CODE="$(grep -oE 'versionCode *= *[0-9]+' app/build.gradle.kts | head -1 | grep -oE '[0-9]+')"
-          if [ "${{ github.event_name }}" = "push" ]; then
-            TAG="${{ github.ref_name }}"
-          elif [ -n "${{ inputs.tag }}" ]; then
-            TAG="${{ inputs.tag }}"
+          if [ "$EVENT_NAME" = "push" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          elif [ -n "${INPUT_TAG:-}" ]; then
+            TAG="$INPUT_TAG"
           else
             TAG="v${VERSION_NAME}"
           fi
+          case "$TAG" in
+            *[!A-Za-z0-9._+-]*|"")
+              echo "::error::Invalid release tag '$TAG' (allowed characters: A-Za-z0-9._+-)."
+              exit 1
+              ;;
+          esac
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -83,6 +92,9 @@ jobs:
       - name: Prepare signing key
         env:
           KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
+          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
+          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
+          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail

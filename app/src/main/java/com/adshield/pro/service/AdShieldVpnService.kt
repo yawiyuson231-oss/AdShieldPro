@@ -116,6 +116,7 @@ class AdShieldVpnService : VpnService() {
                     repository.updateVpnStatus(VpnStatus.CONNECTED)
                     updateForegroundNotification()
                 } else {
+                    startForegroundWithNotification()
                     startVpnTunnel()
                 }
                 return START_STICKY
@@ -123,6 +124,7 @@ class AdShieldVpnService : VpnService() {
             ACTION_RELOAD_TUNNEL_CONFIG -> {
                 // Used only when per-app VPN exclusions or IPv6 interface routing changes
                 if (vpnInterface != null) {
+                    startForegroundWithNotification()
                     startVpnTunnel()
                 }
                 return START_STICKY
@@ -200,6 +202,8 @@ class AdShieldVpnService : VpnService() {
                 updateForegroundNotification()
 
                 runPacketLoop(establishedPfd)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
             } catch (t: Throwable) {
                 repository.updateVpnStatus(
                     status = VpnStatus.ERROR,
@@ -216,7 +220,7 @@ class AdShieldVpnService : VpnService() {
         val packetBuffer = ByteArray(MAX_PACKET_SIZE)
 
         try {
-            while (serviceScope.isActive && vpnInterface != null) {
+            while (serviceScope.isActive && vpnInterface === pfd) {
                 val length = try {
                     inputStream.read(packetBuffer)
                 } catch (_: InterruptedIOException) {
@@ -293,6 +297,7 @@ class AdShieldVpnService : VpnService() {
             return
         }
 
+        var nextServerSeq = tcpPacket.acknowledgmentNumber
         if (tcpPacket.payload.size >= 14) {
             val dnsLen = ((tcpPacket.payload[0].toInt() and 0xFF) shl 8) or
                 (tcpPacket.payload[1].toInt() and 0xFF)
@@ -310,12 +315,13 @@ class AdShieldVpnService : VpnService() {
                     // a single oversized packet with DF set is dropped by the IP stack.
                     val segments = IpPacketFraming.buildTcpResponseSegments(
                         request = tcpPacket,
-                        startSeqNum = tcpPacket.acknowledgmentNumber,
+                        startSeqNum = nextServerSeq,
                         ackNum = (tcpPacket.sequenceNumber + tcpPacket.payload.size) and 0xFFFFFFFFL,
                         tcpPayload = tcpDnsPayload,
                         maxSegmentPayloadBytes = IpPacketFraming.tcpPayloadCapacity(tcpPacket.ipVersion, VPN_MTU)
                     )
                     segments.forEach { segment -> writeToTunSafe(outputStream, segment) }
+                    nextServerSeq = (nextServerSeq + tcpDnsPayload.size) and 0xFFFFFFFFL
                 }
             }
         }
@@ -323,7 +329,7 @@ class AdShieldVpnService : VpnService() {
         if ((flags and IpPacketFraming.TCP_FLAG_FIN) != 0) {
             val finAck = IpPacketFraming.buildTcpResponsePacket(
                 request = tcpPacket,
-                seqNum = tcpPacket.acknowledgmentNumber,
+                seqNum = nextServerSeq,
                 ackNum = (tcpPacket.sequenceNumber + tcpPacket.payload.size + 1L) and 0xFFFFFFFFL,
                 flags = IpPacketFraming.TCP_FLAG_FIN or IpPacketFraming.TCP_FLAG_ACK
             )
@@ -455,6 +461,7 @@ class AdShieldVpnService : VpnService() {
             }
 
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                currentTransport = transportFrom(networkCapabilities)
                 val label = detectCurrentNetworkLabel()
                 if (vpnInterface != null && !isPaused) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
@@ -462,6 +469,9 @@ class AdShieldVpnService : VpnService() {
             }
 
             override fun onLost(network: Network) {
+                val active = cm.activeNetwork?.takeIf { it != network }
+                runCatching { setUnderlyingNetworks(active?.let { arrayOf(it) }) }
+                currentTransport = detectCurrentTransport()
                 val label = detectCurrentNetworkLabel()
                 if (vpnInterface != null && !isPaused) {
                     repository.updateVpnStatus(VpnStatus.CONNECTED, networkLabel = label)
@@ -603,9 +613,14 @@ class AdShieldVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        // Triggered when the user or another VPN application revokes our VPN permission
-        serviceScope.launch {
-            preferencesRepository.setVpnShouldRemainActive(false)
+        // Triggered when the user or another VPN application revokes our VPN permission;
+        // persist durably before stopSelf() cancels serviceScope.
+        runCatching {
+            runBlocking {
+                withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
+                    preferencesRepository.setVpnShouldRemainActive(false)
+                }
+            }
         }
         stopVpnTunnel(reason = "VPN permission was revoked or superseded by another VPN app.")
         stopSelf()

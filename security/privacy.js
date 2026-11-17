@@ -34,7 +34,8 @@ export class PrivateAnalytics {
   }
 
   _dayKey(at = this.clock()) {
-    return new Date(at).toISOString().slice(0, 10);
+    const safeAt = Number.isFinite(at) ? at : this.clock();
+    return new Date(safeAt).toISOString().slice(0, 10);
   }
 
   _day(at) {
@@ -76,7 +77,8 @@ export class PrivateAnalytics {
 
   /** True if a given domain is already in today's distinct set (no raw compare stored). */
   hasSeen(domain, at = this.clock()) {
-    const day = this._day(at);
+    const day = this.days.get(this._dayKey(at));
+    if (!day) return false;
     return day.buckets.has(shortHash(`${this.saltHash}|${String(domain).toLowerCase()}`));
   }
 

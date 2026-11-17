@@ -256,7 +256,7 @@ export function normalizeDomain(input) {
   s = s.split('/')[0].split('?')[0].split('#')[0].split(':')[0];
   s = s.replace(/^\.+/, '').replace(/\.+$/, '');
   if (!s || s.length > 253) return '';
-  if (!/^[a-z0-9.-]+$/.test(s)) return '';
+  if (!/^[a-z0-9_.-]+$/.test(s)) return '';
   const labels = s.split('.');
   if (labels.some((label) => label.length === 0 || label.length > 63 || !LABEL_RE.test(label))) return '';
   return s;
@@ -324,9 +324,9 @@ function hasAdvertSubdomainLabel(domain, protectedEntry) {
     if (ADVERT_LABEL_TOKENS.includes(label)) return true;
     if (ADVERT_LABEL_TOKENS.includes(label.replace(/[-_]/g, ''))) return true;
     const head = label.split(/[-_]/)[0];
-    // `ads-service`, `log-gateway`, `player-telemetry`: lead token only, so a
-    // per-node name like `srv-adserver-3` is not caught by its middle segment.
-    return ADVERT_LABEL_TOKENS.includes(head) && label.includes('-');
+    // `ads-service`, `log-gateway`, `player-telemetry`, `ads_api`: lead token only,
+    // so a per-node name like `srv-adserver-3` is not caught by its middle segment.
+    return ADVERT_LABEL_TOKENS.includes(head) && /[-_]/.test(label);
   });
 }
 
@@ -386,27 +386,15 @@ export function classify(input) {
     };
   }
 
-  // 2. An advert slot published as a subdomain of a media domain (`ads.twitch.tv`)
-  //    is still advert delivery, not playback infrastructure.
+  // 2. An advert/telemetry slot published as a subdomain of a media domain
+  //    (`ads.twitch.tv`, `log.byteoversea.com`) is still advert delivery, not
+  //    playback infrastructure, and must not be exempted wholesale.
   if (hasAdvertSubdomainLabel(domain, protectedEntry)) {
     return {
       domain,
       protected: false,
       adIntent: true,
       reason: `Advert slot on ${protectedEntry}: blocking it removes the ad request, not the stream.`,
-      blockedBy: 'advert-subdomain',
-      matched: null
-    };
-  }
-
-  // 2b. An advert/telemetry subdomain of a media domain is advert delivery, not
-  //     playback. This is the case that must not be exempted wholesale.
-  if (hasAdvertSubdomainLabel(domain, protectedEntry)) {
-    return {
-      domain,
-      protected: false,
-      adIntent: true,
-      reason: `Advert or telemetry slot on ${protectedEntry}: blocking it removes tracking, not the stream.`,
       blockedBy: 'advert-subdomain',
       matched: null
     };
@@ -464,11 +452,17 @@ function isAdvertDeliveryZone(domain) {
   return AD_DELIVERY_HOSTS.some((host) => domain === host || domain.endsWith(`.${host}`));
 }
 
-/** Strips adblock syntax down to the bare pattern the engine would compile. */
+/** Strips adblock and hosts-file syntax down to the bare pattern the engine compiles. */
 export function patternOf(rule) {
   let body = String(rule ?? '').trim();
-  if (!body || body.startsWith('!') || body.startsWith('#')) return '';
+  if (!body || body.startsWith('!') || body.startsWith('#') || body.startsWith('[')) return '';
+  body = body.replace(/\s+#.*$/, '').trim();
+  if (!body) return '';
   if (body.startsWith('@@')) body = body.slice(2).trim();
+  const hostsMatch = body.match(/^(?:0\.0\.0\.0|127\.0\.0\.1|::1?|::ffff:0\.0\.0\.0)\s+(\S+)/i);
+  if (hostsMatch) {
+    return hostsMatch[1].trim().toLowerCase().replace(/^\.+/, '').replace(/\.+$/, '');
+  }
   if (body.startsWith('||')) body = body.slice(2);
   else if (body.startsWith('|')) body = body.slice(1);
   const caret = body.indexOf('^');
@@ -496,10 +490,10 @@ export function explainDanger(rule) {
   const pattern = patternOf(rule);
   if (!pattern) return null;
 
-  // 1. Substring wildcards. `*adserver*` matches any hostname *containing* the
-  //    substring, which includes legitimate per-server CDN names.
+  // 1. Substring wildcards. `*adserver*` and `video*` match any hostname containing
+  //    or starting with the substring, which includes legitimate per-server CDN names.
   if (pattern.includes('*')) {
-    const literal = pattern.replace(/\*/g, '').replace(/^\*|\*$/g, '');
+    const literal = pattern.replace(/\*+/g, '').replace(/^\.+|\.+$/g, '');
     if (literal.length < 4) {
       return {
         code: 'WILDCARD_TOO_BROAD',
@@ -507,24 +501,37 @@ export function explainDanger(rule) {
         detail: `Wildcard "${pattern}" matches almost every host and will break media playback.`
       };
     }
-    // A wildcard is only safe when the remaining literal text is a real label
-    // sequence anchored to a domain (`ads*.example.com` is fine, `*ads*` is not).
-    const anchored = pattern.startsWith('*.') || pattern.startsWith('*');
     const suffix = pattern.split('*').pop() || '';
-    const suffixLooksLikeDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(suffix.replace(/^\./, ''));
-    if (anchored && !pattern.startsWith('*.') && !suffixLooksLikeDomain) {
+    const cleanSuffix = suffix.replace(/^\.+|\.+$/g, '');
+    const suffixLooksLikeDomain = /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/.test(cleanSuffix);
+    const unanchoredLead = pattern.startsWith('*') && !pattern.startsWith('*.') && !suffixLooksLikeDomain;
+    const unanchoredTail = pattern.endsWith('*') && !pattern.endsWith('.*');
+    if (!pattern.includes('.') || unanchoredLead || unanchoredTail) {
       return {
         code: 'SUBSTRING_WILDCARD',
         pattern,
         detail: `Wildcard "${pattern}" matches a substring of a hostname, not a DNS label, so it also matches legitimate player and CDN hosts.`
       };
     }
-    const literalDomain = registrableDomain(literal);
-    if (literalDomain && PROTECTED_REGISTRABLE_DOMAINS.some((z) => literalDomain === z || literalDomain.endsWith(`.${z}`))) {
+    const candidates = [cleanSuffix, normalizeDomain(literal), registrableDomain(literal)].filter(Boolean);
+    const hitCdn = candidates.find((c) => SHARED_CDN_ZONES.includes(c));
+    if (hitCdn) {
+      return {
+        code: 'SHARED_CDN_BLANKET',
+        pattern,
+        detail: `Wildcard "${pattern}" blocks shared CDN zone "${hitCdn}" and will break playback for unrelated services.`
+      };
+    }
+    const hitMedia = candidates.find((c) =>
+      PROTECTED_REGISTRABLE_DOMAINS.some((z) => c === z || c.endsWith(`.${z}`))
+      || PROTECTED_HOSTS.some((h) => c === h || c.endsWith(`.${h}`))
+      || ENTITY_LEVEL_DOMAINS.includes(c)
+    );
+    if (hitMedia) {
       return {
         code: 'WILDCARD_ON_MEDIA_DOMAIN',
         pattern,
-        detail: `Wildcard "${pattern}" applies to a media delivery domain (${literalDomain}).`
+        detail: `Wildcard "${pattern}" applies to a media or entity delivery domain (${hitMedia}).`
       };
     }
     return null;
@@ -543,12 +550,14 @@ export function explainDanger(rule) {
     };
   }
 
-  // 3. Entity-level rules. Anything broader than the actual ad host.
-  if (ENTITY_LEVEL_DOMAINS.includes(domain)) {
+  // 3. Entity-level and protected media zones / required player hosts.
+  if (ENTITY_LEVEL_DOMAINS.includes(domain)
+    || PROTECTED_REGISTRABLE_DOMAINS.includes(domain)
+    || PROTECTED_HOSTS.includes(domain)) {
     return {
       code: 'ENTITY_LEVEL_RULE',
       pattern: domain,
-      detail: `"${domain}" is an entity-level domain: blocking it removes logins, updates and media delivery along with any advert. Block the specific ad host instead.`
+      detail: `"${domain}" is an entity-level or core media domain: blocking it removes logins, updates and media delivery along with any advert. Block the specific ad host instead.`
     };
   }
 

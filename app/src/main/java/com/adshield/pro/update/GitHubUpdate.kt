@@ -32,6 +32,14 @@ data class GitHubRelease(val tag: String, val name: String, val code: Int, val a
 
 object GitHubReleaseClient {
     private const val API_BASE = "https://api.github.com/repos/"
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .followSslRedirects(false)
+            .build()
+    }
+
     fun latest(): GitHubRelease? {
         val repository = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
         if (!repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) return null
@@ -39,7 +47,7 @@ object GitHubReleaseClient {
         val request = Request.Builder().url(endpoint)
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
-        OkHttpClient().newCall(request).execute().use { response ->
+        httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
             val json = JSONObject(response.body?.string() ?: return null)
             val tag = json.optString("tag_name").trim()
@@ -62,7 +70,8 @@ object GitHubReleaseClient {
             val apk = chosen?.first?.optString("browser_download_url")
             val digest = chosen?.first?.optString("digest")
                 ?.takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
-            val trustedUrl = apk?.takeIf { it.startsWith("https://github.com/") && it.contains("/releases/download/") } ?: return null
+            val expectedPrefix = "https://github.com/$repository/releases/download/"
+            val trustedUrl = apk?.takeIf { it.startsWith(expectedPrefix, ignoreCase = true) } ?: return null
             val notes = json.optString("body").takeUnless { it == "null" }?.trim().orEmpty()
                 .take(1800).ifBlank { "Performance improvements and protection updates." }
             return GitHubRelease(tag, tag.removePrefix("v"), major * 10000 + minor * 100 + patch, trustedUrl, digest, notes)
@@ -121,6 +130,8 @@ class GitHubUpdateWorker @AssistedInject constructor(
                 .setContentIntent(pending).setAutoCancel(true).build())
             prefs.edit().putInt("notified_code", release.code).apply()
             Result.success()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (_: Exception) { Result.retry() }
     }
 
@@ -139,11 +150,35 @@ class GitHubUpdateWorker @AssistedInject constructor(
 }
 
 object GitHubApkDownload {
+    private val downloadClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(false)
+            .build()
+    }
+
+    private fun isTrustedGitHubAssetHost(host: String): Boolean {
+        val lower = host.lowercase()
+        return lower == "github.com" ||
+            lower == "objects.githubusercontent.com" ||
+            lower == "release-assets.githubusercontent.com" ||
+            lower.endsWith(".githubusercontent.com")
+    }
+
     suspend fun get(context: Context, release: GitHubRelease): File = withContext(Dispatchers.IO) {
+        val expectedRepo = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
+        require(release.apk.startsWith("https://github.com/$expectedRepo/releases/download/", ignoreCase = true)) {
+            "Untrusted APK update URL refused."
+        }
         val request = Request.Builder().url(release.apk).header("User-Agent", "AdShieldPro-Android-Updater").get().build()
-        OkHttpClient().newCall(request).execute().use { response ->
+        downloadClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw java.io.IOException("Download failed (HTTP " + response.code + ").")
-            val body = response.body ?: throw java.io.IOException("APK download was empty.")
+            if (!response.request.url.isHttps || !isTrustedGitHubAssetHost(response.request.url.host)) {
+                throw java.io.IOException("Redirected to untrusted update host; download refused.")
+            }
+            val body = response.body
             val limit = 250L * 1024L * 1024L
             if (body.contentLength() > limit) throw java.io.IOException("APK exceeds the download size limit.")
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -151,18 +186,23 @@ object GitHubApkDownload {
             val apk = File(dir, "adshield-" + release.code + ".apk")
             val hash = MessageDigest.getInstance("SHA-256")
             var total = 0L
-            body.byteStream().use { input ->
-                FileOutputStream(part).use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        total += count
-                        if (total > limit) throw java.io.IOException("APK exceeds the download size limit.")
-                        hash.update(buffer, 0, count)
-                        output.write(buffer, 0, count)
+            try {
+                body.byteStream().use { input ->
+                    FileOutputStream(part).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            if (total > limit) throw java.io.IOException("APK exceeds the download size limit.")
+                            hash.update(buffer, 0, count)
+                            output.write(buffer, 0, count)
+                        }
                     }
                 }
+            } catch (t: Throwable) {
+                part.delete()
+                throw t
             }
             val actual = hash.digest().joinToString("") { "%02x".format(it) }
             if (release.sha256 != null && !actual.equals(release.sha256, true)) {

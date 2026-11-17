@@ -46,8 +46,15 @@ export function typeToString(type) {
 }
 
 export function typeFromString(name) {
-  const upper = String(name || 'A').toUpperCase();
-  return TYPE[upper] ?? (Number.isInteger(Number(name)) ? Number(name) : TYPE.A);
+  const trimmed = String(name ?? '').trim();
+  if (!trimmed) return TYPE.A;
+  const upper = trimmed.toUpperCase();
+  if (TYPE[upper] !== undefined) return TYPE[upper];
+  if (/^\d+$/.test(trimmed)) {
+    const num = Number(trimmed);
+    if (Number.isInteger(num) && num >= 1 && num <= 65535) return num;
+  }
+  return TYPE.A;
 }
 
 export function rcodeToString(rcode) {
@@ -171,7 +178,8 @@ class Reader {
         if (pos + 1 >= this.bytes.length) throw new DnsFormatError('truncated compression pointer');
         const ptr = ((len & 0x3f) << 8) | this.bytes[pos + 1];
         if (++jumps > 32) throw new DnsFormatError('compression pointer loop');
-        // Pointers must move strictly backwards to prevent loops.
+        // Pointers must target a valid offset after the 12-byte header and move strictly backwards.
+        if (ptr < 12) throw new DnsFormatError('compression pointer into header');
         if (ptr >= pos) throw new DnsFormatError('forward compression pointer');
         if (!advanced) { this.pos = pos + 2; advanced = true; }
         pos = ptr;
@@ -193,69 +201,92 @@ function decodeRdata(reader, type, rdlength) {
   const end = start + rdlength;
   if (end > reader.bytes.length) throw new DnsFormatError('rdata out of bounds');
 
+  const needWithin = (n) => {
+    if (reader.pos + n > end) throw new DnsFormatError('rdata truncated');
+  };
+  const rest = () => {
+    if (reader.pos > end) throw new DnsFormatError('rdata overrun');
+    return reader.slice(end - reader.pos);
+  };
+  const finish = (out) => {
+    if (reader.pos !== end) throw new DnsFormatError('rdata length mismatch');
+    return out;
+  };
+
   switch (type) {
     case TYPE.A: {
+      if (rdlength !== 4) throw new DnsFormatError('invalid A rdlength');
       const b = reader.slice(4);
-      return { address: `${b[0]}.${b[1]}.${b[2]}.${b[3]}` };
+      return finish({ address: `${b[0]}.${b[1]}.${b[2]}.${b[3]}` });
     }
     case TYPE.AAAA: {
+      if (rdlength !== 16) throw new DnsFormatError('invalid AAAA rdlength');
       const b = reader.slice(16);
       const groups = [];
       for (let i = 0; i < 16; i += 2) groups.push(((b[i] << 8) | b[i + 1]).toString(16));
-      return { address: compressIpv6(groups.join(':')) };
+      return finish({ address: compressIpv6(groups.join(':')) });
     }
     case TYPE.NS: case TYPE.CNAME: case TYPE.PTR:
-      return { target: reader.name() };
+      return finish({ target: reader.name() });
     case TYPE.MX: {
+      needWithin(2);
       const preference = reader.u16();
-      return { preference, target: reader.name() };
+      return finish({ preference, target: reader.name() });
     }
     case TYPE.TXT: {
       const chunks = [];
       while (reader.pos < end) {
         const len = reader.u8();
+        needWithin(len);
         chunks.push(new TextDecoder().decode(reader.slice(len)));
       }
-      return { text: chunks.join('') };
+      return finish({ text: chunks.join('') });
     }
     case TYPE.SOA: {
       const mname = reader.name();
       const rname = reader.name();
+      needWithin(20);
       const serial = reader.u32();
       const refresh = reader.u32();
       const retry = reader.u32();
       const expire = reader.u32();
       const minimum = reader.u32();
-      return { mname, rname, serial, refresh, retry, expire, minimum };
+      return finish({ mname, rname, serial, refresh, retry, expire, minimum });
     }
     case TYPE.SRV: {
+      needWithin(6);
       const priority = reader.u16();
       const weight = reader.u16();
       const port = reader.u16();
-      return { priority, weight, port, target: reader.name() };
+      return finish({ priority, weight, port, target: reader.name() });
     }
     case TYPE.CAA: {
+      needWithin(2);
       const flags = reader.u8();
       const tagLen = reader.u8();
+      needWithin(tagLen);
       const tag = new TextDecoder().decode(reader.slice(tagLen));
-      const value = new TextDecoder().decode(reader.slice(end - reader.pos));
-      return { flags, tag, value };
+      const value = new TextDecoder().decode(rest());
+      return finish({ flags, tag, value });
     }
     case TYPE.DS: {
+      needWithin(4);
       const keyTag = reader.u16();
       const algorithm = reader.u8();
       const digestType = reader.u8();
-      const digest = toHex(reader.slice(end - reader.pos));
-      return { keyTag, algorithm, digestType, digest };
+      const digest = toHex(rest());
+      return finish({ keyTag, algorithm, digestType, digest });
     }
     case TYPE.DNSKEY: {
+      needWithin(4);
       const flags = reader.u16();
       const protocol = reader.u8();
       const algorithm = reader.u8();
-      const publicKey = toHex(reader.slice(end - reader.pos));
-      return { flags, protocol, algorithm, publicKey, zoneKey: (flags & 0x0100) !== 0 };
+      const publicKey = toHex(rest());
+      return finish({ flags, protocol, algorithm, publicKey, zoneKey: (flags & 0x0100) !== 0 });
     }
     case TYPE.RRSIG: {
+      needWithin(18);
       const typeCovered = reader.u16();
       const algorithm = reader.u8();
       const labels = reader.u8();
@@ -264,18 +295,20 @@ function decodeRdata(reader, type, rdlength) {
       const inception = reader.u32();
       const keyTag = reader.u16();
       const signerName = reader.name();
-      const signature = toHex(reader.slice(end - reader.pos));
-      return {
+      const signature = toHex(rest());
+      return finish({
         typeCovered, algorithm, labels, originalTtl,
         expiration: new Date(expiration * 1000).toISOString(),
         inception: new Date(inception * 1000).toISOString(),
         keyTag, signerName, signature
-      };
+      });
     }
-    case TYPE.NSEC:
-      return { nextDomain: reader.name(), typeBitmap: toHex(reader.slice(end - reader.pos)) };
+    case TYPE.NSEC: {
+      const nextDomain = reader.name();
+      return finish({ nextDomain, typeBitmap: toHex(rest()) });
+    }
     default:
-      return { raw: toHex(reader.slice(end - reader.pos)) };
+      return finish({ raw: toHex(rest()) });
   }
 }
 

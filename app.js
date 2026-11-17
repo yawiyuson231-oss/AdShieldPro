@@ -54,6 +54,7 @@ const state = {
   trainingError: null,
   bundled: {},
   snapshotTimer: null,
+  analyticsTimer: null,
   lastSnapshotId: null,
   currentPage: 'dashboard'
 };
@@ -88,16 +89,18 @@ async function boot() {
 
     setBootStatus('loading rule sets…', 'info');
     state.engine = new OmniShieldFilterEngine();
-    await loadBundledRules();
-
     state.aether = new Aether({ engine: state.engine });
     state.client = new DnsClient({ engine: state.engine, onObservation: handleObservation });
     state.firewall = new FirewallAI({ onEvent: (event) => {
       if (event.decision === 'block') toast(`Firewall AI blocked ${event.domain}: ${event.reasons[0] || ''}`, 'warn');
     } });
 
+    // Restore saved settings before loading rule sets so optional tiers apply immediately.
     await restoreConfiguration();
+    await loadBundledRules();
+    await loadInstalledFeeds(state.engine);
     applyUserRules();
+    state.aether.reputation.cache.clear();
     await loadCachedModel();
 
     state.booted = true;
@@ -115,7 +118,8 @@ async function boot() {
     updateOnlineStatus();
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    window.addEventListener('pagehide', () => { saveSnapshot('pagehide').catch(() => {}); });
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('pagehide', handlePageHide);
   } catch (err) {
     console.error(err);
     setBootStatus('boot failed', 'bad');
@@ -143,12 +147,36 @@ async function loadBundledRules() {
           if (key === 'lite') setBootStatus(`loading rule sets… ${Math.round(fraction * 100)}%`, 'info');
         }
       });
-      state.bundled[descriptor.source] = { ...result, label: descriptor.label, bytes: text.length };
+      state.bundled[descriptor.source] = {
+        ...result,
+        label: descriptor.label,
+        bytes: new TextEncoder().encode(text).length
+      };
     } catch (err) {
       state.bundled[descriptor.source] = { error: err.message, label: descriptor.label };
     }
   }
-  if (state.settings.aggressiveTier) await enableAggressiveTier(true);
+  if (state.settings.aggressiveTier) {
+    const descriptor = BUNDLED.aggressive;
+    try {
+      const text = await fetchText(descriptor.file);
+      state.engine.loadFilterList(text, descriptor.category, descriptor.source);
+    } catch { /* optional tier */ }
+  }
+}
+
+async function loadInstalledFeeds(engine) {
+  if (!state.feeds || !engine) return;
+  for (const feed of FEED_REGISTRY) {
+    try {
+      const check = await state.feeds.verify(feed.id);
+      if (!check.ok) continue;
+      const text = await state.feeds.content(feed.id);
+      if (text) {
+        await engine.loadFilterListAsync(text, { category: feed.category, source: feed.id });
+      }
+    } catch { /* fall back to bundled copy */ }
+  }
 }
 
 async function enableAggressiveTier(enable) {
@@ -186,10 +214,29 @@ async function rebuildEngine() {
   if (state.settings.aggressiveTier) {
     try { engine.loadFilterList(await fetchText(BUNDLED.aggressive.file), 'ADS', BUNDLED.aggressive.source); } catch { /* ignore */ }
   }
-  state.customRules.forEach((rule) => engine.addUserRule(rule.pattern, rule.isAllow));
+  await loadInstalledFeeds(engine);
+  state.customRules.forEach((rule) => {
+    if (rule.enabled !== false) rule.applied = engine.addUserRule(rule.pattern, rule.isAllow);
+  });
   state.engine = engine;
   state.aether.attachEngine(engine);
+  state.aether.reputation.cache.clear();
   state.client.setEngine(engine);
+}
+
+function scheduleAnalyticsSave() {
+  clearTimeout(state.analyticsTimer);
+  state.analyticsTimer = setTimeout(() => { state.analytics?.save().catch(() => {}); }, 1500);
+}
+
+function handlePageHide() {
+  saveSnapshot('pagehide').catch(() => {});
+  state.analytics?.save().catch(() => {});
+}
+
+function handleHashChange() {
+  const target = location.hash.replace('#', '');
+  if (target && PAGE_RENDERERS[target] && target !== state.currentPage) navigate(target);
 }
 
 function handleObservation(event) {
@@ -199,12 +246,14 @@ function handleObservation(event) {
     const category = event.blockedBy?.category || 'UNCATEGORISED';
     state.monitor.record({ kind: 'blocked', domain, category, latencyMs: event.latencyMs, at: event.at });
     state.analytics.record({ kind: 'blocked', category, domain, at: event.at });
+    scheduleAnalyticsSave();
     state.aether.observe(domain, { blocked: true, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
     return;
   }
   state.monitor.record({ kind: 'lookup', domain, status: event.status, latencyMs: event.latencyMs, at: event.at });
   state.analytics.record({ kind: event.ok ? 'allowed' : 'error', category: 'DNS', domain, at: event.at });
+  scheduleAnalyticsSave();
   if (event.ok) {
     state.aether.observe(domain, { blocked: false, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
@@ -237,29 +286,57 @@ function buildState({ includeModel = false } = {}) {
 }
 
 function applyUserRules() {
-  for (const rule of state.customRules) state.engine.addUserRule(rule.pattern, rule.isAllow);
+  for (const rule of state.customRules) {
+    if (rule.enabled === false) { rule.applied = false; continue; }
+    rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow);
+  }
+}
+
+function applySavedState(saved = {}) {
+  if (saved.settings && typeof saved.settings === 'object') {
+    state.settings = { ...state.settings, ...saved.settings };
+  }
+  if (Array.isArray(saved.customRules)) {
+    state.customRules = saved.customRules
+      .map((r) => ({
+        pattern: String(r.pattern ?? r.rawPattern ?? '').trim(),
+        isAllow: r.isAllow ?? r.ruleType === 'ALLOW',
+        enabled: r.isEnabled !== false
+      }))
+      .filter((r) => r.pattern);
+  }
+  if (saved.aether && state.aether) state.aether.importState(saved.aether);
+  if (state.firewall) {
+    state.firewall.policies.clear();
+    if (saved.firewall?.config && typeof saved.firewall.config === 'object') {
+      for (const [k, v] of Object.entries(saved.firewall.config)) {
+        if (Object.prototype.hasOwnProperty.call(FW_CONFIG, k) && typeof v === typeof FW_CONFIG[k]) {
+          if (typeof v !== 'number' || (Number.isFinite(v) && v > 0)) state.firewall.config[k] = v;
+        }
+      }
+    }
+    if (Array.isArray(saved.firewall?.policies)) {
+      for (const policy of saved.firewall.policies) {
+        if (!policy?.app) continue;
+        for (const d of policy.deny || []) state.firewall.setPolicy(policy.app, d, 'block');
+        for (const d of policy.allow || []) state.firewall.setPolicy(policy.app, d, 'allow');
+      }
+    }
+  }
+  if (saved.protectionMode || Array.isArray(saved.browserSiteExceptions) || Array.isArray(saved.excludedAppPackages)) {
+    state.importedBackup = {
+      ...(state.importedBackup || {}),
+      protectionMode: saved.protectionMode ?? 'BALANCED',
+      browserSiteExceptions: Array.isArray(saved.browserSiteExceptions) ? saved.browserSiteExceptions : [],
+      excludedAppPackages: Array.isArray(saved.excludedAppPackages) ? saved.excludedAppPackages : []
+    };
+  }
 }
 
 async function restoreConfiguration() {
   const recovery = await state.backups.recover();
   if (recovery.ok) {
-    const saved = recovery.state || {};
-    if (saved.settings) state.settings = { ...state.settings, ...saved.settings };
-    if (Array.isArray(saved.customRules)) {
-      state.customRules = saved.customRules
-        .map((r) => ({
-          pattern: String(r.pattern ?? r.rawPattern ?? ''),
-          isAllow: r.isAllow ?? r.ruleType === 'ALLOW'
-        }))
-        .filter((r) => r.pattern);
-    }
-    if (saved.aether && state.aether) state.aether.importState(saved.aether);
-    if (saved.firewall?.policies && state.firewall) {
-      for (const policy of saved.firewall.policies) {
-        for (const d of policy.deny || []) state.firewall.setPolicy(policy.app, d, 'block');
-        for (const d of policy.allow || []) state.firewall.setPolicy(policy.app, d, 'allow');
-      }
-    }
+    applySavedState(recovery.state || {});
     state.lastSnapshotId = recovery.id;
     if (recovery.skipped.length) {
       toast(`Recovered configuration ${recovery.id}, skipped ${recovery.skipped.length} corrupt snapshot(s).`, 'warn');
@@ -441,7 +518,9 @@ function renderDashboard() {
       ['Repaint cadence', `${state.monitorIntervalMs || state.settings.monitorRefreshMs} ms while a live view is open · 0 ms when the tab is hidden`],
       ['Power state', power ? power.summary : 'starting…'],
       ['Throttle', power && power.factor > 1 ? `${power.factor}x (band: ${power.band})` : 'none — default cadence'],
-      ['Rule set memory', `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round((estimateRuleMemory(breakdown.total) / breakdown.total))} bytes per rule)`],
+      ['Rule set memory', breakdown.total > 0
+        ? `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round(estimateRuleMemory(breakdown.total) / breakdown.total)} bytes per rule)`
+        : '0 B (no rules loaded)'],
       ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background']
     ]),
     h('div', { class: 'row', style: { marginTop: '10px' } },
@@ -545,6 +624,7 @@ function verdictPillClass(verdict) {
 
 function analyseDomain(input) {
   const out = document.getElementById('aether-result');
+  if (!state.aether) { mount(out, note('Engine is still starting — try again in a moment.', 'warn')); return; }
   const domain = String(input || '').trim();
   if (!domain) { mount(out, note('Enter a hostname first.', 'warn')); return; }
   let report;
@@ -621,14 +701,25 @@ function analyseDomain(input) {
 
 function toggleDomainRule(domain, currentlyBlocked) {
   if (currentlyBlocked) {
-    state.customRules = state.customRules.filter((r) => !(r.pattern === domain && r.isAllow));
-    state.customRules.push({ pattern: domain, isAllow: true });
-    state.engine.addUserRule(`||${domain}^`, true);
+    state.engine.removeUserRule(domain, false);
+    const added = state.engine.addUserRule(`||${domain}^`, true);
+    if (!added) { toast(`Could not add an allow rule for ${domain}.`, 'bad'); return; }
+    state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
+    state.customRules.push({ pattern: domain, isAllow: true, enabled: true, applied: true });
     toast(`${domain} added to your allowlist.`, 'ok');
   } else {
-    state.customRules = state.customRules.filter((r) => !(r.pattern === domain && !r.isAllow));
-    state.customRules.push({ pattern: domain, isAllow: false });
-    state.engine.addUserRule(`||${domain}^`, false);
+    const prevRejected = state.engine.rejectedRules.length;
+    const added = state.engine.addUserRule(`||${domain}^`, false);
+    if (!added) {
+      const why = state.engine.rejectedRules.length > prevRejected
+        ? state.engine.rejectedRules[state.engine.rejectedRules.length - 1].detail
+        : `Could not block ${domain}.`;
+      toast(why, 'warn');
+      return;
+    }
+    state.engine.removeUserRule(domain, true);
+    state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
+    state.customRules.push({ pattern: domain, isAllow: false, enabled: true, applied: true });
     toast(`${domain} blocked by your rule.`, 'ok');
   }
   state.aether.reputation.cache.clear();
@@ -641,8 +732,10 @@ function toggleDomainRule(domain, currentlyBlocked) {
 function reportFalsePositive(domain) {
   const result = state.aether.reportFalsePositive(domain);
   if (!result.ok) { toast(result.error || 'Could not record the report.', 'bad'); return; }
-  state.customRules = state.customRules.filter((r) => r.pattern !== domain);
-  state.customRules.push({ pattern: domain, isAllow: true });
+  if (result.allowRuleAdded) {
+    state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
+    state.customRules.push({ pattern: domain, isAllow: true, enabled: true, applied: true });
+  }
   toast(result.note, 'ok');
   scheduleSnapshot('false-positive');
   analyseDomain(domain);
@@ -700,7 +793,7 @@ function renderAetherModel() {
 
 function renderAetherFeedback() {
   const node = document.getElementById('aether-feedback');
-  if (!node) return;
+  if (!node || !state.aether) return;
   const snapshot = state.aether.reputation.statsSnapshot();
   const adapted = Object.entries(snapshot.feedback).filter(([, v]) => v.falsePositives + v.confirmations > 0);
   mount(node,
@@ -724,6 +817,7 @@ async function resolveDomain() {
   const type = document.getElementById('dns-type').value;
   const button = document.getElementById('dns-go');
   const out = document.getElementById('dns-result');
+  if (!state.client) { mount(out, note('DNS client is still starting — try again in a moment.', 'warn')); return; }
   const domain = String(input.value || '').trim();
   if (!domain) { mount(out, note('Enter a hostname first.', 'warn')); return; }
   setBusy(button, true, 'Resolving…');
@@ -783,14 +877,17 @@ function renderDnsResult(out, result, type) {
     const a = result.results.a;
     const aaaa = result.results.aaaa;
     const cls = result.blocked ? 'blocked' : (a.ok || aaaa.ok) ? 'allowed' : 'error';
+    const cacheLabel = a.cached && aaaa.cached ? 'hit' : (a.cached || aaaa.cached ? 'partial hit' : 'miss');
+    const primaryReasons = a.reasons?.length ? a.reasons : (aaaa.reasons || []);
+    const cnameSource = a.cname?.length ? a : (aaaa.cname?.length ? aaaa : null);
     mount(out,
       h('div', { class: `verdict ${cls}` },
         h('h3', { text: `${result.name} — ${result.blocked ? 'blocked' : a.ok || aaaa.ok ? 'resolved' : 'not resolved'}` }),
         h('ul', {},
           h('li', { text: `IPv4: ${a.addresses.join(', ') || '—'} ${a.status !== 'ok' ? `(${a.status})` : ''}` }),
           h('li', { text: `IPv6: ${aaaa.addresses.join(', ') || '—'} ${aaaa.status !== 'ok' ? `(${aaaa.status})` : ''}` }),
-          h('li', { text: `Cache: ${a.cached ? 'hit' : 'miss'} · latency ${result.latencyMs} ms` }),
-          ...(a.reasons || []).map((r) => h('li', { text: r }))
+          h('li', { text: `Cache: ${cacheLabel} · TTL ${result.ttl ?? '—'} · latency ${result.latencyMs} ms` }),
+          ...primaryReasons.map((r) => h('li', { text: r }))
         )
       ),
       h('h3', { text: 'Per-family detail' }),
@@ -798,7 +895,7 @@ function renderDnsResult(out, result, type) {
         ['A', a.status, a.resolver?.name ?? '—', a.transport ?? '—', a.dnssec?.status ?? '—', `${a.latencyMs} ms`],
         ['AAAA', aaaa.status, aaaa.resolver?.name ?? '—', aaaa.transport ?? '—', aaaa.dnssec?.status ?? '—', `${aaaa.latencyMs} ms`]
       ]),
-      ...(a.cname?.length ? chainAuditNodes(chainAuditFor(a)) : [])
+      ...(cnameSource ? chainAuditNodes(chainAuditFor(cnameSource)) : [])
     );
     return;
   }
@@ -920,7 +1017,8 @@ function renderFirewall() {
  */
 function firewallThresholdRows() {
   const rows = [];
-  for (const [key, value] of Object.entries(FW_CONFIG)) {
+  const cfg = state.firewall?.config || FW_CONFIG;
+  for (const [key, value] of Object.entries(cfg)) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       for (const [sub, subValue] of Object.entries(value)) {
         rows.push([`${key}.${sub}`, String(subValue)]);
@@ -987,10 +1085,16 @@ function runFirewallSelfTest() {
 function inspectFirewall() {
   const domain = String(document.getElementById('fw-input').value || '').trim();
   const out = document.getElementById('fw-inspect-out');
+  if (!state.firewall || !state.aether) { mount(out, note('Firewall AI is still starting — try again in a moment.', 'warn')); return; }
   if (!domain) { mount(out, note('Enter a destination that appears in the observation list.', 'warn')); return; }
-  const report = state.firewall.inspect(domain);
-  const reputation = state.aether.analyze(domain);
-  const decision = state.firewall.evaluate(domain, { reputation });
+  const normalized = OmniShieldFilterEngine.normalizeDomain(domain);
+  if (!normalized) {
+    mount(out, note('Input is not a valid hostname.', 'warn'));
+    return;
+  }
+  const report = state.firewall.inspect(normalized);
+  const reputation = state.aether.analyze(normalized);
+  const decision = state.firewall.evaluate(normalized, { reputation: reputation.error ? null : reputation });
   mount(out,
     h('div', { class: `verdict ${decision.decision === 'block' ? 'blocked' : decision.decision === 'monitor' ? 'error' : 'allowed'}` },
       h('h3', { text: `${decision.domain} → ${decision.decision.toUpperCase()} (confidence: ${decision.confidence})` }),
@@ -1007,13 +1111,15 @@ function inspectFirewall() {
       ['Registrable domain', report.parent],
       ['Entropy (main label)', String(report.features.entropy)],
       ['Labels', String(report.features.labelCount)],
-      ['AETHER reputation', `${reputation.score}/100 (${reputation.verdictLabel})`]
+      ['AETHER reputation', reputation.error ? 'unavailable' : `${reputation.score}/100 (${reputation.verdictLabel})`]
     ])
   );
 }
 
 function importFirewallLog(file) {
+  if (!state.firewall) { toast('Firewall AI is still starting.', 'warn'); return; }
   const reader = new FileReader();
+  reader.onerror = () => toast('Could not read the selected file.', 'bad');
   reader.onload = () => {
     try {
       const parsed = JSON.parse(String(reader.result));
@@ -1120,7 +1226,7 @@ function runEngineBenchmark(iterations = 5000) {
     ok: true,
     evaluated: sample.length,
     totalMs: Math.round(totalMs * 100) / 100,
-    perSecond: Math.round(sample.length / (totalMs / 1000)),
+    perSecond: totalMs > 0 ? Math.round(sample.length / (totalMs / 1000)) : sample.length * 1000,
     p50us: Math.round(pct(0.5) * 1000),
     p95us: Math.round(pct(0.95) * 1000),
     meanUs: Math.round((totalMs * 1000 / sample.length) * 10) / 10,
@@ -1222,6 +1328,7 @@ async function renderFeeds() {
 async function checkFeedUpdates() {
   const button = document.getElementById('feeds-check');
   const status = document.getElementById('feeds-status');
+  if (!state.feeds || !state.engine) { mount(status, note('Feed manager is still starting.', 'warn')); return; }
   setBusy(button, true, 'Checking…');
   const lines = [];
   try {
@@ -1255,6 +1362,7 @@ async function checkFeedUpdates() {
 
 async function verifyFeeds() {
   const status = document.getElementById('feeds-status');
+  if (!state.feeds) return;
   const results = [];
   for (const feed of FEED_REGISTRY) {
     const result = await state.feeds.verify(feed.id);
@@ -1268,6 +1376,7 @@ async function verifyFeeds() {
 /* ------------------------------------------------------------------ */
 
 function renderPrivacy() {
+  if (!state.analytics) return;
   const report = state.analytics.report();
   const days = report.days.length
     ? table(['Day', 'Reported events', 'Suppressed', 'Distinct domains', 'Categories'], report.days.map((d) => [
@@ -1323,8 +1432,11 @@ async function renderSnapshots() {
           onclick: async () => {
             const result = await state.backups.restore(s.id);
             if (!result.ok) { toast(`Restore failed: ${result.reason}`, 'bad'); return; }
-            toast('Snapshot restored. Reloading configuration…', 'ok');
-            location.reload();
+            applySavedState(result.state || {});
+            await rebuildEngine();
+            await saveSnapshot('restored');
+            renderAll();
+            toast(`Restored configuration snapshot ${s.id}.`, 'ok');
           }
         })
       ]))
@@ -1355,13 +1467,14 @@ function renderSync() {
         h('td', { class: 'mono', text: rule.pattern }),
         h('td', {}, pill(rule.isAllow ? 'ALLOW' : 'BLOCK', rule.isAllow ? 'ok' : 'bad')),
         h('td', { text: 'suffix' }),
-        h('td', { text: 'on' }),
+        h('td', { text: rule.enabled === false ? 'off' : (rule.applied === false ? 'ignored' : 'on') }),
         h('td', {},
           h('button', {
             class: 'sm ghost', text: 'Remove',
             onclick: () => {
               state.customRules = state.customRules.filter((r) => r !== rule);
-              state.engine.removeUserRule(`||${rule.pattern}^`, rule.isAllow);
+              state.engine.removeUserRule(rule.pattern, rule.isAllow);
+              state.aether?.reputation.cache.clear();
               scheduleSnapshot('rule-removed');
               renderSync();
               renderDashboard();
@@ -1378,7 +1491,9 @@ function renderSync() {
 
 function importAndroidBackup(file) {
   const status = document.getElementById('import-status');
+  if (!state.engine || !state.aether) { mount(status, note('Engine is still starting — try again in a moment.', 'warn')); return; }
   const reader = new FileReader();
+  reader.onerror = () => mount(status, note('Import failed: could not read the selected file.', 'bad'));
   reader.onload = () => {
     try {
       const data = JSON.parse(String(reader.result));
@@ -1386,12 +1501,15 @@ function importAndroidBackup(file) {
       state.importedBackup = data;
       let applied = 0;
       for (const rule of data.customRules) {
+        if (!rule || typeof rule !== 'object') continue;
         const pattern = String(rule.rawPattern ?? rule.pattern ?? '').trim();
         if (!pattern) continue;
         const isAllow = rule.ruleType === 'ALLOW' || rule.isAllow === true;
+        const enabled = rule.isEnabled !== false;
         if (state.customRules.some((r) => r.pattern === pattern && r.isAllow === isAllow)) continue;
-        state.customRules.push({ pattern, isAllow });
-        if (state.engine.addUserRule(pattern, isAllow)) applied++;
+        const didApply = enabled ? state.engine.addUserRule(pattern, isAllow) : false;
+        state.customRules.push({ pattern, isAllow, enabled, applied: didApply });
+        if (didApply) applied++;
       }
       state.aether.reputation.cache.clear();
       const notes = [
@@ -1559,6 +1677,7 @@ async function checkFeedUpdatesQuietly() {
         if (result.ok && result.changed) {
           const text = await state.feeds.content(feed.id);
           state.engine.loadFilterList(text, feed.category, feed.id);
+          state.aether?.reputation.cache.clear();
           toast(`${feed.name} updated (${number(result.meta.rules)} rules).`, 'ok');
           renderDashboard();
         }
@@ -1594,14 +1713,18 @@ function wireEvents() {
   document.getElementById('dns-go').addEventListener('click', resolveDomain);
   dnsInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') resolveDomain(); });
   document.getElementById('dns-flush').addEventListener('click', () => {
+    if (!state.client) return;
     state.client.cache.clear();
     renderDnsCache();
     toast('DNS cache flushed.', 'ok');
   });
 
+  const fwInput = document.getElementById('fw-input');
   document.getElementById('fw-selftest').addEventListener('click', runFirewallSelfTest);
   document.getElementById('fw-go').addEventListener('click', inspectFirewall);
+  fwInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') inspectFirewall(); });
   document.getElementById('fw-export').addEventListener('click', () => {
+    if (!state.firewall) return;
     const snapshot = state.firewall.snapshot();
     download('omnishield-firewall-observations.json', JSON.stringify({
       exportedAt: new Date().toISOString(),
@@ -1609,22 +1732,31 @@ function wireEvents() {
       note: 'Destination scale only; no payloads are ever captured.',
       observations: [...state.firewall.destinations.values()]
         .filter((d) => !d.domain.startsWith('parent:'))
-        .map((d) => ({ domain: d.domain, app: d.app, count: d.count, firstSeen: d.firstSeen, lastSeen: d.lastSeen }))
+        .map((d) => ({
+          domain: d.domain, app: d.app, count: d.count,
+          firstSeen: d.firstSeen, lastSeen: d.lastSeen,
+          times: d.times.slice(-40)
+        }))
     }, null, 2));
   });
   document.getElementById('fw-import').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
-    if (file) importFirewallLog(file);
+    if (file) {
+      importFirewallLog(file);
+      try { event.target.value = ''; } catch { /* ignore */ }
+    }
   });
 
   document.getElementById('feeds-check').addEventListener('click', checkFeedUpdates);
   document.getElementById('feeds-verify').addEventListener('click', verifyFeeds);
 
   document.getElementById('privacy-export').addEventListener('click', () => {
+    if (!state.analytics) return;
     download('omnishield-analytics.json', state.analytics.exportJSON());
     toast('Aggregate report exported.', 'ok');
   });
   document.getElementById('privacy-clear').addEventListener('click', async () => {
+    if (!state.analytics) return;
     if (!confirm('Delete all locally stored analytics? This cannot be undone.')) return;
     await state.analytics.clear();
     renderPrivacy();
@@ -1633,6 +1765,7 @@ function wireEvents() {
 
   document.getElementById('snapshot-save').addEventListener('click', () => saveSnapshot('manual', { silent: false }));
   document.getElementById('snapshot-recover').addEventListener('click', async () => {
+    if (!state.backups) return;
     const result = await state.backups.recover();
     const status = document.getElementById('sync-status');
     if (result.ok) {
@@ -1644,7 +1777,10 @@ function wireEvents() {
 
   document.getElementById('import-file').addEventListener('change', (event) => {
     const file = event.target.files?.[0];
-    if (file) importAndroidBackup(file);
+    if (file) {
+      importAndroidBackup(file);
+      try { event.target.value = ''; } catch { /* ignore */ }
+    }
   });
   document.getElementById('import-btn').addEventListener('click', () => {
     const file = document.getElementById('import-file').files?.[0];
@@ -1684,6 +1820,12 @@ globalThis.__omnishield = {
   startMonitorLoop,
   stop() {
     clearInterval(state.monitorTimer);
+    clearTimeout(state.snapshotTimer);
+    clearTimeout(state.analyticsTimer);
+    window.removeEventListener('online', updateOnlineStatus);
+    window.removeEventListener('offline', updateOnlineStatus);
+    window.removeEventListener('hashchange', handleHashChange);
+    window.removeEventListener('pagehide', handlePageHide);
     try { state.power?.stop(); } catch { /* ignore */ }
   }
 };

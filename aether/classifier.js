@@ -60,6 +60,7 @@ export function tokenizeDomain(domain, mode = 'hybrid') {
     return tokens;
   }
   const labels = name.split('.').filter(Boolean);
+  if (!labels.length) return [];
   tokens.push(`T:${labels[labels.length - 1]}`);
   for (const label of labels) {
     tokens.push(`L:${label}`);
@@ -431,26 +432,46 @@ export class DomainClassifier {
 
   static fromJSON(json) {
     if (!json || json.version !== 1) return null;
+    if (!Array.isArray(json.vocab) || !Array.isArray(json.logLikPos) || !Array.isArray(json.logLikNeg)) {
+      return null;
+    }
+    if (json.vocab.length === 0
+      || json.logLikPos.length !== json.vocab.length
+      || json.logLikNeg.length !== json.vocab.length
+      || !Number.isFinite(json.logPriorPos)
+      || !Number.isFinite(json.logPriorNeg)) {
+      return null;
+    }
+    const logLikPos = Float64Array.from(json.logLikPos);
+    const logLikNeg = Float64Array.from(json.logLikNeg);
+    for (let i = 0; i < logLikPos.length; i++) {
+      if (!Number.isFinite(logLikPos[i]) || !Number.isFinite(logLikNeg[i])) return null;
+    }
+    const featureMode = json.featureMode ?? 'hybrid';
+    const binary = json.binary ?? true;
+    const normalizeEvidence = json.normalizeEvidence ?? true;
+    const evidenceExponent = Number.isFinite(json.evidenceExponent) ? json.evidenceExponent : 0.25;
     const c = new DomainClassifier({
       alpha: json.alpha, maxFeatures: json.maxFeatures, seed: json.seed,
-      featureMode: json.featureMode, binary: json.binary,
-      normalizeEvidence: json.normalizeEvidence,
-      evidenceExponent: json.evidenceExponent
+      featureMode, binary, normalizeEvidence, evidenceExponent
     });
-    c.operatingThreshold = json.operatingThreshold ?? json.metrics?.operatingThreshold ?? 0.5;
+    const opThresh = json.operatingThreshold ?? json.metrics?.operatingThreshold ?? 0.5;
+    c.operatingThreshold = Number.isFinite(opThresh) ? opThresh : 0.5;
     c.model = {
-      vocab: json.vocab,
-      vocabIndex: new Map(json.vocab.map((t, i) => [t, i])),
-      logLikPos: Float64Array.from(json.logLikPos),
-      logLikNeg: Float64Array.from(json.logLikNeg),
+      vocab: json.vocab.map(String),
+      vocabIndex: new Map(json.vocab.map((t, i) => [String(t), i])),
+      logLikPos,
+      logLikNeg,
       logPriorPos: json.logPriorPos,
       logPriorNeg: json.logPriorNeg,
-      normalizeEvidence: json.normalizeEvidence ?? true,
-      evidenceExponent: json.evidenceExponent ?? 1,
+      featureMode,
+      binary,
+      normalizeEvidence,
+      evidenceExponent,
       trainedAt: json.trainedAt
     };
-    c.metrics = json.metrics;
-    c.trainingInfo = json.trainingInfo;
+    c.metrics = json.metrics ?? null;
+    c.trainingInfo = json.trainingInfo ?? null;
     return c;
   }
 }

@@ -127,31 +127,47 @@ export class FirewallAI {
 
   /* ---------------- observation ---------------- */
 
+  _evictIfNeeded() {
+    while (this.destinations.size > this.maxDestinations) {
+      let oldestKey = null; let oldest = Infinity;
+      for (const [k, v] of this.destinations) if (v.lastSeen < oldest) { oldest = v.lastSeen; oldestKey = k; }
+      if (!oldestKey) break;
+      this.destinations.delete(oldestKey);
+    }
+  }
+
+  _pushTime(times, at) {
+    if (times.length > 0 && at < times[times.length - 1]) {
+      times.push(at);
+      times.sort((a, b) => a - b);
+    } else {
+      times.push(at);
+    }
+    while (times.length > this.maxTimesPerDestination) times.shift();
+  }
+
   /**
    * Records one real connection/DNS observation.
    * @param {{domain:string, app?:string, at?:number, bytesOut?:number}} input
    */
   observe(input) {
-    const domain = String(input.domain || '').toLowerCase();
+    const domain = String(input?.domain || '').trim().toLowerCase().replace(/\.+$/, '');
     if (!domain) return null;
-    const at = input.at ?? this.clock();
+    const rawAt = input.at ?? this.clock();
+    const at = Number.isFinite(rawAt) ? rawAt : this.clock();
     const app = input.app || 'unknown';
 
     let entry = this.destinations.get(domain);
     if (!entry) {
       entry = { domain, app, times: [], count: 0, lastSeen: at, firstSeen: at, subdomains: new Set(), bytesOut: 0 };
       this.destinations.set(domain, entry);
-      if (this.destinations.size > this.maxDestinations) {
-        let oldestKey = null; let oldest = Infinity;
-        for (const [k, v] of this.destinations) if (v.lastSeen < oldest) { oldest = v.lastSeen; oldestKey = k; }
-        if (oldestKey) this.destinations.delete(oldestKey);
-      }
+      this._evictIfNeeded();
     }
-    entry.times.push(at);
-    if (entry.times.length > this.maxTimesPerDestination) entry.times.shift();
+    this._pushTime(entry.times, at);
     entry.count++;
-    entry.lastSeen = at;
-    entry.bytesOut += input.bytesOut || 0;
+    if (at < entry.firstSeen) entry.firstSeen = at;
+    if (at > entry.lastSeen) entry.lastSeen = at;
+    entry.bytesOut += Number.isFinite(input.bytesOut) ? input.bytesOut : 0;
 
     // Track unique subdomains per registrable parent for tunnelling analysis.
     const parent = registrableDomain(domain);
@@ -162,24 +178,32 @@ export class FirewallAI {
         if (!parentEntry) {
           parentEntry = { domain: `parent:${parent}`, parent, app, times: [], count: 0, lastSeen: at, firstSeen: at, subdomains: new Set(), bytesOut: 0 };
           this.destinations.set(`parent:${parent}`, parentEntry);
+          this._evictIfNeeded();
         }
-        parentEntry.subdomains.add(sub);
-        parentEntry.times.push(at);
-        if (parentEntry.times.length > this.maxTimesPerDestination) parentEntry.times.shift();
+        if (parentEntry.subdomains.size < 2000) parentEntry.subdomains.add(sub);
+        this._pushTime(parentEntry.times, at);
         parentEntry.count++;
-        parentEntry.lastSeen = at;
+        if (at < parentEntry.firstSeen) parentEntry.firstSeen = at;
+        if (at > parentEntry.lastSeen) parentEntry.lastSeen = at;
       }
     }
     this.stats.observations++;
     return entry;
   }
 
-  /** Bulk import of an observation log (e.g. from the Android core). */
+  /** Bulk import of an observation log (e.g. from the Android core or an exported web log). */
   importLog(entries) {
     let accepted = 0;
     for (const e of entries || []) {
-      if (!e?.domain) continue;
-      this.observe({ domain: e.domain, app: e.app, at: e.at ?? e.timestamp, bytesOut: e.bytesOut });
+      if (!e?.domain || String(e.domain).startsWith('parent:')) continue;
+      if (Array.isArray(e.times) && e.times.length > 0) {
+        for (const t of e.times) {
+          this.observe({ domain: e.domain, app: e.app, at: t });
+          accepted++;
+        }
+        continue;
+      }
+      this.observe({ domain: e.domain, app: e.app, at: e.at ?? e.timestamp ?? e.lastSeen, bytesOut: e.bytesOut });
       accepted++;
     }
     return accepted;
@@ -188,7 +212,7 @@ export class FirewallAI {
   /* ---------------- detectors ---------------- */
 
   /** Periodic check-in detection (C2 beaconing). */
-  detectBeaconing(domain) {
+  detectBeaconing(domain, { recordStats = true } = {}) {
     const entry = this.destinations.get(domain);
     const cfg = this.config;
     if (!entry || entry.times.length < cfg.beaconMinSamples) {
@@ -220,12 +244,12 @@ export class FirewallAI {
           'consistent with command-and-control beacons — but also with apps polling a legit API on a timer.'
         : `Intervals to ${domain} are irregular (CV ${cv === null ? 'n/a' : (cv * 100).toFixed(0)}%), so this is not periodic traffic.`
     };
-    if (fired) this.stats.beaconing++;
+    if (fired && recordStats) this.stats.beaconing++;
     return result;
   }
 
   /** DNS tunnelling detection for a registrable parent domain. */
-  detectTunneling(parent) {
+  detectTunneling(parent, { recordStats = true } = {}) {
     const key = parent.startsWith('parent:') ? parent : `parent:${parent}`;
     const entry = this.destinations.get(key);
     const cfg = this.config;
@@ -265,12 +289,12 @@ export class FirewallAI {
           '(data encoded in query names) — but also content-delivery and anti-tracking domain sharding.'
         : `Subdomain pattern under ${parent} does not match tunnelling (${passed}/4 indicators).`
     };
-    if (fired) this.stats.tunneling++;
+    if (fired && recordStats) this.stats.tunneling++;
     return result;
   }
 
   /** EWMA + z-score burst detection for one destination. */
-  detectRateAnomaly(domain) {
+  detectRateAnomaly(domain, { recordStats = true } = {}) {
     const entry = this.destinations.get(domain);
     const cfg = this.config;
     const times = entry?.times || [];
@@ -295,7 +319,7 @@ export class FirewallAI {
     const sd = stdDev(windows);
     const z = sd === 0 ? (currentRate > mean ? Infinity : 0) : (currentRate - mean) / sd;
     const fired = z >= cfg.rateZThreshold && currentRate >= cfg.rateMinSamples;
-    if (fired) this.stats.rateAnomalies++;
+    if (fired && recordStats) this.stats.rateAnomalies++;
     return {
       id: 'rate',
       fired,
@@ -314,16 +338,19 @@ export class FirewallAI {
   }
 
   /** Many distinct destinations in a short window (DGA storm / domain spray). */
-  detectFanout(at = this.clock()) {
+  detectFanout(at = this.clock(), { recordStats = true } = {}) {
     const cfg = this.config;
     const windowStart = at - cfg.fanoutWindowMs;
     const distinct = new Set();
     for (const entry of this.destinations.values()) {
       if (entry.domain.startsWith('parent:')) continue;
-      if (entry.lastSeen >= windowStart) distinct.add(registrableDomain(entry.domain));
+      if (entry.lastSeen < windowStart || entry.firstSeen > at) continue;
+      if (entry.lastSeen <= at || entry.times.some((t) => t >= windowStart && t <= at)) {
+        distinct.add(registrableDomain(entry.domain));
+      }
     }
     const fired = distinct.size >= cfg.fanoutThreshold;
-    if (fired) this.stats.fanout++;
+    if (fired && recordStats) this.stats.fanout++;
     return {
       id: 'fanout',
       fired,
@@ -345,7 +372,7 @@ export class FirewallAI {
    * Blocks only on: explicit user deny, or two independent firing signals.
    */
   evaluate(domain, { app = 'unknown', reputation = null, at = this.clock() } = {}) {
-    const name = String(domain || '').toLowerCase();
+    const name = String(domain || '').trim().toLowerCase().replace(/\.+$/, '');
     const signals = [];
     const beacon = this.detectBeaconing(name);
     const rate = this.detectRateAnomaly(name);
@@ -355,8 +382,15 @@ export class FirewallAI {
     signals.push(beacon, rate, tunnel, fanout);
 
     const policy = this.policies.get(app);
-    const explicitDeny = policy?.deny.has(name) || policy?.deny.has(parent);
-    const explicitAllow = policy?.allow.has(name) || policy?.allow.has(parent);
+    // Exact hostname policy always beats a broader registrable-domain policy so an
+    // allow rule for safe.example.com still works when example.com is blocked.
+    let explicitPolicy = null;
+    if (policy?.allow.has(name)) explicitPolicy = 'allow';
+    else if (policy?.deny.has(name)) explicitPolicy = 'deny';
+    else if (parent && policy?.allow.has(parent)) explicitPolicy = 'allow';
+    else if (parent && policy?.deny.has(parent)) explicitPolicy = 'deny';
+    const explicitDeny = explicitPolicy === 'deny';
+    const explicitAllow = explicitPolicy === 'allow';
 
     const fired = signals.filter((s) => s.fired);
     const independent = new Set(fired.map((s) => s.id));
@@ -412,16 +446,16 @@ export class FirewallAI {
 
   /** Analyses one destination in depth (all detectors, no decision). */
   inspect(domain) {
-    const name = String(domain || '').toLowerCase();
+    const name = String(domain || '').trim().toLowerCase().replace(/\.+$/, '');
     const parent = registrableDomain(name);
     const features = extractFeatures(name);
     return {
       domain: name,
       parent,
       features,
-      beaconing: this.detectBeaconing(name),
-      rate: this.detectRateAnomaly(name),
-      tunneling: this.detectTunneling(parent),
+      beaconing: this.detectBeaconing(name, { recordStats: false }),
+      rate: this.detectRateAnomaly(name, { recordStats: false }),
+      tunneling: this.detectTunneling(parent, { recordStats: false }),
       observations: this.destinations.get(name)?.count ?? 0
     };
   }
@@ -430,7 +464,7 @@ export class FirewallAI {
     return {
       stats: { ...this.stats },
       destinations: this.destinations.size,
-      fanout: this.detectFanout(),
+      fanout: this.detectFanout(this.clock(), { recordStats: false }),
       config: { ...this.config },
       policies: [...this.policies.entries()].map(([app, p]) => ({ app, deny: [...p.deny], allow: [...p.allow] }))
     };

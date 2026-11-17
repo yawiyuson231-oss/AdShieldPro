@@ -100,20 +100,23 @@ export class B2Client {
   }
 
   /** Time-limited download authorization scoped to a single key prefix. */
-  async getDownloadAuthorization({ keyPrefix, validDurationSeconds, contentType }) {
+  async getDownloadAuthorization({ keyPrefix, validDurationSeconds, contentDisposition }) {
     const payload = {
       bucketId: this.bucketId,
       fileNamePrefix: keyPrefix,
       validDurationSeconds
     }
-    if (contentType) payload.b2ContentDisposition = null
+    if (typeof contentDisposition === 'string' && contentDisposition) {
+      payload.b2ContentDisposition = contentDisposition
+    }
     const body = await this.call('b2_get_download_authorization', payload)
     return body.authorizationToken
   }
 
   downloadUrl(key, authorization) {
-    const separator = authorization.includes('?') ? '&' : '?'
-    return `${this.downloadBase}/file/${this.bucketName}/${encodePath(key)}${separator}Authorization=${encodeURIComponent(authorization)}`
+    const base = `${this.downloadBase}/file/${encodeURIComponent(this.bucketName)}/${encodePath(key)}`
+    const separator = base.includes('?') ? '&' : '?'
+    return `${base}${separator}Authorization=${encodeURIComponent(authorization)}`
   }
 
   async deleteFileVersion({ fileName, fileId }) {
@@ -121,8 +124,9 @@ export class B2Client {
   }
 
   /** Reconciliation: list live versions so used_bytes can be verified against reality. */
-  async listFileVersions({ prefix, maxFileCount = 1000, startFileId = null }) {
-    const payload = { bucketId: this.bucketId, prefix, maxFileCount, delimeter: '' }
+  async listFileVersions({ prefix, maxFileCount = 1000, startFileName = null, startFileId = null }) {
+    const payload = { bucketId: this.bucketId, prefix, maxFileCount, delimiter: '' }
+    if (startFileName) payload.startFileName = startFileName
     if (startFileId) payload.startFileId = startFileId
     return this.call('b2_list_file_versions', payload)
   }

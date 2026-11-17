@@ -26,6 +26,7 @@ export class DnsCache {
     this.entries = new Map();
     /** @type {Map<string, Promise<any>>} */
     this.inflight = new Map();
+    this._epoch = 0;
     this.stats = {
       hits: 0, misses: 0, staleHits: 0, negativeHits: 0,
       evictions: 0, expirations: 0, stores: 0, singleFlightJoins: 0
@@ -33,7 +34,7 @@ export class DnsCache {
   }
 
   static key(name, type = 'A') {
-    return `${String(type).toUpperCase()}|${String(name).toLowerCase().replace(/\.$/, '')}`;
+    return `${String(type).trim().toUpperCase()}|${String(name).trim().toLowerCase().replace(/\.+$/, '')}`;
   }
 
   _now() { return this.clock(); }
@@ -65,12 +66,14 @@ export class DnsCache {
   set(name, type, data, meta = {}) {
     const key = DnsCache.key(name, type);
     const negative = !!meta.negative;
-    const rawTtl = negative ? (meta.negativeTtl ?? 60) : (meta.ttl ?? 60);
-    const ttl = Math.min(Math.max(Math.round(rawTtl), MIN_TTL_SECONDS), MAX_TTL_SECONDS);
+    const candidateTtl = Number(negative ? (meta.negativeTtl ?? 60) : (meta.ttl ?? 60));
+    const safeTtl = Number.isFinite(candidateTtl) ? candidateTtl : 60;
+    const ttl = Math.min(Math.max(Math.round(safeTtl), MIN_TTL_SECONDS), MAX_TTL_SECONDS);
     const now = this._now();
-    const staleGrace = (meta.staleGrace ?? 60) * 1000;
+    const rawGrace = Number(meta.staleGrace ?? 60);
+    const staleGrace = (Number.isFinite(rawGrace) && rawGrace >= 0 ? rawGrace : 60) * 1000;
     const entry = {
-      key, name, type: String(type).toUpperCase(), data, negative,
+      key, name, type: String(type).trim().toUpperCase(), data, negative,
       storedAt: now,
       ttl,
       expiresAt: now + ttl * 1000,
@@ -102,6 +105,7 @@ export class DnsCache {
   }
 
   clear() {
+    this._epoch++;
     this.entries.clear();
     this.inflight.clear();
   }
@@ -113,23 +117,28 @@ export class DnsCache {
    * @template T
    * @param {string} key
    * @param {() => Promise<T>} factory
-   * @param {(value:T) => {ttl?:number, negative?:boolean, negativeTtl?:number}} [store]
+   * @param {(value:T) => {ttl?:number, negative?:boolean, negativeTtl?:number}|null} [store]
    */
   async singleFlight(key, factory, store) {
     const existing = this.inflight.get(key);
     if (existing) { this.stats.singleFlightJoins++; return existing; }
+    const startEpoch = this._epoch;
     const promise = (async () => {
       try {
         const value = await factory();
-        if (store) {
+        if (store && this._epoch === startEpoch) {
           // Key format is `${TYPE}|${name}` — see DnsCache.key().
-          const [type, name] = key.split('|');
-          const meta = store(value) || {};
-          this.set(name, type, value, meta);
+          const sep = key.indexOf('|');
+          if (sep > 0 && sep < key.length - 1) {
+            const type = key.slice(0, sep);
+            const name = key.slice(sep + 1);
+            const meta = store(value);
+            if (meta !== null && meta !== false) this.set(name, type, value, meta || {});
+          }
         }
         return value;
       } finally {
-        this.inflight.delete(key);
+        if (this.inflight.get(key) === promise) this.inflight.delete(key);
       }
     })();
     this.inflight.set(key, promise);

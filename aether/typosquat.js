@@ -23,9 +23,10 @@ export const SEVERITY_LABELS = Object.freeze({ 0: 'none', 1: 'low', 2: 'medium',
 /** Canonical TLD for each brand, taken from the curated popular-domain list. */
 const BRAND_CANONICAL_TLD = new Map();
 for (const domain of POPULAR_DOMAINS) {
-  const label = domain.split('.').slice(-2)[0];
-  const tld = domain.split('.').pop();
-  if (!label || !/^[a-z]+$/.test(label)) continue;
+  const reg = registrableDomain(domain);
+  const label = reg.split('.')[0];
+  const tld = publicSuffix(domain);
+  if (!label || !tld || !/^[a-z]+$/.test(label)) continue;
   if (!BRAND_CANONICAL_TLD.has(label)) BRAND_CANONICAL_TLD.set(label, tld);
 }
 
@@ -73,8 +74,9 @@ export function damerauLevenshtein(a, b, maxDistance = Infinity) {
 /** Normalizes look-alike characters so 'paypa1' and 'pаypal' (Cyrillic а) collapse. */
 export function skeleton(label) {
   let s = String(label || '').toLowerCase();
-  // Decode punycode first so homograph attacks are visible to the matcher.
-  s = s.split('-').map((part) => (part.startsWith('xn--') ? decodePunycodeLabel(part) : part)).join('-');
+  // Decode punycode DNS labels first (whole label, keeping `xn--` intact) so
+  // IDN homograph attacks are visible to the matcher.
+  s = s.split('.').map((part) => (part.startsWith('xn--') ? decodePunycodeLabel(part) : part)).join('.');
   // Fold common Cyrillic/Greek look-alikes to Latin.
   s = s.replace(/[\u0430\u03b1]/g, 'a').replace(/[\u0435\u03b5]/g, 'e')
     .replace(/[\u043e\u03bf\u03d5]/g, 'o').replace(/[\u0440\u03c1]/g, 'p')
@@ -111,6 +113,7 @@ const AFFIX_TOKENS = [
   'wallet', 'billing', 'payment', 'recovery', 'unlock', 'reset', 'portal',
   'customer', 'team', 'alert', 'notice', 'invoice', 'center', 'online'
 ];
+const AFFIX_SKELETONS = AFFIX_TOKENS.map((t) => stripSeparators(skeleton(t)));
 
 /**
  * Analyses a hostname for brand impersonation.
@@ -137,7 +140,6 @@ export function findImpersonation(domain, options = {}) {
   if (POPULAR_SET.has(registrable) || POPULAR_SET.has(normalized)) return result;
 
   const skelReg = stripSeparators(skeleton(regLabel));
-  const skelSub = stripSeparators(skeleton(sub));
   const subLabels = labelsOf(sub);
 
   for (const brand of brands) {
@@ -147,7 +149,7 @@ export function findImpersonation(domain, options = {}) {
     // 1. Brand hidden in the subdomain, unknown registrable domain.
     if (sub && subLabels.some((l) => {
       const s = stripSeparators(skeleton(l));
-      return s === skelBrand && stripSeparators(regLabel) !== skelBrand;
+      return s === skelBrand && skelReg !== skelBrand;
     })) {
       result.matches.push({
         brand, kind: 'brand-in-subdomain', severity: SEVERITY.HIGH,
@@ -159,7 +161,7 @@ export function findImpersonation(domain, options = {}) {
     // 2. Brand plus a phishing affix: paypal-login, secure-apple, verify-paypal.
     const brandWithAffix = skelReg.includes(skelBrand)
       && skelReg !== skelBrand
-      && AFFIX_TOKENS.some((t) => skelReg.includes(t));
+      && AFFIX_SKELETONS.some((t) => skelReg.includes(t));
     if (brandWithAffix && skelBrand.length >= 5) {
       result.matches.push({
         brand, kind: 'brand-affix', severity: SEVERITY.HIGH,

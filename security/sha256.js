@@ -36,8 +36,9 @@ export function sha256Bytes(input) {
   const data = toBytes(input);
   const bitLength = data.length * 8;
 
-  // Pad: 0x80, zeros, 64-bit big-endian length.
-  const paddedLength = (((data.length + 9) >> 6) + 1) << 6;
+  // Pad: 0x80 (1 byte), zeros, 64-bit big-endian length (8 bytes).
+  // A 55-byte message fits in a single 64-byte block (55 + 1 + 8 = 64).
+  const paddedLength = Math.ceil((data.length + 9) / 64) * 64;
   const padded = new Uint8Array(paddedLength);
   padded.set(data);
   padded[data.length] = 0x80;

@@ -148,21 +148,31 @@ class WorldMonitorJsBridge(
             val p = el as? JsonObject ?: return@mapNotNull null
             val rise = p["riseEpochMs"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null
             val set = p["setEpochMs"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null
-            val culm = p["culminationEpochMs"]?.jsonPrimitive?.longOrNull ?: ((rise + set) / 2L)
             val maxEl = p["maxElevationDeg"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
-            if (!maxEl.isFinite() || set < rise) return@mapNotNull null
+            if (!maxEl.isFinite() || set < rise || rise < 0L) return@mapNotNull null
+            val spanMs = set - rise
+            val culm = p["culminationEpochMs"]?.jsonPrimitive?.longOrNull ?: (rise + spanMs / 2L)
+            val obsLat = (p["observerLat"]?.jsonPrimitive?.doubleOrNull ?: 0.0)
+                .takeIf { it.isFinite() }?.coerceIn(-90.0, 90.0) ?: 0.0
+            val obsLon = (p["observerLon"]?.jsonPrimitive?.doubleOrNull ?: 0.0)
+                .takeIf { it.isFinite() }?.coerceIn(-180.0, 180.0) ?: 0.0
+            val riseAz = (p["riseAzimuthDeg"]?.jsonPrimitive?.doubleOrNull ?: 0.0)
+                .takeIf { it.isFinite() }?.coerceIn(0.0, 360.0) ?: 0.0
+            val setAz = (p["setAzimuthDeg"]?.jsonPrimitive?.doubleOrNull ?: 0.0)
+                .takeIf { it.isFinite() }?.coerceIn(0.0, 360.0) ?: 0.0
+            val computedDurSec = (spanMs / 1000L).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
             SatellitePassPrediction(
                 entityId = sanitizeId(p["entityId"]?.jsonPrimitive?.content).ifBlank { entityId },
                 name = sanitizeText(p["name"]?.jsonPrimitive?.content, 100),
-                observerLat = p["observerLat"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
-                observerLon = p["observerLon"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                observerLat = obsLat,
+                observerLon = obsLon,
                 riseEpochMs = rise,
                 culminationEpochMs = culm,
                 setEpochMs = set,
                 maxElevationDeg = maxEl.coerceIn(0.0, 90.0),
-                riseAzimuthDeg = (p["riseAzimuthDeg"]?.jsonPrimitive?.doubleOrNull ?: 0.0).coerceIn(0.0, 360.0),
-                setAzimuthDeg = (p["setAzimuthDeg"]?.jsonPrimitive?.doubleOrNull ?: 0.0).coerceIn(0.0, 360.0),
-                durationSeconds = (p["durationSeconds"]?.jsonPrimitive?.intOrNull ?: ((set - rise) / 1000L).toInt()).coerceAtLeast(0)
+                riseAzimuthDeg = riseAz,
+                setAzimuthDeg = setAz,
+                durationSeconds = (p["durationSeconds"]?.jsonPrimitive?.intOrNull ?: computedDurSec).coerceAtLeast(0)
             )
         }
         listener.onSatellitePassesComputed(entityId, passes)

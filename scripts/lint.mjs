@@ -79,14 +79,20 @@ export function reachableModules(root = ROOT) {
   while (queue.length) {
     const file = queue.pop();
     if (seen.has(file)) continue;
+    const absFile = resolve(root, file);
     let source;
-    try { source = readFileSync(resolve(root, file), 'utf8'); } catch { continue; }
+    try { source = readFileSync(absFile, 'utf8'); } catch { continue; }
     seen.add(file);
-    // Static ES imports plus the service worker's precache list.
+    const baseDir = dirname(absFile);
+    // Static ES imports resolved relative to the importing module's directory.
     for (const match of source.matchAll(/(?:import\s+[^'"]*from\s*|import\s*\()\s*['"](\.\.?\/[^'"]+)['"]/g)) {
-      queue.push(match[1].replace(/^\.\//, ''));
+      const target = relative(root, resolve(baseDir, match[1])).replace(/\\/g, '/');
+      if (!target.startsWith('..')) queue.push(target);
     }
-    for (const match of source.matchAll(/'\.\/([\w./-]+\.js)'/g)) queue.push(match[1]);
+    // Service worker precache list (resolved against the site root).
+    if (file === 'sw.js') {
+      for (const match of source.matchAll(/'\.\/([\w./-]+\.js)'/g)) queue.push(match[1]);
+    }
   }
   return seen;
 }
@@ -109,12 +115,17 @@ export function lint(root = ROOT) {
       }
       if (/\bdebugger\b/.test(line)) add('no-debugger', where, line.trim().slice(0, 120));
       if (/(?<![\w.])alert\s*\(/.test(line)) add('no-alert', where, line.trim().slice(0, 120));
-      if (/\b(innerHTML|outerHTML|insertAdjacentHTML)\s*=/.test(line)) add('no-html-sink', where, line.trim().slice(0, 120));
+      if (/\b(innerHTML|outerHTML)\s*=/.test(line) || /\binsertAdjacentHTML\s*\(/.test(line)) {
+        add('no-html-sink', where, line.trim().slice(0, 120));
+      }
       if (/\bdocument\.write\s*\(/.test(line)) add('no-document-write', where, line.trim().slice(0, 120));
       if (/(?<![\w.$])eval\s*\(/.test(line)) add('no-eval', where, line.trim().slice(0, 120));
       if (/\bnew\s+Function\s*\(/.test(line)) add('no-new-function', where, line.trim().slice(0, 120));
       if (/\b(TODO|FIXME|XXX)\b/.test(line)) add('no-placeholder-markers', where, line.trim().slice(0, 120));
-      if (/XMLHttpRequest/.test(line) && /async\s*:\s*false/.test(line)) add('no-sync-xhr', where, line.trim().slice(0, 120));
+      if ((/XMLHttpRequest/.test(line) && /async\s*:\s*false/.test(line))
+        || /\.open\s*\(\s*['"][A-Z]+['"]\s*,\s*[^,]+,\s*false\b/.test(line)) {
+        add('no-sync-xhr', where, line.trim().slice(0, 120));
+      }
     });
 
     for (const name of unusedImports(source)) {

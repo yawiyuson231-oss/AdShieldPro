@@ -156,6 +156,8 @@ class ScheduledScanWorker @AssistedInject constructor(
                 )
             )
             Result.success()
+        } catch (c: kotlinx.coroutines.CancellationException) {
+            throw c
         } catch (t: Throwable) {
             // Retry on transient failures (PackageManager pressure, IO), never crash the process.
             runCatching {

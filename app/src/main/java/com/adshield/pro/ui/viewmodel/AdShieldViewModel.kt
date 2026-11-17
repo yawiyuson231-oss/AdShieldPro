@@ -1440,8 +1440,9 @@ class AdShieldViewModel @Inject constructor(
                     }
                 )
             }
-            if (errorMessage != null) {
-                showFeedback(errorMessage!!)
+            val failure = errorMessage
+            if (failure != null) {
+                showFeedback(failure)
             } else {
                 systemPreferencesController.requestTileUpdates()
                 onAdded()
