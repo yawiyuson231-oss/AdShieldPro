@@ -281,6 +281,25 @@ export function verify() {
     add(`doc: ${doc}`, exists(doc) && statSync(abs(doc)).size > 400);
   }
 
+  /* 12. Generated documentation contains rendered prose, never raw source.
+   *
+   * docs/CAPABILITY_MATRIX.md is rendered from the Kotlin registry. A parser that
+   * does not fold Kotlin's adjacent string concatenation publishes `" +` and stray
+   * quotes into the table, so the doc silently stops being readable. Catch that here
+   * as well as in the generator itself.
+   */
+  const generated = ['docs/CAPABILITY_MATRIX.md', 'docs/CONNECTOR_VERIFICATION.md'];
+  for (const doc of generated) {
+    if (!exists(doc)) { add(`generated doc is renderable: ${doc}`, false, 'missing'); continue; }
+    const body = read(doc);
+    const leaks = [
+      body.includes('" +') && 'unfolded string concatenation (" +)',
+      body.includes('" +\n') && 'unfolded string concatenation (" +)',
+      /(^|\n)\s*"[\w ]/.test(body) && 'stray source quote at line start'
+    ].filter(Boolean);
+    add(`generated doc is renderable: ${doc}`, leaks.length === 0, leaks.join(', ') || 'clean');
+  }
+
   return {
     ok: checks.every((c) => c.ok),
     checks,

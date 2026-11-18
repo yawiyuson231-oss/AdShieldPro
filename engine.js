@@ -456,7 +456,15 @@ export class OmniShieldFilterEngine {
     let ok = 0;
     for (const rule of rules) {
       if (!rule) continue;
-      if (this.addUserRule(rule.pattern ?? rule.rawPattern, rule.isAllow ?? rule.ruleType === 'ALLOW')) ok++;
+      // The match type must survive the round-trip: defaulting to SUFFIX would
+      // widen an EXACT rule to every subdomain, so an imported or recovered
+      // config would block more than the user ever chose.
+      const matchType = rule.matchType ?? (rule.rawPattern && /[*?]/.test(String(rule.rawPattern)) ? 'WILDCARD' : undefined);
+      if (this.addUserRule(
+        rule.pattern ?? rule.rawPattern,
+        rule.isAllow ?? rule.ruleType === 'ALLOW',
+        matchType
+      )) ok++;
     }
     this._invalidate();
     return ok;
