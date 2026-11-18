@@ -445,46 +445,35 @@ class AdShieldVpnService : VpnService() {
         // Allowed domain: resolve via configured DoH / DoT / Protected UDP-TCP resolver
         val upstreamResult = upstreamDnsResolver.resolve(query, currentSettings.resolverConfig)
 
-        // Re-evaluate question against the latest snapshot in case user allowlisted while in flight,
-        // then inspect returned CNAME answer chains so disguised first-party trackers are blocked.
-        val latestQuestionEval = filterRuleEngine.evaluate(query.questionDomain)
-        val cnameDecision = CnameCloakingInspector.inspect(
+        // Check returned aliases, including on cache hits, against the current rules.
+        val aliasDecision = CnameCloakingInspector.inspect(
             questionDomain = query.questionDomain,
-            questionEvaluation = latestQuestionEval,
             dnsResponse = upstreamResult.responseBytes,
             filterEngine = filterRuleEngine,
             enabled = currentSettings.cnameUncloakingEnabled,
             bypassDomainFilters = decision.bypassDomainFilters
         )
-        if (cnameDecision.shouldBlock) {
+        if (aliasDecision.shouldBlock) {
             val mode = filterRuleEngine.getCurrentSnapshot().protectionMode
-            val blockedBytes = DnsPacketCodec.buildBlockedResponse(
-                query = query,
-                sinkholeZeroIp = mode.blockSinkholeZeroIp
-            )
-            val ruleLabel = if (cnameDecision.cloakedTarget != null &&
-                cnameDecision.matchedRule != null &&
-                cnameDecision.matchedRule != cnameDecision.cloakedTarget
-            ) {
-                "${cnameDecision.cloakedTarget} (${cnameDecision.matchedRule})"
-            } else {
-                cnameDecision.cloakedTarget ?: cnameDecision.matchedRule
-            }
+            val blockedReply = CnameCloakingInspector.blockedReply(query, mode.blockSinkholeZeroIp)
+            val target = aliasDecision.cloakedTarget
+            val rule = aliasDecision.matchedRule
+            val ruleLabel = if (target != null && rule != null && rule != target) "$target ($rule)" else target ?: rule
             repository.recordDnsQueryEvent(
                 domain = query.questionDomain,
                 queryType = query.qTypeName,
                 isBlocked = true,
-                category = cnameDecision.matchedCategory,
+                category = aliasDecision.matchedCategory,
                 matchedRule = ruleLabel,
-                sourceList = cnameDecision.sourceName,
+                sourceList = aliasDecision.sourceName,
                 latencyMs = upstreamResult.latencyMs,
-                protocolUsed = if (mode.blockSinkholeZeroIp) "CNAME Sinkhole 0.0.0.0" else "CNAME NXDOMAIN",
+                protocolUsed = blockedReply.label,
                 fromCache = upstreamResult.fromCache,
                 appPackageName = app?.packageName,
                 appName = app?.label
             )
             maybeRefreshNotificationCounter()
-            return blockedBytes
+            return blockedReply.bytes
         }
 
         repository.recordDnsQueryEvent(

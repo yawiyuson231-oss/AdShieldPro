@@ -80,6 +80,29 @@ applies, in order:
 This governs DNS decisions only. Apps that use hardcoded IPs, HTTP DNS, or their own encrypted
 transport are unaffected, because those packets never enter the tunnel.
 
+### DNS Alias Shield
+
+**Settings → DNS Alias Shield** (under **Encrypted Upstream DNS Protocol**) extends the
+original CNAME feature to HTTPS and SVCB (RFC 9460). It is on by default and respects
+any previous opt-out. A first-party name can look harmless in the question but name a tracker
+or other blocked destination in the reply.
+
+- After upstream validation, the VPN checks aliases reachable from the question in the Answer
+  section, including on cache hits. It follows CNAME and service-binding aliases already present
+  in the reply and checks named ServiceMode destinations for the queried record type. Unrelated
+  records, additional records and opaque service parameters aren't used as blocking evidence.
+- It checks the active rules rather than treating all third-party services as trackers. Explicit
+  allowlists, app/network passthrough and playback safeguards are preserved. No extra queries
+  are sent. DNS activity identifies the record type, destination and matching rule for a block.
+- When an HTTPS or SVCB lookup is blocked at this stage, the app returns **NOERROR with no answers
+  (NODATA)** for that type. This suppresses the entire binding reply, including address hints,
+  without telling the device that the hostname itself doesn't exist. Any subsequent A/AAAA
+  lookup is still filtered independently. CNAME blocks for address queries keep the configured
+  NXDOMAIN or sinkhole behavior.
+
+The shield can only inspect targets actually included in the received reply; it does not
+resolve unseen links or inspect connections to addresses already known by an app.
+
 ## 5. Resolver diagnostics
 
 Settings can run a real diagnostic query (`engine/dns/DnsDiagnostics.kt`): a genuine A query

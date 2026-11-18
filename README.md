@@ -1,4 +1,4 @@
-# AdShield Pro 2.10.2 — Android DNS Ad & Tracker Protection
+# AdShield Pro — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -25,12 +25,20 @@ git tag v2.3.1 && git push origin v2.3.1
 ```
 
 The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
-publishes it to GitHub Releases with a SHA-256 checksum and refreshes the GitHub Pages site.
-The workflow no longer attaches the signing keystore to new releases. Earlier releases did expose
-it; treat that key as compromised and review signing-key security before publishing an update. Re-running it for an existing tag
-replaces that release's APK assets instead of failing or creating a duplicate release.
-To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
-`ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
+publishes it to GitHub Releases with a SHA-256 checksum and refreshes GitHub Pages. Release tags
+must match the app version. The workflow never overwrites an existing production release or moves
+an existing tag.
+
+**Signing recovery is required before publishing another APK.** A historical release exposed the
+private signing key. Changing its password or moving it into Actions secrets does not make that
+key trustworthy, and choosing an unrelated key will not automatically upgrade existing installs.
+Decide how existing GitHub APK users will move to a trusted signer before resuming publication.
+After recovery, configure the reviewed public certificate SHA-256 in the Actions variable
+`ADSHIELD_TRUSTED_APK_CERT_SHA256` and provision the private `ADSHIELD_KEYSTORE_BASE64`,
+`ADSHIELD_STORE_PASSWORD`, and optional `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD` as Actions
+secrets. Never share the keystore or passwords in a release, commit, or chat. The workflow checks
+that the new build matches the approved certificate and the production upgrade path, and rejects
+the exposed signer. The website and debug CI builds do not need this key.
 
 ### Test APK before publishing
 
@@ -39,15 +47,15 @@ signed, R8-minified APK as a GitHub pre-release**, so it can be installed and ex
 device before the real release goes out:
 
 ```bash
-# test whatever the branch already contains
+# test the merged version on main after signing recovery
 gh workflow run "Test APK (pre-release)" --ref main
 
-# test an unmerged pull request (builds exactly that commit, no merge needed)
-gh workflow run "Test APK (pre-release)" --ref main -f source_ref=refs/pull/13/head
-
-# a second round on the same version keeps a separate tag
-gh workflow run "Test APK (pre-release)" --ref main -f source_ref=arena/my-branch -f tag=test-v2.10.0-rc2
+# a second round on the same version uses a separate tag
+gh workflow run "Test APK (pre-release)" --ref main -f tag=test-v2.11.1-rc2
 ```
+
+For an unmerged pull request, use its **Android build & test** debug artifact instead. The debug
+APK can install separately from the production app and is not a production update.
 
 It runs the unit tests, UI-performance gate, universal-build gate and a signing-continuity check,
 then creates tag `test-v<versionName>` with `AdShieldPro-<versionName>-test.apk` and its SHA-256.
@@ -55,7 +63,7 @@ Design guarantees, enforced by the workflow itself:
 
 - **Signed with the published release key**, never a throwaway one — the test APK installs *over*
   the current release as an update, and the real release later replaces it in place. If no release
-  keystore is available the job fails instead of producing an un-upgradable APK.
+  keystore passes the same signing checks as production, the job fails.
 - **Always a pre-release**, so `/releases/latest` — what the in-app updater and the website download
   link resolve — keeps pointing at the shipped version. A final step asserts this and fails if the
   test build ever became *Latest*.
@@ -274,6 +282,14 @@ test or stable, can upgrade to it in place.
 
 ## What AdShield Pro does
 
+- **Run security tasks with AETHER:** In **Security → Agent**, run a **Security review** to check
+  protection and app risks together, or choose **Scan a file** to check one file locally. You can
+  ask for two or three checks (for example, “Audit my apps, then test DNS speed”) and get a
+  guided plan from the offline model. Approve each step and review its receipt separately.
+  **Connect AI API** supports your own Gemini, OpenAI, or HTTPS Chat Completions-compatible
+  provider. **Test API** checks the saved connection without running a tool. Online task
+  suggestions send only the approved task description, not device findings. See
+  [API setup and supported tasks](docs/PHONE_AGENT.md).
 - **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
 - **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
 - **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.
@@ -329,6 +345,7 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
   - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
   - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
   - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
+- **DNS Alias Shield**: Checks CNAME, HTTPS and SVCB answer targets against active rules, including on cache hits, without extra network lookups. Respects user allowlists and playback safeguards. See [DNS security architecture](docs/DNS_SECURITY_ARCHITECTURE.md#dns-alias-shield).
 
 ### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
 - **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.

@@ -12,7 +12,7 @@ Checks
           x86, x86_64) — a pure-JVM APK passes trivially; AndroidX libraries such as
           libandroidx.graphics.path.so are fine as long as no ABI is left behind.
           Contains classes*.dex, resources.arsc, AndroidManifest.xml.
-  3. APK: bundled offline rule sets are present and non-trivial.
+  3. APK: bundled offline rule sets are present and non-trivial; the AETHER model matches source.
   4. versionCode/versionName match the build file (so upgrades are ordered).
 
 Usage: python3 tools/check_universal_release.py app/build/outputs/apk/release/app-release.apk
@@ -111,6 +111,12 @@ def check_apk(apk: Path, problems: list[str]) -> dict:
                 continue
             if archive.getinfo(entry).file_size < minimum_lines * 8:
                 problems.append(f"{asset} looks truncated in the APK")
+
+        model_path = "assets/aether/task_model.tsv"
+        weights = (ROOT / "app/src/main" / model_path).read_bytes()
+        if (model_path not in names or archive.getinfo(model_path).file_size != len(weights)
+                or archive.read(model_path) != weights):
+            problems.append("APK is missing the checked-in AETHER task model weights")
 
         lib_names = sorted(set().union(*abi_libs.values())) if abi_libs else []
         return {

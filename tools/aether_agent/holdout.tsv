@@ -1,0 +1,94 @@
+CHECK_PHONE	give me a snapshot of my phone's protection
+CHECK_PHONE	report whether filtering is still active
+CHECK_PHONE	does android think this wifi is an open network
+CHECK_PHONE	check the weak wireless signal and protection status
+CHECK_PHONE	see if my storage is nearly full
+CHECK_PHONE	do a quick check of phone health
+CHECK_PHONE	review the status of the shield
+CHECK_PHONE	patingin kung ligtas ang wifi ng phone ko
+CHECK_PHONE	naka on pa ba ang adshield protection
+CHECK_PHONE	tignan kung mainit at mabagal ang cellphone
+AUDIT_APPS	look for installed apps with questionable permissions
+AUDIT_APPS	inspect the apps I've installed for red flags
+AUDIT_APPS	do any apps have access they shouldn't
+AUDIT_APPS	audit permissions and install sources of apps
+AUDIT_APPS	check the risk of apps on this phone
+AUDIT_APPS	find applications with sensitive permissions
+AUDIT_APPS	which apps are from an unknown installer
+AUDIT_APPS	patingin kung may suspicious na apps ako
+AUDIT_APPS	i audit ang app permissions ko
+AUDIT_APPS	may apps bang delikado ang permissions
+SCAN_LINK	check whether a link is impersonating a login page
+SCAN_LINK	can you look for phishing signs in a url
+SCAN_LINK	inspect this link without visiting the page
+SCAN_LINK	tell me whether this web address looks deceptive
+SCAN_LINK	someone sent a link; I'd like a safety scan
+SCAN_LINK	check the link before I enter my password
+SCAN_LINK	look at a suspicious url for signs of fraud
+SCAN_LINK	phishing kaya ang link na ito
+SCAN_LINK	may panganib ba itong url sa sms
+SCAN_LINK	pacheck kung scam ang website link
+BENCHMARK_DNS	compare latency across dns services
+BENCHMARK_DNS	tell me which dns resolvers respond on this connection
+BENCHMARK_DNS	can we time dns lookups right now
+BENCHMARK_DNS	measure response speed of the dns servers without switching
+BENCHMARK_DNS	test for slow resolver replies
+BENCHMARK_DNS	find the fastest dns option by measuring replies
+BENCHMARK_DNS	do a dns speed comparison on mobile data
+BENCHMARK_DNS	pacheck ng dns response time
+BENCHMARK_DNS	paki kumpara ng bilis ng dns
+BENCHMARK_DNS	gaano kabilis ang dns resolvers
+ENABLE_ALIAS_SHIELD	please enable the alias shield in dns settings
+ENABLE_ALIAS_SHIELD	switch on the dns alias checks
+ENABLE_ALIAS_SHIELD	turn on filtering for cname destinations
+ENABLE_ALIAS_SHIELD	I'd like to activate the alias shield now
+ENABLE_ALIAS_SHIELD	enable protection from trackers hiding behind cnames
+ENABLE_ALIAS_SHIELD	turn on dns cname cloaking protection
+ENABLE_ALIAS_SHIELD	use alias shield to filter hidden tracker hosts
+ENABLE_ALIAS_SHIELD	i on ang proteksyon laban sa cname cloaking
+ENABLE_ALIAS_SHIELD	pwede bang buksan yung alias shield
+ENABLE_ALIAS_SHIELD	pa activate ng dns alias shield
+UNSUPPORTED	turn cname uncloaking off
+UNSUPPORTED	switch off the alias shield
+UNSUPPORTED	is the alias shield turned on already
+UNSUPPORTED	don't turn on the dns alias shield
+UNSUPPORTED	do not run any tests today
+UNSUPPORTED	don't run the dns benchmark
+UNSUPPORTED	avoid scanning my apps
+UNSUPPORTED	stop checking this url
+UNSUPPORTED	open the web link and fill the form
+UNSUPPORTED	remove the unsafe apps from my device
+UNSUPPORTED	change to a new dns server for me
+SCAN_FILE	inspect this downloaded file for threats
+UNSUPPORTED	measure the upload speed of my wifi
+UNSUPPORTED	read a document from another app's storage
+UNSUPPORTED	what's the time
+UNSUPPORTED	help me write a song
+UNSUPPORTED	start protection now
+UNSUPPORTED	do a thing
+UNSUPPORTED	what is an alias record in dns
+UNSUPPORTED	stop and delete my saved scans
+UNSUPPORTED	buksan ang url sa browser
+UNSUPPORTED	i disable ang cname protection
+UNSUPPORTED	pwede bang palitan ang dns server
+UNSUPPORTED	wag mo buksan ang alias shield
+UNSUPPORTED	gusto kong mag delete ng files
+SECURITY_REVIEW	give me a security review of my phone protection and apps
+SECURITY_REVIEW	do both the app risk check and protection check
+SECURITY_REVIEW	review my apps and my phone's protection in one report
+SECURITY_REVIEW	audit the phone settings and app permission risks together
+SECURITY_REVIEW	put device security and installed app findings into one report
+SECURITY_REVIEW	can you run a broader security review with an app audit
+SECURITY_REVIEW	check the shield and app permissions in a single pass
+SECURITY_REVIEW	paki review ng app security at protection ko
+SECURITY_REVIEW	suriin mo yung apps at seguridad ng settings ko
+SECURITY_REVIEW	gusto ko ng security review ng phone at mga app
+SCAN_FILE	check a downloaded pdf before I read it
+SCAN_FILE	can you inspect one local application installer
+SCAN_FILE	check an attachment I haven't opened yet
+SCAN_FILE	run the scanner on an archive I choose
+SCAN_FILE	look for warning signs inside this saved document
+SCAN_FILE	check whether there are risks in this apk file
+SCAN_FILE	pacheck kung ligtas itong file na nakuha ko
+SCAN_FILE	i scan itong dokumento sa downloads
+SCAN_FILE	pwede mo ba tingnan kung risky ang apk na ito

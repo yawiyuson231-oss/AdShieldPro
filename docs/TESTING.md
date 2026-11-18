@@ -45,8 +45,9 @@ export ADSHIELD_KEY_PASSWORD=…
 `.github/workflows/android-build.yml` runs on every push to `main` / agent branches and on pull
 requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 
-1. Capability matrix freshness check (`tools/generate_capability_matrix.py --check`)
-2. UI performance gates (`tools/check_ui_performance.py`)
+1. Capability matrix and connector report freshness checks, plus the strict capability-test audit
+2. Bundled AETHER task model reproducibility/holdout (`tools/train_aether_tasks.py --check`) and
+   UI performance gates (`tools/check_ui_performance.py`)
 3. `:app:compileDebugKotlin` — fails fast on toolchain problems
 4. `:app:assembleDebug` — APK packaging
 5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
@@ -62,6 +63,9 @@ The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 ```bash
 ./gradlew :app:testDebugUnitTest          # runs app/src/test/**
 ./gradlew :app:testDebugUnitTest --tests 'com.adshield.pro.AdShieldEngineTestSuite'
+./gradlew :app:testDebugUnitTest --tests 'com.adshield.pro.DnsAliasShieldTest'
+./gradlew :app:testDebugUnitTest --tests 'com.adshield.pro.Aether*Test' --tests 'com.adshield.pro.SecurityCenterTestSuite'
+python3 tools/train_aether_tasks.py --check
 ```
 
 HTML report: `app/build/reports/tests/testDebugUnitTest/index.html`.
@@ -88,18 +92,24 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | UDP delivery limits | `fitResponseToUdpLimit` preserves ID/RCODE/question and sets TC=1 when an upstream answer cannot fit a single tunnel datagram; `udpPayloadCapacity` per IP version |
 | `IpPacketFraming` | IPv4/IPv6 UDP and TCP parsing, IPv4 header options, TCP options, fragmentation rejection, RFC 1071 / RFC 8200 checksums (verified to recompute to zero), and segmentation of large TCP DNS answers so no packet exceeds the tunnel MTU |
 | `UpstreamDnsResolver` | Upstream answers are only accepted when they are responses carrying the query's transaction ID; only NOERROR/NXDOMAIN answers are cacheable; cache keys are scoped to the active resolver endpoint; IPv6 fallback server list |
+| `DnsAliasShieldTest` | CNAME and HTTPS/SVCB targets connected to the question, type-scoped NODATA blocking, allowlist/passthrough behavior, playback safeguards, and safe handling of unrelated or malformed records |
 | `FilterRuleEngine` | Protection-mode category gating, custom allow/block precedence, wildcards, hosts/Adblock list parsing, duplicate counting, HTML/binary rejection, conflict analysis, snapshot rollback, concurrent evaluation |
 | `BrowserContentBlocker` | Tracking-parameter stripping, request blocking, site allowlists, cosmetic script generation, DNS-label-boundary third-party detection |
 | `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
+| `AetherSecurityAgentTest` / `AetherOnlinePlannerTest` / `AetherOnlineHttpTest` | Offline intent model, separate send and run consent, Gemini and Chat Completions wire formats, legacy config reads, stale approvals, reply/error bounds and cancellation (fixtures, not live accounts) |
+| `AetherGuidedPlanTest` | Real bundled model on explicit English/Taglish sequences, no partial plan on unclear or disallowed steps, step-bound one-use approvals, retries, skips and receipt coverage |
+| `AetherSecurityReviewTest` / `AetherPhoneAgentTest` | Independent review steps, partial or failed coverage, propagated cancellation, package metadata indicators, one-use file picker receipts, actual byte limits and existing phone-evidence rules |
+| `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
 | `IntelligenceMapTestSuite` | Event sanitizer (evidence required, size bounds, secret/PII redaction, severity escalation), factory routing (DNS/scan/battery/VPN/automation), aggregator state derivation from real inputs only, dedupe policy, repository round-trip/prune/corrupt rows, hit-testing, pinch focal stability, tap-vs-drag, camera lerp/clamping, recommendations, aggregation performance budget |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
 browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
-Those cannot be exercised by JVM unit tests.
+For the Agent's actual Compose UI, file picker, Android App Info, package visibility and live
+provider setup, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
 
 ## Manual smoke test (device / emulator, API 29+)
 

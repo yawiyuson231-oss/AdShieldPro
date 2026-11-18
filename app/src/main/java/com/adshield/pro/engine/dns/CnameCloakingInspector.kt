@@ -6,13 +6,9 @@ import com.adshield.pro.engine.filter.DnsMediaPlaybackGuard
 import com.adshield.pro.engine.filter.FilterRuleEngine
 
 /**
- * Unmasks CNAME-cloaked trackers and ad/malware domains in upstream DNS Answer chains.
- *
- * Trackers frequently ask publishers to delegate a first-party subdomain (for example
- * `metrics.publisher.example`) via a DNS `CNAME` record pointing at a third-party collector
- * (`collector.adtech-tracker.example`). A question-only DNS filter lets the query pass because
- * the queried name looks first-party; inspecting the returned `CNAME` chain catches the real
- * destination while honouring user allowlists and [DnsMediaPlaybackGuard] streaming safety.
+ * DNS Alias Shield: checks destinations named by CNAME, HTTPS and SVCB answers against the
+ * active filter rules. A publisher hostname can look safe while its answer names a tracker.
+ * This is local to the DNS answer: no follow-up queries, including on upstream cache hits.
  */
 object CnameCloakingInspector {
 
@@ -27,7 +23,7 @@ object CnameCloakingInspector {
 
     fun inspect(
         questionDomain: String,
-        questionEvaluation: FilterEvaluationResult,
+        questionEvaluation: FilterEvaluationResult? = null,
         dnsResponse: ByteArray,
         filterEngine: FilterRuleEngine,
         enabled: Boolean,
@@ -36,26 +32,20 @@ object CnameCloakingInspector {
         if (!enabled || bypassDomainFilters) {
             return CnameCloakDecision(shouldBlock = false)
         }
-        // Respect explicit user or system-safety allowlists on the queried first-party domain.
-        if (isExplicitAllow(questionEvaluation)) {
+        val aliases = DnsPacketCodec.extractAnswerAliases(dnsResponse, expectedQuestion = questionDomain)
+        if (aliases.isEmpty()) return CnameCloakDecision(shouldBlock = false)
+        // Use the current verdict when none was supplied, so an allowlist change made while
+        // resolution was in flight can still take effect. Ordinary answers need no second check.
+        if (isExplicitAllow(questionEvaluation ?: filterEngine.evaluate(questionDomain))) {
             return CnameCloakDecision(shouldBlock = false)
         }
 
-        val chain = DnsPacketCodec.extractCnameTargets(dnsResponse)
-        if (chain.isEmpty()) {
-            return CnameCloakDecision(shouldBlock = false)
-        }
-
-        val normalizedQuestion = questionDomain.trim().trimEnd('.').lowercase()
-        for (target in chain) {
-            if (target == normalizedQuestion) continue
-
+        val cnameChain = aliases.filter { it.type == DnsPacketCodec.AnswerAliasType.CNAME }.map { it.target }
+        for ((type, target) in aliases) {
             val targetEval = filterEngine.evaluate(target)
-            if (isExplicitAllow(targetEval)) continue
             if (!targetEval.isBlocked) continue
 
-            // Never break video/audio stream delivery when a site CNAMEs onto a protected playback
-            // host (unless the user explicitly wrote a custom block rule for that target).
+            // Preserve playback destinations unless the user explicitly blocked the target.
             val isExplicitUserBlock =
                 targetEval.sourceName == "User Custom Rule" || targetEval.sourceName == "User Blocklist"
             if (!isExplicitUserBlock && DnsMediaPlaybackGuard.isProtectedPlaybackHost(target)) {
@@ -67,12 +57,29 @@ object CnameCloakingInspector {
                 cloakedTarget = target,
                 matchedRule = targetEval.matchedRule ?: target,
                 matchedCategory = targetEval.matchedCategory,
-                sourceName = "CNAME Uncloaking · ${targetEval.sourceName}",
-                cnameChain = chain
+                sourceName = "${type.name} Uncloaking · ${targetEval.sourceName}",
+                cnameChain = cnameChain
             )
         }
 
-        return CnameCloakDecision(shouldBlock = false, cnameChain = chain)
+        return CnameCloakDecision(shouldBlock = false, cnameChain = cnameChain)
+    }
+
+    internal data class BlockedReply(val bytes: ByteArray, val label: String)
+
+    internal fun blockedReply(query: DnsPacketCodec.ParsedDnsQuery, sinkholeZeroIp: Boolean): BlockedReply {
+        if (query.qType == DnsPacketCodec.TYPE_HTTPS || query.qType == DnsPacketCodec.TYPE_SVCB) {
+            // Drop the entire binding RRset, including any address hints. NXDOMAIN would also
+            // tell a downstream cache the original name has no A/AAAA records.
+            return BlockedReply(DnsPacketCodec.buildNoDataResponse(query), "Alias block · NODATA")
+        }
+        val label = when {
+            !sinkholeZeroIp -> "Local NXDOMAIN"
+            query.qClass == DnsPacketCodec.CLASS_IN && query.qType == DnsPacketCodec.TYPE_A -> "Sinkhole 0.0.0.0"
+            query.qClass == DnsPacketCodec.CLASS_IN && query.qType == DnsPacketCodec.TYPE_AAAA -> "Sinkhole ::"
+            else -> "NODATA"
+        }
+        return BlockedReply(DnsPacketCodec.buildBlockedResponse(query, sinkholeZeroIp), "Alias block · $label")
     }
 
     private fun isExplicitAllow(evaluation: FilterEvaluationResult): Boolean {

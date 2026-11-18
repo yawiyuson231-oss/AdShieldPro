@@ -178,7 +178,7 @@
     <div class="eyebrow">Privacy &amp; Data Safety</div>
     <h1>Privacy Policy &amp; Google Play Data Safety Disclosure</h1>
     <p class="meta">
-      <span>Effective date: November 17, 2026</span>
+      <span>Effective date: November 18, 2026</span>
       <span>Application: AdShield Pro (<code>com.adshield.pro</code>)</span>
       <span>Companion web app: OmniShield X (<code>/app/</code>)</span>
     </p>
@@ -188,7 +188,7 @@
       <p>AdShield Pro is engineered as a local, on-device privacy and DNS filtering firewall for Android, paired with a static browser-only companion platform.</p>
       <ul>
         <li><strong>No Root Required:</strong> AdShield Pro operates exclusively in standard Android user space.</li>
-        <li><strong>No Developer Analytics or Data Sale:</strong> Neither the Android app nor the website includes developer analytics, advertising SDKs, crash-tracking SDKs, or developer-operated collection endpoints, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud, and media hosts) receive the requests needed to provide their service and are governed by their own privacy policies.</li>
+        <li><strong>No Developer Analytics or Data Sale:</strong> Neither the Android app nor the website includes developer analytics, advertising SDKs, crash-tracking SDKs, or developer-operated collection endpoints, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud storage, media, and optional AI) receive the requests needed to provide their service and are governed by their own privacy policies.</li>
         <li><strong>No HTTPS Interception or Root Certificates:</strong> AdShield Pro never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.</li>
       </ul>
     </section>
@@ -237,6 +237,10 @@
 
       <h3>4D. Direct-Media Downloads</h3>
       <p>Inspecting or downloading a permitted direct HTTPS media URL contacts that media host directly and stores download history locally in Room until you delete it. AdShield Pro does not bypass authentication, DRM, or site restrictions.</p>
+
+      <h3>4E. Optional AETHER AI API</h3>
+      <p>AETHER guided plans and local scans do not use an AI provider. No AI API is connected by default. If you connect one, the app stores the configuration and key encrypted on-device using Android Keystore. You can remove the connection in <strong>Security → Agent</strong>.</p>
+      <p>Only after you review and approve a send does your task text (or a fixed test prompt), model identifier and API authentication go directly to the configured HTTPS provider. DNS history, installed-app lists, scan reports and files are not attached. The provider may retain the request and observe normal connection metadata under its own terms. Removing the connection does not revoke the key or erase data already sent.</p>
     </section>
 
     <section class="card" aria-labelledby="s5">
@@ -281,6 +285,12 @@
               <td><strong>No developer collection</strong> (history local; URL sent to host on user action)</td>
               <td><strong>User-selected media host</strong></td>
               <td>User-requested download</td>
+            </tr>
+            <tr>
+              <td>AETHER task text and AI API key</td>
+              <td><strong>No developer collection</strong> (sent only when you approve an online request or test)</td>
+              <td><strong>User-selected AI provider</strong></td>
+              <td>Optional task suggestion and API authentication</td>
             </tr>
             <tr>
               <td>Installed app list (<code>QUERY_ALL_PACKAGES</code>)</td>

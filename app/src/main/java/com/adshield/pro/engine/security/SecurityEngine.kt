@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -21,14 +22,14 @@ import javax.inject.Singleton
 /**
  * AdShield Pro — Security Center orchestrator.
  *
- * Anti-virus + anti-phishing that works on ANY app, ANY file, ANY link, ANY website:
+ * Local static security checks over user-selected files, links and Android-visible app metadata:
  * - WEB/LINK PROTECTION: live threat-intelligence hosts from the on-device filter engine
  *   (both the DNS VPN and this scanner read the same updated malware lists) plus deep URL
  *   static analysis (typosquatting, punycode, credential patterns, dropper structures).
  * - FILE PROTECTION: signature + structural scanning of any accessible file — polyglot
  *   executables, script droppers, macro documents, zip-slip archives, EICAR test standard.
  * - APP PROTECTION: static APK analysis with a real binary-manifest parser plus a whole-device
- *   installed-app audit using MTD-grade permission-stack triage.
+ *   installed-app audit using permission-stack indicators.
  *
  * 100% on-device. Files and links never leave the phone.
  */
@@ -70,17 +71,33 @@ class SecurityEngine @Inject constructor(
 
     // --- File protection -------------------------------------------------------
 
-    suspend fun scanFile(file: File): SecurityScanRecord = withContext(Dispatchers.IO) {
-        val fileVerdict = fileScanner.scanFile(file)
-        val apkReport = if (file.name.lowercase().let { it.endsWith(".apk") || it.endsWith(".apks") || it.endsWith(".xapk") }) {
-            runCatching { apkAnalyzer.analyzeApk(file) }.getOrNull()
-        } else null
+    internal data class FileInspection(val record: SecurityScanRecord, val bytes: Long, val limitations: List<String>)
+
+    suspend fun scanFile(file: File): SecurityScanRecord = inspectFile(file).let {
+        it.record.copy(findings = it.record.findings + it.limitations)
+    }
+
+    internal suspend fun inspectFile(file: File): FileInspection = withContext(Dispatchers.IO) {
+        val startedAt = System.currentTimeMillis()
+        val checkpoint: () -> Unit = { ensureActive() }
+        val fileVerdict = fileScanner.scanFile(file, checkpoint)
+        val extension = file.extension.lowercase()
+        val apkReport = if (extension == "apk") apkAnalyzer.analyzeApk(file, checkpoint) else null
+        val limitations = buildList {
+            addAll(fileVerdict.limitations)
+            if (apkReport != null) {
+                addAll(apkReport.limitations)
+                add("APK signatures were not cryptographically verified.")
+            } else if (extension == "apks" || extension == "xapk") {
+                add("Checked outer archive metadata only. Split APK contents were not inspected.")
+            }
+        }
 
         val combinedScore = maxOf(fileVerdict.riskScore, apkReport?.riskScore ?: 0)
         val combinedFindings = fileVerdict.findings + (apkReport?.riskReasons ?: emptyList())
         val threatName = apkReport?.let { r ->
             if (r.threatLevel == ApkAnalyzer.ThreatLevel.DANGEROUS || r.threatLevel == ApkAnalyzer.ThreatLevel.SUSPICIOUS) {
-                "Risky APK: ${r.packageName ?: file.name} (score ${r.riskScore})"
+                "APK risk indicators (score ${r.riskScore})"
             } else fileVerdict.threatName
         } ?: fileVerdict.threatName
 
@@ -92,19 +109,25 @@ class SecurityEngine @Inject constructor(
             else -> SecurityLevel.CLEAN
         }
 
-        SecurityScanRecord(
-            id = System.currentTimeMillis(),
+        ensureActive()
+        val finishedAt = System.currentTimeMillis()
+        val record = SecurityScanRecord(
+            id = finishedAt,
             kind = ScanKind.FILE,
             target = file.absolutePath,
             threatLevel = level,
             riskScore = combinedScore,
             threatName = threatName,
             findings = combinedFindings,
-            recommendation = if (apkReport != null && level != SecurityLevel.CLEAN) {
-                "Do not install this APK. ${apkReport.riskReasons.firstOrNull() ?: "Risk indicators found."}"
-            } else fileVerdict.recommendation,
-            timestampEpochMs = System.currentTimeMillis()
+            recommendation = when {
+                apkReport != null && level != SecurityLevel.CLEAN -> "Do not install this APK based on this check. Verify the source and review the indicators."
+                level == SecurityLevel.CLEAN && limitations.isNotEmpty() -> "This scan had limits. It cannot confirm that the file is safe."
+                else -> fileVerdict.recommendation
+            },
+            timestampEpochMs = finishedAt,
+            durationMs = (finishedAt - startedAt).coerceAtLeast(0L)
         )
+        FileInspection(record, fileVerdict.sizeBytes, limitations)
     }
 
     suspend fun scanUriContent(uri: Uri, displayName: String): SecurityScanRecord? = withContext(Dispatchers.IO) {
@@ -134,46 +157,62 @@ class SecurityEngine @Inject constructor(
 
     suspend fun auditInstalledApps(
         onProgress: (completed: Int, total: Int, currentTarget: String) -> Unit = { _, _, _ -> }
-    ): List<AppRiskAuditor.AppRiskAudit> = withContext(Dispatchers.IO) {
+    ): List<AppRiskAuditor.AppRiskAudit> = auditVisibleApps(onProgress).inspected
+
+    /** Report unavailable metadata separately from inspected apps, including uninstall races. */
+    @Suppress("DEPRECATION") // The int flags also work on the minSdk path.
+    suspend fun auditVisibleApps(
+        onProgress: (processed: Int, total: Int, currentTarget: String) -> Unit = { _, _, _ -> }
+    ): AppRiskAuditor.VisibleAudit = withContext(Dispatchers.IO) {
         val pm = context.packageManager
-        val apps = runCatching { pm.getInstalledApplications(PackageManager.GET_PERMISSIONS) }
-            .getOrDefault(emptyList())
-
-        apps.map { appInfo ->
-            val requested: List<String> = runCatching {
-                pm.getPackageInfo(appInfo.packageName, PackageManager.GET_PERMISSIONS)
-                    .requestedPermissions?.toList()
-            }.getOrNull() ?: emptyList()
-            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                runCatching {
-                    pm.getInstallSourceInfo(appInfo.packageName).installingPackageName
+        val apps = runCatching { pm.getInstalledApplications(0) }.getOrElse {
+            return@withContext AppRiskAuditor.VisibleAudit(0, emptyList())
+        }
+        val inspected = ArrayList<AppRiskAuditor.AppRiskAudit>(apps.size)
+        val flags = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or
+            PackageManager.MATCH_DISABLED_COMPONENTS
+        apps.forEachIndexed { index, appInfo ->
+            ensureActive()
+            val packageName = appInfo.packageName
+            val info = runCatching { pm.getPackageInfo(packageName, flags) }.getOrNull()
+            var label = packageName
+            if (info != null) {
+                val installer = runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        pm.getInstallSourceInfo(packageName).installingPackageName
+                    } else {
+                        pm.getInstallerPackageName(packageName)
+                    }
                 }.getOrNull()
-            } else {
-                @Suppress("DEPRECATION")
-                runCatching { pm.getInstallerPackageName(appInfo.packageName) }.getOrNull()
+                label = runCatching { pm.getApplicationLabel(appInfo).toString() }.getOrDefault(packageName)
+                val bindings = buildSet {
+                    info.services.orEmpty().mapNotNullTo(this) { service ->
+                        service.permission?.takeIf { it == "android.permission.BIND_ACCESSIBILITY_SERVICE" ||
+                            it == "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" }
+                    }
+                    info.receivers.orEmpty().mapNotNullTo(this) { receiver ->
+                        receiver.permission?.takeIf { it == "android.permission.BIND_DEVICE_ADMIN" }
+                    }
+                }
+                inspected += appAuditor.audit(AppRiskAuditor.AppSecurityProfile(
+                    packageName = packageName,
+                    appName = label,
+                    versionName = info.versionName,
+                    targetSdkVersion = appInfo.targetSdkVersion,
+                    requestedPermissions = info.requestedPermissions?.toList().orEmpty(),
+                    installerPackageName = installer,
+                    isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0,
+                    firstInstallTimeEpochMs = info.firstInstallTime,
+                    declaredComponentPermissions = bindings
+                ))
             }
-            val label = runCatching { pm.getApplicationLabel(appInfo).toString() }.getOrDefault(appInfo.packageName)
-            val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-            val isUpdated = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-
-            AppRiskAuditor.AppSecurityProfile(
-                packageName = appInfo.packageName,
-                appName = label,
-                versionName = runCatching { pm.getPackageInfo(appInfo.packageName, 0).versionName }.getOrNull(),
-                targetSdkVersion = appInfo.targetSdkVersion,
-                requestedPermissions = requested,
-                installerPackageName = installer,
-                isSystemApp = isSystem,
-                isUpdatedSystemApp = isUpdated,
-                firstInstallTimeEpochMs = runCatching {
-                    pm.getPackageInfo(appInfo.packageName, 0).firstInstallTime
-                }.getOrDefault(0L)
-            )
-        }.mapIndexed { index, profile ->
-            val audit = appAuditor.audit(profile)
-            onProgress(index + 1, apps.size, profile.appName)
-            audit
-        }.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }.thenBy { it.profile.appName.lowercase() })
+            ensureActive()
+            onProgress(index + 1, apps.size, label)
+        }
+        val ordered = inspected.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }
+            .thenBy { it.profile.appName.lowercase() })
+        AppRiskAuditor.VisibleAudit(apps.size, ordered)
     }
 
     // --- Security posture summary ----------------------------------------------

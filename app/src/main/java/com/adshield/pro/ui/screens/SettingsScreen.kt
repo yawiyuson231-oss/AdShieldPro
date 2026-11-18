@@ -371,11 +371,11 @@ fun SettingsScreen(
                                 .padding(end = 12.dp)
                         ) {
                             Text(
-                                text = "CNAME-Cloaking Tracker Shield",
+                                text = "DNS Alias Shield",
                                 style = MaterialTheme.typography.titleMedium
                             )
                             Text(
-                                text = "Inspects upstream DNS CNAME answer chains and blocks disguised first-party tracker aliases while preserving user allowlists and video-playback CDNs.",
+                                text = "Checks CNAME, HTTPS, and SVCB replies for destinations on your blocklists. Respects allowlists and playback safeguards without sending extra DNS queries.",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

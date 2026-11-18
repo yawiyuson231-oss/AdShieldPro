@@ -1,6 +1,6 @@
 # AdShield Pro / OMNISHIELD X INFINITY — Privacy Policy & Google Play Data Safety Disclosure
 
-**Effective Date:** November 17, 2026
+**Effective Date:** November 18, 2026
 
 **Application:** AdShield Pro (`com.adshield.pro`)
 
@@ -10,7 +10,7 @@
 
 AdShield Pro is engineered from the ground up as a local, on-device privacy and ad-blocking firewall for Android.
 - **No Root Required:** AdShield Pro operates exclusively in standard Android user space.
-- **No Developer Analytics or Data Sale:** The app includes no developer analytics, advertising, crash-tracking SDK, or developer-operated collection endpoint, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud, and media hosts) receive the requests needed to provide their service and have their own privacy policies.
+- **No Developer Analytics or Data Sale:** The app includes no developer analytics, advertising, crash-tracking SDK, or developer-operated collection endpoint, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud storage, media, and optional AI) receive the requests needed to provide their service and have their own privacy policies.
 - **No HTTPS Interception or Root Certificates:** AdShield Pro never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.
 
 ---
@@ -69,6 +69,11 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - Inspecting or downloading a direct media URL sends that URL and normal connection metadata to its host. The app supports only direct permitted HTTPS media and does not bypass authentication, DRM or site restrictions.
 - Local download history includes source/final file metadata, destination URI, status, sizes, errors and integrity results. It remains in Room until you remove the history entry or clear app data. Removing history does not delete the downloaded document.
 
+### 4E. Optional AETHER AI API
+
+- AETHER guided plans and local scans do not use an AI provider. No AI API is connected by default. If you connect one, the app stores the API configuration and key encrypted on your device with Android Keystore; you can remove the connection in **Security → Agent**.
+- Only after you review and approve a send does the app send your task text (or a fixed test prompt), model identifier and API authentication directly to the configured HTTPS provider. The request does not attach DNS history, installed-app lists, scan reports or files. The provider may retain the request and observe normal connection metadata under its own terms. Removing the connection does not revoke the key or delete any data already sent.
+
 ---
 
 ## 5. Google Play Data Safety Section Summary
@@ -80,5 +85,6 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 | Files, filenames and security hashes | **No developer collection** (local by default; cloud transfer only on user action) | **User-authorized WebDAV/Nextcloud or preview/share app** | File management, security and storage |
 | Cloud account / password | **No developer collection** (username/URL local; password encrypted locally; sent to configured server for authentication) | **User-authorized storage provider** | User-requested cloud connection |
 | Direct media URL / download metadata | **No developer collection** (history stored locally; URL sent to media host on user action) | **User-selected media host** | User-requested download |
+| AETHER task text and AI API key | **No developer collection** (sent only when you approve an online request or test) | **User-selected AI provider** | Optional task suggestion and API authentication |
 | Installed App List (`QUERY_ALL_PACKAGES`) | **No** (Never leaves device) | **No** | Per-app VPN controls and local security audit |
 | Diagnostics / Crash Tracking SDKs | **None Included** | **No** | Zero third-party tracking SDKs |
