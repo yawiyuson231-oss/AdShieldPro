@@ -27,7 +27,8 @@ git tag v2.3.1 && git push origin v2.3.1
 The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
 publishes it to GitHub Releases with a SHA-256 checksum and refreshes GitHub Pages. Release tags
 must match the app version. The workflow never overwrites an existing production release or moves
-an existing tag.
+an existing tag. The in-app updater only offers stable release APKs with a valid SHA-256 asset
+digest from GitHub. Android still checks signing compatibility when you approve installation.
 
 **Signing recovery is required before publishing another APK.** A historical release exposed the
 private signing key. Changing its password or moving it into Actions secrets does not make that

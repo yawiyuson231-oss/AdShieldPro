@@ -28,8 +28,6 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-data class GitHubRelease(val tag: String, val name: String, val code: Int, val apk: String, val sha256: String?, val notes: String)
-
 object GitHubReleaseClient {
     private const val API_BASE = "https://api.github.com/repos/"
     private val httpClient: OkHttpClient by lazy {
@@ -42,54 +40,28 @@ object GitHubReleaseClient {
 
     fun latest(): GitHubRelease? {
         val repository = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
-        if (!repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) return null
+        if (!GitHubReleaseMetadata.isRepository(repository)) return null
         val endpoint = API_BASE + repository + "/releases/latest"
         val request = Request.Builder().url(endpoint)
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
-            val json = JSONObject(response.body?.string() ?: return null)
-            val tag = json.optString("tag_name").trim()
-            val match = Regex("""v?(\d+)\.(\d+)\.(\d+)""").find(tag) ?: return null
-            val major = match.groupValues[1].toIntOrNull() ?: return null
-            val minor = match.groupValues[2].toIntOrNull() ?: return null
-            val patch = match.groupValues[3].toIntOrNull() ?: return null
-            if (minor > 99 || patch > 99) return null
+            val json = JSONObject(response.body.string())
             val assets = json.optJSONArray("assets") ?: return null
-            // Releases may list more than one APK (debug builds, per-ABI splits). Prefer a single
-            // release/universal APK and never pick a debug or split artifact: installing one of
-            // those over the installed release build fails or downgrades what the user runs.
-            val candidates = (0 until assets.length())
-                .mapNotNull { assets.optJSONObject(it) }
-                .map { it to it.optString("name") }
-                .filter { (_, name) -> isInstallableReleaseApk(name) }
-            val chosen = candidates.firstOrNull { (_, name) ->
-                name.contains("release", true) || name.contains("universal", true)
-            } ?: candidates.firstOrNull()
-            val apk = chosen?.first?.optString("browser_download_url")
-            val digest = chosen?.first?.optString("digest")
-                ?.takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
-            val expectedPrefix = "https://github.com/$repository/releases/download/"
-            val trustedUrl = apk?.takeIf { it.startsWith(expectedPrefix, ignoreCase = true) } ?: return null
-            val notes = json.optString("body").takeUnless { it == "null" }?.trim().orEmpty()
-                .take(1800).ifBlank { "Performance improvements and protection updates." }
-            return GitHubRelease(tag, tag.removePrefix("v"), major * 10000 + minor * 100 + patch, trustedUrl, digest, notes)
+            return GitHubReleaseMetadata.select(
+                repository = repository,
+                tag = json.optString("tag_name"),
+                draft = json.optBoolean("draft", true),
+                preRelease = json.optBoolean("prerelease", true),
+                body = json.optString("body").takeUnless { it == "null" },
+                assets = (0 until assets.length()).asSequence().mapNotNull { index ->
+                    assets.optJSONObject(index)?.let {
+                        GitHubReleaseMetadata.Asset(it.optString("name"), it.optString("browser_download_url"), it.optString("digest"))
+                    }
+                }
+            )
         }
-    }
-
-    private val SPLIT_ABI = Regex("""[-_](arm64[-_]?v8a|armeabi[-_]?v7a|x86|x86_64)(?=[-_.])""")
-
-    /**
-     * True for APK assets the in-app updater is allowed to install. Debug builds and per-ABI
-     * split APKs are rejected because they cannot replace the installed release package.
-     */
-    fun isInstallableReleaseApk(name: String): Boolean {
-        val lower = name.trim().lowercase()
-        if (!lower.endsWith(".apk")) return false
-        if (lower.contains("debug")) return false
-        if (SPLIT_ABI.containsMatchIn(lower)) return false
-        return true
     }
 }
 
@@ -173,8 +145,11 @@ object GitHubApkDownload {
 
     suspend fun get(context: Context, release: GitHubRelease): File = withContext(Dispatchers.IO) {
         val expectedRepo = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
-        require(release.apk.startsWith("https://github.com/$expectedRepo/releases/download/", ignoreCase = true)) {
+        require(GitHubReleaseMetadata.isTrustedApkUrl(expectedRepo, release.tag, release.apk)) {
             "Untrusted APK update URL refused."
+        }
+        require(GitHubReleaseMetadata.isSha256(release.sha256)) {
+            "No valid SHA-256 checksum was provided for this update."
         }
         val request = Request.Builder().url(release.apk).header("User-Agent", "AdShieldPro-Android-Updater").get().build()
         downloadClient.newCall(request).execute().use { response ->
@@ -209,7 +184,7 @@ object GitHubApkDownload {
                 throw t
             }
             val actual = hash.digest().joinToString("") { "%02x".format(it) }
-            if (release.sha256 != null && !actual.equals(release.sha256, true)) {
+            if (!actual.equals(release.sha256, true)) {
                 part.delete()
                 throw java.io.IOException("APK checksum verification failed; it was not installed.")
             }

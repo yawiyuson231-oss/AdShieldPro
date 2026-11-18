@@ -477,7 +477,7 @@ object CapabilityRegistry {
         cap(
             "update-verify", "APK integrity check (SHA-256) before install", CapabilityArea.UPDATES,
             CapabilityStatus.IMPLEMENTED, "update/GitHubUpdate.kt", emptyList(),
-            listOf("Release digest / published .sha256"),
+            listOf("Required SHA-256 APK asset digest from the GitHub Releases API"),
             listOf("Digest is only as trustworthy as the release itself; signing key is the real root of trust"),
             "Manual: corrupt a download and confirm the install is refused"
         ),

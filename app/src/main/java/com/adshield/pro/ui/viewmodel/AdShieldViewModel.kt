@@ -337,7 +337,7 @@ class AdShieldViewModel @Inject constructor(
             try {
                 val release = withContext(Dispatchers.IO) { GitHubReleaseClient.latest() }
                 when {
-                    release == null -> showFeedback("Couldn't check for updates. Check your internet connection and try again.")
+                    release == null -> showFeedback("Couldn't verify update information from GitHub. Try again later or check GitHub Releases.")
                     release.code <= BuildConfig.VERSION_CODE -> showFeedback("AdShield Pro is up to date.")
                     else -> {
                         val intent = Intent(appContext, UpdatePromptActivity::class.java).apply {
