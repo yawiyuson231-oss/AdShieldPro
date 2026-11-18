@@ -42,9 +42,11 @@ cache or reach an application. A response is rejected when:
 Record walking is performed by `DnsPacketCodec.inspectResponseRecordTypes`, which walks the
 question, answer, authority and additional sections with bounded offsets and rejects
 compression-pointer loops rather than trusting header counts. Cached replies expire against a
-monotonic clock; hits return only remaining record TTLs and leave EDNS flags alone. Zero-TTL
-replies are not stored. Negative results require an authority SOA, with a lifetime no greater than
-its TTL or SOA.MINIMUM. Custom DoH paths and query strings are cache-keyed case-sensitively.
+monotonic clock that includes time spent asleep. Hits return only remaining record TTLs and leave
+EDNS flags alone. A whole wire reply is only reused for the same query bytes, excluding the rewritten
+transaction ID; different DNSSEC flags or EDNS options do not share replies. Zero-TTL replies are
+not stored. Negative results require an authority SOA, with a lifetime no greater than its TTL or
+SOA.MINIMUM. Custom DoH paths and query strings are cache-keyed case-sensitively.
 
 ## 3. DNSSEC: reporting, not local validation
 

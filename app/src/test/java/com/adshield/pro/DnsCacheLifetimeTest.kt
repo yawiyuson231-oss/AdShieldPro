@@ -114,11 +114,33 @@ class DnsCacheLifetimeTest {
         assertNotEquals(UpstreamDnsResolver.buildCacheKey(query(), original), UpstreamDnsResolver.buildCacheKey(query(), other))
     }
 
-    private fun query(id: Int = 1): DnsPacketCodec.ParsedDnsQuery {
-        val bytes = byteArrayOf((id ushr 8).toByte(), id.toByte(), 1, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+    @Test
+    fun resolverDoesNotReplayAcrossCheckingDisabledOrEdnsDoFlags() = runBlocking {
+        val resolver = UpstreamDnsResolver(DnsProviderHealthMonitor())
+        resolver.cacheClockMs = { 100_000L }
+        var upstreamCalls = 0
+        resolver.providerTransport = UpstreamDnsResolver.ProviderTransport { parsed, _, _ ->
+            upstreamCalls++
+            DnsPacketCodec.buildBlockedResponse(parsed, true, ttlSeconds = 5)
+        }
+        val config = DnsResolverConfig(preset = DnsProviderPreset.CLOUDFLARE, protocol = DnsProtocol.DOH)
+        assertFalse(resolver.resolve(query(1, dnssecOk = false), config).fromCache)
+        assertFalse(resolver.resolve(query(2, checkingDisabled = true, dnssecOk = false), config).fromCache)
+        assertFalse(resolver.resolve(query(3, dnssecOk = true), config).fromCache)
+        assertTrue(resolver.resolve(query(4, dnssecOk = false), config).fromCache)
+        assertTrue(resolver.resolve(query(5, checkingDisabled = true, dnssecOk = false), config).fromCache)
+        assertTrue(resolver.resolve(query(6, dnssecOk = true), config).fromCache)
+        assertEquals(3, upstreamCalls)
+    }
+
+    private fun query(id: Int = 1, checkingDisabled: Boolean = false, dnssecOk: Boolean? = null): DnsPacketCodec.ParsedDnsQuery {
+        val bytes = byteArrayOf((id ushr 8).toByte(), id.toByte(), 1, if (checkingDisabled) 0x10 else 0,
+            0, 1, 0, 0, 0, 0, 0, if (dnssecOk == null) 0 else 1,
             1, 'a'.code.toByte(), 4, 't'.code.toByte(), 'e'.code.toByte(), 's'.code.toByte(), 't'.code.toByte(), 0,
             0, 1, 0, 1)
-        return requireNotNull(DnsPacketCodec.parseQuery(bytes))
+        val wire = if (dnssecOk == null) bytes else bytes +
+            byteArrayOf(0, 0, 41, 4, 0xd0.toByte(), 0, 0, if (dnssecOk) 0x80.toByte() else 0, 0, 0, 0)
+        return requireNotNull(DnsPacketCodec.parseQuery(wire))
     }
 
     private fun unsignedTtlAt(wire: ByteArray, offset: Int): Int = ByteBuffer.wrap(wire, offset, 4).int

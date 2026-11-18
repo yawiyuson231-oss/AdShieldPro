@@ -1,5 +1,6 @@
 package com.adshield.pro.engine.dns
 
+import android.os.SystemClock
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
@@ -60,7 +61,8 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     internal var providerTransport: ProviderTransport? = null
 
-    internal var cacheClockMs: () -> Long = { System.nanoTime() / 1_000_000L }
+    // TTLs must keep aging while the phone is asleep, without depending on wall-clock changes.
+    internal var cacheClockMs: () -> Long = SystemClock::elapsedRealtime
 
     data class UpstreamResult(
         val responseBytes: ByteArray,
@@ -79,8 +81,19 @@ class UpstreamDnsResolver @Inject constructor(
         val dnssecStatus: DnssecStatus?
     )
 
-    private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > 1024
+    private class ReplyCacheKey(private val resolverScope: String, rawQuery: ByteArray) {
+        // A whole wire reply only matches this query's flags, question and EDNS options.
+        // Exclude the transaction ID, the one request field we rewrite on a cache hit.
+        private val wire = rawQuery.copyOfRange(2, rawQuery.size)
+        private val hash = 31 * resolverScope.hashCode() + wire.contentHashCode()
+
+        override fun hashCode(): Int = hash
+        override fun equals(other: Any?): Boolean = other is ReplyCacheKey &&
+            resolverScope == other.resolverScope && wire.contentEquals(other.wire)
+    }
+
+    private val dnsCache = object : LinkedHashMap<ReplyCacheKey, CachedDnsEntry>(128, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ReplyCacheKey, CachedDnsEntry>?): Boolean = size > 1024
     }
 
     @Volatile
@@ -232,18 +245,23 @@ class UpstreamDnsResolver @Inject constructor(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig
     ): UpstreamResult = withContext(Dispatchers.IO) {
-        val cacheKey = buildCacheKey(query, config)
-        val now = cacheClockMs()
-        val cached = synchronized(dnsCache) {
-            val entry = dnsCache[cacheKey]
-            if (entry != null && entry.response.isExpired(now - entry.receivedAtMs)) {
-                dnsCache.remove(cacheKey)
-                null
-            } else entry
+        val cacheKey = if (query.rawPayload.size in 12..MAX_CACHE_QUERY_BYTES) {
+            ReplyCacheKey(buildCacheKey(query, config), query.rawPayload)
+        } else null
+        val hit = cacheKey?.let { key ->
+            synchronized(dnsCache) {
+                val entry = dnsCache[key] ?: return@synchronized null
+                val ageMs = cacheClockMs() - entry.receivedAtMs
+                if (entry.response.isExpired(ageMs)) {
+                    dnsCache.remove(key)
+                    null
+                } else entry to ageMs
+            }
         }
-        if (cached != null) {
+        if (hit != null) {
+            val (cached, ageMs) = hit
             return@withContext UpstreamResult(
-                responseBytes = cached.response.forQuery(query.transactionId, now - cached.receivedAtMs),
+                responseBytes = cached.response.forQuery(query.transactionId, ageMs),
                 protocolUsed = "${cached.protocolOrigin} (Cached)",
                 fromCache = true,
                 latencyMs = 0,
@@ -371,11 +389,13 @@ class UpstreamDnsResolver @Inject constructor(
         if (resolved != null) {
             val result = resolved.result
             // A losing hedged request must not overwrite the reply that won.
-            val payload = DnsPacketCodec.prepareCachedResponse(result.responseBytes)
-            if (payload != null && !payload.isExpired(cacheClockMs() - resolved.receivedAtMs)) {
-                synchronized(dnsCache) {
-                    dnsCache[cacheKey] = CachedDnsEntry(payload, resolved.receivedAtMs, result.protocolUsed,
-                        result.providerId, result.dnssecStatus)
+            if (cacheKey != null) {
+                val payload = DnsPacketCodec.prepareCachedResponse(result.responseBytes)
+                if (payload != null && !payload.isExpired(cacheClockMs() - resolved.receivedAtMs)) {
+                    synchronized(dnsCache) {
+                        dnsCache[cacheKey] = CachedDnsEntry(payload, resolved.receivedAtMs, result.protocolUsed,
+                            result.providerId, result.dnssecStatus)
+                    }
                 }
             }
             return@withContext result
@@ -658,6 +678,7 @@ class UpstreamDnsResolver @Inject constructor(
          */
         private const val UDP_TIMEOUT_MS = 2500
         private const val MAX_DNS_WIRE_BYTES = 65_535
+        private const val MAX_CACHE_QUERY_BYTES = 4_096 // Bound memory for wire-exact cache keys.
 
         fun transactionIdOf(rawDnsMessage: ByteArray): Int {
             if (rawDnsMessage.size < 2) return -1
