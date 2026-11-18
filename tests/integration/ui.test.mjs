@@ -475,3 +475,31 @@ test('no page uses innerHTML or trusts file content as markup', () => {
   assert.equal(/insertAdjacentHTML/.test(appSource), false, 'app.js must not use insertAdjacentHTML');
   assert.equal(/\.innerHTML\s*=/.test(domSource), false, 'ui/dom.js must not assign innerHTML');
 });
+
+test('analytics are persisted to storage after real DNS activity (debounced flush)', async () => {
+  // Regression: app.js called `state.analytics.save()`, which does not exist, so the
+  // debounce timer raised "save is not a function" and nothing was ever written.
+  const key = 'omnishield-x:analytics:state';
+  await win.localStorage.removeItem(key);
+
+  app.navigate('dns');
+  await app.state.client.lookup('example.com');
+  await new Promise((resolve) => setTimeout(resolve, 2200)); // longer than the 1500 ms debounce
+
+  const stored = await win.localStorage.getItem(key);
+  assert.ok(stored, 'analytics must be written to localStorage after activity');
+  const parsed = JSON.parse(stored);
+  assert.equal(parsed.version, 1);
+  assert.ok(parsed.days.length >= 1, 'at least one day bucket must be persisted');
+  assert.equal(stored.includes('example.com'), false, 'raw hostnames must never be persisted');
+});
+
+test('removing a user rule from the UI stops it blocking immediately', async () => {
+  app.navigate('dns');
+  app.state.engine.addUserRule('ui-removal.example', false, 'SUFFIX');
+  assert.equal(app.state.engine.evaluate('ui-removal.example').blocked, true, 'rule must start blocking');
+  const removed = app.state.engine.removeUserRule('ui-removal.example', false);
+  assert.equal(removed, true, 'removeUserRule must report the removal');
+  assert.equal(app.state.engine.evaluate('ui-removal.example').blocked, false,
+    'a removed rule must not keep blocking the domain');
+});

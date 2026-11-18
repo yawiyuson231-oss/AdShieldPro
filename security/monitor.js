@@ -35,8 +35,11 @@ export class SecurityMonitor {
 
   /** Records one real event. */
   record(event) {
-    const at = event.at ?? this.clock();
+    const at = Number.isFinite(event.at) ? event.at : this.clock();
     const entry = { ...event, at };
+    // A non-finite latency is not a measurement: drop it rather than letting
+    // NaN reach the recent-event table (rendered as "Invalid Date") or a report.
+    if ('latencyMs' in entry && !Number.isFinite(entry.latencyMs)) delete entry.latencyMs;
     this.events.push(entry);
     if (this.events.length > MAX_EVENTS) this.events.shift();
 
