@@ -171,12 +171,19 @@ def check_packaged_metadata(apk: Path, config: dict, aapt2: str | None, problems
     package = dict(re.findall(r"(\w+)='([^']*)'", package_line.group(1))) if package_line else {}
     if package.get("split"):
         problems.append("APK is a split package, not an installable standalone package")
-    for field, value in (("applicationId", package.get("name")),
-                         ("versionCode", package.get("versionCode")),
-                         ("versionName", package.get("versionName")),
-                         ("minSdk", re.search(r"^sdkVersion:'(\d+)'$", badging, re.MULTILINE)),
-                         ("targetSdk", re.search(r"^targetSdkVersion:'(\d+)'$", badging, re.MULTILINE))):
-        actual = value.group(1) if isinstance(value, re.Match) else value
+    # aapt2's newer badging output names this minSdkVersion; older tools use sdkVersion.
+    def sdk_value(label: str) -> str | None:
+        match = re.search(rf"^{label}:'(\d+)'$", badging, re.MULTILINE)
+        return match.group(1) if match else None
+
+    actual_config = {
+        "applicationId": package.get("name"),
+        "versionCode": package.get("versionCode"),
+        "versionName": package.get("versionName"),
+        "minSdk": sdk_value("(?:minSdkVersion|sdkVersion)"),
+        "targetSdk": sdk_value("targetSdkVersion"),
+    }
+    for field, actual in actual_config.items():
         if actual != str(config[field]):
             problems.append(f"APK manifest {field}: expected {config[field]}, got {actual or 'missing'}")
 

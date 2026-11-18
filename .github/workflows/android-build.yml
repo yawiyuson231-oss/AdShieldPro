@@ -24,6 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Start fresh CI reports
+        run: |
+          rm -rf -- .ci
+          mkdir -p .ci
+
       - name: JDK 21
         uses: actions/setup-java@v5
         with:
@@ -91,6 +96,14 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/assemble.log :app:assembleDebug
 
+      - name: Verify debug APK identity, universal packaging and signature
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          python3 -m unittest discover -s tools/tests 2>&1 | tee .ci/universal-debug.log
+          python3 tools/check_universal_release.py --variant debug "$APK" 2>&1 | tee -a .ci/universal-debug.log
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK" 2>&1 | tee -a .ci/universal-debug.log
+
       - name: Release build with R8 + resource shrinking (throwaway keystore)
         run: |
           set -o pipefail
@@ -110,13 +123,10 @@ jobs:
           ls -l "$APK"
           sha256sum "$APK"
 
-      - name: Verify debug and release APK identity and universal packaging
+      - name: Verify packaged release APK
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s tools/tests
-          python3 tools/check_universal_release.py --variant debug app/build/outputs/apk/debug/app-debug.apk
-          python3 tools/check_universal_release.py app/build/outputs/apk/release/app-release.apk
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify app/build/outputs/apk/debug/app-debug.apk
+          python3 tools/check_universal_release.py app/build/outputs/apk/release/app-release.apk 2>&1 | tee .ci/universal-release.log
 
       - name: JVM unit tests
         run: |
@@ -184,7 +194,7 @@ jobs:
         if: failure()
         run: rm -rf .ci-mirror || true
 
-      - name: Surface Gradle errors as annotations
+      - name: Surface build and validation errors as annotations
         if: failure()
         run: |
           # Test assertions never reach the annotation surface above, and the Actions log
@@ -193,7 +203,7 @@ jobs:
           mkdir -p .ci/junit
           cp app/build/test-results/testDebugUnitTest/*.xml .ci/junit/ 2>/dev/null || true
           cat .ci/*.log 2>/dev/null \
-            | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|error:" \
+            | grep -E "^e: |FAILURE:|What went wrong|Execution failed|Caused by|Unresolved reference|Could not (resolve|find)|^  - (APK|aapt2|cannot read APK)|error:" \
             | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true
 
       - name: Upload debug APK

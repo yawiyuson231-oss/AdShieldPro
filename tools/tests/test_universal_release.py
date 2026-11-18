@@ -13,13 +13,13 @@ class PackagedApkMetadataTest(unittest.TestCase):
         self.assertEqual(problems, [])
         return config
 
-    def check(self, variant, replacements=None, omit_package=False):
+    def check(self, variant, replacements=None, omit_package=False, min_sdk_label="minSdkVersion"):
         config = self.config(variant)
         values = {**config, **(replacements or {})}
         package = (f"package: name='{values['applicationId']}' versionCode='{values['versionCode']}' "
                    f"versionName='{values['versionName']}' {values.get('extraPackageFields', '')}\n")
         output = ("" if omit_package else package) + (
-            f"sdkVersion:'{values['minSdk']}'\ntargetSdkVersion:'{values['targetSdk']}'\n"
+            f"{min_sdk_label}:'{values['minSdk']}'\ntargetSdkVersion:'{values['targetSdk']}'\n"
         )
         problems = []
         with patch("tools.check_universal_release.subprocess.run", return_value=mock_aapt(output)) as run:
@@ -32,6 +32,9 @@ class PackagedApkMetadataTest(unittest.TestCase):
         self.assertNotEqual(self.config("debug")["applicationId"], self.config("release")["applicationId"])
         self.assertEqual(self.check("debug"), [])
         self.assertEqual(self.check("release"), [])
+
+    def test_accepts_older_aapt2_sdk_version_spelling(self):
+        self.assertEqual(self.check("release", min_sdk_label="sdkVersion"), [])
 
     def test_rejects_wrong_variant_stale_version_and_sdk_mismatch(self):
         release = self.config("release")
