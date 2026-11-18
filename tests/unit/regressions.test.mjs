@@ -14,6 +14,7 @@ import { BackupManager, migrate, SCHEMA_VERSION } from '../../security/backup.js
 import { FeedManager, validateFeedText } from '../../security/feedmanager.js';
 import { FirewallAI } from '../../security/firewall-ai.js';
 import { PrivateAnalytics } from '../../security/privacy.js';
+import { SecurityMonitor } from '../../security/monitor.js';
 import { MemoryStorage } from '../../security/storage.js';
 import { decodeMessage, fromHex, typeFromString, DnsFormatError } from '../../dns/codec.js';
 import { DnsCache } from '../../dns/cache.js';
@@ -342,4 +343,136 @@ test('lint resolves nested relative imports and flags insertAdjacentHTML calls',
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+/**
+ * Regression: analytics persistence must go through a method that exists.
+ *
+ * app.js used to call `state.analytics.save()`, but PrivateAnalytics only ever
+ * implemented `flush()`. The optional-call operator hid the mistake from the type
+ * checker and the `.catch()` swallowed the follow-on error, so every DNS event
+ * raised a `save is not a function` TypeError on the debounce timer and no
+ * analytics were ever written to storage.
+ */
+test('analytics persistence uses the method the class actually exposes', () => {
+  const analytics = new PrivateAnalytics({ storage: new MemoryStorage() });
+  assert.equal(typeof analytics.flush, 'function', 'PrivateAnalytics.flush must exist');
+  assert.equal(analytics.save, undefined,
+    'app.js must not depend on a save() alias that does not exist');
+});
+
+test('privacy analytics survive a flush/load round-trip through storage', async () => {
+  const storage = new MemoryStorage();
+  const clock = () => 1_700_000_000_000;
+  const first = new PrivateAnalytics({ storage, clock });
+  for (let i = 0; i < 12; i++) first.record({ kind: 'blocked', category: 'ADS', domain: `t${i}.example` });
+  assert.equal(await first.flush(), true, 'flush must report success when a storage adapter exists');
+
+  const second = new PrivateAnalytics({ storage, clock });
+  assert.equal(await second.load(), true, 'flushed state must load back');
+  const report = second.report();
+  assert.equal(report.days.length, 1);
+  assert.equal(report.days[0].categories.ADS, 12, 'recorded counts must survive the round-trip');
+  assert.equal(report.days[0].distinctDomains, 12, 'distinct hashed domains must survive the round-trip');
+});
+
+test('every cross-module method app.js calls exists on the class that owns it', async () => {
+  const owners = {
+    Aether: (await import('../../aether/index.js')).Aether,
+    BackupManager: (await import('../../security/backup.js')).BackupManager,
+    FeedManager: (await import('../../security/feedmanager.js')).FeedManager,
+    FirewallAI: (await import('../../security/firewall-ai.js')).FirewallAI,
+    SecurityMonitor: (await import('../../security/monitor.js')).SecurityMonitor,
+    PrivateAnalytics: (await import('../../security/privacy.js')).PrivateAnalytics,
+    PowerGovernor: (await import('../../security/power.js')).PowerGovernor
+  };
+  const expected = {
+    Aether: ['analyze', 'attachEngine', 'exportState', 'importState', 'observe', 'reportFalsePositive', 'train'],
+    BackupManager: ['list', 'recover', 'remove', 'restore', 'save'],
+    FeedManager: ['content', 'list', 'update', 'verify'],
+    FirewallAI: ['evaluate', 'importLog', 'inspect', 'observe', 'setPolicy', 'snapshot'],
+    SecurityMonitor: ['metrics', 'record'],
+    PrivateAnalytics: ['clear', 'exportJSON', 'flush', 'load', 'record', 'report'],
+    PowerGovernor: ['describe', 'intervalFor', 'start', 'stop']
+  };
+  for (const [name, methods] of Object.entries(expected)) {
+    const cls = owners[name];
+    assert.ok(cls, `${name} must be importable`);
+    for (const method of methods) {
+      assert.equal(typeof cls.prototype[method], 'function', `${name}.${method} is referenced by app.js but missing`);
+    }
+  }
+});
+
+test('app.js never calls a persistence method the analytics class does not have', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../../app.js', import.meta.url), 'utf8');
+  assert.equal(/state\.analytics\??\.save\s*\(/.test(source), false,
+    'app.js must call analytics.flush(), not the non-existent analytics.save()');
+});
+
+/**
+ * Regression: a non-finite timestamp or latency must never reach the recent-event
+ * view. The monitor table renders `new Date(e.at).toLocaleTimeString()`, so a NaN
+ * `at` printed "Invalid Date", and a NaN latency leaked into the report/export.
+ */
+test('monitor drops non-finite timestamps and latencies instead of displaying them', () => {
+  const m = new SecurityMonitor();
+  m.record({ kind: 'blocked', domain: 'nan-latency.example', latencyMs: NaN });
+  m.record({ kind: 'blocked', domain: 'inf-latency.example', latencyMs: Infinity });
+  m.record({ kind: 'blocked', domain: 'nan-at.example', at: NaN, latencyMs: 5 });
+  m.record({ kind: 'blocked', domain: 'bad-at.example', at: 'yesterday' });
+
+  const recent = m.metrics().recent;
+  assert.equal(recent.length, 4, 'every event is still recorded');
+  for (const event of recent) {
+    assert.ok(Number.isFinite(event.at), `event.at must be a real timestamp, got ${event.at}`);
+    assert.ok(!Number.isNaN(new Date(event.at).getTime()), 'at must render as a real time');
+    if ('latencyMs' in event) {
+      assert.ok(Number.isFinite(event.latencyMs), `latencyMs must be finite, got ${event.latencyMs}`);
+    }
+  }
+  assert.ok(Number.isFinite(m.metrics().averageLatency), 'the average must stay a real number');
+});
+
+/**
+ * Regression: `setUserRules` (config import / snapshot recovery) dropped matchType.
+ *
+ * Every restored rule became a SUFFIX rule, so an EXACT rule that blocked one
+ * host started blocking every subdomain of it after a restore — the engine
+ * blocked more than the user configured. The match type must survive the
+ * round-trip, and a wildcard pattern must stay a wildcard.
+ */
+test('setUserRules preserves EXACT, SUFFIX and WILDCARD semantics across a restore', () => {
+  const exact = new OmniShieldFilterEngine();
+  exact.setUserRules([{ pattern: 'exactonly.example', isAllow: false, matchType: 'EXACT' }]);
+  assert.equal(exact.evaluate('exactonly.example').blocked, true, 'EXACT still blocks its host');
+  assert.equal(exact.evaluate('deep.sub.exactonly.example').blocked, false,
+    'EXACT must not widen to subdomains after a restore');
+
+  const suffix = new OmniShieldFilterEngine();
+  suffix.setUserRules([{ pattern: 'tree.example', isAllow: false, matchType: 'SUFFIX' }]);
+  assert.equal(suffix.evaluate('a.b.tree.example').blocked, true, 'SUFFIX keeps matching subdomains');
+
+  const wildcard = new OmniShieldFilterEngine();
+  wildcard.setUserRules([{ pattern: 'ads*.example', isAllow: false }]);
+  assert.equal(wildcard.evaluate('ads7.example').blocked, true,
+    'a wildcard pattern must be restored as a wildcard, not as a literal suffix');
+
+  const allow = new OmniShieldFilterEngine();
+  allow.setUserRules([{ rawPattern: 'allowed.example', ruleType: 'ALLOW' }]);
+  assert.equal(allow.evaluate('allowed.example').blocked, false, 'ALLOW survives via ruleType');
+});
+
+test('setUserRules([]) clears every user rule', () => {
+  const engine = new OmniShieldFilterEngine();
+  engine.setUserRules([
+    { pattern: 'one.example', isAllow: false, matchType: 'SUFFIX' },
+    { pattern: 'two.example', isAllow: true, matchType: 'EXACT' },
+    { pattern: 'three*.example', isAllow: false }
+  ]);
+  assert.ok(engine.totalRules() > 0, 'rules were installed');
+  engine.setUserRules([]);
+  assert.equal(engine.totalRules(), 0, 'no user rule may survive an empty replacement');
+  assert.equal(engine.evaluate('one.example').blocked, false);
 });

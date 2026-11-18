@@ -87,11 +87,58 @@ def unquote(value: str) -> str:
     return value
 
 
+def join_concat(value: str) -> str:
+    """Fold Kotlin adjacent string-literal concatenation into one literal.
+
+    The registry wraps long prose across lines with `"first part " +\\n "second part"`.
+    Without this step the doc would publish the raw Kotlin source (`" +` and leading
+    quotes) instead of the sentence a reader is meant to see. Anything that is not a
+    plain chain of string literals joined by `+` is returned unchanged, so the caller
+    still sees (and rejects) constructs it does not understand.
+    """
+    parts: list[str] = []
+    cursor = 0
+    text = value.strip()
+    while True:
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
+        if cursor >= len(text) or text[cursor] != '"':
+            return value
+        cursor += 1  # opening quote
+        chunk: list[str] = []
+        closed = False
+        while cursor < len(text):
+            char = text[cursor]
+            if char == "\\" and cursor + 1 < len(text):
+                chunk.append(text[cursor:cursor + 2])
+                cursor += 2
+                continue
+            if char == '"':
+                closed = True
+                cursor += 1
+                break
+            chunk.append(char)
+            cursor += 1
+        if not closed:
+            return value
+        parts.append("".join(chunk))
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
+        if cursor >= len(text):
+            break
+        if text[cursor] != "+":
+            return value
+        cursor += 1
+    if len(parts) == 1:
+        return value
+    return '"' + "".join(parts) + '"'
+
+
 def list_items(value: str) -> list[str]:
     value = value.strip()
     if value.startswith("listOf(") and value.endswith(")"):
         inner = value[len("listOf("):-1]
-        return [unquote(item) for item in split_top_level(inner) if item.strip()]
+        return [unquote(join_concat(item)) for item in split_top_level(inner) if item.strip()]
     if value in ("emptyList()", "listOf()"):
         return []
     raise SystemExit(f"unrecognised list expression in registry: {value[:80]}")
@@ -138,15 +185,15 @@ def parse(source: str) -> list[dict]:
             raise SystemExit(f"unknown capability status: {status}")
         entries.append(
             {
-                "id": unquote(args[0]),
-                "name": unquote(args[1]),
+                "id": unquote(join_concat(args[0])),
+                "name": unquote(join_concat(args[1])),
                 "area": area,
                 "status": status,
-                "code": unquote(args[4]),
+                "code": unquote(join_concat(args[4])),
                 "permissions": list_items(args[5]),
                 "data_sources": list_items(args[6]),
                 "limitations": list_items(args[7]),
-                "verification": unquote(args[8]),
+                "verification": unquote(join_concat(args[8])),
             }
         )
     if not entries:
