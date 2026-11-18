@@ -87,7 +87,7 @@ data class AppSettingsState(
     // --- Quick Settings Tiles for System Preferences ---
     val privateDnsTileConfig: PrivateDnsTileConfig = PrivateDnsTileConfig(),
     val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig(),
-    // --- CNAME-Cloaking Shield & Timed Auto-Resume Pause (Snooze) ---
+    // --- DNS Alias Shield (retains the original CNAME setting) & Timed Auto-Resume Pause ---
     val cnameUncloakingEnabled: Boolean = true,
     val vpnSnoozeUntilEpochMs: Long = 0L
 )
@@ -181,7 +181,7 @@ class UserPreferencesRepository @Inject constructor(
         val PRIVATE_DNS_TILE_CONFIG_JSON = stringPreferencesKey("private_dns_tile_config_json")
         val USB_DEBUGGING_TILE_CONFIG_JSON = stringPreferencesKey("usb_debugging_tile_config_json")
 
-        // CNAME-Cloaking Shield & Timed Protection Snooze
+        // Keep the stored CNAME key for DNS Alias Shield and existing backups.
         val CNAME_UNCLOAKING_ENABLED = booleanPreferencesKey("cname_uncloaking_enabled")
         val VPN_SNOOZE_UNTIL_MS = longPreferencesKey("vpn_snooze_until_epoch_ms")
     }

@@ -73,6 +73,9 @@ jobs:
           chmod +x tools/audit_capability_tests.py
           python3 tools/audit_capability_tests.py --strict
 
+      - name: Verify bundled AETHER task model
+        run: python3 tools/train_aether_tasks.py --check
+
       - name: UI performance and lazy-list gates
         run: |
           chmod +x tools/check_ui_performance.py

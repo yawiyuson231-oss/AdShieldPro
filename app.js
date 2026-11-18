@@ -226,14 +226,20 @@ async function rebuildEngine() {
   state.client.setEngine(engine);
 }
 
+function flushAnalytics() {
+  clearTimeout(state.analyticsTimer);
+  state.analyticsTimer = null;
+  state.analytics?.flush().catch(() => {});
+}
+
 function scheduleAnalyticsSave() {
   clearTimeout(state.analyticsTimer);
-  state.analyticsTimer = setTimeout(() => { state.analytics?.save().catch(() => {}); }, 1500);
+  state.analyticsTimer = setTimeout(flushAnalytics, 1500);
 }
 
 function handlePageHide() {
   saveSnapshot('pagehide').catch(() => {});
-  state.analytics?.save().catch(() => {});
+  flushAnalytics();
 }
 
 function handleHashChange() {

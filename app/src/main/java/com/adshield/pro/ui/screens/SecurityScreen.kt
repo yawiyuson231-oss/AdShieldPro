@@ -5,6 +5,8 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.engine.aether.AetherPhoneAgent
 import com.adshield.pro.engine.aether.SecurityReportExplainer
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.QuarantinedItem
@@ -87,7 +90,7 @@ import java.util.Date
 /**
  * AdShield Pro — Security Center (Anti-Virus & Anti-Phishing).
  *
- * Sub-tabs: Protection posture, App audit, File scanner, Link/URL scanner, Scan history.
+ * Sub-tabs: Protection posture, Security Agent, App audit, File scanner, Link/URL scanner, Scan history.
  */
 @Composable
 fun SecurityScreen(
@@ -117,6 +120,7 @@ fun SecurityScreen(
     onBuildScanReport: suspend () -> String,
     onSetScheduledScan: (Boolean, Int) -> Unit,
     onShowFeedback: (String) -> Unit,
+    onOpenAgentTool: (AetherPhoneAgent.Tool) -> Unit,
     onCleanAndScanLink: (String) -> Unit = {}
 ) {
     var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
@@ -130,14 +134,16 @@ fun SecurityScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                SecurityTabChip("Shield", Icons.Default.Security, selectedSubTab == 0, Modifier.weight(1f)) { selectedSubTab = 0 }
-                SecurityTabChip("Apps", Icons.Default.GppGood, selectedSubTab == 1, Modifier.weight(1f)) { selectedSubTab = 1 }
-                SecurityTabChip("Files", Icons.Default.Description, selectedSubTab == 2, Modifier.weight(1f)) { selectedSubTab = 2 }
-                SecurityTabChip("Links", Icons.Default.Link, selectedSubTab == 3, Modifier.weight(1f)) { selectedSubTab = 3 }
-                SecurityTabChip("History", Icons.Default.AccessTime, selectedSubTab == 4, Modifier.weight(1f)) { selectedSubTab = 4 }
+                SecurityTabChip("Shield", Icons.Default.Security, selectedSubTab == 0, Modifier) { selectedSubTab = 0 }
+                SecurityTabChip("Agent", Icons.Default.Shield, selectedSubTab == 5, Modifier) { selectedSubTab = 5 }
+                SecurityTabChip("Apps", Icons.Default.GppGood, selectedSubTab == 1, Modifier) { selectedSubTab = 1 }
+                SecurityTabChip("Files", Icons.Default.Description, selectedSubTab == 2, Modifier) { selectedSubTab = 2 }
+                SecurityTabChip("Links", Icons.Default.Link, selectedSubTab == 3, Modifier) { selectedSubTab = 3 }
+                SecurityTabChip("History", Icons.Default.AccessTime, selectedSubTab == 4, Modifier) { selectedSubTab = 4 }
             }
         }
 
@@ -146,6 +152,15 @@ fun SecurityScreen(
             1 -> AppAuditTab(appAudits, isAuditingApps, onAuditApps)
             2 -> FileScanTab(fileScanResult, isScanning, scanProgress, onScanUri, onQuarantineLastScanned, onDeleteScannedDocument)
             3 -> LinkScanTab(urlScanResult, isScanning, onScanUrl, onCleanAndScanLink, onShowFeedback)
+            5 -> AetherPhoneAgentScreen(
+                onTool = { tool ->
+                    when (tool) {
+                        AetherPhoneAgent.Tool.FILE_SCAN -> selectedSubTab = 2
+                        AetherPhoneAgent.Tool.SCAN_HISTORY -> selectedSubTab = 4
+                        else -> onOpenAgentTool(tool)
+                    }
+                }
+            )
             else -> HistoryTab(
                 history = scanHistory,
                 summary = scanSummary,

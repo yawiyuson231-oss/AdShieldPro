@@ -1,0 +1,411 @@
+CHECK_PHONE	check my phone security
+CHECK_PHONE	is my phone protected right now
+CHECK_PHONE	check whether adshield protection is running
+CHECK_PHONE	show the current protection status
+CHECK_PHONE	is the ad blocker turned on
+CHECK_PHONE	make sure the shield is active
+CHECK_PHONE	run a security health check
+CHECK_PHONE	look at my security settings
+CHECK_PHONE	run a device health report
+CHECK_PHONE	diagnose why my phone feels slow
+CHECK_PHONE	check if my wifi is secure
+CHECK_PHONE	why is my wifi signal weak
+CHECK_PHONE	check my connection and phone health
+CHECK_PHONE	what security settings need attention
+CHECK_PHONE	check if my storage is low
+CHECK_PHONE	is the phone overheating
+CHECK_PHONE	see how much memory is available
+CHECK_PHONE	review my device's safety
+CHECK_PHONE	check my wireless connection
+CHECK_PHONE	is the vpn paused
+CHECK_PHONE	see what's wrong with my device
+CHECK_PHONE	check network settings for safety gaps
+CHECK_PHONE	do I have enough free space
+CHECK_PHONE	check if this wifi needs a login
+CHECK_PHONE	is my connection unprotected
+CHECK_PHONE	assess the security on this phone
+CHECK_PHONE	suriin ang seguridad ng cellphone ko
+CHECK_PHONE	i check mo kung naka on ang protection
+CHECK_PHONE	mahina ba ang signal ng wifi ko
+CHECK_PHONE	ligtas ba ang koneksyon ko
+CHECK_PHONE	bakit mainit ang phone ko
+CHECK_PHONE	kumusta ang status ng adshield protection
+CHECK_PHONE	tignan mo yung wifi at storage ko
+CHECK_PHONE	may problema ba sa settings ng phone
+AUDIT_APPS	audit my installed apps
+AUDIT_APPS	check my apps for risky permissions
+AUDIT_APPS	check if any installed app looks suspicious
+AUDIT_APPS	find apps with dangerous privileges
+AUDIT_APPS	look for unsafe apps on my phone
+AUDIT_APPS	which apps should I review
+AUDIT_APPS	show me apps with excessive permissions
+AUDIT_APPS	review installed applications for risk
+AUDIT_APPS	check for sideloaded apps
+AUDIT_APPS	run a permission audit
+AUDIT_APPS	look at how my apps were installed
+AUDIT_APPS	find high risk apps
+AUDIT_APPS	scan the apps on this device
+AUDIT_APPS	which apps ask for sensitive access
+AUDIT_APPS	look for signs of spyware among installed apps
+AUDIT_APPS	do a local app safety scan
+AUDIT_APPS	inspect what permissions my applications request
+AUDIT_APPS	review my installed software
+AUDIT_APPS	look for apps targeting older android versions
+AUDIT_APPS	check whether an app requested accessibility permission
+AUDIT_APPS	report the applications that need a closer look
+AUDIT_APPS	see whether any apps come from unknown sources
+AUDIT_APPS	show suspicious permission combinations for apps
+AUDIT_APPS	find phone apps with concerning access
+AUDIT_APPS	look for apps installed outside the play store
+AUDIT_APPS	review the risk of the apps I have
+AUDIT_APPS	i scan mo yung mga app ko
+AUDIT_APPS	alin sa apps ang kahina hinala
+AUDIT_APPS	may delikadong app ba dito
+AUDIT_APPS	suriin ang permissions ng apps
+AUDIT_APPS	acheck yung mga naka install na apps
+AUDIT_APPS	hanapin ang risky na apps
+AUDIT_APPS	paki audit ng mga application ko
+AUDIT_APPS	ingnan ang mga app na galing sa unknown source
+SCAN_LINK	check this link for phishing
+SCAN_LINK	is this link a scam
+SCAN_LINK	scan a url without opening it
+SCAN_LINK	inspect a link I got in a text
+SCAN_LINK	does this address look like a phishing page
+SCAN_LINK	look for scam indicators in a website link
+SCAN_LINK	analyze a web address before I visit
+SCAN_LINK	check if a link has a fake login domain
+SCAN_LINK	is it safe to click this url
+SCAN_LINK	check this web link for fraud
+SCAN_LINK	run the link scanner
+SCAN_LINK	review a suspicious hyperlink
+SCAN_LINK	check a message's url for a lookalike host
+SCAN_LINK	is this web address on the malware list
+SCAN_LINK	look for a phishing link from my email
+SCAN_LINK	analyze the url but don't open it
+SCAN_LINK	I need to verify a website address
+SCAN_LINK	check a shortened link my friend sent
+SCAN_LINK	does this link look malicious
+SCAN_LINK	detect fraud in a link
+SCAN_LINK	I'd like to paste a link for a safety check
+SCAN_LINK	inspect a url for signs of a scam
+SCAN_LINK	is this website link legit
+SCAN_LINK	check a payment link before I tap it
+SCAN_LINK	review a login link for spoofing
+SCAN_LINK	scan the link in an sms
+SCAN_LINK	scam ba itong link
+SCAN_LINK	paki check ng url na ito
+SCAN_LINK	ligtas ba itong link na pinadala
+SCAN_LINK	may phishing ba itong link
+SCAN_LINK	suriin mo ang website address
+SCAN_LINK	i check mo kung fake ang url
+SCAN_LINK	pwede bang i scan itong link
+SCAN_LINK	mukhang panloloko yung link sa text
+BENCHMARK_DNS	run a dns benchmark
+BENCHMARK_DNS	test dns speed
+BENCHMARK_DNS	compare the dns resolver response times
+BENCHMARK_DNS	which dns provider is fastest
+BENCHMARK_DNS	measure how long dns lookups take
+BENCHMARK_DNS	benchmark my current dns connection
+BENCHMARK_DNS	find which resolver replies quickest
+BENCHMARK_DNS	test my dns latency
+BENCHMARK_DNS	check if my dns resolvers are responding
+BENCHMARK_DNS	measure lookup delays across the dns providers
+BENCHMARK_DNS	see which dns server is reachable
+BENCHMARK_DNS	compare resolver speeds
+BENCHMARK_DNS	run a real test of dns response times
+BENCHMARK_DNS	is my dns slow
+BENCHMARK_DNS	time some dns lookups
+BENCHMARK_DNS	check how fast encrypted dns answers
+BENCHMARK_DNS	compare the dns defaults without changing settings
+BENCHMARK_DNS	find slow dns resolution
+BENCHMARK_DNS	measure dns lookup performance
+BENCHMARK_DNS	how quickly do resolvers respond on mobile data
+BENCHMARK_DNS	check if dns resolution is timing out
+BENCHMARK_DNS	which resolver performs best on this network
+BENCHMARK_DNS	test the upstream dns endpoints
+BENCHMARK_DNS	run resolver benchmarks over wifi
+BENCHMARK_DNS	measure the performance of dns over https
+BENCHMARK_DNS	are my dns requests taking too long
+BENCHMARK_DNS	paki test ang bilis ng dns
+BENCHMARK_DNS	mabagal ba ang dns ko
+BENCHMARK_DNS	alin ang pinakamabilis na dns resolver
+BENCHMARK_DNS	i benchmark mo yung dns settings
+BENCHMARK_DNS	i compare ang mga dns provider
+BENCHMARK_DNS	sukatin ang dns latency
+BENCHMARK_DNS	gumagana ba ang dns resolver ko
+BENCHMARK_DNS	check kung mabilis sumagot ang dns
+ENABLE_ALIAS_SHIELD	enable dns alias shield
+ENABLE_ALIAS_SHIELD	turn on alias shield
+ENABLE_ALIAS_SHIELD	enable cname protection
+ENABLE_ALIAS_SHIELD	switch alias shield on
+ENABLE_ALIAS_SHIELD	block trackers hiding behind dns aliases
+ENABLE_ALIAS_SHIELD	turn on cname uncloaking
+ENABLE_ALIAS_SHIELD	check cname destinations when blocking dns
+ENABLE_ALIAS_SHIELD	protect me from cloaked cname trackers
+ENABLE_ALIAS_SHIELD	activate dns alias filtering
+ENABLE_ALIAS_SHIELD	enable checking of aliases in dns replies
+ENABLE_ALIAS_SHIELD	make adshield filter cloaked dns aliases
+ENABLE_ALIAS_SHIELD	set dns alias shield to enabled
+ENABLE_ALIAS_SHIELD	stop trackers hidden in cname answers
+ENABLE_ALIAS_SHIELD	start filtering suspicious dns alias targets
+ENABLE_ALIAS_SHIELD	can you turn on alias filtering
+ENABLE_ALIAS_SHIELD	enable the protection against dns cname cloaking
+ENABLE_ALIAS_SHIELD	apply the alias shield setting
+ENABLE_ALIAS_SHIELD	turn on filtering for tracker aliases
+ENABLE_ALIAS_SHIELD	activate cname uncloaking protection
+ENABLE_ALIAS_SHIELD	make the alias shield active
+ENABLE_ALIAS_SHIELD	check dns aliases rather than only the requested domain
+ENABLE_ALIAS_SHIELD	enable adshield's alias shield feature
+ENABLE_ALIAS_SHIELD	block known trackers behind cname records
+ENABLE_ALIAS_SHIELD	I want dns alias shield turned on
+ENABLE_ALIAS_SHIELD	prevent dns cloaked tracking with alias shield
+ENABLE_ALIAS_SHIELD	enable cname target checking
+ENABLE_ALIAS_SHIELD	buksan ang dns alias shield
+ENABLE_ALIAS_SHIELD	i on mo yung alias shield
+ENABLE_ALIAS_SHIELD	paki enable ang cname protection
+ENABLE_ALIAS_SHIELD	i activate ang alias shield
+ENABLE_ALIAS_SHIELD	harangin ang trackers na nakatago sa cname
+ENABLE_ALIAS_SHIELD	pabukas ng dns alias shield
+ENABLE_ALIAS_SHIELD	gamitin ang dns alias protection
+ENABLE_ALIAS_SHIELD	i turn on yung cname uncloaking
+UNSUPPORTED	delete all of my files
+UNSUPPORTED	uninstall the risky apps automatically
+UNSUPPORTED	turn off alias shield
+UNSUPPORTED	disable dns alias protection
+UNSUPPORTED	keep alias shield disabled
+UNSUPPORTED	stop filtering cname aliases
+UNSUPPORTED	do not enable cname uncloaking
+UNSUPPORTED	don't enable alias shield
+UNSUPPORTED	is alias shield enabled
+UNSUPPORTED	what does cname uncloaking mean
+SCAN_FILE	scan this pdf for malware
+SCAN_FILE	can you scan a file I downloaded
+UNSUPPORTED	open this attachment and read it
+UNSUPPORTED	open this link in the browser
+UNSUPPORTED	download the app at this url
+UNSUPPORTED	don't scan the link
+UNSUPPORTED	don't run a security check
+UNSUPPORTED	do not audit my apps
+UNSUPPORTED	cancel the dns benchmark
+UNSUPPORTED	I don't want to test dns speed
+UNSUPPORTED	change my dns to a different server
+UNSUPPORTED	use this dns provider instead
+UNSUPPORTED	disable adshield protection
+UNSUPPORTED	turn on the vpn
+UNSUPPORTED	what is the weather today
+UNSUPPORTED	tell me a joke
+UNSUPPORTED	hello there
+UNSUPPORTED	check this
+UNSUPPORTED	can you help me
+UNSUPPORTED	scan everything
+UNSUPPORTED	fix all my issues
+UNSUPPORTED	copy my photos to a cloud account
+UNSUPPORTED	check my banking password
+UNSUPPORTED	read my other app's messages
+UNSUPPORTED	clear app data and speed up my phone
+UNSUPPORTED	remove malicious apps from my phone
+UNSUPPORTED	I need to free storage by deleting photos
+UNSUPPORTED	run a wifi download speed test
+UNSUPPORTED	factory reset this phone
+UNSUPPORTED	change my lock screen passcode
+UNSUPPORTED	connect to my neighbor's wifi
+UNSUPPORTED	check the phone and audit all apps and run a dns benchmark
+UNSUPPORTED	make a new dns rule to block a website
+UNSUPPORTED	please allowlist a website
+UNSUPPORTED	i off mo ang alias shield
+UNSUPPORTED	wag i enable ang alias shield
+UNSUPPORTED	burahin mo lahat ng files
+UNSUPPORTED	i uninstall ang apps ko
+UNSUPPORTED	paki buksan ang link na ito
+SCAN_FILE	paki scan ng apk file
+UNSUPPORTED	baguhin mo yung password ko
+UNSUPPORTED	palitan ang dns provider ko
+UNSUPPORTED	wag mo i scan yung apps ko
+UNSUPPORTED	ok na salamat
+UNSUPPORTED	what was the last threat detected
+CHECK_PHONE	check my phone
+CHECK_PHONE	check my protection
+CHECK_PHONE	give me a quick security checkup
+CHECK_PHONE	check for security problems on my phone
+CHECK_PHONE	do a phone security review
+CHECK_PHONE	check if wifi is open
+CHECK_PHONE	paki check ang wifi ko
+CHECK_PHONE	check phone health
+CHECK_PHONE	check the phone for signs of security gaps
+AUDIT_APPS	audit my apps
+AUDIT_APPS	audit apps
+AUDIT_APPS	check my apps
+AUDIT_APPS	scan my apps
+AUDIT_APPS	look for suspicious apps
+AUDIT_APPS	see if my apps are risky
+AUDIT_APPS	check for malware-like app permissions
+AUDIT_APPS	audit my apps for risky permissions
+AUDIT_APPS	check if the apps on my phone are suspicious
+AUDIT_APPS	check app permissions
+AUDIT_APPS	patingin sa permissions ng apps ko
+SCAN_LINK	check a link
+SCAN_LINK	check link
+SCAN_LINK	scan this link
+SCAN_LINK	check for a scam in this url
+SCAN_LINK	review a link I was sent
+BENCHMARK_DNS	benchmark dns
+BENCHMARK_DNS	run a dns speed test
+BENCHMARK_DNS	check dns latency
+BENCHMARK_DNS	test dns
+ENABLE_ALIAS_SHIELD	turn on dns alias shield
+ENABLE_ALIAS_SHIELD	enable alias shield on this phone
+SCAN_FILE	can you scan this file
+UNSUPPORTED	do another thing for me
+UNSUPPORTED	check my download speed
+UNSUPPORTED	wifi bandwidth test
+UNSUPPORTED	don't change the alias shield setting
+UNSUPPORTED	tell me if dns alias shield is on
+UNSUPPORTED	keep the current alias shield setting
+UNSUPPORTED	don't run the protection check
+UNSUPPORTED	don't check my dns settings
+UNSUPPORTED	do not scan installed apps
+UNSUPPORTED	give me advice about the risks of my app permissions without auditing
+UNSUPPORTED	start adshield filtering now
+UNSUPPORTED	start the vpn to protect my phone
+UNSUPPORTED	activate the vpn connection
+UNSUPPORTED	start device protection for me
+UNSUPPORTED	turn protection on for all apps
+UNSUPPORTED	start filtering my internet traffic
+UNSUPPORTED	resume adshield protection
+SECURITY_REVIEW	run a security review
+SECURITY_REVIEW	security review
+SECURITY_REVIEW	begin a complete security review
+SECURITY_REVIEW	run the phone and app security review
+SECURITY_REVIEW	check my protection and audit my apps
+SECURITY_REVIEW	inspect my phone and apps together
+SECURITY_REVIEW	audit app permissions and check phone protection
+SECURITY_REVIEW	run a combined app audit and protection check
+SECURITY_REVIEW	scan app metadata and look at my security settings
+SECURITY_REVIEW	look for risky apps and gaps in my protection
+SECURITY_REVIEW	show me security risks in phone settings and apps
+SECURITY_REVIEW	review my phone security plus app permissions
+SECURITY_REVIEW	check installed apps and whether adshield is active
+SECURITY_REVIEW	look at app install sources and my protection status
+SECURITY_REVIEW	give me a combined security report
+SECURITY_REVIEW	look over protection and app safety in one review
+SECURITY_REVIEW	start a security checkup for my phone and apps
+SECURITY_REVIEW	check my apps along with wifi and shielding
+SECURITY_REVIEW	can you review the protection and application risks together
+SECURITY_REVIEW	please review my overall mobile security
+SECURITY_REVIEW	check security from settings to installed apps
+SECURITY_REVIEW	check the apps and network security on my phone
+SECURITY_REVIEW	assess app permissions as well as device protection
+SECURITY_REVIEW	run a broad review of adshield and the apps I use
+SECURITY_REVIEW	give me the phone and app security overview
+SECURITY_REVIEW	i review ang security ng phone at apps
+SECURITY_REVIEW	paki full security review ng phone ko
+SECURITY_REVIEW	i check ang protection at app permissions
+SECURITY_REVIEW	suriin ang seguridad ng phone pati mga app
+SECURITY_REVIEW	paki audit ng apps at check ng wifi security ko
+SECURITY_REVIEW	i check kung naka on protection pati mga app risks
+SECURITY_REVIEW	gawin ang security review sa mga app at settings
+SECURITY_REVIEW	patingin ng phone protection at risky apps
+SECURITY_REVIEW	i review ang protection at permissions nang sabay
+SCAN_FILE	scan a file
+SCAN_FILE	check a file for malware
+SCAN_FILE	inspect a document before opening it
+SCAN_FILE	run a file safety scan
+SCAN_FILE	look for suspicious patterns in an attachment
+SCAN_FILE	check this apk before I install it
+SCAN_FILE	analyze a downloaded installer without running it
+SCAN_FILE	check an android package file
+SCAN_FILE	read one document for potential threats
+SCAN_FILE	scan an attachment for bad content
+SCAN_FILE	inspect a suspicious zip archive
+SCAN_FILE	check a file I received today
+SCAN_FILE	let me pick a file to scan
+SCAN_FILE	scan a pdf for security risks
+SCAN_FILE	can I check this saved attachment for threats
+SCAN_FILE	look for macros in a word document
+SCAN_FILE	look at a spreadsheet for suspicious content
+SCAN_FILE	inspect a document I got in an email
+SCAN_FILE	check an apk file for risk indicators
+SCAN_FILE	analyze a zip file I downloaded
+SCAN_FILE	I need a local scan for one chosen file
+SCAN_FILE	is this attachment safe to open
+SCAN_FILE	check a document's structure for risk
+SCAN_FILE	check this file right before I use it
+SCAN_FILE	paki scan itong file
+SCAN_FILE	i check mo kung safe itong attachment
+SCAN_FILE	may malware ba itong apk
+SCAN_FILE	ligtas ba buksan itong file
+SCAN_FILE	suriin ang dokumentong na download ko
+SCAN_FILE	i scan ang apk bago ko i install
+SCAN_FILE	pwede ba i scan yung zip file
+SCAN_FILE	pacheck ng file na galing sa email
+UNSUPPORTED	scan every file in my storage
+UNSUPPORTED	delete this suspicious attachment for me
+UNSUPPORTED	upload my document for scanning
+UNSUPPORTED	install this apk now
+UNSUPPORTED	check app risks and change all of my settings
+UNSUPPORTED	quarantine all the files you find
+UNSUPPORTED	scan my system files without picking anything
+UNSUPPORTED	inspect a private database from inside a different app
+CHECK_PHONE	check my phone and leave out the app audit
+CHECK_PHONE	check only the current protection status
+AUDIT_APPS	just list the apps with risk flags
+AUDIT_APPS	check app permissions only
+SECURITY_REVIEW	run the two checks for protection and application risks
+SECURITY_REVIEW	show protection and permissions side by side
+SECURITY_REVIEW	look at phone protection and app security in a shared report
+SECURITY_REVIEW	i check sabay ang app risks at mga protection settings
+SECURITY_REVIEW	i review ang apps pati seguridad ng adshield settings
+SECURITY_REVIEW	check both installed app risks and whether protection is working
+SCAN_FILE	check a package installer from my downloads
+SCAN_FILE	is a saved application installer suspicious
+SCAN_FILE	inspect a local installer before I use it
+SCAN_FILE	let me choose an archive to inspect
+SCAN_FILE	search a saved document for suspicious features
+SCAN_FILE	patingin kung risky yung apk bago ko gamitin
+SCAN_FILE	scan a downloaded document for warning signs
+CHECK_PHONE	show if dns protection is active
+CHECK_PHONE	review whether the shield is working
+CHECK_PHONE	check whether my wifi has open security
+SCAN_LINK	check if this link looks like a fake sign in page
+SCAN_LINK	verify a link before I enter my credentials
+BENCHMARK_DNS	paki compare ang bilis ng dns servers ko
+CHECK_PHONE	show a quick status snapshot for this phone
+CHECK_PHONE	give me the current protection snapshot
+CHECK_PHONE	can this phone tell whether I am connected to open wifi
+CHECK_PHONE	is my current wireless connection unencrypted
+AUDIT_APPS	patingin kung may delikadong app sa device ko
+AUDIT_APPS	paki tingnan kung suspicious ang mga naka install na apps
+AUDIT_APPS	hanapin ang apps na may mapanganib na permissions
+SCAN_LINK	check a web address for a fake login screen
+SCAN_LINK	could this website link imitate a sign in screen
+SECURITY_REVIEW	do the checks for both installed app safety and protection
+SECURITY_REVIEW	review app permissions and shield status together
+SECURITY_REVIEW	i check mo ang mga apps saka ang seguridad ng phone settings
+SECURITY_REVIEW	patingin sa seguridad ng phone settings at permissions ng apps
+SCAN_FILE	run a safety check for the selected zip archive
+SCAN_FILE	check whether a downloaded apk has warning signs
+SCAN_FILE	pacheck kung suspicious yung nakuha kong apk
+SCAN_FILE	patingin kung ano ang risk sa dokumento na ito
+UNSUPPORTED	why would I turn on the alias shield
+UNSUPPORTED	how do I enable cname protection myself
+UNSUPPORTED	open this saved attachment and share it
+CHECK_PHONE	is adshield shielding my connection right now
+CHECK_PHONE	can android see an unsecured wifi connection
+CHECK_PHONE	what's the state of the protection shield
+CHECK_PHONE	look up the network security status reported by android
+SCAN_LINK	verify that a link isn't a fake account sign in
+SCAN_LINK	can you check the url before I sign in
+SCAN_LINK	look for a phishing login on this web link
+ENABLE_ALIAS_SHIELD	please activate the alias shield in adshield
+ENABLE_ALIAS_SHIELD	enable tracking protection for dns alias destinations
+SECURITY_REVIEW	check adshield alongside all the visible app permissions
+SCAN_FILE	pwede bang makita kung delikado ang na save kong apk
+SCAN_FILE	pwede tingnan kung suspicious itong attachment
+SCAN_FILE	inspect the attachment before I try to read it
+SCAN_FILE	need a local scan for a package installer I have
+UNSUPPORTED	what is the current time
+UNSUPPORTED	tell me the time of day
+UNSUPPORTED	what time is it now
+UNSUPPORTED	what's the weather like today
+UNSUPPORTED	check the current temperature outside
+UNSUPPORTED	can you set an alarm

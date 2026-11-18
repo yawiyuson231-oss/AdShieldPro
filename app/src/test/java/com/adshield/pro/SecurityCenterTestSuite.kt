@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.CancellationException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -162,14 +163,67 @@ class SecurityCenterTestSuite {
         val bytes = ByteArrayOutputStream().apply {
             write(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())) // JPEG SOI
             write(ByteArray(4096))
-            write(byteArrayOf(0x4D, 0x5A)) // MZ (Windows PE header) hidden inside
-            write(ByteArray(2048))
+            // Inert header fields; the fixture cannot execute.
+            val header = ByteArray(88)
+            header[0] = 0x4D
+            header[1] = 0x5A
+            header[60] = 64 // PE header offset, little-endian
+            header[64] = 0x50
+            header[65] = 0x45
+            header[68] = 0x4C
+            header[69] = 0x01
+            header[70] = 0x01
+            write(header)
         }.toByteArray()
         val file = writeTempFile("innocent.jpg", bytes)
         try {
             val verdict = scanner.scanFile(file)
             assertEquals(FileThreatScanner.ThreatLevel.DANGEROUS, verdict.threatLevel)
             assertTrue(verdict.threatName!!.contains("Polyglot"))
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun testFileScanner_doesNotTreatIncidentalMzBytesAsAnExecutable() {
+        val bytes = ByteArray(128 * 1024)
+        bytes[0] = 0xFF.toByte()
+        bytes[1] = 0xD8.toByte()
+        bytes[2] = 0xFF.toByte()
+        bytes[4096] = 0x4D
+        bytes[4097] = 0x5A
+        val file = writeTempFile("snapshot.jpg", bytes)
+        try {
+            assertTrue(FileThreatScanner().scanFile(file).isClean)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun testFileScanner_checksSignaturesAcrossWindowsBeforeTheTail() {
+        val bytes = ByteArray(512 * 1024)
+        FileThreatScanner.EICAR_STRING.encodeToByteArray().copyInto(bytes, 65_530)
+        val file = writeTempFile("fixture.dat", bytes)
+        try {
+            assertEquals("EICAR.Test.File", FileThreatScanner().scanFile(file).threatName)
+        } finally {
+            file.delete()
+        }
+    }
+
+    @Test
+    fun testFileScanner_reportsUnreadableArchiveMetadataAndPropagatesCancellation() {
+        val file = writeTempFile("invalid.zip", "This is not a ZIP archive".encodeToByteArray())
+        try {
+            assertTrue(FileThreatScanner().scanFile(file).limitations.any { "ZIP" in it })
+            var checkpoints = 0
+            val scan = runCatching {
+                FileThreatScanner().scanFile(file) { if (++checkpoints == 2) throw CancellationException() }
+            }
+            assertTrue(scan.exceptionOrNull() is CancellationException)
+            assertTrue(ApkAnalyzer().analyzeApk(file).limitations.isNotEmpty())
         } finally {
             file.delete()
         }
@@ -373,6 +427,32 @@ class SecurityCenterTestSuite {
         assertTrue(report.riskScore >= 25)
     }
 
+    @Test
+    fun testApkAnalyzer_limitsDexReadsAcrossEntries() {
+        val fixture = File.createTempFile("dex-budget-fixture-", ".apk")
+        try {
+            ZipOutputStream(fixture.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
+                zip.write(buildAxml("com.example.fixture", emptyList()))
+                zip.closeEntry()
+                val zeros = ByteArray(1024 * 1024)
+                zip.putNextEntry(ZipEntry("classes.dex"))
+                repeat(11) { zip.write(zeros) }
+                zip.closeEntry()
+                zip.putNextEntry(ZipEntry("classes2.dex"))
+                zip.write(zeros)
+                zip.write("InMemoryDexClassLoader".encodeToByteArray())
+                zip.closeEntry()
+            }
+            val result = ApkAnalyzer().analyzeApk(fixture)
+            assertEquals("com.example.fixture", result.packageName)
+            assertTrue(result.limitations.any { it.contains("DEX read limit") })
+            assertTrue(!result.usesDynamicCodeLoading)
+        } finally {
+            fixture.delete()
+        }
+    }
+
     /** Builds a minimal zip that looks like an APK: AndroidManifest.xml + classes.dex. */
     private fun buildFakeApk(axml: ByteArray): ByteArray {
         val out = ByteArrayOutputStream()
@@ -403,12 +483,13 @@ class SecurityCenterTestSuite {
                 targetSdkVersion = 26,
                 requestedPermissions = listOf(
                     "android.permission.INTERNET",
-                    "android.permission.ACCESSIBILITY_SERVICE",
-                    "android.permission.BIND_ACCESSIBILITY_SERVICE",
                     "android.permission.RECEIVE_SMS",
                     "android.permission.READ_SMS",
-                    "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE",
                     "android.permission.REQUEST_INSTALL_PACKAGES"
+                ),
+                declaredComponentPermissions = setOf(
+                    "android.permission.BIND_ACCESSIBILITY_SERVICE",
+                    "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
                 ),
                 installerPackageName = null,
                 isSystemApp = false

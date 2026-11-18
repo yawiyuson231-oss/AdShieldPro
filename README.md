@@ -274,6 +274,14 @@ test or stable, can upgrade to it in place.
 
 ## What AdShield Pro does
 
+- **Run security tasks with AETHER:** In **Security → Agent**, run a **Security review** to check
+  protection and app risks together, or choose **Scan a file** to check one file locally. You can
+  ask for two or three checks (for example, “Audit my apps, then test DNS speed”) and get a
+  guided plan from the offline model. Approve each step and review its receipt separately.
+  **Connect AI API** supports your own Gemini, OpenAI, or HTTPS Chat Completions-compatible
+  provider. **Test API** checks the saved connection without running a tool. Online task
+  suggestions send only the approved task description, not device findings. See
+  [API setup and supported tasks](docs/PHONE_AGENT.md).
 - **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
 - **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
 - **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.
@@ -329,6 +337,7 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
   - **DNS-over-TLS (DoT, RFC 7858)** over port 853 with TLS SNI and hostname certificate verification.
   - **Protected UDP & TCP Port 53** with automatic TCP upgrade on truncated (`TC=1`) responses.
   - **TTL-Aware LRU Cache** (`1024` entries) rewriting 2-byte Transaction IDs on cache hits for low-latency repeat lookups. When DoH or DoT fails, the resolver returns `SERVFAIL` instead of silently downgrading to plaintext; UDP/TCP is an explicit unencrypted mode.
+- **DNS Alias Shield**: Checks CNAME, HTTPS and SVCB answer targets against active rules, including on cache hits, without extra network lookups. Respects user allowlists and playback safeguards. See [DNS security architecture](docs/DNS_SECURITY_ARCHITECTURE.md#dns-alias-shield).
 
 ### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
 - **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.

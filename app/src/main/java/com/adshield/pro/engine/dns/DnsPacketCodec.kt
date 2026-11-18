@@ -22,6 +22,12 @@ object DnsPacketCodec {
 
     const val CLASS_IN = 1
 
+    private const val MAX_RESPONSE_RECORDS = 4096
+
+    internal enum class AnswerAliasType { CNAME, HTTPS, SVCB }
+
+    internal data class AnswerAlias(val type: AnswerAliasType, val target: String)
+
     data class ParsedDnsQuery(
         val transactionId: Int,
         val flags: Int,
@@ -93,14 +99,26 @@ object DnsPacketCodec {
 
     private data class DomainReadResult(
         val domain: String,
-        val nextOffset: Int
-    )
+        val nextOffset: Int,
+        val hasDotInLabel: Boolean
+    ) {
+        // Don't confuse literal wire labels with dotted hostnames or pass URL-like strings to
+        // the filter engine. Underscores are valid in DNS service names (e.g. _dns.example).
+        fun policyName(): String? {
+            if (hasDotInLabel) return null
+            val valid = domain.all { ch ->
+                ch in 'a'..'z' || ch in 'A'..'Z' || ch in '0'..'9' || ch == '.' || ch == '-' || ch == '_'
+            }
+            return if (valid) domain.lowercase() else null
+        }
+    }
 
     private fun readDomainName(
         packet: ByteArray,
         msgStart: Int,
         startPos: Int,
-        limit: Int
+        limit: Int,
+        allowCompression: Boolean = true
     ): DomainReadResult? {
         val sb = StringBuilder(64)
         var pos = startPos
@@ -108,6 +126,7 @@ object DnsPacketCodec {
         var jumped = false
         var jumpCount = 0
         var totalChars = 0
+        var hasDotInLabel = false
 
         while (true) {
             if (pos >= limit || pos < msgStart) return null
@@ -123,7 +142,7 @@ object DnsPacketCodec {
             val pointerMask = lenByte and 0xC0
             if (pointerMask == 0xC0) {
                 // RFC 1035 Compression pointer: 2 bytes
-                if (pos + 1 >= limit) return null
+                if (!allowCompression || pos + 1 >= limit) return null
                 if (!jumped) {
                     nextPosAfterQuestion = pos + 2
                     jumped = true
@@ -149,6 +168,7 @@ object DnsPacketCodec {
                     val ch = (packet[pos + 1 + i].toInt() and 0xFF).toChar()
                     // Reject control characters
                     if (ch.code < 0x20 || ch.code == 0x7F) return null
+                    if (ch == '.') hasDotInLabel = true
                     sb.append(ch)
                 }
                 totalChars += labelLen
@@ -161,7 +181,7 @@ object DnsPacketCodec {
         }
 
         if (nextPosAfterQuestion < 0) return null
-        return DomainReadResult(sb.toString(), nextPosAfterQuestion)
+        return DomainReadResult(sb.toString(), nextPosAfterQuestion, hasDotInLabel)
     }
 
     /**
@@ -176,6 +196,17 @@ object DnsPacketCodec {
         query: ParsedDnsQuery,
         sinkholeZeroIp: Boolean,
         ttlSeconds: Int = 60
+    ): ByteArray = buildPolicyResponse(query, if (sinkholeZeroIp) 0 else 3, sinkholeZeroIp, ttlSeconds)
+
+    /** Suppresses a record type without claiming the queried name doesn't exist. */
+    internal fun buildNoDataResponse(query: ParsedDnsQuery): ByteArray =
+        buildPolicyResponse(query, rcode = 0, sinkholeZeroIp = false, ttlSeconds = 0)
+
+    private fun buildPolicyResponse(
+        query: ParsedDnsQuery,
+        rcode: Int,
+        sinkholeZeroIp: Boolean,
+        ttlSeconds: Int
     ): ByteArray {
         val out = ByteArrayOutputStream(128)
         val rdBit = query.flags and 0x0100 // Preserve Recursion Desired bit
@@ -183,7 +214,6 @@ object DnsPacketCodec {
         val canSinkholeIp = sinkholeZeroIp &&
             query.qClass == CLASS_IN &&
             (query.qType == TYPE_A || query.qType == TYPE_AAAA)
-        val rcode = if (sinkholeZeroIp) 0 else 3 // 0 = NOERROR, 3 = NXDOMAIN
         // QR = 1 (0x8000), AA = 0, RA = 1 (0x0080)
         val responseFlags = 0x8000 or rdBit or 0x0080 or rcode
 
@@ -359,7 +389,7 @@ object DnsPacketCodec {
         if (message.size < 12) return null
         val qd = u16At(message, 4)
         val records = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
-        if (qd != 1 || records > 4096) return null
+        if (qd != 1 || records > MAX_RESPONSE_RECORDS) return null
         var offset = 12
         val question = readDomainName(message, 0, offset, message.size) ?: return null
         offset = question.nextOffset + 4
@@ -378,64 +408,107 @@ object DnsPacketCodec {
         return if (offset == message.size) types else null
     }
 
+    /** Returns normalized CNAME targets reachable from the response question. */
+    fun extractCnameTargets(dnsResponse: ByteArray): List<String> = extractAnswerAliases(dnsResponse)
+        .filter { it.type == AnswerAliasType.CNAME }
+        .map { it.target }
+
+    private data class AliasRecord(val alias: AnswerAlias, val follow: Boolean)
+
     /**
-     * Extracts ordered, normalized CNAME canonical target hostnames (RFC 1035 TYPE 5, CLASS IN)
-     * from a DNS response's Answer section so CNAME-cloaked first-party trackers can be evaluated
-     * against the filter engine without touching non-CNAME records.
-     *
-     * Validates header flags (`QR == 1`, `OPCODE == 0`, `RCODE == 0`), exact `RDLENGTH` bounds,
-     * RFC 1035 compression pointers, and bounds output to at most [MAX_CNAME_CHAIN] targets.
+     * Selects reachable IN-class CNAME and RFC 9460 HTTPS/SVCB targets from a standard NOERROR
+     * answer. Only matching service-binding types are examined, and Authority/Additional records
+     * never contribute to blocking. Callers still validate the original query and full response.
      */
-    fun extractCnameTargets(dnsResponse: ByteArray): List<String> {
-        if (dnsResponse.size < 12) return emptyList()
-        val flags = u16At(dnsResponse, 2)
-        // Must be a standard QUERY response (QR=1, OPCODE=0) with NOERROR (RCODE=0)
-        if ((flags and 0x8000) == 0 || (flags and 0x7800) != 0 || (flags and 0x000F) != 0) {
+    internal fun extractAnswerAliases(message: ByteArray, expectedQuestion: String? = null): List<AnswerAlias> {
+        if (message.size < 12) return emptyList()
+        val flags = u16At(message, 2)
+        // Require QR=1 and reject non-QUERY opcodes, truncation, reserved Z and nonzero RCODE.
+        if (flags and 0x8000 == 0 || flags and 0x7A4F != 0) return emptyList()
+        val answerCount = u16At(message, 6)
+        if (u16At(message, 4) != 1 || answerCount !in 1..MAX_RESPONSE_RECORDS) return emptyList()
+        val question = readDomainName(message, 0, 12, message.size) ?: return emptyList()
+        val questionName = question.policyName()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+        if (expectedQuestion != null && !questionName.equals(expectedQuestion.trim().trimEnd('.'), ignoreCase = true)) {
             return emptyList()
         }
-        val qdCount = u16At(dnsResponse, 4)
-        val anCount = u16At(dnsResponse, 6)
-        if (qdCount <= 0 || qdCount > 64 || anCount <= 0) return emptyList()
+        var offset = question.nextOffset + 4
+        if (offset > message.size || u16At(message, question.nextOffset + 2) != CLASS_IN) return emptyList()
+        val questionType = u16At(message, question.nextOffset)
 
-        var offset = 12
-        var questionDomain: String? = null
-        repeat(qdCount) { idx ->
-            val qRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return emptyList()
-            if (idx == 0) {
-                questionDomain = qRead.domain.trimEnd('.').lowercase()
+        // Index by owner, not wire order: the next link may appear before its parent.
+        val byOwner = mutableMapOf<String, MutableList<AliasRecord>>()
+        repeat(answerCount) {
+            val ownerRead = readDomainName(message, 0, offset, message.size) ?: return emptyList()
+            val header = ownerRead.nextOffset
+            if (header + 10 > message.size) return emptyList()
+            val start = header + 10
+            val end = start + u16At(message, header + 8)
+            if (end > message.size) return emptyList()
+            offset = end
+            if (u16At(message, header + 2) != CLASS_IN) return@repeat
+            val wireType = u16At(message, header)
+            val type = when {
+                wireType == TYPE_CNAME -> AnswerAliasType.CNAME
+                wireType == questionType && wireType == TYPE_HTTPS -> AnswerAliasType.HTTPS
+                wireType == questionType && wireType == TYPE_SVCB -> AnswerAliasType.SVCB
+                else -> return@repeat
             }
-            offset = qRead.nextOffset + 4
-            if (offset > dnsResponse.size) return emptyList()
+            val owner = ownerRead.policyName() ?: return@repeat
+            val record = readAliasRecord(message, type, start, end) ?: return@repeat
+            byOwner.getOrPut(owner) { mutableListOf() }.add(record)
         }
+        if (questionName !in byOwner) return emptyList()
 
-        val targets = LinkedHashSet<String>()
-        repeat(anCount.coerceAtMost(64)) {
-            if (offset >= dnsResponse.size) return targets.toList()
-            val ownerRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return targets.toList()
-            val rrHeader = ownerRead.nextOffset
-            if (rrHeader + 10 > dnsResponse.size) return targets.toList()
-            val rrType = u16At(dnsResponse, rrHeader)
-            val rrClass = u16At(dnsResponse, rrHeader + 2)
-            val rdLength = u16At(dnsResponse, rrHeader + 8)
-            val rdataStart = rrHeader + 10
-            val rdataEnd = rdataStart + rdLength
-            if (rdLength < 0 || rdataEnd > dnsResponse.size) return targets.toList()
-
-            if (rrType == TYPE_CNAME && rrClass == CLASS_IN && rdLength > 0 && targets.size < MAX_CNAME_CHAIN) {
-                val targetRead = readDomainName(dnsResponse, 0, rdataStart, dnsResponse.size)
-                if (targetRead != null && targetRead.nextOffset == rdataEnd) {
-                    val normalized = targetRead.domain.trimEnd('.').lowercase()
-                    if (normalized.isNotEmpty() && normalized.length <= 253 && normalized != questionDomain) {
-                        targets.add(normalized)
-                    }
-                }
+        val targets = linkedSetOf<AnswerAlias>()
+        val visited = hashSetOf(questionName)
+        val pending = ArrayDeque<String>().apply { addLast(questionName) }
+        while (pending.isNotEmpty()) {
+            val records = byOwner[pending.removeFirst()] ?: continue
+            val hasCname = records.any { it.alias.type == AnswerAliasType.CNAME }
+            // AliasMode takes precedence over ServiceMode in a service-binding RRset.
+            val hasAlias = records.any { it.follow }
+            for ((alias, follow) in records) {
+                if ((hasCname && alias.type != AnswerAliasType.CNAME) || (hasAlias && !follow)) continue
+                // Root in ServiceMode means the owner; in AliasMode it means no service.
+                if (alias.target.isEmpty() || alias.target == questionName) continue
+                targets.add(alias)
+                if (follow && alias.target in byOwner && visited.add(alias.target)) pending.addLast(alias.target)
             }
-            offset = rdataEnd
         }
         return targets.toList()
     }
 
-    private const val MAX_CNAME_CHAIN = 16
+    private fun readAliasRecord(message: ByteArray, type: AnswerAliasType, start: Int, end: Int): AliasRecord? {
+        if (type == AnswerAliasType.CNAME) {
+            val name = readDomainName(message, 0, start, end) ?: return null
+            val target = name.policyName()?.takeIf { it.isNotEmpty() } ?: return null
+            if (name.nextOffset != end) return null
+            return AliasRecord(AnswerAlias(type, target), follow = true)
+        }
+
+        if (end - start < 3) return null // SvcPriority plus at least the root label
+        val isAliasMode = u16At(message, start) == 0
+        val name = readDomainName(message, 0, start + 2, end, allowCompression = false) ?: return null
+        val target = name.policyName() ?: return null
+        // AliasMode recipients ignore SvcParams. In ServiceMode make sure the key/length/value
+        // fields fit the RDATA and keys are ordered, without interpreting hints as hostnames.
+        if (!isAliasMode && !validSvcParamFraming(message, name.nextOffset, end)) return null
+        return AliasRecord(AnswerAlias(type, target), follow = isAliasMode)
+    }
+
+    private fun validSvcParamFraming(message: ByteArray, start: Int, end: Int): Boolean {
+        var offset = start
+        var previousKey = -1
+        while (offset < end) {
+            if (end - offset < 4) return false
+            val key = u16At(message, offset)
+            if (key <= previousKey) return false
+            previousKey = key
+            offset += 4 + u16At(message, offset + 2)
+        }
+        return offset == end
+    }
 
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)

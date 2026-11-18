@@ -334,6 +334,22 @@ test('DNS lab refuses to invent an answer for an unresolvable name', async () =>
   assert.equal(out.includes('93.184.216.34'), false, 'must not leak another domain\'s answer');
 });
 
+test('DNS Lab flushes aggregate analytics without persisting the hostname', async () => {
+  const domain = 'dns-analytics-check.example';
+  app.navigate('dns');
+  $('#dns-input').value = domain;
+  $('#dns-type').value = 'A';
+  const before = app.state.analytics.stats.recorded;
+  await app.resolveDomain();
+  assert.equal(app.state.analytics.stats.recorded, before + 1);
+
+  win.dispatchEvent(new win.Event('pagehide'));
+  const saved = await app.state.storage.getItem('analytics:state');
+  assert.ok(saved, 'leaving the page must persist the aggregate');
+  assert.ok(JSON.parse(saved).days.some((day) => day.buckets.length > 0));
+  assert.ok(!saved.includes(domain), 'the hostname must not be persisted in the clear');
+});
+
 test('Firewall AI shows the thresholds it actually runs with', () => {
   app.navigate('firewall');
   const out = text('#fw-state');

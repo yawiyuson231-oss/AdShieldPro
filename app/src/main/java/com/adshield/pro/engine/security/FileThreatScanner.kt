@@ -1,16 +1,19 @@
 package com.adshield.pro.engine.security
 
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
+import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.concurrent.CancellationException
+import java.util.zip.ZipFile
 
 /**
  * AdShield Pro — Deep File Threat Scanner (Pure Kotlin, unit-testable).
  *
  * Scans any accessible file for:
  * 1. Exact signature matches (industry-standard EICAR antivirus test signature).
- * 2. Polyglot / steganographic executables (real PE (.exe) or ELF payload hidden inside
- *    .jpg / .png / .gif / .pdf containers — a common malware delivery trick).
+ * 2. Corroborated executable header indicators inside JPEG, PNG, GIF and PDF containers.
  * 3. Script-based droppers (PowerShell -enc, curl|sh, mshta, certutil download chains).
  * 4. Macro-laden Office documents (vbaProject.bin inside OOXML zip containers).
  * 5. Path-traversal (Zip Slip) archive entries.
@@ -30,17 +33,20 @@ class FileThreatScanner {
         val riskScore: Int,
         val threatName: String?,
         val findings: List<String>,
-        val recommendation: String
+        val recommendation: String,
+        val limitations: List<String> = emptyList()
     ) {
         val isClean: Boolean get() = threatLevel == ThreatLevel.CLEAN
     }
 
-    /** Cap for deep content reads to keep scans fast and memory-safe on huge files. */
-    private val maxDeepScanBytes = 24L * 1024 * 1024
-
-    fun scanFile(file: File): FileVerdict {
-        val sha = computeSha256OrNull(file)
+    fun scanFile(file: File, checkpoint: () -> Unit = {}): FileVerdict {
+        checkpoint()
+        val size = file.length()
+        val sha = computeSha256OrNull(file, checkpoint)
         val findings = ArrayList<String>()
+        val limitations = ArrayList<String>()
+        if (sha == null) limitations += "Couldn't read the full file for fingerprinting."
+        if (size > MAX_DEEP_SCAN_BYTES) limitations += "Content checks sampled the first 24 MiB."
         var score = 0
         var threatName: String? = null
 
@@ -63,40 +69,42 @@ class FileThreatScanner {
             score += 20
         }
 
-        if (file.exists() && file.isFile) {
-            val head = readHeadBytes(file, headSize = 16)
+        val head = readOrNull { file.inputStream().use { it.readHeader() } }
+        if (head == null) {
+            limitations += "Couldn't read the file contents."
+        } else {
             // 2. Polyglot detection: media/document container hiding a real executable
             if (head.size >= 4) {
                 val container = detectContainer(head)
                 if (container != null) {
-                    val embedded = findEmbeddedExecutableMarker(file)
-                    if (embedded != null) {
-                        findings.add("Real executable payload ($embedded) hidden inside a $container container (polyglot/steganography malware)")
+                    val embedded = readOrNull { findEmbeddedExecutableMarker(file, checkpoint) }
+                    if (embedded == null) {
+                        limitations += "Couldn't finish checking for embedded executable headers."
+                    } else if (embedded.isNotEmpty()) {
+                        findings.add("Embedded $embedded header in a $container container")
                         score += 90
-                        threatName = "Polyglot Executable ($container → $embedded)"
+                        threatName = "Polyglot Executable Indicator ($container → $embedded)"
                     }
                 }
             }
 
             // 3/4/5. Content signature + dropper script heuristics (streamed, bounded)
-            val contentFindings = scanContentStream(file)
-            findings.addAll(contentFindings.findings)
-            score += contentFindings.score
-            if (threatName == null && contentFindings.threatName != null) {
-                threatName = contentFindings.threatName
-            }
+            val content = readOrNull { scanContentStream(file, checkpoint) }
+            if (content != null) {
+                findings.addAll(content.findings)
+                score += content.score
+                if (threatName == null) threatName = content.threatName
+            } else limitations += "Couldn't finish checking content for signatures and script indicators."
 
-            // 6. Archive inspection (bounded) for Zip Slip and macro documents
-            if (lowerName.endsWith(".zip") || lowerName.endsWith(".apk") || lowerName.endsWith(".docx") ||
-                lowerName.endsWith(".xlsx") || lowerName.endsWith(".pptx") || lowerName.endsWith(".xapk") ||
-                lowerName.endsWith(".apks") || lowerName.endsWith(".jar")
-            ) {
-                val archiveFindings = inspectZipArchive(file)
-                findings.addAll(archiveFindings.findings)
-                score += archiveFindings.score
-                if (threatName == null && archiveFindings.threatName != null) {
-                    threatName = archiveFindings.threatName
-                }
+            // Only inspect ZIP metadata. Never extract or execute archive contents.
+            if (hasZipHeader(head) || lowerName.substringAfterLast('.') in ZIP_EXTENSIONS) {
+                val archive = readOrNull { inspectZipArchive(file, checkpoint) }
+                if (archive != null) {
+                    findings.addAll(archive.findings)
+                    score += archive.score
+                    if (threatName == null) threatName = archive.threatName
+                    if (archive.limited) limitations += "Archive checks stopped after $MAX_ZIP_ENTRIES entries."
+                } else limitations += "Couldn't inspect ZIP archive metadata."
             }
         }
 
@@ -106,37 +114,37 @@ class FileThreatScanner {
             else -> ThreatLevel.CLEAN
         }
         val recommendation = when (level) {
-            ThreatLevel.DANGEROUS -> "Do not open or install. Delete this file and empty the containing folder from the Deep Cleaner."
-            ThreatLevel.SUSPICIOUS -> "High-risk indicators. Only open if you fully trust the origin; scan again after any security list sync."
-            ThreatLevel.CLEAN -> "No known signatures or structural threats detected. Local scan cannot guarantee 100% safety for brand-new malware."
+            ThreatLevel.DANGEROUS -> "Do not open or install this file. Review the indicators and verify the source."
+            ThreatLevel.SUSPICIOUS -> "Verify the source before opening this file. The findings are indicators, not proof."
+            ThreatLevel.CLEAN -> when {
+                limitations.isNotEmpty() -> "Some checks were incomplete. A lack of matching indicators does not guarantee safety."
+                findings.isNotEmpty() -> "Low-scoring indicators matched. Verify the source before using this file."
+                else -> "No threat indicators matched. A local scan cannot guarantee safety."
+            }
         }
 
         return FileVerdict(
             fileName = file.name,
-            sizeBytes = if (file.exists()) file.length() else 0L,
+            sizeBytes = size,
             sha256 = sha,
             threatLevel = level,
             riskScore = score.coerceAtMost(100),
             threatName = threatName,
             findings = findings,
-            recommendation = recommendation
+            recommendation = recommendation,
+            limitations = limitations
         )
     }
 
-    // --- Signature 1: exact EICAR + hashed marker check on first bytes ---
-    private fun readHeadBytes(file: File, headSize: Int): ByteArray {
-        return runCatching {
-            file.inputStream().use { ins ->
-                val buf = ByteArray(headSize)
-                var read = 0
-                while (read < headSize) {
-                    val r = ins.read(buf, read, headSize - read)
-                    if (r < 0) break
-                    read += r
-                }
-                buf.copyOf(read)
-            }
-        }.getOrDefault(ByteArray(0))
+    private fun InputStream.readHeader(): ByteArray {
+        val header = ByteArray(16)
+        var filled = 0
+        while (filled < header.size) {
+            val count = read(header, filled, header.size - filled)
+            if (count <= 0) break
+            filled += count
+        }
+        return header.copyOf(filled)
     }
 
     private fun detectContainer(head: ByteArray): String? {
@@ -149,157 +157,157 @@ class FileThreatScanner {
         }
     }
 
-    /** Scans a bounded window of the file for MZ/ELF executable magic hidden behind a container header. */
-    private fun findEmbeddedExecutableMarker(file: File): String? {
-        return runCatching {
-            file.inputStream().use { ins ->
-                val window = ByteArray(8192)
-                var total = 0L
-                var overlap = ByteArray(0)
-                while (total < maxDeepScanBytes) {
-                    val read = ins.read(window)
-                    if (read < 0) break
-                    val chunk = overlap + window.copyOf(read)
-                    val mzIdx = chunk.indexOfPattern(byteArrayOf(0x4D, 0x5A)) // "MZ" PE header
-                    if (mzIdx >= 0) return@runCatching "Windows PE executable"
-                    val elfIdx = chunk.indexOfPattern(byteArrayOf(0x7F, 0x45, 0x4C, 0x46)) // ELF magic
-                    if (elfIdx >= 0) return@runCatching "Linux ELF executable"
-                    val elfArmIdx = chunk.indexOfPattern("dex\n".toByteArray()) // hidden Android DEX
-                    if (elfArmIdx >= 0) return@runCatching "Android DEX bytecode"
-                    overlap = chunk.copyOfRange((chunk.size - 8).coerceAtLeast(0), chunk.size)
-                    total += read
+    private fun hasZipHeader(head: ByteArray): Boolean = head.size >= 4 &&
+        head[0] == 0x50.toByte() && head[1] == 0x4B.toByte() &&
+        ((head[2] == 3.toByte() && head[3] == 4.toByte()) || (head[2] == 5.toByte() && head[3] == 6.toByte()))
+
+    /** Short magic alone (especially 'MZ') is common in non-executable content. Corroborate it. */
+    private fun findEmbeddedExecutableMarker(file: File, checkpoint: () -> Unit): String = RandomAccessFile(file, "r").use { input ->
+        val limit = minOf(MAX_DEEP_SCAN_BYTES, input.length())
+        val bytes = ByteArray(CHUNK_SIZE + MAX_PE_OFFSET + 24)
+        var offset = 0L
+        while (offset < limit) {
+            checkpoint()
+            val read = minOf(bytes.size.toLong(), limit - offset).toInt()
+            input.seek(offset)
+            input.readFully(bytes, 0, read)
+            val window = minOf(CHUNK_SIZE, read)
+            for (i in 0 until window) {
+                when (bytes[i].toInt()) {
+                    0x4D -> if (i + 64 <= read && bytes[i + 1] == 0x5A.toByte()) {
+                        val header = bytes.leInt(i + 60)
+                        if (header in 64..MAX_PE_OFFSET && i + header + 24 <= read) {
+                            val pe = i + header
+                            if (bytes.leInt(pe) == 0x00004550 && bytes.leInt(pe + 4) != 0 &&
+                                (bytes[pe + 6] != 0.toByte() || bytes[pe + 7] != 0.toByte())
+                            ) return "Windows PE"
+                        }
+                    }
+                    0x7F -> if (i + 16 <= read && bytes.leInt(i) == 0x464C457F &&
+                        bytes[i + 4].toInt() in 1..2 && bytes[i + 5].toInt() in 1..2 && bytes[i + 6] == 1.toByte()
+                    ) return "ELF executable"
+                    0x64 -> if (i + 8 <= read && bytes.leInt(i) == 0x0A786564 && bytes[i + 7] == 0.toByte() &&
+                        (i + 4 until i + 7).all { bytes[it].toInt() in '0'.code..'9'.code }
+                    ) return "Android DEX"
                 }
-                null
             }
-        }.getOrNull()
+            offset += window
+        }
+        ""
     }
 
-    // --- Signatures 3 & 4: dropper scripts + macro docs (streamed, bounded) ---
-    private data class ContentFindings(
-        val findings: List<String>,
-        val score: Int,
-        val threatName: String?
-    )
+    private fun ByteArray.leInt(index: Int): Int = (this[index].toInt() and 0xFF) or
+        ((this[index + 1].toInt() and 0xFF) shl 8) or ((this[index + 2].toInt() and 0xFF) shl 16) or
+        (this[index + 3].toInt() shl 24)
 
-    private fun scanContentStream(file: File): ContentFindings {
-        val findings = ArrayList<String>()
-        var score = 0
-        var threatName: String? = null
-        val sb = StringBuilder()
-        runCatching {
-            file.inputStream().use { ins ->
-                val buf = ByteArray(65536)
-                var total = 0L
-                while (total < maxDeepScanBytes) {
-                    val read = ins.read(buf)
-                    if (read < 0) break
-                    sb.append(String(buf, 0, read, Charsets.ISO_8859_1))
-                    if (sb.length > 300_000) sb.delete(0, sb.length - 200_000)
-                    total += read
+    private data class ContentFindings(val findings: List<String>, val score: Int, val threatName: String?)
+
+    private fun scanContentStream(file: File, checkpoint: () -> Unit): ContentFindings {
+        val matched = BooleanArray(SCRIPT_PATTERNS.size)
+        var expression = false
+        var decoder = false
+        file.inputStream().use { input ->
+            val bytes = ByteArray(CHUNK_SIZE)
+            var remaining = MAX_DEEP_SCAN_BYTES
+            var overlap = ""
+            while (remaining > 0) {
+                checkpoint()
+                val read = input.read(bytes, 0, minOf(remaining, bytes.size.toLong()).toInt())
+                if (read <= 0) break
+                val text = overlap + String(bytes, 0, read, Charsets.ISO_8859_1)
+                if (text.contains(EICAR_STRING)) return ContentFindings(
+                    listOf("Exact match: EICAR antivirus test signature (industry-standard detection test file)"),
+                    100, "EICAR.Test.File"
+                )
+                // Check every window, including signatures that cross a chunk boundary. Deduplicate hits.
+                SCRIPT_PATTERNS.forEachIndexed { index, (pattern, _) ->
+                    if (!matched[index]) matched[index] = pattern.containsMatchIn(text)
                 }
+                expression = expression || text.contains("Invoke-Expression", ignoreCase = true)
+                decoder = decoder || text.contains("FromBase64String", ignoreCase = true) ||
+                    text.contains("DownloadString", ignoreCase = true)
+                overlap = text.takeLast(256) // Longer than any of the bounded patterns.
+                remaining -= read
             }
         }
-        val text = sb.toString()
-
-        if (text.contains(EICAR_STRING)) {
-            findings.add("Exact match: EICAR antivirus test signature (industry-standard detection test file)")
-            return ContentFindings(findings, 100, "EICAR.Test.File")
-        }
-        val dropperPatterns = listOf(
-            Regex("""powershell(\.exe)?.{0,40}-(enc|EncodedCommand|w hidden)""", RegexOption.IGNORE_CASE) to
-                "Obfuscated PowerShell dropper command (-enc/hidden)",
-            Regex("""certutil.{0,30}-urlcache""", RegexOption.IGNORE_CASE) to
-                "certutil download chain (LOLBas malware technique)",
-            Regex("""mshta\s+https?://""", RegexOption.IGNORE_CASE) to
-                "mshta remote script execution (HTA dropper)",
-            Regex("""(curl|wget).{0,60}\|\s*(sudo\s+)?(ba)?sh""", RegexOption.IGNORE_CASE) to
-                "Pipe-to-shell remote loader (curl|sh malware pattern)",
-            Regex("""rundll32\s+javascript""", RegexOption.IGNORE_CASE) to
-                "rundll32 JavaScript proxy execution"
+        val findings = SCRIPT_PATTERNS.mapIndexedNotNull { index, (_, label) -> label.takeIf { matched[index] } }
+        if (findings.isNotEmpty()) return ContentFindings(findings, findings.size * 60, "Script Dropper Technique")
+        if (expression && decoder) return ContentFindings(
+            listOf("PowerShell expression execution and decoding or download markers"), 55, "Script Dropper Technique"
         )
-        for ((regex, label) in dropperPatterns) {
-            if (regex.containsMatchIn(text)) {
-                findings.add(label)
-                score += 60
-                if (threatName == null) threatName = "Script Dropper Technique"
-            }
-        }
-        if (score == 0 && text.contains("Invoke-Expression", ignoreCase = true) &&
-            (text.contains("FromBase64String", ignoreCase = true) || text.contains("DownloadString", ignoreCase = true))
-        ) {
-            findings.add("Base64-decoded remote payload execution (PowerShell dropper)")
-            score += 55
-            threatName = "Script Dropper Technique"
-        }
-
-        return ContentFindings(findings, score, threatName)
+        return ContentFindings(emptyList(), 0, null)
     }
 
-    // --- Signature 6: archive safety (zip slip, macros) ---
-    private data class ArchiveFindings(
-        val findings: List<String>,
-        val score: Int,
-        val threatName: String?
-    )
+    private data class ArchiveFindings(val findings: List<String>, val score: Int, val threatName: String?, val limited: Boolean)
 
-    private fun inspectZipArchive(file: File): ArchiveFindings {
-        val findings = ArrayList<String>()
-        var score = 0
-        var threatName: String? = null
-        runCatching {
-            java.util.zip.ZipFile(file).use { zip ->
-                val entries = zip.entries()
-                var checked = 0
-                while (entries.hasMoreElements() && checked < 4096) {
-                    val entry = entries.nextElement()
-                    checked++
-                    val norm = entry.name.replace('\\', '/')
-                    if (norm.contains("..") && norm.split('/').contains("..")) {
-                        findings.add("Zip-Slip path traversal entry: '${entry.name.take(80)}'")
-                        score += 70
-                        if (threatName == null) threatName = "Archive Path Traversal (Zip Slip)"
-                    }
-                    if (norm.equals("word/vbaProject.bin", ignoreCase = true) ||
-                        norm.equals("xl/vbaProject.bin", ignoreCase = true) ||
-                        norm.equals("ppt/vbaProject.bin", ignoreCase = true)
-                    ) {
-                        findings.add("Office document with embedded VBA macro project (vbaProject.bin)")
-                        score += 40
-                        if (threatName == null) threatName = "Macro-Carrying Office Document"
-                    }
-                }
-            }
+    private fun inspectZipArchive(file: File, checkpoint: () -> Unit): ArchiveFindings = ZipFile(file).use { zip ->
+        val entries = zip.entries()
+        var checked = 0
+        var traversals = false
+        var macros = false
+        while (entries.hasMoreElements() && checked < MAX_ZIP_ENTRIES) {
+            checkpoint()
+            val name = entries.nextElement().name.replace('\\', '/')
+            checked++
+            traversals = traversals || name.split('/').contains("..")
+            macros = macros || name.equals("word/vbaProject.bin", ignoreCase = true) ||
+                name.equals("xl/vbaProject.bin", ignoreCase = true) || name.equals("ppt/vbaProject.bin", ignoreCase = true)
         }
-        return ArchiveFindings(findings, score, threatName)
+        ArchiveFindings(
+            findings = buildList {
+                if (traversals) add("Zip-Slip path traversal entry found")
+                if (macros) add("Office document with embedded VBA macro project (vbaProject.bin)")
+            },
+            score = (if (traversals) 70 else 0) + (if (macros) 40 else 0),
+            threatName = when {
+                traversals -> "Archive Path Traversal (Zip Slip)"
+                macros -> "Macro-Carrying Office Document"
+                else -> null
+            },
+            limited = entries.hasMoreElements()
+        )
     }
 
-    private fun ByteArray.indexOfPattern(pattern: ByteArray): Int {
-        if (pattern.isEmpty() || size < pattern.size) return -1
-        outer@ for (i in 0..size - pattern.size) {
-            for (j in pattern.indices) {
-                if (this[i + j] != pattern[j]) continue@outer
+    private fun computeSha256OrNull(file: File, checkpoint: () -> Unit): String? = readOrNull {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val bytes = ByteArray(CHUNK_SIZE)
+            while (true) {
+                checkpoint()
+                val read = input.read(bytes)
+                if (read <= 0) break
+                digest.update(bytes, 0, read)
             }
-            return i
         }
-        return -1
+        digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    private fun computeSha256OrNull(file: File): String? {
-        return runCatching {
-            val digest = MessageDigest.getInstance("SHA-256")
-            file.inputStream().use { ins ->
-                val buf = ByteArray(131072)
-                while (true) {
-                    val read = ins.read(buf)
-                    if (read < 0) break
-                    digest.update(buf, 0, read)
-                }
-            }
-            digest.digest().joinToString("") { "%02x".format(it) }
-        }.getOrNull()
+    private inline fun <T> readOrNull(block: () -> T): T? = try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: IOException) {
+        null
+    } catch (_: SecurityException) {
+        null
     }
 
     companion object {
+        private const val MAX_DEEP_SCAN_BYTES = 24L * 1024 * 1024
+        private const val CHUNK_SIZE = 65_536
+        private const val MAX_PE_OFFSET = 4_096
+        private const val MAX_ZIP_ENTRIES = 4_096
+        private val ZIP_EXTENSIONS = setOf("zip", "apk", "apks", "xapk", "docx", "docm", "xlsx", "xlsm", "pptx", "pptm", "jar")
+        private val SCRIPT_PATTERNS = listOf(
+            Regex("""powershell(\.exe)?.{0,40}-(enc|EncodedCommand|w hidden)""", RegexOption.IGNORE_CASE) to
+                "Obfuscated PowerShell dropper command (-enc/hidden)",
+            Regex("""certutil.{0,30}-urlcache""", RegexOption.IGNORE_CASE) to "certutil download command indicator",
+            Regex("""mshta\s{1,32}https?://""", RegexOption.IGNORE_CASE) to "mshta remote script execution indicator",
+            Regex("""(curl|wget).{0,60}\|\s{0,32}(sudo\s{1,32})?(ba)?sh""", RegexOption.IGNORE_CASE) to
+                "Pipe-to-shell command indicator",
+            Regex("""rundll32\s{1,32}javascript""", RegexOption.IGNORE_CASE) to "rundll32 JavaScript execution indicator"
+        )
+
         /** Industry-standard EICAR test payload — the only "malware" string shipped with AdShield Pro. */
         const val EICAR_STRING =
             "X5O!P%@AP[4\\PZX54(P^)7CC)7}\$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!\$H+H*"

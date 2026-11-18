@@ -79,6 +79,7 @@ import com.adshield.pro.domain.intelligence.IntelligenceAction
 import com.adshield.pro.domain.intelligence.IntelligenceModule
 import com.adshield.pro.domain.model.RuleMatchType
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.engine.aether.AetherPhoneAgent
 import com.adshield.pro.engine.platform.ProtectionSnoozeController
 import com.adshield.pro.engine.platform.SystemPreferencesController
 import com.adshield.pro.ui.components.LinkCleanerDialog
@@ -423,7 +424,29 @@ fun AdShieldMainApp(
                     },
                     onOpenWorldMonitor = { currentTab = MainNavDestination.WORLD_MONITOR }
                 )
-                MainNavDestination.SECURITY -> SecurityDestination(viewModel)
+                MainNavDestination.SECURITY -> SecurityDestination(viewModel, onOpenAgentTool = { tool ->
+                    when (tool) {
+                        AetherPhoneAgent.Tool.PROTECTION -> currentTab = MainNavDestination.HOME
+                        AetherPhoneAgent.Tool.DNS_SETTINGS, AetherPhoneAgent.Tool.APP_FIREWALL -> {
+                            showAboutScreen = false
+                            showQuickTilesScreen = false
+                            showAppFirewallScreen = tool == AetherPhoneAgent.Tool.APP_FIREWALL
+                            currentTab = MainNavDestination.SETTINGS
+                        }
+                        AetherPhoneAgent.Tool.NETWORK_SETTINGS -> {
+                            runCatching { context.startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }
+                                .onFailure { viewModel.showFeedback("Open Network & internet in Android Settings.") }
+                        }
+                        AetherPhoneAgent.Tool.OPTIMIZER -> currentTab = MainNavDestination.OPTIMIZER
+                        AetherPhoneAgent.Tool.BATTERY -> currentTab = MainNavDestination.BATTERY
+                        AetherPhoneAgent.Tool.DNS_ACTIVITY -> currentTab = MainNavDestination.STATISTICS
+                        AetherPhoneAgent.Tool.BROWSER -> currentTab = MainNavDestination.AD_BLOCKER
+                        // The Agent authorizes and runs its tasks within Security.
+                        AetherPhoneAgent.Tool.DNS_BENCHMARK, AetherPhoneAgent.Tool.ENABLE_ALIAS_SHIELD,
+                        AetherPhoneAgent.Tool.APP_AUDIT, AetherPhoneAgent.Tool.FILE_SCAN,
+                        AetherPhoneAgent.Tool.LINK_SCAN, AetherPhoneAgent.Tool.SCAN_HISTORY -> Unit
+                    }
+                })
                 MainNavDestination.FILES -> FilesDestination()
                 MainNavDestination.CLOUD -> CloudDestination()
                 MainNavDestination.DOWNLOADS -> DownloadsDestination()
@@ -700,7 +723,10 @@ private fun IntelligenceDestination(
 }
 
 @Composable
-private fun SecurityDestination(viewModel: AdShieldViewModel) {
+private fun SecurityDestination(
+    viewModel: AdShieldViewModel,
+    onOpenAgentTool: (AetherPhoneAgent.Tool) -> Unit
+) {
     val securityPosture by viewModel.securityPosture.collectAsStateWithLifecycle()
     val vpnState by viewModel.vpnState.collectAsStateWithLifecycle()
     val malwareBlocks by viewModel.malwareBlocks.collectAsStateWithLifecycle()
@@ -741,6 +767,7 @@ private fun SecurityDestination(viewModel: AdShieldViewModel) {
         onBuildScanReport = viewModel::buildScanReport,
         onSetScheduledScan = viewModel::setScheduledScan,
         onShowFeedback = viewModel::showFeedback,
+        onOpenAgentTool = onOpenAgentTool,
         onCleanAndScanLink = viewModel::inspectSharedOrPastedLink
     )
 }

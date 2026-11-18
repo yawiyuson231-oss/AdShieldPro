@@ -313,21 +313,21 @@ object CapabilityRegistry {
             "scan-file", "File signature and structural scan (EICAR, polyglot, zip-slip)", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/FileThreatScanner.kt", emptyList(),
             listOf("File bytes read from SAF URIs or app-accessible paths"),
-            listOf("Signature + structure only; no byte-level AV engine and no cloud hash lookup"),
-            "SecurityCenterTestSuite.testFileScanner_detectsEicarTestSignature and related cases"
+            listOf("Bounded signature and structure checks, not a safety certificate or a cloud antivirus service"),
+            "SecurityCenterTestSuite.testFileScanner_checksSignaturesAcrossWindowsBeforeTheTail and SecurityCenterTestSuite.testFileScanner_doesNotTreatIncidentalMzBytesAsAnExecutable"
         ),
         cap(
             "scan-apk", "APK binary manifest analysis (package, permissions, risk)", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/ApkAnalyzer.kt", emptyList(),
             listOf("Binary AXML parser over the APK zip"),
-            listOf("Static analysis only; nothing is installed or executed"),
+            listOf("Bounded static analysis; nothing is installed or executed and signatures are not cryptographically verified"),
             "SecurityCenterTestSuite.testApkAnalyzer_axmlParser_extractsPackageAndPermissions and related cases"
         ),
         cap(
             "scan-app-audit", "Installed-app permission risk audit", CapabilityArea.THREAT_SCANNING,
             CapabilityStatus.IMPLEMENTED, "engine/security/AppRiskAuditor.kt", listOf("android.permission.QUERY_ALL_PACKAGES"),
-            listOf("PackageManager metadata and requested permissions"),
-            listOf("Risk is a permission-stack heuristic, not a malware verdict"),
+            listOf("Android-visible PackageManager metadata, exact platform permission names and declared component bindings"),
+            listOf("Permission and installer indicators do not show permission grants or prove malware"),
             "SecurityCenterTestSuite.testAppAuditor_flagsAccessibilitySmsTrojanProfile"
         ),
         cap(
@@ -536,6 +536,50 @@ object CapabilityRegistry {
             listOf("User setting: Manual / verified only / verified + suspected"),
             listOf("Manual mode reports instead of blocking; suspected blocking is opt-in and needs a higher score"),
             "AetherCoreTest.testManualAutonomy_reportsInsteadOfBlocking"
+        ),
+        cap(
+            "aether-phone-agent", "AETHER on-device phone check and recommended tools", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherPhoneAgent.kt",
+            listOf("android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE"),
+            listOf("AdShield preferences and runtime, existing DNS/scan summaries, Android network and device readings"),
+            listOf("On demand; rules not a cloud AI; missing readings stay unknown; diagnostic queries and settings actions require confirmation"),
+            "AetherPhoneAgentTest.identifiesReportedOpenWifiWeakSignalAndSignInAsSeparateIssues and AetherPhoneAgentTest.honoursLoggingOptOutAndDoesNotEchoRawActivity"
+        ),
+        cap(
+            "aether-security-tasks", "AETHER task selection with a bundled on-device model", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherTaskModel.kt", emptyList(),
+            listOf("A fitted intent model, AdShield scanners, Android app metadata and phone readings"),
+            listOf("Classifies one supported task per input clause; the user approves each actual check; no general chat or scheduled work"),
+            "AetherSecurityAgentTest.shippedModelMatchesHoldoutWithoutWrongTaskSuggestions and AetherSecurityAgentTest.realLocalScannerReceivesOnlyAnExplicitlyApprovedLink"
+        ),
+        cap(
+            "aether-guided-plans", "AETHER guided plans with separate step approvals", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherGuidedPlan.kt", emptyList(),
+            listOf("On-device intent classification of explicit task clauses, followed by user-approved AdShield checks"),
+            listOf("Two or three read-only steps; no automatic next step or provider send; DNS benchmark sends fixed probes only if approved; receipts cleared on exit"),
+            "AetherGuidedPlanTest.shippedModelBuildsOrderedEnglishAndTaglishPlansWithoutChangingSingleTaskBehavior and AetherGuidedPlanTest.rejectsTheWholePlanIfAnyStepIsUnclearRestrictedOrChangesSettings and AetherGuidedPlanTest.onlyTheMatchingStepApprovalCanStartOrFinishAnAttempt and AetherGuidedPlanTest.failedOrCanceledChecksStayOnTheSameStepAndRequireFreshApproval and AetherGuidedPlanTest.receiptsDistinguishMissingEvidenceFromCompletedChecksWithLimits"
+        ),
+        cap(
+            "aether-security-review", "AETHER local protection and app-risk review", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherSecurityReview.kt",
+            listOf("android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.QUERY_ALL_PACKAGES"),
+            listOf("Phone/protection readings and metadata from Android-visible packages"),
+            listOf("Two fixed read-only steps with independent time limits. Shows missing readings and skipped apps; no setting changes or device safety verdict"),
+            "AetherSecurityReviewTest.runsOnlyTheTwoReviewStepsAndReportsSkippedApps and AetherSecurityReviewTest.deadlineOrFailureLeavesTheOtherStepsEvidenceIntact and AetherSecurityReviewTest.cancelingTheReviewDoesNotStartTheNextStep"
+        ),
+        cap(
+            "aether-selected-file", "AETHER local scan of one chosen file", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/AetherSecurityTools.kt", emptyList(),
+            listOf("Single-use Android document picker approval and bounded reads of the selected content URI"),
+            listOf("24 MiB maximum, static checks of a temporary local copy, no install, upload, original modification or Agent history entry"),
+            "AetherSecurityReviewTest.boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy and AetherSecurityReviewTest.staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan and AetherSecurityReviewTest.cancelDuringFileReadPreventsWritingTheNextChunk"
+        ),
+        cap(
+            "aether-online-api", "Optional user-configured AETHER online AI API", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "data/repository/AetherOnlinePlanner.kt", listOf("android.permission.INTERNET"),
+            listOf("User-owned Gemini Developer API, OpenAI or compatible HTTPS Chat Completions access; Keystore-encrypted settings and separately approved task text"),
+            listOf("API test sends a real request but runs no tool; requires a supported text model and provider account; response can only propose an allowlisted task"),
+            "AetherOnlinePlannerTest.outboundReviewContainsOnlyTypedTaskTextAndNeverIncludesScannedLinks and AetherOnlinePlannerTest.approvalToSendDoesNotApproveAnOnlineSuggestedTask and AetherOnlinePlannerTest.restoresOldConnectionsWithoutResavingKeysAndBindsApprovalToARevision and AetherOnlinePlannerTest.geminiUsesOnlyFinalTextAndRejectsIncompleteRepliesAndToolCalls and AetherOnlineHttpTest.sendsOneHttpsPostWithBearerAuthenticationAndReturnsOnlyTheTaskId and AetherOnlineHttpTest.sendsGeminiKeyOnlyToPinnedNativeEndpointAndParsesTheReply and AetherOnlineHttpTest.stoppingTheWaitCancelsTheHttpCallWithoutReturningATask"
         ),
         cap(
             "live-network-dashboard", "Live DNS traffic dashboard with real event feed", CapabilityArea.DNS_PROTECTION,
@@ -994,12 +1038,12 @@ object CapabilityRegistry {
             "n/a — commercial backend / physical sensor restriction"
         ),
         cap(
-            "dns-cname-uncloaking", "CNAME-cloaking answer-chain tracker shield",
+            "dns-cname-uncloaking", "DNS Alias Shield (CNAME, HTTPS and SVCB)",
             CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/CnameCloakingInspector.kt", listOf(PERM_VPN, PERM_INTERNET),
-            listOf("RFC 1035 TYPE 5 CNAME resource records parsed from upstream DNS Answer sections and evaluated against FilterRuleEngine"),
-            listOf("Requires one upstream resolution before inspecting the returned alias chain; honours user allowlists and exempts DnsMediaPlaybackGuard playback domains"),
-            "FeatureExpansion211TestSuite.testCnameExtractionHandlesCompressedChainsAndRejectsMalformedWire and FeatureExpansion211TestSuite.testCnameCloakingBlocksTrackerAliasesWhileRespectingAllowlistAndMediaSafety"
+            listOf("Reachable CNAME and matching HTTPS/SVCB targets in validated DNS answers or cache hits, checked against active rules"),
+            listOf("No follow-up queries; honours user allowlists, pass-through and playback safeguards; DNS only"),
+            "DnsAliasShieldTest.followsHttpsAliasModeAndCnamesInUnorderedAnswers and DnsAliasShieldTest.checksSvcbServiceModeNamesButDoesNotInterpretOpaqueParametersAsNames"
         ),
         cap(
             "dns-resolver-benchmark", "Concurrent multi-provider DoH/DoT/UDP resolver latency benchmark",

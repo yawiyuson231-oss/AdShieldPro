@@ -13,19 +13,19 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Stores WebDAV passwords only as Android-Keystore-backed AES-GCM ciphertext. */
+/** Stores user-supplied provider credentials as Android-Keystore-backed AES-GCM ciphertext. */
 @Singleton
 class ProviderCredentialStore @Inject constructor(
     @ApplicationContext context: Context
 ) {
     private val preferences = context.getSharedPreferences("infinity_provider_credentials", Context.MODE_PRIVATE)
 
-    fun put(providerId: String, password: String) {
+    fun put(providerId: String, password: String, durable: Boolean = false) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(password.toByteArray(Charsets.UTF_8))
         val payload = cipher.iv + encrypted
-        preferences.edit().putString(providerId, Base64.encodeToString(payload, Base64.NO_WRAP)).apply()
+        finishWrite(preferences.edit().putString(providerId, Base64.encodeToString(payload, Base64.NO_WRAP)), durable)
     }
 
     fun get(providerId: String): String? {
@@ -41,10 +41,15 @@ class ProviderCredentialStore @Inject constructor(
         }.getOrNull()
     }
 
-    fun remove(providerId: String) {
-        preferences.edit().remove(providerId).apply()
+    fun remove(providerId: String, durable: Boolean = false) {
+        finishWrite(preferences.edit().remove(providerId), durable)
     }
 
+    private fun finishWrite(editor: android.content.SharedPreferences.Editor, durable: Boolean) {
+        if (durable) check(editor.commit()) { "Couldn't save provider credentials" } else editor.apply()
+    }
+
+    @Synchronized
     private fun getOrCreateKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }

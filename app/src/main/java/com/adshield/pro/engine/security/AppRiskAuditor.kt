@@ -3,9 +3,8 @@ package com.adshield.pro.engine.security
 /**
  * AdShield Pro — Installed App Risk Auditor (Pure Kotlin rules, unit-testable).
  *
- * Audits every installed application using the same triage logic as mobile MTD products:
- * installer origin, permission stack, target SDK hygiene, accessibility abuse,
- * device-admin lockware patterns, and known-good vs unknown publisher namespaces.
+ * Reviews Android-visible app metadata: install source, requested permissions, declared
+ * component bindings, and target SDK. Declarations are not permission grants or observed behavior.
  */
 class AppRiskAuditor {
 
@@ -20,7 +19,8 @@ class AppRiskAuditor {
         val installerPackageName: String?,
         val isSystemApp: Boolean,
         val isUpdatedSystemApp: Boolean = false,
-        val firstInstallTimeEpochMs: Long = 0L
+        val firstInstallTimeEpochMs: Long = 0L,
+        val declaredComponentPermissions: Set<String> = emptySet()
     )
 
     data class AppRiskAudit(
@@ -31,12 +31,18 @@ class AppRiskAuditor {
         val summary: String
     )
 
+    data class VisibleAudit(val visibleCount: Int, val inspected: List<AppRiskAudit>) {
+        val unavailableCount: Int get() = visibleCount - inspected.size
+    }
+
     fun audit(profile: AppSecurityProfile): AppRiskAudit {
         val findings = ArrayList<String>()
         var score = 0
 
-        val perms = profile.requestedPermissions
-        val has = { suffix: String -> perms.any { it.endsWith(suffix) } }
+        val requested = profile.requestedPermissions.toHashSet()
+        fun has(permission: String) = "android.permission.$permission" in requested
+        fun declaresBinding(permission: String) = "android.permission.$permission" in profile.declaredComponentPermissions
+        val declaresAccessibility = declaresBinding("BIND_ACCESSIBILITY_SERVICE")
 
         // Installer origin trust
         when (profile.installerPackageName) {
@@ -44,66 +50,65 @@ class AppRiskAuditor {
                 // Play Store origin — baseline trust
             }
             null, "" -> {
-                findings.add("Unknown install source (side-loaded, no installer recorded)")
+                findings.add("Unknown install source (no installer reported)")
                 score += 15
             }
             else -> {
-                findings.add("Installed from a third-party source: ${profile.installerPackageName}")
+                findings.add("Android reported this installer: ${profile.installerPackageName}")
                 score += 10
             }
         }
 
-        // Accessibility abuse (banking trojan / overlay pattern)
-        if (has("android.permission.ACCESSIBILITY_SERVICE") || has("BIND_ACCESSIBILITY_SERVICE")) {
-            findings.add("Uses Accessibility services — can read screen content and auto-click dialogs")
+        if (declaresAccessibility) {
+            findings.add("Declares an Accessibility binding; this does not confirm the service is enabled")
             score += 30
         }
-        if (has("android.permission.BIND_ACCESSIBILITY_SERVICE") && has("android.permission.RECEIVE_SMS")) {
-            findings.add("Accessibility + SMS interception — banking trojan capability stack")
+        if (declaresAccessibility && has("RECEIVE_SMS")) {
+            findings.add("Declares Accessibility and requests SMS receive access (potential SMS interception, not observed)")
             score += 25
         }
 
         // Silent install dropper pattern
-        if (has("android.permission.REQUEST_INSTALL_PACKAGES")) {
-            findings.add("Can request installation of other packages (dropper capability)")
+        if (has("REQUEST_INSTALL_PACKAGES")) {
+            findings.add("Requests permission to install other packages")
             score += 15
         }
-        if (has("android.permission.REQUEST_INSTALL_PACKAGES") && !has("android.permission.INTERNET")) {
-            findings.add("Install capability without Internet — inconsistent for a normal app")
+        if (has("REQUEST_INSTALL_PACKAGES") && !has("INTERNET")) {
+            findings.add("Requests package installation without requesting Internet access")
             score += 10
         }
 
         // Lockware / device admin
-        if (has("android.permission.BIND_DEVICE_ADMIN")) {
-            findings.add("Device administrator rights — can resist uninstall (lockware pattern)")
+        if (declaresBinding("BIND_DEVICE_ADMIN")) {
+            findings.add("Declares a device administrator binding; active admin status was not checked")
             score += 15
         }
-        if (has("android.permission.BIND_NOTIFICATION_LISTENER_SERVICE")) {
-            findings.add("Reads every notification (OTP codes often arrive as notifications)")
+        if (declaresBinding("BIND_NOTIFICATION_LISTENER_SERVICE")) {
+            findings.add("Declares a notification listener binding; notification access was not verified")
             score += 12
         }
 
         // Surveillance stack
-        if (has("android.permission.RECORD_AUDIO") && has("android.permission.CAMERA") &&
-            has("android.permission.ACCESS_BACKGROUND_LOCATION")
+        if (has("RECORD_AUDIO") && has("CAMERA") &&
+            has("ACCESS_BACKGROUND_LOCATION")
         ) {
-            findings.add("Microphone + camera + background location — full surveillance stack")
+            findings.add("Requests microphone, camera and background location together")
             score += 25
         }
-        if (has("android.permission.SEND_SMS") && has("android.permission.READ_CONTACTS")) {
-            findings.add("Can send premium SMS to your contacts (subscription fraud pattern)")
+        if (has("SEND_SMS") && has("READ_CONTACTS")) {
+            findings.add("Requests SMS sending and contacts access together")
             score += 12
         }
 
         // SDK hygiene
         if (profile.targetSdkVersion in 1..28 && !profile.isSystemApp) {
-            findings.add("Targets an outdated Android version (targetSdk ${profile.targetSdkVersion}) — skips modern permission guards")
+            findings.add("Targets an older Android version (targetSdk ${profile.targetSdkVersion})")
             score += 12
         }
 
         // Updated system app (possible privileged tampering on old ROMs)
         if (profile.isUpdatedSystemApp && profile.installerPackageName != "com.android.vending") {
-            findings.add("Updated system app installed outside Play Protect")
+            findings.add("Android did not report Google Play as the installer for this system app update")
             score += 6
         }
 
@@ -119,10 +124,10 @@ class AppRiskAuditor {
             else -> RiskLevel.TRUSTED
         }
         val summary = when (level) {
-            RiskLevel.HIGH -> "High-risk app. Review its permissions in Android settings or uninstall it."
+            RiskLevel.HIGH -> "High-risk metadata indicators. Review the app and its permissions in Android Settings."
             RiskLevel.MEDIUM -> "Elevated risk. Verify the source and revoke any unneeded permissions."
-            RiskLevel.LOW -> "Minor privacy considerations — nothing alarming."
-            RiskLevel.TRUSTED -> "No risk indicators. Clean audit."
+            RiskLevel.LOW -> "Minor privacy indicators in the available app metadata."
+            RiskLevel.TRUSTED -> "No risk indicators matched the available app metadata."
         }
 
         return AppRiskAudit(

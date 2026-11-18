@@ -5,6 +5,7 @@ import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.CancellationException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -35,13 +36,16 @@ class ApkAnalyzer {
         val riskReasons: List<String>,
         val isSigned: Boolean,
         val usesDynamicCodeLoading: Boolean,
-        val usesPackerOrObfuscator: Boolean
+        val usesPackerOrObfuscator: Boolean,
+        val limitations: List<String> = emptyList()
     ) {
         val isClean: Boolean get() = threatLevel == ThreatLevel.CLEAN
     }
 
-    fun analyzeApk(file: File): ApkReport {
+    fun analyzeApk(file: File, checkpoint: () -> Unit = {}): ApkReport {
         val reasons = ArrayList<String>()
+        val limitations = ArrayList<String>()
+        checkpoint()
         var score = 0
         var packageName: String? = null
         var permissions: List<String> = emptyList()
@@ -49,79 +53,85 @@ class ApkAnalyzer {
         var dynamicLoading = false
         var packer = false
 
-        runCatching {
+        try {
             ZipFile(file).use { zip ->
                 val manifestEntry: ZipEntry? = zip.getEntry("AndroidManifest.xml")
-                if (manifestEntry != null) {
-                    val bytes = zip.getInputStream(manifestEntry).use { readBounded(it, 4L * 1024 * 1024) }
-                    val parsed = parseBinaryAndroidManifest(bytes)
-                    packageName = parsed.first
-                    permissions = parsed.second
+                if (manifestEntry != null && manifestEntry.size in 1L..MANIFEST_LIMIT) {
+                    val bytes = zip.getInputStream(manifestEntry).use { readBounded(it, MANIFEST_LIMIT, checkpoint) }
+                    if (bytes.size.toLong() == manifestEntry.size) {
+                        val parsed = parseBinaryAndroidManifest(bytes, checkpoint)
+                        packageName = parsed.first
+                        permissions = parsed.second
+                    }
                 }
 
-                // Signing check
                 val entries = zip.entries()
-                var dexScanned = 0L
-                while (entries.hasMoreElements()) {
+                var checked = 0
+                var dexRemaining = DEX_LIMIT
+                var dexLimited = false
+                while (checked < ENTRY_LIMIT && entries.hasMoreElements()) {
+                    checkpoint()
+                    checked++
                     val e = entries.nextElement()
                     val name = e.name.lowercase()
                     if (name.startsWith("meta-inf/") && (name.endsWith(".rsa") || name.endsWith(".dsa") || name.endsWith(".ec"))) {
                         isSigned = true
                     }
-                    // Packer native libraries
-                    if (name.startsWith("lib/") && PACKER_LIB_MARKERS.any { name.contains(it) }) {
-                        packer = true
-                    }
-                    // Bounded dex string scan for dynamic code loading
-                    if (name.startsWith("classes") && name.endsWith(".dex") && dexScanned < 12L * 1024 * 1024) {
-                        val bytes = zip.getInputStream(e).use { readBounded(it, 12L * 1024 * 1024) }
-                        dexScanned += bytes.size
-                        if (bytes.searchFor("InMemoryDexClassLoader".toByteArray()) ||
-                            bytes.searchFor("dalvik/system/DexClassLoader".toByteArray())
-                        ) {
-                            dynamicLoading = true
+                    if (name.startsWith("lib/") && PACKER_LIB_MARKERS.any { name.contains(it) }) packer = true
+                    if (name.startsWith("classes") && name.endsWith(".dex")) {
+                        // Apply one shared decompression budget across all DEX entries.
+                        if (dexRemaining == 0L) {
+                            dexLimited = true
+                            continue
                         }
-                        if (bytes.searchFor("libjiagu".toByteArray()) || bytes.searchFor("libDexHelper".toByteArray())) {
-                            packer = true
-                        }
+                        val indicators = zip.getInputStream(e).use { inspectDex(it, dexRemaining, checkpoint) }
+                        dexRemaining -= indicators.bytesRead
+                        dexLimited = dexLimited || (dexRemaining == 0L && e.size > indicators.bytesRead)
+                        dynamicLoading = dynamicLoading || indicators.dynamicLoading
+                        packer = packer || indicators.packer
                     }
                 }
+                if (entries.hasMoreElements()) limitations += "APK entry checks stopped after $ENTRY_LIMIT entries."
+                if (dexLimited) limitations += "APK code indicator checks reached the 12 MiB DEX read limit."
             }
-            if (!isSigned) {
-                isSigned = hasApkSigBlockV2Plus(file)
-            }
+            if (!isSigned) isSigned = hasApkSigBlockV2Plus(file)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            limitations += "Couldn't finish reading APK metadata."
         }
+        checkpoint()
 
         // --- Permission risk scoring ---
         for (perm in permissions) {
             val weight = PERMISSION_RISK_WEIGHT[perm] ?: 0
             score += weight
         }
-        val has = { p: String -> permissions.any { it == p || it.endsWith(".$p") || it.endsWith(".permission.$p") } }
-        val perm = { suffix: String -> permissions.firstOrNull { it.endsWith(suffix) } }
+        val permissionNames = permissions.toHashSet()
+        fun requests(name: String) = "android.permission.$name" in permissionNames
 
-        if (perm("android.permission.ACCESSIBILITY_SERVICE") != null ||
-            perm("android.permission.BIND_ACCESSIBILITY_SERVICE") != null
+        if (requests("ACCESSIBILITY_SERVICE") ||
+            requests("BIND_ACCESSIBILITY_SERVICE")
         ) {
-            reasons.add("Requests Accessibility service access — the #1 mobile banking-trojan overlay/autofill abuse vector")
+            reasons.add("Requests an accessibility-related permission; service and grant status were not verified")
             score += 30
         }
-        if (perm("android.permission.RECEIVE_SMS") != null && perm("android.permission.READ_SMS") != null) {
-            reasons.add("Full SMS interception stack (receive + read) — typical OTP-theft behavior")
+        if (requests("RECEIVE_SMS") && requests("READ_SMS")) {
+            reasons.add("SMS interception indicator: requests both SMS receive and read permissions")
             score += 25
         }
-        if (perm("android.permission.REQUEST_INSTALL_PACKAGES") != null && dynamicLoading) {
-            reasons.add("Silent-install permission combined with runtime dynamic code loading — classic dropper architecture")
+        if (requests("REQUEST_INSTALL_PACKAGES") && dynamicLoading) {
+            reasons.add("Requests package installation and contains dynamic code loading references")
             score += 35
         }
-        if (perm("android.permission.READ_CONTACTS") != null && perm("android.permission.READ_CALL_LOG") != null &&
-            perm("android.permission.RECORD_AUDIO") != null
+        if (requests("READ_CONTACTS") && requests("READ_CALL_LOG") &&
+            requests("RECORD_AUDIO")
         ) {
-            reasons.add("Contacts + call log + microphone exfiltration stack")
+            reasons.add("Requests contacts, call log and microphone permissions together")
             score += 20
         }
-        if (perm("android.permission.SYSTEM_ALERT_WINDOW") != null && perm("android.permission.QUERY_ALL_PACKAGES") != null) {
-            reasons.add("Overlay window + full app enumeration — phishing-overlay capability")
+        if (requests("SYSTEM_ALERT_WINDOW") && requests("QUERY_ALL_PACKAGES")) {
+            reasons.add("Requests overlay window and broad app visibility permissions together")
             score += 15
         }
 
@@ -130,30 +140,29 @@ class ApkAnalyzer {
         val lowerPkg = pkg.lowercase()
         if (lowerPkg.isNotEmpty()) {
             if (SUSPICIOUS_PACKAGE_TOKENS.any { lowerPkg.contains(it) }) {
-                reasons.add("Package name contains cracker/modware tokens: '$pkg'")
+                reasons.add("Package name contains cracker/modware tokens")
                 score += 20
             }
             if (lowerPkg.count { it == '.' } == 1 && !lowerPkg.startsWith("com.") && !lowerPkg.startsWith("org.") &&
                 !lowerPkg.startsWith("net.") && !lowerPkg.startsWith("io.")
             ) {
-                reasons.add("Single-segment publisher namespace ('$pkg') — typical of repacked/side-loaded builds")
+                reasons.add("Package uses a short publisher namespace")
                 score += 8
             }
         } else {
-            reasons.add("Manifest package name could not be parsed — malformed or intentionally corrupted package structure")
-            score += 15
+            limitations += "APK manifest package and permissions could not be confirmed."
         }
 
         if (!isSigned) {
-            reasons.add("No signing certificate found inside the archive (unsigned/modified build)")
+            reasons.add("No APK signing markers found in the inspected metadata")
             score += 12
         }
         if (dynamicLoading && !packer) {
-            reasons.add("Loads code dynamically at runtime (DexClassLoader) — common in droppers and cheat/modware")
+            reasons.add("Contains dynamic code loading references; behavior was not observed")
             score += 10
         }
         if (packer) {
-            reasons.add("Protected by a commercial APK packer/obfuscator — hides real behavior from analysis")
+            reasons.add("Contains APK packer or obfuscator markers")
             score += 12
         }
 
@@ -172,15 +181,17 @@ class ApkAnalyzer {
             riskReasons = reasons,
             isSigned = isSigned,
             usesDynamicCodeLoading = dynamicLoading,
-            usesPackerOrObfuscator = packer
+            usesPackerOrObfuscator = packer,
+            limitations = limitations
         )
     }
 
     /**
      * Minimal, hardened parser for compiled binary AndroidManifest.xml (AXML).
-     * Returns (packageName, requestedPermissions). Never throws; returns empty results on error.
+     * Returns (packageName, requestedPermissions). Malformed input produces an empty result;
+     * cancellation is allowed to propagate.
      */
-    fun parseBinaryAndroidManifest(data: ByteArray): Pair<String?, List<String>> {
+    fun parseBinaryAndroidManifest(data: ByteArray, checkpoint: () -> Unit = {}): Pair<String?, List<String>> {
         return runCatching {
             if (data.size < 8) return@runCatching Pair(null, emptyList<String>())
             val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
@@ -189,22 +200,28 @@ class ApkAnalyzer {
             if (rootType != 0x0003) return@runCatching Pair(null, emptyList<String>()) // not RES_XML_TYPE
             val rootHeaderSize = buf.getShort(2).toInt() and 0xFFFF
             val rootSize = buf.getInt(4)
-            if (rootSize <= 0 || rootSize > data.size) return@runCatching Pair(null, emptyList<String>())
+            if (rootSize > data.size || rootHeaderSize !in 8..rootSize) return@runCatching Pair(null, emptyList<String>())
 
             var stringPool: List<String> = emptyList()
             var packageAttr: String? = null
-            val permissions = ArrayList<String>()
+            val permissions = LinkedHashSet<String>()
 
             var offset = rootHeaderSize
-            while (offset + 8 <= rootSize && offset + 8 <= data.size) {
+            while (offset <= rootSize - 8) {
+                checkpoint()
                 val type = (data[offset].toInt() and 0xFF) or ((data[offset + 1].toInt() and 0xFF) shl 8)
                 val headerSize = (data[offset + 2].toInt() and 0xFF) or ((data[offset + 3].toInt() and 0xFF) shl 8)
                 val chunkSize = buf.getInt(offset + 4)
-                if (chunkSize <= 0 || offset + chunkSize > data.size) break
+                if (headerSize !in 8..chunkSize || chunkSize > rootSize - offset) {
+                    return@runCatching Pair(null, emptyList<String>())
+                }
+                val chunkEnd = offset + chunkSize
 
                 when (type) {
                     0x0001 -> { // RES_STRING_POOL_TYPE
-                        stringPool = parseStringPool(data, offset, chunkSize)
+                        if (stringPool.isNotEmpty()) return@runCatching Pair(null, emptyList<String>())
+                        stringPool = parseStringPool(data, offset, chunkSize, headerSize, checkpoint)
+                        if (stringPool.isEmpty()) return@runCatching Pair(null, emptyList<String>())
                     }
                     0x0102 -> { // RES_XML_START_ELEMENT_TYPE
                         if (stringPool.isNotEmpty()) {
@@ -212,7 +229,7 @@ class ApkAnalyzer {
                             // attrExt: ns(4) + name(4) + attributeStart(2) + attributeSize(2)
                             //          + attributeCount(2) + idIndex(2) + classIndex(2) + styleIndex(2)
                             val nodeBase = offset
-                            if (headerSize >= 16 && nodeBase + headerSize + 20 <= data.size) {
+                            if (headerSize >= 16 && chunkSize - headerSize >= 20) {
                                 buf.position(nodeBase + headerSize)
                                 buf.int // ns
                                 val nameIdx = buf.int
@@ -222,7 +239,9 @@ class ApkAnalyzer {
 
                                 val elementName = stringPool.getOrNull(nameIdx)
                                 val attrBase = nodeBase + headerSize + attributeStart
-                                if (attributeSize >= 20 && attrBase + attributeSize.toLong() * attributeCount <= data.size) {
+                                if (attributeStart >= 20 && attributeSize >= 20 &&
+                                    attrBase + attributeSize.toLong() * attributeCount <= chunkEnd
+                                ) {
                                     for (i in 0 until attributeCount) {
                                         buf.position(attrBase + i * attributeSize)
                                         buf.int // attr ns
@@ -240,6 +259,7 @@ class ApkAnalyzer {
                                         }
                                         if (elementName == "uses-permission" && attrName == "name") {
                                             value?.let { permissions.add(it) }
+                                            if (permissions.size > 4_096) return@runCatching Pair(null, emptyList<String>())
                                         }
                                         if (elementName == "manifest" && attrName == "package") {
                                             packageAttr = value
@@ -252,62 +272,58 @@ class ApkAnalyzer {
                 }
                 offset += chunkSize
             }
-            Pair(packageAttr, permissions.distinct())
-        }.getOrDefault(Pair(null, emptyList<String>()))
+            if (offset != rootSize) Pair(null, emptyList<String>()) else Pair(packageAttr, permissions.toList())
+        }.getOrElse { failure ->
+            if (failure !is Exception || failure is CancellationException) throw failure
+            Pair(null, emptyList())
+        }
     }
 
     /** Parses a RES_STRING_POOL_TYPE chunk into decoded strings (UTF-8 and UTF-16 encodings). */
-    private fun parseStringPool(data: ByteArray, chunkOffset: Int, chunkSize: Int): List<String> {
-        if (chunkSize < 28 || chunkOffset + 28 > data.size) return emptyList()
+    private fun parseStringPool(
+        data: ByteArray, chunkOffset: Int, chunkSize: Int, headerSize: Int, checkpoint: () -> Unit
+    ): List<String> {
+        if (headerSize < 28 || headerSize > chunkSize) return emptyList()
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
-        buf.position(chunkOffset)
-        buf.short // type
-        buf.short // headerSize
-        buf.int // size
-        val stringCount = buf.int
-        val styleCount = buf.int
-        val flags = buf.int
-        val stringsStart = buf.int
-        val stylesStart = buf.int
-        if (stringCount < 0 || stringCount > 60_000 || styleCount < 0 || stringsStart < 0) return emptyList()
+        val stringCount = buf.getInt(chunkOffset + 8)
+        val styleCount = buf.getInt(chunkOffset + 12)
+        val flags = buf.getInt(chunkOffset + 16)
+        val stringsStart = buf.getInt(chunkOffset + 20)
+        val stylesStart = buf.getInt(chunkOffset + 24)
+        val tableEnd = headerSize + 4L * (stringCount.toLong() + styleCount)
+        val end = if (stylesStart == 0) chunkSize else stylesStart
+        if (stringCount !in 0..60_000 || styleCount < 0 || stringsStart < tableEnd || end !in stringsStart..chunkSize) {
+            return emptyList()
+        }
         val isUtf8 = (flags and (1 shl 8)) != 0
-
-        val offsets = IntArray(stringCount)
-        for (i in 0 until stringCount) {
-            val entryPos = chunkOffset.toLong() + 28L + i.toLong() * 4L
-            if (entryPos < 0L || entryPos + 4L > data.size.toLong()) return emptyList()
-            offsets[i] = buf.getInt(entryPos.toInt())
-        }
-
         val result = ArrayList<String>(stringCount)
+        var remainingChars = 1_048_576
         for (i in 0 until stringCount) {
-            val off = offsets[i]
-            val absLong = chunkOffset.toLong() + stringsStart.toLong() + off.toLong()
-            if (off < 0 || absLong < 0L || absLong >= data.size.toLong()) {
-                result.add("")
-                continue
-            }
-            val abs = absLong.toInt()
-            val str = if (isUtf8) decodeUtf8PoolString(data, abs) else decodeUtf16PoolString(data, abs)
-            result.add(str ?: "")
+            if ((i and 255) == 0) checkpoint()
+            val off = buf.getInt(chunkOffset + headerSize + i * 4)
+            if (off !in 0 until end - stringsStart) return emptyList()
+            val absolute = chunkOffset + stringsStart + off
+            val str = (if (isUtf8) decodeUtf8PoolString(data, absolute, chunkOffset + end)
+                else decodeUtf16PoolString(data, absolute, chunkOffset + end)) ?: return emptyList()
+            remainingChars -= str.length
+            if (remainingChars < 0) return emptyList()
+            result.add(str)
         }
-        @Suppress("UNUSED_EXPRESSION")
-        stylesStart
         return result
     }
 
-    private fun decodeUtf16PoolString(data: ByteArray, pos: Int): String? {
+    private fun decodeUtf16PoolString(data: ByteArray, pos: Int, end: Int): String? {
         var p = pos
-        if (p < 0 || p + 2 > data.size) return null
+        if (p < 0 || p + 2 > end) return null
         val buf = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
         var len = buf.getShort(p).toInt() and 0xFFFF
         p += 2
         if (len and 0x8000 != 0) {
-            if (p + 2 > data.size) return null
+            if (p + 2 > end) return null
             len = ((len and 0x7FFF) shl 16) or (buf.getShort(p).toInt() and 0xFFFF)
             p += 2
         }
-        if (len < 0 || p.toLong() + len.toLong() * 2L + 2L > data.size.toLong()) return null
+        if (len !in 0..4_096 || p.toLong() + len * 2L + 2L > end) return null
         val chars = CharArray(len)
         for (i in 0 until len) {
             chars[i] = buf.getChar(p + i * 2)
@@ -315,27 +331,27 @@ class ApkAnalyzer {
         return String(chars)
     }
 
-    private fun decodeUtf8PoolString(data: ByteArray, pos: Int): String? {
+    private fun decodeUtf8PoolString(data: ByteArray, pos: Int, end: Int): String? {
         var p = pos
-        if (p < 0 || p >= data.size) return null
+        if (p < 0 || p >= end) return null
         // utf16 length (u8 or u8*2), then utf8 length (u8 or u8*2), then bytes, then NUL
         var b = data[p].toInt() and 0xFF
         p++
         if (b and 0x80 != 0) {
-            if (p >= data.size) return null
+            if (p >= end) return null
             b = ((b and 0x7F) shl 8) or (data[p].toInt() and 0xFF)
             p++
         }
-        if (p >= data.size) return null
+        if (p >= end) return null
         // b is utf16 char count; skip
         var len = data[p].toInt() and 0xFF
         p++
         if (len and 0x80 != 0) {
-            if (p >= data.size) return null
+            if (p >= end) return null
             len = ((len and 0x7F) shl 8) or (data[p].toInt() and 0xFF)
             p++
         }
-        if (len < 0 || p.toLong() + len.toLong() > data.size.toLong()) return null
+        if (len !in 0..16_384 || p.toLong() + len + 1L > end) return null
         return String(data, p, len, Charsets.UTF_8)
     }
 
@@ -368,31 +384,45 @@ class ApkAnalyzer {
         }
     }.getOrDefault(false)
 
-    private fun readBounded(input: InputStream, maxBytes: Long): ByteArray {
+    private fun readBounded(input: InputStream, maxBytes: Long, checkpoint: () -> Unit): ByteArray {
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(65536)
         var total = 0L
         while (total < maxBytes) {
+            checkpoint()
             val read = input.read(buffer, 0, buffer.size.coerceAtMost((maxBytes - total).toInt()))
-            if (read < 0) break
+            if (read <= 0) break
             out.write(buffer, 0, read)
             total += read
         }
         return out.toByteArray()
     }
 
-    private fun ByteArray.searchFor(pattern: ByteArray): Boolean {
-        if (pattern.isEmpty() || size < pattern.size) return false
-        outer@ for (i in 0..size - pattern.size) {
-            for (j in pattern.indices) {
-                if (this[i + j] != pattern[j]) continue@outer
-            }
-            return true
+    private data class DexIndicators(val bytesRead: Long, val dynamicLoading: Boolean, val packer: Boolean)
+
+    private fun inspectDex(input: InputStream, budget: Long, checkpoint: () -> Unit): DexIndicators {
+        val buffer = ByteArray(65_536)
+        var read = 0L
+        var overlap = ""
+        var dynamic = false
+        var packer = false
+        while (read < budget) {
+            checkpoint()
+            val count = input.read(buffer, 0, minOf(buffer.size.toLong(), budget - read).toInt())
+            if (count <= 0) break
+            read += count
+            val text = overlap + String(buffer, 0, count, Charsets.ISO_8859_1)
+            dynamic = dynamic || text.contains("InMemoryDexClassLoader") || text.contains("dalvik/system/DexClassLoader")
+            packer = packer || text.contains("libjiagu") || text.contains("libDexHelper")
+            overlap = text.takeLast(32)
         }
-        return false
+        return DexIndicators(read, dynamic, packer)
     }
 
     companion object {
+        private const val ENTRY_LIMIT = 4_096
+        private const val MANIFEST_LIMIT = 4L * 1024 * 1024
+        private const val DEX_LIMIT = 12L * 1024 * 1024
         private val PACKER_LIB_MARKERS = listOf(
             "libjiagu", "libjiagu_art", "libjiagu_x86", "libdexhelper", "libsecexe", "libsecmain",
             "libprotectclass", "libshellx", "libnqshield", "libexecmain", "libtup", "libexec.so"

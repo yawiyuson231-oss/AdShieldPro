@@ -415,7 +415,7 @@ fun HomeScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             DetectionRow("DNS filter", if (isConnected) "Active" else "Standby", isConnected)
-                            DetectionRow("CNAME shield", if (settings.cnameUncloakingEnabled) "Enabled" else "Off", settings.cnameUncloakingEnabled)
+                            DetectionRow("DNS Alias Shield", if (settings.cnameUncloakingEnabled) "Enabled" else "Off", settings.cnameUncloakingEnabled)
                             DetectionRow("Threat lists", if (vpnState.loadedRuleCount > 0) "Loaded" else "Loading", vpnState.loadedRuleCount > 0)
                             DetectionRow("Browser shield", if (settings.browserCosmeticFilteringEnabled) "Enabled" else "Off", settings.browserCosmeticFilteringEnabled)
                             DetectionRow("Offline baseline", "Bundled", true)

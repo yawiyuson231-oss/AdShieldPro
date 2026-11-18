@@ -64,7 +64,7 @@ import com.adshield.pro.ui.theme.formatInteger
  * Full-screen Per-App Firewall & Split-Tunnel Manager.
  *
  * Lets users control each installed application individually across four deterministic modes:
- *  - **Filtered** (routes DNS through AdShield VPN with blocklists + CNAME-cloaking shield)
+ *  - **Filtered** (routes DNS through AdShield VPN with blocklists and DNS Alias Shield)
  *  - **Allow DNS** (routes DNS through encrypted upstream while bypassing domain blocklists)
  *  - **Block DNS** (blocks all DNS lookups originating from the app's UID)
  *  - **Bypass VPN** (excludes the app from the VPN tunnel via `addDisallowedApplication`)

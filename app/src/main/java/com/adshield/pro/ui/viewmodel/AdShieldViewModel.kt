@@ -656,8 +656,8 @@ class AdShieldViewModel @Inject constructor(
             preferencesRepository.setCnameUncloakingEnabled(enabled)
             upstreamDnsResolver.clearCache()
             showFeedback(
-                if (enabled) "CNAME-cloaking tracker shield enabled."
-                else "CNAME-cloaking tracker shield disabled."
+                if (enabled) "DNS Alias Shield enabled."
+                else "DNS Alias Shield disabled."
             )
         }
     }
