@@ -32,7 +32,7 @@ Run from the repository root (where `gradlew.bat` and `settings.gradle.kts` live
 
 ### Step 1: Use the Existing Production Signing Keystore
 
-For an update to an already installed AdShield Pro app, use the original production keystore and credentials. Do not generate a replacement key: Android will reject the update if it is signed with a different key. If this is the first ever release, create and securely back up a keystore before publishing.
+Use a trusted private signing key for the intended distribution channel. Android requires a compatible signing certificate or supported signing lineage for in-place updates. The historical GitHub APK key was publicly exposed: do not use it for production or import it as a Play upload key. GitHub APK publication remains blocked pending signing recovery (see [Publishing a release](../README.md#publishing-a-release)). If using Google Play App Signing, manage the upload key separately in Play Console.
 
 ### Step 2: Set Signing Environment Variables and Build `.aab`
 `app/build.gradle.kts` reads release credentials from environment variables or Gradle user properties (never hardcoded in source control). On Windows, you can keep them in `%USERPROFILE%\.gradle\gradle.properties`, outside this project:

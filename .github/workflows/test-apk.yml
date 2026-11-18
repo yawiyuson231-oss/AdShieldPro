@@ -11,20 +11,18 @@ name: Test APK (pre-release)
 #   * The tag prefix is `test-`, which cannot match the `v*` tag trigger of release.yml, so a
 #     test build can never accidentally publish a real release.
 #
-# The APK is signed with the SAME release keystore as the published builds (never a throwaway
-# key), so a tester's install is upgraded in place by the final release instead of failing on a
-# certificate mismatch. The keystore itself is never attached to a test release.
+# Signed with the same approved private key as the published builds. Release signing is only
+# for commits already on main. For unmerged work, use the Android CI debug APK instead.
 #
 # Usage:
 #   gh workflow run "Test APK (pre-release)" --ref main
-#   gh workflow run "Test APK (pre-release)" --ref main -f source_ref=refs/pull/13/head
-#   gh workflow run "Test APK (pre-release)" --ref main -f source_ref=arena/my-branch -f tag=test-v2.10.0-rc2
+#   gh workflow run "Test APK (pre-release)" --ref main -f tag=test-v2.11.1-rc2
 
 on:
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Ref to build (branch, tag or refs/pull/<n>/head). Empty = the ref this workflow runs on'
+        description: 'Optional ref already merged into main. Empty = the ref this workflow runs on'
         required: false
         default: ''
       tag:
@@ -52,6 +50,21 @@ jobs:
         with:
           ref: ${{ inputs.source_ref || github.ref }}
           fetch-depth: 0
+
+      - name: Require a reviewed main commit and signing configuration
+        env:
+          TRUSTED_CERT: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
+            echo "::error::Release signing requires a commit already merged into main. Use an Android CI debug artifact for an unmerged PR."
+            exit 1
+          fi
+          if [[ ! "$TRUSTED_CERT" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+            echo "::error::APK publication is blocked until signing recovery is reviewed and ADSHIELD_TRUSTED_APK_CERT_SHA256 is configured."
+            exit 1
+          fi
 
       - name: JDK 21
         uses: actions/setup-java@v5
@@ -115,55 +128,6 @@ jobs:
           echo "apk_name=AdShieldPro-${VERSION_NAME}-test.apk" >> "$GITHUB_OUTPUT"
           echo "Building test APK: versionName=$VERSION_NAME versionCode=$VERSION_CODE commit=$SHORT ref=$SOURCE_REF tag=$TAG"
 
-      # Same key as the published releases, by the same precedence as release.yml:
-      #   ADSHIELD_KEYSTORE_BASE64 secret -> keystore attached to any existing release.
-      # Unlike release.yml this never generates a key: a test build signed with a throwaway key
-      # could not be upgraded over by the real release, which is the whole point of testing it.
-      - name: Prepare release signing key
-        env:
-          KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
-          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
-          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
-          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          KEYSTORE=/tmp/adshield-release.jks
-          if [ -n "${KEYSTORE_B64:-}" ]; then
-            STORE_PASS="${ADSHIELD_STORE_PASSWORD:?set ADSHIELD_STORE_PASSWORD next to ADSHIELD_KEYSTORE_BASE64}"
-            echo "using keystore from ADSHIELD_KEYSTORE_BASE64 secret"
-            printf '%s' "$KEYSTORE_B64" | base64 -d > "$KEYSTORE"
-          else
-            mkdir -p /tmp/keystore
-            FOUND=""
-            FOUND_TAG=""
-            for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
-              if gh release download "$TAG" --pattern 'adshield-release.*' --dir /tmp/keystore \
-                  --clobber 2>/dev/null; then
-                CANDIDATE="$(ls /tmp/keystore/adshield-release.* 2>/dev/null | head -1 || true)"
-                if [ -n "$CANDIDATE" ] && [ -s "$CANDIDATE" ]; then
-                  FOUND="$CANDIDATE"
-                  FOUND_TAG="$TAG"
-                  break
-                fi
-              fi
-            done
-            if [ -z "$FOUND" ]; then
-              echo "::error::No release keystore found (no ADSHIELD_KEYSTORE_BASE64 secret and no adshield-release.keystore asset on any release). A test APK must be signed with the release key or it cannot be upgraded by the real release."
-              exit 1
-            fi
-            echo "reusing keystore attached to release $FOUND_TAG"
-            cp "$FOUND" "$KEYSTORE"
-            STORE_PASS="${ADSHIELD_STORE_PASSWORD:-adshield-release}"
-          fi
-          {
-            echo "ADSHIELD_KEYSTORE_PATH=${KEYSTORE}"
-            echo "ADSHIELD_KEYSTORE_PASSWORD=${STORE_PASS}"
-            echo "ADSHIELD_KEY_ALIAS=${ADSHIELD_KEY_ALIAS:-adshield}"
-            echo "ADSHIELD_KEY_PASSWORD=${ADSHIELD_KEY_PASSWORD:-${STORE_PASS}}"
-          } >> "$GITHUB_ENV"
-          keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASS" | tail -3
-
       - name: UI performance and lazy-list gates
         run: |
           chmod +x tools/check_ui_performance.py gradlew
@@ -172,10 +136,15 @@ jobs:
       - name: JVM unit tests
         run: ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
 
-      - name: Build signed release APK
-        run: |
-          ./gradlew :app:assembleRelease --no-daemon --console=plain
-          ls -l app/build/outputs/apk/release/
+      - name: Build APK with the approved private signing key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+          KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
+          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
+          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
+          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
+        run: bash tools/release_signing.sh build
 
       - name: Universal-build gate
         run: |
@@ -183,38 +152,10 @@ jobs:
           chmod +x tools/check_universal_release.py
           python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/release/*.apk | head -1)"
 
-      # A test APK that cannot be installed over the shipped app is a wasted test round.
-      - name: Verify signing continuity with the published release
+      - name: Verify the built APK signature
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
-          NEW_APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
-          "$APKSIGNER" verify --print-certs "$NEW_APK" > /tmp/new-certs.txt
-          NEW_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/new-certs.txt | head -1 | awk '{print $NF}')"
-          test -n "$NEW_DIGEST"
-          PREV_TAG=""
-          for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
-            if gh release download "$TAG" --pattern 'AdShieldPro-*-release.apk' --dir /tmp/prev --clobber 2>/dev/null; then
-              PREV_TAG="$TAG"
-              break
-            fi
-          done
-          if [ -z "$PREV_TAG" ]; then
-            echo "No published AdShield Pro release APK yet; nothing to compare against."
-            exit 0
-          fi
-          PREV_APK="$(ls /tmp/prev/AdShieldPro-*-release.apk | head -1)"
-          "$APKSIGNER" verify --print-certs "$PREV_APK" > /tmp/prev-certs.txt
-          PREV_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/prev-certs.txt | head -1 | awk '{print $NF}')"
-          echo "published ($PREV_TAG): $PREV_DIGEST"
-          echo "test build:            $NEW_DIGEST"
-          if [ "$NEW_DIGEST" != "$PREV_DIGEST" ]; then
-            echo "::error::Test APK is signed with a different certificate than $PREV_TAG, so testers could not install it as an update. Use the original release keystore."
-            exit 1
-          fi
-          echo "Signing continuity verified: this test APK installs over $PREV_TAG."
+          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+        run: bash tools/release_signing.sh verify app/build/outputs/apk/release/app-release.apk
 
       - name: Verify and package APK
         id: apk
@@ -282,17 +223,24 @@ jobs:
           creates tag \`v${VERSION_NAME}\`, makes it \`latest\` and points the website at it.
           EOF
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "pre-release $TAG already exists: replacing its APK assets and notes"
-            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
-            gh release edit "$TAG" --title "AdShield Pro ${VERSION_NAME} — TEST BUILD" \
-              --notes-file /tmp/notes.md --prerelease
-          else
-            gh release create "$TAG" "$APK" "$APK.sha256" \
-              --title "AdShield Pro ${VERSION_NAME} — TEST BUILD" \
-              --notes-file /tmp/notes.md \
-              --target "${{ steps.meta.outputs.commit }}" \
-              --prerelease
+            echo "::error::Release $TAG already exists. Choose a new test tag."
+            exit 1
           fi
+          REF="refs/tags/$TAG"
+          COMMIT="$(git rev-parse HEAD)"
+          if git show-ref --verify --quiet "$REF"; then
+            test "$(git rev-parse "$REF^{commit}")" = "$COMMIT" || {
+              echo "::error::Tag $TAG points to a different commit; choose a new test tag."
+              exit 1
+            }
+          else
+            git tag "$TAG" "$COMMIT"
+            git push origin "$REF"
+          fi
+          gh release create "$TAG" "$APK" "$APK.sha256" \
+            --title "AdShield Pro ${VERSION_NAME} — TEST BUILD" \
+            --notes-file /tmp/notes.md \
+            --verify-tag --prerelease --latest=false
 
       # The safety property of this whole pipeline: the test build must not have become the
       # release the updater and the website download link resolve to.
@@ -303,7 +251,7 @@ jobs:
         run: |
           set -euo pipefail
           PRE="$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)"
-          LATEST="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name || true)"
+          LATEST="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
           echo "$TAG prerelease=$PRE latest=$LATEST"
           test "$PRE" = "true" || { echo "::error::$TAG is not marked as a pre-release"; exit 1; }
           test "$LATEST" != "$TAG" || { echo "::error::$TAG became the Latest release; the test build must never replace the published one"; exit 1; }

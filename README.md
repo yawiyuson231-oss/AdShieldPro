@@ -1,4 +1,4 @@
-# AdShield Pro 2.10.2 — Android DNS Ad & Tracker Protection
+# AdShield Pro — Android DNS Ad & Tracker Protection
 
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
@@ -25,12 +25,20 @@ git tag v2.3.1 && git push origin v2.3.1
 ```
 
 The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
-publishes it to GitHub Releases with a SHA-256 checksum and refreshes the GitHub Pages site.
-The workflow no longer attaches the signing keystore to new releases. Earlier releases did expose
-it; treat that key as compromised and review signing-key security before publishing an update. Re-running it for an existing tag
-replaces that release's APK assets instead of failing or creating a duplicate release.
-To sign with your own key instead, add repository secrets `ADSHIELD_KEYSTORE_BASE64`,
-`ADSHIELD_STORE_PASSWORD`, and optionally `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD`.
+publishes it to GitHub Releases with a SHA-256 checksum and refreshes GitHub Pages. Release tags
+must match the app version. The workflow never overwrites an existing production release or moves
+an existing tag.
+
+**Signing recovery is required before publishing another APK.** A historical release exposed the
+private signing key. Changing its password or moving it into Actions secrets does not make that
+key trustworthy, and choosing an unrelated key will not automatically upgrade existing installs.
+Decide how existing GitHub APK users will move to a trusted signer before resuming publication.
+After recovery, configure the reviewed public certificate SHA-256 in the Actions variable
+`ADSHIELD_TRUSTED_APK_CERT_SHA256` and provision the private `ADSHIELD_KEYSTORE_BASE64`,
+`ADSHIELD_STORE_PASSWORD`, and optional `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD` as Actions
+secrets. Never share the keystore or passwords in a release, commit, or chat. The workflow checks
+that the new build matches the approved certificate and the production upgrade path, and rejects
+the exposed signer. The website and debug CI builds do not need this key.
 
 ### Test APK before publishing
 
@@ -39,15 +47,15 @@ signed, R8-minified APK as a GitHub pre-release**, so it can be installed and ex
 device before the real release goes out:
 
 ```bash
-# test whatever the branch already contains
+# test the merged version on main after signing recovery
 gh workflow run "Test APK (pre-release)" --ref main
 
-# test an unmerged pull request (builds exactly that commit, no merge needed)
-gh workflow run "Test APK (pre-release)" --ref main -f source_ref=refs/pull/13/head
-
-# a second round on the same version keeps a separate tag
-gh workflow run "Test APK (pre-release)" --ref main -f source_ref=arena/my-branch -f tag=test-v2.10.0-rc2
+# a second round on the same version uses a separate tag
+gh workflow run "Test APK (pre-release)" --ref main -f tag=test-v2.11.1-rc2
 ```
+
+For an unmerged pull request, use its **Android build & test** debug artifact instead. The debug
+APK can install separately from the production app and is not a production update.
 
 It runs the unit tests, UI-performance gate, universal-build gate and a signing-continuity check,
 then creates tag `test-v<versionName>` with `AdShieldPro-<versionName>-test.apk` and its SHA-256.
@@ -55,7 +63,7 @@ Design guarantees, enforced by the workflow itself:
 
 - **Signed with the published release key**, never a throwaway one — the test APK installs *over*
   the current release as an update, and the real release later replaces it in place. If no release
-  keystore is available the job fails instead of producing an un-upgradable APK.
+  keystore passes the same signing checks as production, the job fails.
 - **Always a pre-release**, so `/releases/latest` — what the in-app updater and the website download
   link resolve — keeps pointing at the shipped version. A final step asserts this and fails if the
   test build ever became *Latest*.

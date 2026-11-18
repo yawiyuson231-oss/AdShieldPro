@@ -7,14 +7,13 @@ name: Release APK
 #      app/build.gradle.kts and publishes tag v<versionName>, skipping if it already exists.
 #   2. Tag push: push a tag like v2.3.1 and the same pipeline builds and publishes it.
 #
-# The signing key is generated once and then kept (see "Signing key" below), so every future
-# release can upgrade-install over the previous one.
+# Fails closed unless a trusted, private signing key preserves the published upgrade path.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (default: v<versionName> from app/build.gradle.kts)'
+        description: 'Must match v<versionName> from app/build.gradle.kts (the default)'
         required: false
         default: ''
   push:
@@ -38,6 +37,21 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Require a reviewed main commit and signing configuration
+        env:
+          TRUSTED_CERT: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
+            echo "::error::Release signing requires a commit already merged into main. Use an Android CI debug artifact for an unmerged PR."
+            exit 1
+          fi
+          if [[ ! "$TRUSTED_CERT" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+            echo "::error::APK publication is blocked until signing recovery is reviewed and ADSHIELD_TRUSTED_APK_CERT_SHA256 is configured."
+            exit 1
+          fi
 
       - name: JDK 21
         uses: actions/setup-java@v5
@@ -73,82 +87,15 @@ jobs:
           else
             TAG="v${VERSION_NAME}"
           fi
-          case "$TAG" in
-            *[!A-Za-z0-9._+-]*|"")
-              echo "::error::Invalid release tag '$TAG' (allowed characters: A-Za-z0-9._+-)."
-              exit 1
-              ;;
-          esac
+          if [[ ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$TAG" != "v$VERSION_NAME" ]]; then
+            echo "::error::Release tag must match v<versionName> from app/build.gradle.kts."
+            exit 1
+          fi
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "apk_name=AdShieldPro-${VERSION_NAME}-release.apk" >> "$GITHUB_OUTPUT"
           echo "Releasing $TAG (versionName=$VERSION_NAME, versionCode=$VERSION_CODE)"
-
-      # Signing key: reuse the key stored in the ADSHIELD_KEYSTORE_BASE64 Actions secret,
-      # otherwise reuse a historical keystore asset (newest first). If neither is available,
-      # fail rather than generate an ephemeral key or break upgrade installs. New releases never
-      # attach keys; historical assets must be treated as exposed.
-      - name: Prepare signing key
-        env:
-          KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
-          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
-          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
-          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p .ci
-          KEYSTORE=/tmp/adshield-release.jks
-          STORE_PASS="${ADSHIELD_STORE_PASSWORD:-adshield-release}"
-          export KEYSTORE STORE_PASS
-          if [ -n "${KEYSTORE_B64:-}" ]; then
-            STORE_PASS="${ADSHIELD_STORE_PASSWORD:?set ADSHIELD_STORE_PASSWORD next to ADSHIELD_KEYSTORE_BASE64}"
-            export STORE_PASS
-            echo "using keystore from ADSHIELD_KEYSTORE_BASE64 secret"
-            printf '%s' "$KEYSTORE_B64" | base64 -d > "$KEYSTORE"
-            {
-              echo "ADSHIELD_KEYSTORE_PASSWORD=${ADSHIELD_STORE_PASSWORD:?set the ADSHIELD_STORE_PASSWORD secret alongside the keystore}"
-              echo "ADSHIELD_KEY_ALIAS=${ADSHIELD_KEY_ALIAS:-adshield}"
-              echo "ADSHIELD_KEY_PASSWORD=${ADSHIELD_KEY_PASSWORD:-${ADSHIELD_STORE_PASSWORD}}"
-            } >> "$GITHUB_ENV"
-          else
-            # Scan EVERY release (newest first) for the keystore, not just the latest one:
-            # a release that reused an older key does not re-attach it, so the newest release
-            # may not carry the asset even though an older one does. Picking only the latest
-            # release once silently generated a fresh key and broke upgrade installs.
-            # Pattern is a glob: it matches the .keystore name and the .jks name an earlier run used.
-            FOUND=""
-            FOUND_TAG=""
-            for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
-              if gh release download "$TAG" --pattern 'adshield-release.*' --dir /tmp/keystore \
-                  --clobber 2>/dev/null; then
-                CANDIDATE="$(ls /tmp/keystore/adshield-release.* 2>/dev/null | head -1 || true)"
-                if [ -n "$CANDIDATE" ] && [ -s "$CANDIDATE" ]; then
-                  FOUND="$CANDIDATE"
-                  FOUND_TAG="$TAG"
-                  break
-                fi
-              fi
-            done
-            if [ -n "$FOUND" ]; then
-              echo "reusing keystore attached to release $FOUND_TAG: $FOUND"
-              cp "$FOUND" "$KEYSTORE"
-              STORE_PASS="${ADSHIELD_STORE_PASSWORD:-adshield-release}"
-              echo "STORE_PASS=${STORE_PASS}" >> "$GITHUB_ENV"
-              echo "reused=true" >> "$GITHUB_ENV"
-            else
-              echo "::error::No signing key found. Provision a privately backed-up keystore using ADSHIELD_KEYSTORE_BASE64 and ADSHIELD_STORE_PASSWORD before publishing."
-              exit 1
-            fi
-            {
-              echo "ADSHIELD_KEYSTORE_PASSWORD=${STORE_PASS}"
-              echo "ADSHIELD_KEY_ALIAS=adshield"
-              echo "ADSHIELD_KEY_PASSWORD=${STORE_PASS}"
-            } >> "$GITHUB_ENV"
-          fi
-          echo "ADSHIELD_KEYSTORE_PATH=${KEYSTORE}" >> "$GITHUB_ENV"
-          keytool -list -keystore "$KEYSTORE" -storepass "$STORE_PASS" | tail -3
 
       - name: UI performance and lazy-list gates
         run: |
@@ -160,52 +107,27 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
 
-      - name: Build signed release APK
-        run: |
-          ./gradlew :app:assembleRelease --no-daemon --console=plain
-          ls -l app/build/outputs/apk/release/
+      - name: Build APK with the approved private signing key
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+          KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
+          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
+          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
+          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
+        run: bash tools/release_signing.sh build
 
       - name: Universal-build gate (blocks the release if the APK is device-specific)
         run: |
           set -euo pipefail
+          mkdir -p .ci
           chmod +x tools/check_universal_release.py
           python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/release/*.apk | head -1)" | tee .ci/universal.log
 
-      # Guard the upgrade path: the new APK must be signed with the same certificate as the
-      # previous published release, or Android will refuse to install it as an update.
-      - name: Verify signing continuity with the previous release
+      - name: Verify the built APK signature
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
-          NEW_APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
-          "$APKSIGNER" verify --print-certs "$NEW_APK" > /tmp/new-certs.txt
-          NEW_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/new-certs.txt | head -1 | awk '{print $NF}')"
-          test -n "$NEW_DIGEST"
-          # Newest release that actually shipped an AdShield Pro APK (this repo also holds
-          # older OmniShield X releases signed with a different key — skip those).
-          PREV_TAG=""
-          for TAG in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
-            if gh release download "$TAG" --pattern 'AdShieldPro-*-release.apk' --dir /tmp/prev --clobber 2>/dev/null; then
-              PREV_TAG="$TAG"
-              break
-            fi
-          done
-          if [ -z "$PREV_TAG" ]; then
-            echo "No previous AdShield Pro release APK; nothing to compare against."
-            exit 0
-          fi
-          PREV_APK="$(ls /tmp/prev/AdShieldPro-*-release.apk | head -1)"
-          "$APKSIGNER" verify --print-certs "$PREV_APK" > /tmp/prev-certs.txt
-          PREV_DIGEST="$(grep -i 'certificate SHA-256 digest' /tmp/prev-certs.txt | head -1 | awk '{print $NF}')"
-          echo "previous ($PREV_TAG): $PREV_DIGEST"
-          echo "new build:            $NEW_DIGEST"
-          if [ "$NEW_DIGEST" != "$PREV_DIGEST" ]; then
-            echo "::error::Signing certificate changed versus $PREV_TAG. Installing this APK over an existing AdShield Pro would fail. Use the original keystore (ADSHIELD_KEYSTORE_BASE64 secret or the adshield-release.keystore release asset)."
-            exit 1
-          fi
-          echo "Signing continuity verified: updates from $PREV_TAG will install over the existing app."
+          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+        run: bash tools/release_signing.sh verify app/build/outputs/apk/release/app-release.apk
 
       - name: Verify and package APK
         id: apk
@@ -248,22 +170,14 @@ jobs:
           \`$(cat "$APK.sha256")\`.
 
           ## What is in this build
-          - **New in 2.11.0 — CNAME-Cloaking Tracker Shield & Resolver Speed Benchmark:** inspects
-            upstream DNS CNAME answer chains in real time to block disguised first-party tracker
-            aliases (while respecting user allowlists and video-playback CDNs), plus a one-tap
-            concurrent DoH/DoT/UDP resolver latency benchmark with ranked results in Settings.
-          - **New in 2.11.0 — Dedicated Per-App Firewall & Split-Tunnel Manager:** search and filter
-            installed apps by live DNS traffic or override state and assign Filtered, Allow DNS,
-            Block DNS, or Bypass VPN (split-tunnel) per application, with one-tap bulk reset.
-          - **New in 2.11.0 — Shield Quick Settings Tile, Auto-Resume Timed Pause & Home Widget:**
-            no-ADB Quick Settings tile to toggle AdShield anywhere, 5/15/30/60-minute timed pause
-            with automatic Doze-aware resume (great for captive portals), and a resizable live
-            Home-Screen protection widget with blocked counter and 15-minute pause button.
-          - **New in 2.11.0 — Share-Sheet Link Cleaner & Instant Threat Check:** share any URL from
-            any app to AdShield Pro (or paste in Security → Links) to peel outbound tracking
-            redirects, strip 80+ global & platform-specific tracking parameters (preserving YouTube
-            timestamps, search queries, and product variants), run an instant on-device phishing
-            check, and copy, re-share, or open directly in Privacy Browser.
+          - **AETHER guided security plans:** build a two- or three-step plan offline, approve each
+            step separately, and see a receipt before starting the next check.
+          - **Optional AETHER API connections:** Gemini, OpenAI, and compatible HTTPS Chat Completions.
+            Review what will be sent before sending it. Testing a connection does not run a tool.
+          - **DNS Alias Shield:** check CNAME and matching HTTPS/SVCB targets in validated DNS answers
+            without extra lookups, while respecting allowlists and playback safeguards.
+          - **On-device review and scanning:** inspect Android-visible app risks and one selected file
+            with explicit limits. Scans do not execute or upload the file or prove it is safe.
           - Security & reliability hardening across VPN/TCP-DNS/IPv6 packet framing, DoH/DoT and
             DNSSEC-scoped caching, video-safe wildcard filtering, Privacy Browser cosmetic/scheme
             guards and Tor \`.onion\` leak prevention, World Monitor tile & RSS/Atom feed isolation,
@@ -309,24 +223,26 @@ jobs:
           - Built and verified by the "Release APK" workflow (unit tests, APK structure checks,
             universal-build gate, signing-continuity check against the previous release).
           - Signing keys are not included in release assets. Previously published keystore assets
-            must be considered exposed; release maintainers should review signing-key security.
+            are considered exposed and cannot be used for production signing.
           EOF
           if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "release $TAG already exists: updating its APK assets and release notes"
-            gh release upload "$TAG" "$APK" "$APK.sha256" --clobber
-            gh release edit "$TAG" \
-              --title "AdShield Pro ${VERSION_NAME}" \
-              --notes-file /tmp/notes.md
-            exit 0
+            echo "::error::Release $TAG already exists. Bump the app version instead of replacing shipped assets."
+            exit 1
           fi
-          git config user.name "AdShield Release"
-          git config user.email "release@adshield.local"
-          git tag -f "$TAG" "$GITHUB_SHA"
-          git push -f origin "$TAG" || true
+          REF="refs/tags/$TAG"
+          if git show-ref --verify --quiet "$REF"; then
+            test "$(git rev-parse "$REF^{commit}")" = "$GITHUB_SHA" || {
+              echo "::error::Tag $TAG points to a different commit; refusing to publish."
+              exit 1
+            }
+          else
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "$REF"
+          fi
           gh release create "$TAG" "$APK" "$APK.sha256" \
             --title "AdShield Pro ${VERSION_NAME}" \
             --notes-file /tmp/notes.md \
-            --target "$GITHUB_SHA"
+            --verify-tag --latest
 
       # Best effort: trigger the real Pages pipeline (docs/ at /, web platform at /app/).
       # Pages has to be switched on once by a repository admin (Settings -> Pages ->
