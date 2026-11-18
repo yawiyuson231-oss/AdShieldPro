@@ -41,7 +41,10 @@ cache or reach an application. A response is rejected when:
 
 Record walking is performed by `DnsPacketCodec.inspectResponseRecordTypes`, which walks the
 question, answer, authority and additional sections with bounded offsets and rejects
-compression-pointer loops rather than trusting header counts.
+compression-pointer loops rather than trusting header counts. Cached replies expire against a
+monotonic clock; hits return only remaining record TTLs and leave EDNS flags alone. Zero-TTL
+replies are not stored. Negative results require an authority SOA, with a lifetime no greater than
+its TTL or SOA.MINIMUM. Custom DoH paths and query strings are cache-keyed case-sensitively.
 
 ## 3. DNSSEC: reporting, not local validation
 

@@ -551,7 +551,8 @@ class AdShieldEngineTestSuite {
     @Test
     fun testOnlyNoerrorAndNxdomainAnswersAreCacheable() {
         val query = DnsPacketCodec.parseQuery(buildRawDnsQueryPacket())!!
-        assertTrue(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, false)))
+        // NXDOMAIN is cacheable only when the authority section supplies a usable SOA TTL.
+        assertFalse(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, false)))
         assertTrue(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, true)))
         assertFalse(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildServFailResponse(query)))
 

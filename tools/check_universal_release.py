@@ -13,14 +13,18 @@ Checks
           libandroidx.graphics.path.so are fine as long as no ABI is left behind.
           Contains classes*.dex, resources.arsc, AndroidManifest.xml.
   3. APK: bundled offline rule sets are present and non-trivial; the AETHER model matches source.
-  4. versionCode/versionName match the build file (so upgrades are ordered).
+  4. APK manifest (read with Android SDK aapt2): application ID, versionCode/versionName,
+     minSdk and targetSdk match the intended debug or release variant. Reject split APKs.
 
 Usage: python3 tools/check_universal_release.py app/build/outputs/apk/release/app-release.apk
 """
 from __future__ import annotations
 
+import argparse
+import os
 import re
-import sys
+import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -38,15 +42,26 @@ def read_int(pattern: str, text: str, label: str) -> int:
     return int(match.group(1))
 
 
-def check_build_config(problems: list[str]) -> dict:
+def read_string(field: str, text: str) -> str:
+    match = re.search(rf'\b{field}\s*=\s*"([^"]+)"', text)
+    if not match:
+        raise SystemExit(f"could not read {field} from app/build.gradle.kts")
+    return match.group(1)
+
+
+def check_build_config(problems: list[str], variant: str = "release") -> dict:
     text = BUILD_FILE.read_text(encoding="utf-8")
     info = {
+        "applicationId": read_string("applicationId", text),
         "minSdk": read_int(r"minSdk\s*=\s*(\d+)", text, "minSdk"),
         "targetSdk": read_int(r"targetSdk\s*=\s*(\d+)", text, "targetSdk"),
         "compileSdk": read_int(r"compileSdk\s*=\s*(\d+)", text, "compileSdk"),
         "versionCode": read_int(r"versionCode\s*=\s*(\d+)", text, "versionCode"),
-        "versionName": re.search(r'versionName\s*=\s*"([^"]+)"', text).group(1),
+        "versionName": read_string("versionName", text),
     }
+    if variant == "debug":
+        info["applicationId"] += read_string("applicationIdSuffix", text)
+        info["versionName"] += read_string("versionNameSuffix", text)
     if info["minSdk"] != MIN_SDK_REQUIRED:
         problems.append(f"minSdk is {info['minSdk']}, expected {MIN_SDK_REQUIRED} (universal baseline)")
     if info["targetSdk"] < MIN_SDK_REQUIRED:
@@ -127,17 +142,66 @@ def check_apk(apk: Path, problems: list[str]) -> dict:
         }
 
 
+def find_aapt2() -> str | None:
+    # CI installs this version. Local users can also supply --aapt2 or put it on PATH.
+    sdk = os.getenv("ANDROID_HOME") or os.getenv("ANDROID_SDK_ROOT")
+    if sdk:
+        binary = "aapt2.exe" if os.name == "nt" else "aapt2"
+        path = Path(sdk) / "build-tools" / "36.0.0" / binary
+        if path.is_file():
+            return str(path)
+    return shutil.which("aapt2")
+
+
+def check_packaged_metadata(apk: Path, config: dict, aapt2: str | None, problems: list[str]) -> None:
+    if not aapt2:
+        problems.append("aapt2 not found; install Android build-tools 36.0.0 or pass --aapt2")
+        return
+    try:
+        result = subprocess.run(
+            [aapt2, "dump", "badging", str(apk.resolve())],
+            check=True, capture_output=True, encoding="utf-8", timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        problems.append("aapt2 could not read the packaged Android manifest")
+        return
+
+    badging = result.stdout
+    package_line = re.search(r"^package: (.*)$", badging, re.MULTILINE)
+    package = dict(re.findall(r"(\w+)='([^']*)'", package_line.group(1))) if package_line else {}
+    if package.get("split"):
+        problems.append("APK is a split package, not an installable standalone package")
+    for field, value in (("applicationId", package.get("name")),
+                         ("versionCode", package.get("versionCode")),
+                         ("versionName", package.get("versionName")),
+                         ("minSdk", re.search(r"^sdkVersion:'(\d+)'$", badging, re.MULTILINE)),
+                         ("targetSdk", re.search(r"^targetSdkVersion:'(\d+)'$", badging, re.MULTILINE))):
+        actual = value.group(1) if isinstance(value, re.Match) else value
+        if actual != str(config[field]):
+            problems.append(f"APK manifest {field}: expected {config[field]}, got {actual or 'missing'}")
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        raise SystemExit(__doc__)
-    apk = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Validate the packaged standalone AdShield APK.")
+    parser.add_argument("apk", type=Path)
+    parser.add_argument("--variant", choices=("debug", "release"), default="release")
+    parser.add_argument("--aapt2", help="Path to the Android SDK aapt2 executable")
+    args = parser.parse_args()
+    apk = args.apk
     problems: list[str] = []
-    config = check_build_config(problems)
-    apk_info = check_apk(apk, problems)
+    config = check_build_config(problems, args.variant)
+    try:
+        apk_info = check_apk(apk, problems)
+    except (OSError, zipfile.BadZipFile) as error:
+        problems.append(f"cannot read APK ZIP: {error}")
+        apk_info = {}
+    if apk_info:
+        check_packaged_metadata(apk, config, args.aapt2 or find_aapt2(), problems)
 
     print("Universal build gate")
-    print(f"  version        : {config.get('versionName')} (versionCode {config.get('versionCode')})")
-    print(f"  sdk            : min {config.get('minSdk')} / target {config.get('targetSdk')} / compile {config.get('compileSdk')}")
+    print(f"  variant        : {args.variant}, {config['applicationId']}")
+    print(f"  version        : {config['versionName']} (versionCode {config['versionCode']})")
+    print(f"  sdk            : min {config['minSdk']} / target {config['targetSdk']} / compile {config['compileSdk']}")
     if apk_info:
         print(f"  apk            : {apk.name}, {apk_info['size_mb']} MB, {apk_info['dex']} dex file(s)")
         print(f"  native libs    : {', '.join(apk_info['native_abis'])}")

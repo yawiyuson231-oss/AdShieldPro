@@ -327,6 +327,10 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun checkForUpdates() {
+        if (BuildConfig.DEBUG) {
+            showFeedback("This is a debug build. Get a newer debug APK from GitHub Actions instead of installing a production update.")
+            return
+        }
         if (_isCheckingForUpdates.value) return
         viewModelScope.launch {
             _isCheckingForUpdates.value = true

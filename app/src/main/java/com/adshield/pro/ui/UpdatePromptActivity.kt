@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.adshield.pro.BuildConfig
 import com.adshield.pro.update.GitHubApkDownload
 import com.adshield.pro.update.GitHubRelease
 import com.adshield.pro.ui.theme.AdShieldProTheme
@@ -50,6 +51,7 @@ class UpdatePromptActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG) { finish(); return }
         release = read(intent)
         if (release == null) { finish(); return }
         render()

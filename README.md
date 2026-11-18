@@ -54,9 +54,6 @@ gh workflow run "Test APK (pre-release)" --ref main
 gh workflow run "Test APK (pre-release)" --ref main -f tag=test-v2.11.1-rc2
 ```
 
-For an unmerged pull request, use its **Android build & test** debug artifact instead. The debug
-APK can install separately from the production app and is not a production update.
-
 It runs the unit tests, UI-performance gate, universal-build gate and a signing-continuity check,
 then creates tag `test-v<versionName>` with `AdShieldPro-<versionName>-test.apk` and its SHA-256.
 Design guarantees, enforced by the workflow itself:
@@ -72,6 +69,15 @@ Design guarantees, enforced by the workflow itself:
 
 Once the test build is verified, publish for real with the **Release APK** workflow above.
 
+### Install a debug build on an Android phone
+
+For unmerged changes or while production signing is on hold, open the branch's successful
+[**Android build & test** run](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
+while signed in to GitHub. Under **Artifacts**, download `adshield-pro-debug-apk`. GitHub serves a
+ZIP, not an installer. In Android's **Files → Downloads**, extract the ZIP, open `app-debug.apk`
+from the extracted folder, then tap **Install** in Android's installer. If prompted, grant the
+Files app permission to install this APK. It appears as **AdShield Pro (Debug)** alongside the
+production app. The debug build does not use production in-app updates.
 
 ## OmniShield X web platform (browser)
 

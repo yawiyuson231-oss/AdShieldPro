@@ -98,6 +98,9 @@ class GitHubUpdateWorker @AssistedInject constructor(
     @Assisted context: Context, @Assisted params: WorkerParameters
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Debug has a different application ID and signer; a production APK is not its update.
+        // Also stop already-enqueued work when updating from an earlier debug build.
+        if (BuildConfig.DEBUG) return@withContext Result.success()
         try {
             val release = GitHubReleaseClient.latest() ?: return@withContext Result.retry()
             if (release.code <= BuildConfig.VERSION_CODE) return@withContext Result.success()
@@ -139,6 +142,7 @@ class GitHubUpdateWorker @AssistedInject constructor(
         private const val CHANNEL = "app_updates"
         private const val ID = 7021
         fun schedule(context: Context) {
+            if (BuildConfig.DEBUG) return
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
             val work = WorkManager.getInstance(context)
             work.enqueueUniquePeriodicWork("adshield_update_periodic", ExistingPeriodicWorkPolicy.KEEP,

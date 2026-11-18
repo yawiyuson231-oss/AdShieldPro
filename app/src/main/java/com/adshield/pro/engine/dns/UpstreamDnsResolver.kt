@@ -35,7 +35,8 @@ import javax.net.ssl.SSLSocketFactory
  * Endpoint plus its settled outcome, used while racing two providers.
  * Top-level because Kotlin does not allow nested type aliases.
  */
-private typealias AttemptOutcome = Pair<DnsProviderEndpoint, Result<UpstreamDnsResolver.UpstreamResult>>
+private data class TimedDnsReply(val result: UpstreamDnsResolver.UpstreamResult, val receivedAtMs: Long)
+private typealias AttemptOutcome = Pair<DnsProviderEndpoint, Result<TimedDnsReply>>
 
 /**
  * Multi-protocol Upstream DNS Client supporting:
@@ -59,6 +60,7 @@ class UpstreamDnsResolver @Inject constructor(
     @Volatile
     internal var providerTransport: ProviderTransport? = null
 
+    internal var cacheClockMs: () -> Long = { System.nanoTime() / 1_000_000L }
 
     data class UpstreamResult(
         val responseBytes: ByteArray,
@@ -70,9 +72,11 @@ class UpstreamDnsResolver @Inject constructor(
     )
 
     private data class CachedDnsEntry(
-        val wireResponse: ByteArray,
-        val expiresAtEpochMs: Long,
-        val protocolOrigin: String
+        val response: DnsPacketCodec.CachedResponse,
+        val receivedAtMs: Long,
+        val protocolOrigin: String,
+        val providerId: String?,
+        val dnssecStatus: DnssecStatus?
     )
 
     private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
@@ -231,19 +235,24 @@ class UpstreamDnsResolver @Inject constructor(
         query: DnsPacketCodec.ParsedDnsQuery,
         config: DnsResolverConfig
     ): UpstreamResult = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
         val cacheKey = buildCacheKey(query, config)
-        val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
+        val now = cacheClockMs()
+        val cached = synchronized(dnsCache) {
+            val entry = dnsCache[cacheKey]
+            if (entry != null && entry.response.isExpired(now - entry.receivedAtMs)) {
+                dnsCache.remove(cacheKey)
+                null
+            } else entry
+        }
         if (cached != null) {
-            if (cached.expiresAtEpochMs > now) {
-                return@withContext UpstreamResult(
-                    responseBytes = DnsPacketCodec.rewriteTransactionId(cached.wireResponse, query.transactionId),
-                    protocolUsed = "${cached.protocolOrigin} (Cached)",
-                    fromCache = true,
-                    latencyMs = 0
-                )
-            }
-            synchronized(dnsCache) { dnsCache.remove(cacheKey) }
+            return@withContext UpstreamResult(
+                responseBytes = cached.response.forQuery(query.transactionId, now - cached.receivedAtMs),
+                protocolUsed = "${cached.protocolOrigin} (Cached)",
+                fromCache = true,
+                latencyMs = 0,
+                providerId = cached.providerId,
+                dnssecStatus = cached.dnssecStatus
+            )
         }
 
         val configuredPlan = DnsProviderRegistry.queryPlan(config)
@@ -257,35 +266,26 @@ class UpstreamDnsResolver @Inject constructor(
          * One provider attempt. Returns only a response that passed
          * [DnsResponseValidator]; anything else throws.
          */
-        suspend fun attempt(endpoint: DnsProviderEndpoint): UpstreamResult {
+        suspend fun attempt(endpoint: DnsProviderEndpoint): TimedDnsReply {
             val providerStart = System.currentTimeMillis()
             healthMonitor.checkAvailable(endpoint.providerId, config.protocol, providerStart)
             val response = providerTransport?.query(query, config, endpoint)
                 ?: executeProviderQuery(query, config, endpoint)
+            val receivedAt = cacheClockMs()
             val inspection = DnsResponseValidator.validate(query.rawPayload, response, config.dnssecMode)
             val latency = (System.currentTimeMillis() - providerStart).coerceAtLeast(1)
             healthMonitor.recordSuccess(endpoint.providerId, config.protocol, latency, System.currentTimeMillis())
             val protocol = "${config.protocol.name} (${endpoint.displayName}) · ${inspection.dnssecStatus.name}"
-            if (shouldCacheDnsResponse(response)) {
-                val ttlSeconds = DnsPacketCodec.extractResponseTtlSeconds(response)
-                synchronized(dnsCache) {
-                    dnsCache.put(
-                        cacheKey,
-                        CachedDnsEntry(
-                            wireResponse = response.copyOf(),
-                            expiresAtEpochMs = System.currentTimeMillis() + ttlSeconds * 1000L,
-                            protocolOrigin = protocol
-                        )
-                    )
-                }
-            }
-            return UpstreamResult(
-                responseBytes = response,
-                protocolUsed = protocol,
-                fromCache = false,
-                latencyMs = latency.toInt().coerceAtMost(Int.MAX_VALUE),
-                providerId = endpoint.providerId,
-                dnssecStatus = inspection.dnssecStatus
+            return TimedDnsReply(
+                UpstreamResult(
+                    responseBytes = response,
+                    protocolUsed = protocol,
+                    fromCache = false,
+                    latencyMs = latency.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    providerId = endpoint.providerId,
+                    dnssecStatus = inspection.dnssecStatus
+                ),
+                receivedAtMs = receivedAt
             )
         }
 
@@ -320,7 +320,7 @@ class UpstreamDnsResolver @Inject constructor(
                 .isSuccess
         }.ifEmpty { plan }
 
-        var resolved: UpstreamResult? = null
+        var resolved: TimedDnsReply? = null
         var index = 0
         while (resolved == null && index < usable.size) {
             val primary = usable[index]
@@ -371,7 +371,18 @@ class UpstreamDnsResolver @Inject constructor(
             }
         }
 
-        if (resolved != null) return@withContext resolved as UpstreamResult
+        if (resolved != null) {
+            val result = resolved.result
+            // A losing hedged request must not overwrite the reply that won.
+            val payload = DnsPacketCodec.prepareCachedResponse(result.responseBytes)
+            if (payload != null && !payload.isExpired(cacheClockMs() - resolved.receivedAtMs)) {
+                synchronized(dnsCache) {
+                    dnsCache[cacheKey] = CachedDnsEntry(payload, resolved.receivedAtMs, result.protocolUsed,
+                        result.providerId, result.dnssecStatus)
+                }
+            }
+            return@withContext result
+        }
 
         // Fail closed at the DNS protocol layer: return SERVFAIL, never an unvalidated response
         // and never an implicit plaintext downgrade.
@@ -667,18 +678,8 @@ class UpstreamDnsResolver @Inject constructor(
             return (flags and 0x8000) != 0 // QR = 1
         }
 
-        /**
-         * Only NOERROR (0) and NXDOMAIN (3) answers are safe to cache. SERVFAIL (2), REFUSED (5),
-         * FORMERR (1) and NOTIMP (4) describe a transient upstream/negative state and truncated
-         * (TC=1) messages are incomplete, so they are always re-queried.
-         */
-        fun shouldCacheDnsResponse(response: ByteArray): Boolean {
-            if (response.size < 12) return false
-            val flags = ((response[2].toInt() and 0xFF) shl 8) or (response[3].toInt() and 0xFF)
-            if ((flags and 0x0200) != 0) return false
-            val rcode = flags and 0x000F
-            return rcode == 0 || rcode == 3
-        }
+        /** Whether a complete response has a nonzero usable cache lifetime. */
+        fun shouldCacheDnsResponse(response: ByteArray): Boolean = DnsPacketCodec.extractResponseTtlSeconds(response) > 0
 
         /**
          * Ordered plaintext DNS server list: IPv4 primary/secondary first (fastest, most
@@ -699,7 +700,8 @@ class UpstreamDnsResolver @Inject constructor(
          */
         fun buildCacheKey(query: DnsPacketCodec.ParsedDnsQuery, config: DnsResolverConfig): String {
             val endpoint = when (config.protocol) {
-                DnsProtocol.DOH -> config.activeDohUrl.lowercase()
+                // The scheme/host may be case-insensitive, but the endpoint path and query aren't.
+                DnsProtocol.DOH -> config.activeDohUrl
                 DnsProtocol.DOT -> "${config.activeDotHost.lowercase()}:${config.preset.dotPort}"
                 DnsProtocol.UDP_TCP -> upstreamUdpTcpServers(config).joinToString(",")
             }
