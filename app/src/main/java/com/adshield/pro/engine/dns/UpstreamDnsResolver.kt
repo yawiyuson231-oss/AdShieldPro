@@ -112,14 +112,11 @@ class UpstreamDnsResolver @Inject constructor(
     fun trimExpiredAndExcessCache(targetSize: Int = 128): Int {
         synchronized(dnsCache) {
             val before = dnsCache.size
-            val now = System.currentTimeMillis()
-            val snapshot = dnsCache.entries.toList()
-            for (mapEntry in snapshot) {
-                val key = mapEntry.key
-                val entry = mapEntry.value
-                if (now >= entry.expiresAtEpochMs) {
-                    dnsCache.remove(key)
-                }
+            val now = cacheClockMs()
+            val entries = dnsCache.values.iterator()
+            while (entries.hasNext()) {
+                val entry = entries.next()
+                if (entry.response.isExpired(now - entry.receivedAtMs)) entries.remove()
             }
             val target = targetSize.coerceAtLeast(0)
             while (dnsCache.size > target) {

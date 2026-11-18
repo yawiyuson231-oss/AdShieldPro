@@ -100,6 +100,10 @@ class DnsCacheLifetimeTest {
         time.addAndGet(3_800)
         assertFalse(resolver.resolve(query(3), config).fromCache)
         assertEquals(2, upstreamCalls)
+        assertEquals(0, resolver.trimExpiredAndExcessCache()) // newly received replacement
+        time.addAndGet(5_000)
+        assertEquals(1, resolver.trimExpiredAndExcessCache())
+        assertEquals(0, resolver.getCacheSize())
     }
 
     @Test
