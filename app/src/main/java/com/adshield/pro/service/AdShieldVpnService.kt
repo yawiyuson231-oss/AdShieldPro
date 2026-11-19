@@ -176,39 +176,42 @@ class AdShieldVpnService : VpnService() {
 
         tunnelJob = serviceScope.launch {
             try {
-                // A rebuild must use committed settings, not the packet path's last-known cache.
-                val settings = repository.refreshProtectionSettings()
-                preferencesRepository.setVpnShouldRemainActive(true)
-                val builder = Builder()
-                    .setSession(getString(R.string.vpn_session_name))
-                    .setMtu(VPN_MTU)
-                    .setBlocking(true)
-                    .addAddress(VIRTUAL_IPV4_CLIENT, 30)
-                    .addRoute(VIRTUAL_IPV4_DNS, 32)
-                    .addDnsServer(VIRTUAL_IPV4_DNS)
-                val ipv6 = settings.resolverConfig.enableIpv6
-                if (ipv6) {
-                    builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
-                    builder.addRoute(VIRTUAL_IPV6_DNS, 128)
-                    builder.addDnsServer(VIRTUAL_IPV6_DNS)
-                }
-
-                // The app's own automatic exclusion keeps upstream requests out of the tunnel.
-                // It is not a user exception and is not counted in the receipt.
-                tryAddExclusion(builder, packageName)
-                val exclusions = VpnExclusionSetup.collect(settings.excludedAppPackages, packageName) {
-                    tryAddExclusion(builder, it)
-                }
-                val configureIntent = PendingIntent.getActivity(
-                    this@AdShieldVpnService, 0, Intent(this@AdShieldVpnService, MainActivity::class.java),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                builder.setConfigureIntent(configureIntent)
-                val networkLabel = detectCurrentNetworkLabel()
-
                 // establish() can outlive cancellation and may replace the existing OS VPN.
-                // Serialize it off the main thread, including disposal of any superseded result.
+                // Begin setup from fresh settings after earlier establishment work has exited.
                 val pfd = establishMutex.withLock {
+                    currentCoroutineContext().ensureActive()
+                    if (synchronized(tunnelLock) { tunnelGeneration != generation }) return@withLock null
+                    // Read committed settings after the queue wait, not while an earlier
+                    // OS setup can still be finishing.
+                    val settings = repository.refreshProtectionSettings()
+                    preferencesRepository.setVpnShouldRemainActive(true)
+                    val builder = Builder()
+                        .setSession(getString(R.string.vpn_session_name))
+                        .setMtu(VPN_MTU)
+                        .setBlocking(true)
+                        .addAddress(VIRTUAL_IPV4_CLIENT, 30)
+                        .addRoute(VIRTUAL_IPV4_DNS, 32)
+                        .addDnsServer(VIRTUAL_IPV4_DNS)
+                    val ipv6 = settings.resolverConfig.enableIpv6
+                    if (ipv6) {
+                        builder.addAddress(VIRTUAL_IPV6_CLIENT, 126)
+                        builder.addRoute(VIRTUAL_IPV6_DNS, 128)
+                        builder.addDnsServer(VIRTUAL_IPV6_DNS)
+                    }
+
+                    // The app's own automatic exclusion keeps upstream requests out of the tunnel.
+                    // It is not a user exception and is not counted in the receipt.
+                    tryAddExclusion(builder, packageName)
+                    val exclusions = VpnExclusionSetup.collect(settings.excludedAppPackages, packageName) {
+                        tryAddExclusion(builder, it)
+                    }
+                    val configureIntent = PendingIntent.getActivity(
+                        this@AdShieldVpnService, 0, Intent(this@AdShieldVpnService, MainActivity::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                    builder.setConfigureIntent(configureIntent)
+                    val networkLabel = detectCurrentNetworkLabel()
+
                     currentCoroutineContext().ensureActive()
                     if (synchronized(tunnelLock) { tunnelGeneration != generation }) return@withLock null
                     val established = builder.establish() ?: error("Android did not establish the VPN. Check VPN consent and always-on settings.")

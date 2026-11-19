@@ -104,6 +104,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `DnsAddressFallbackTest` | Same-provider address scheduling and cancellation, fast first address, and a separate TCP allowance after a matching truncated UDP reply |
 | `DnsResolverHardeningTest` | Question matching before UDP TC retry, RDATA and EDNS bounds, extended RCODE/EDE, encrypted failover and cancellation, uncached diagnostics and DoH transport checks |
 | `AetherSecurityReviewTest` / `AetherDnsPolicyReviewTest` | Three independent local reads, partial coverage, propagated cancellation, exact package-ID matching before display limits, saved-rule conflicts, resolver-plan eligibility, custom endpoint redaction and unknown vs. zero |
+| `VpnExclusionSetupTest` | Only real user exclusions are attempted; saved route and exclusion changes can invalidate pending setup as well as an installed tunnel |
 | `AetherVpnExclusionPreviewTest` | Exact saved-package selection, no-op and stale targets, setup evidence vs. unknown, and synthetic before/after decisions for per-app rules, network exceptions and allowlist-only precedence without mutating inputs |
 | `AetherPhoneAgentTest` / `AetherSecurityReviewTest` | Phone evidence and logging opt-out, package metadata indicators, one-use file picker receipts and actual byte limits |
 | `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |

@@ -597,7 +597,7 @@ class AdShieldViewModel @Inject constructor(
             upstreamDnsResolver.clearCache()
             repository.refreshProtectionSettings()
             if (prevIpv6 != config.enableIpv6) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("DNS Resolver updated to ${config.preset.displayName} (${config.protocol.label})")
         }
@@ -861,7 +861,7 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesRepository.toggleExcludedAppPackage(packageName, excluded)
             loadInstalledApps()
-            reloadTunnelIfConnected()
+            reloadTunnelIfActive()
             showFeedback(
                 if (excluded) "Excluded $packageName from VPN tunnel."
                 else "Included $packageName in VPN protection."
@@ -887,7 +887,7 @@ class AdShieldViewModel @Inject constructor(
                 refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
             )
             if (wasExcluded && policy != AppDnsPolicy.DEFAULT) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("${packageName}: ${policy.label}")
         }
@@ -903,7 +903,7 @@ class AdShieldViewModel @Inject constructor(
                 refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
             )
             if (hadExclusions) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("Reset all per-app split-tunnel and DNS firewall overrides.")
         }
@@ -1128,11 +1128,8 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
-    private fun reloadTunnelIfConnected() {
-        val currentStatus = vpnState.value.status
-        if (currentStatus == com.adshield.pro.domain.model.VpnStatus.CONNECTED ||
-            currentStatus == com.adshield.pro.domain.model.VpnStatus.PAUSED
-        ) {
+    private fun reloadTunnelIfActive() {
+        if (vpnState.value.status.acceptsTunnelConfigReload) {
             val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
                 action = AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG
             }

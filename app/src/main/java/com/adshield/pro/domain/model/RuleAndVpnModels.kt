@@ -80,7 +80,14 @@ enum class VpnStatus {
     CONNECTED,
     RECONNECTING,
     PAUSED,
-    ERROR
+    ERROR;
+
+    /** An edit to routes or exclusions must also replace a pending setup. */
+    internal val acceptsTunnelConfigReload: Boolean
+        get() = when (this) {
+            STARTING, CONNECTED, RECONNECTING, PAUSED -> true
+            DISCONNECTED, ERROR -> false
+        }
 }
 
 data class VpnRuntimeState(

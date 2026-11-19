@@ -1,10 +1,19 @@
 package com.adshield.pro
 
 import com.adshield.pro.domain.model.VpnExclusionSetup
+import com.adshield.pro.domain.model.VpnStatus
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class VpnExclusionSetupTest {
+    @Test
+    fun routeAndExclusionEditsCanInvalidatePendingOrInstalledTunnels() {
+        assertEquals(
+            setOf(VpnStatus.STARTING, VpnStatus.CONNECTED, VpnStatus.RECONNECTING, VpnStatus.PAUSED),
+            VpnStatus.entries.filter { it.acceptsTunnelConfigReload }.toSet()
+        )
+    }
+
     @Test
     fun recordsOnlyActualUserExclusionAttemptsWithoutCountingTheAppItself() {
         val calls = mutableListOf<String>()
