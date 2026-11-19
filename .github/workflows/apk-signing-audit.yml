@@ -1,0 +1,38 @@
+name: Audit published APK signing certificates
+
+# Reads public APKs only. No signing credentials, tags, releases, or write access.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'arena/**']
+    paths:
+      - '.github/workflows/apk-signing-audit.yml'
+      - 'tools/release_signing.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  public-signers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Ensure apksigner is available
+        run: |
+          set -euo pipefail
+          if [ ! -x "$ANDROID_HOME/build-tools/36.0.0/apksigner" ]; then
+            SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+            yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+            "$SDKMGR" --install 'build-tools;36.0.0'
+          fi
+      - name: Compare verified public signers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release_signing.sh audit
