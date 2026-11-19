@@ -30,7 +30,11 @@ printf '%s\n' "$install_result"
 [[ "${install_result//$'\r'/}" == *$'\nSuccess' || "${install_result//$'\r'/}" == Success ]] || fail 'Install did not report success.'
 "${adb[@]}" shell pm path "$package" | grep '^package:' || fail 'Expected debug application ID was not installed.'
 
-launch=$("${adb[@]}" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$package" 2>&1) ||
+# Launchers resolve MAIN/LAUNCHER first, then start the component explicitly. An implicit
+# am start additionally needs CATEGORY_DEFAULT, which launcher filters do not normally have.
+resolved=$("${adb[@]}" shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$package" | tr -d '\r')
+grep -Fx "$activity" <<< "$resolved" || fail "No AdShield Pro launcher entry: $resolved"
+launch=$("${adb[@]}" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$activity" 2>&1) ||
     fail "Android could not launch the app: $launch"
 printf '%s\n' "$launch"
 grep -qx 'Status: ok' <<< "${launch//$'\r'/}" || fail 'Android did not report a successful launcher start.'

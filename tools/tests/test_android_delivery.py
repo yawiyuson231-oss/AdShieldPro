@@ -50,7 +50,10 @@ install*)
     printf 'Performing Streamed Install\\r\\nSuccess\\r\\n'
     ;;
 'shell pm path com.adshield.pro.debug') echo 'package:/data/app/fixture/base.apk' ;;
-'shell am start -W '*) printf 'Status: ok\\r\\n'; ;;
+'shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p com.adshield.pro.debug')
+    if [[ "${NO_LAUNCHER:-0}" == 1 ]]; then echo 'No activity found'; else echo 'com.adshield.pro.debug/com.adshield.pro.MainActivity'; fi
+    ;;
+'shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n com.adshield.pro.debug/com.adshield.pro.MainActivity') printf 'Status: ok\\r\\n'; ;;
 'shell pidof -s com.adshield.pro.debug')
     if [[ "${CRASH:-0}" == 1 && -f pid-seen ]]; then exit 1; fi
     touch pid-seen
@@ -70,6 +73,7 @@ esac
     def test_fail_for_rejected_apk_or_startup_crash(self):
         self.mock_emulator()
         for settings, diagnostic in [({'REJECT_INSTALL': '1'}, 'INSTALL_FAILED_INVALID_APK'),
+                                     ({'NO_LAUNCHER': '1'}, 'No AdShield Pro launcher entry'),
                                      ({'CRASH': '1'}, 'crashed after launch')]:
             with self.subTest(diagnostic=diagnostic):
                 result = self.run_script('smoke_android_install.sh', str(self.apk_rel), **settings)
