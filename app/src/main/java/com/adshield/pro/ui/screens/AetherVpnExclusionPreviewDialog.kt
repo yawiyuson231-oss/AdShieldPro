@@ -74,7 +74,7 @@ private fun PreviewTargetList(load: suspend () -> List<Target>, onSelect: (Targe
             else -> items(targets, key = { "preview-choice:${it.packageName}" }, contentType = { "preview-app" }) { target ->
                 ListItem(
                     headlineContent = { Text(target.appLabel ?: target.packageName) },
-                    supportingContent = if (target.appLabel == null) null else { { Text(target.packageName) } },
+                    supportingContent = if (target.appLabel == null) null else ({ Text(target.packageName) }),
                     modifier = Modifier
                         .clickable(role = Role.Button, onClickLabel = "Preview Filtered mode") { onSelect(target) }
                         .testTag("preview-choice:${target.packageName}")
@@ -112,6 +112,9 @@ private fun LazyListScope.previewItems(target: Target, report: Report) {
             } else {
                 Text("Per-app DNS rule: ${report.savedAppPolicy.label} → ${AppDnsPolicy.DEFAULT.label}")
             }
+            if (report.savedAppPolicy == AppDnsPolicy.BLOCK_ALL) {
+                Text("Some requests could pass the policy check instead of being blocked for this app.")
+            }
             Text("Other app rules and global DNS settings would stay the same. Nothing was changed by this preview.")
         }
     }
@@ -129,7 +132,7 @@ private fun LazyListScope.previewItems(target: Target, report: Report) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Example DNS decisions", style = MaterialTheme.typography.titleSmall)
             Text("These examples compare saved vs. Filtered rules only if a DNS request reaches active filtering and Android identifies it as coming from this app. DNS requests outside the tunnel skip these rules.")
-            Text("No DNS was sent or observed. This can't predict which domains the app uses, whether its requests reach the tunnel, upstream answers, or whether the app will work. Another exclusion for a shared app UID can still affect routing.",
+            Text("No DNS queries were sent or observed. This doesn't test reply checks such as Alias Shield or DNSSEC. It can't predict routing, upstream answers, or whether the app will work. Another exclusion for a shared app UID can still affect routing.",
                 style = MaterialTheme.typography.bodySmall)
         }
     }
@@ -150,8 +153,8 @@ private fun LazyListScope.previewItems(target: Target, report: Report) {
 private fun DnsPolicyDecision.previewLabel(): String = when {
     isBlocked -> "Blocked · $sourceName"
     bypassDomainFilters -> "Skips domain filters · $sourceName"
-    sourceName == "Allowed" -> "Passes local checks"
-    else -> "Passes local checks · $sourceName"
+    sourceName == "Allowed" -> "Not blocked at this step"
+    else -> "Not blocked at this step · $sourceName"
 }
 
 @Composable
