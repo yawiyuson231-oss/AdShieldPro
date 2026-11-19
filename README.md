@@ -264,8 +264,10 @@ test or stable, can upgrade to it in place.
   directly. The bundled model suggests a task without an account, key, cloud inference or prompt
   upload. **Security review** combines three read-only specialists for phone protection, saved DNS
   policy and visible app metadata. It compares saved VPN exclusions with Android tunnel setup when
-  a receipt exists, and flags overlaps with app risk indicators. It sends no data and changes no settings. The separate DNS benchmark sends real probes
-  only after its own approval. See [supported checks](docs/PHONE_AGENT.md) and the
+  a receipt exists, and flags overlaps with app risk indicators. **Preview restoring an app**
+  explains the change from one saved VPN exclusion to **Filtered** mode. Neither sends data or
+  changes settings. The separate DNS benchmark sends real probes only after its own approval.
+  See [supported checks](docs/PHONE_AGENT.md) and the
   [Android Agent roadmap](docs/AETHER_AGENT_ROADMAP.md).
 - **Check your DNS resolver:** Run a live, uncached probe in Settings to see which provider replied,
   its DNSSEC and EDNS evidence, and why selected backups were needed. DoH and DoT remain encrypted

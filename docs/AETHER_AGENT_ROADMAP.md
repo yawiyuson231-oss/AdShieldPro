@@ -30,13 +30,18 @@ changed settings, rebuild, pause/resume and stop. A separate test uses a control
 in-flight cancellation. This does not validate physical handsets, all network transitions or packet
 coverage. See [the test scope](TESTING.md#android-agent-device-tests).
 
+**Preview restoring an app** is a separate read-only tool, not a fourth automatic reader. Choose
+one saved VPN exclusion to see the diff for **Filtered** mode, the sampled setup evidence, and
+hypothetical DNS decisions from the real evaluator. It writes no policy, performs no rebuild, and
+makes no live DNS request. See [preview scope](PHONE_AGENT.md#preview-restoring-one-excluded-app).
+
 ## What to build next, in order
 
 | Priority | Proposed delivery | Evidence required before shipping |
 | --- | --- | --- |
 | **P0 · Validate on handsets and protect the release channel** | Extend API 29 coverage to a low-memory handset and a current handset, including actual network switches, Android revocation, IPv6 routing and configuration changes. Keep public previews separate from private Secure signing. | Device traces for approval, cancel, VPN transitions and controlled egress. Verify fresh install and upgrade; CI test-signing is not production signing. |
 | **P1 · Extend applied evidence only where measurable** | Keep setup receipts separate from per-query policy decisions. Where Android provides reliable attribution and logging is allowed, consider bounded summaries tagged with source, freshness and unknown attribution. | Verify receipt and per-query summaries on controlled fixtures; never infer packet or per-app coverage from a configuration flag. |
-| **P2 · Make safe fixes reviewable** | Add a policy preview specialist that computes a before/after diff using the existing DNS policy evaluator. Start with one narrowly scoped change and show what it cannot predict. Bind approval to exact inputs, recheck the settings revision before applying, and provide undo without overwriting later changes. | Test policy precedence, no-op, stale/double approval, timeout, partial failure, undo, and app compatibility. No silent auto-block, uninstall, permission grant or rollback over a newer edit. |
+| **P2 · Make safe fixes reviewable** | The first read-only preview is implemented. Validate it on handsets before considering an apply step. Any future apply must bind approval to exact inputs, recheck the settings revision, and provide undo without overwriting later changes. | Test policy precedence, no-op, stale/double approval, timeout, partial failure, undo, and app compatibility. No silent auto-block, uninstall, permission grant or rollback over a newer edit. |
 | **P3 · Expand defensive evidence, then models** | Run link and file specialists only on one explicitly supplied URL or picker-selected file. Use versioned local indicators with source and age; report stale or conflicting evidence instead of hiding it. Improve English and Taglish task routing and abstention. Evaluate optional on-device summarization of the structured evidence if it measurably helps users. | Separate task-routing and threat-quality test sets, privacy/retention checks, false-positive review, and measured low-end phone cost. Generated prose must not introduce new evidence or authorize an action. Keep deterministic reports as the fallback. |
 
 Do not restore open-ended cloud planning or add arbitrary network requests, accessibility privileges,
@@ -67,6 +72,5 @@ claiming AdShield is better than another app:
   repeat trials and report sample sizes and uncertainty. Compare only overlapping features, disclose
   constraints and misses, and get independent verification before a superiority claim.
 
-**Next implementation:** start with a read-only preview for restoring one saved VPN exclusion to
-filtered. It should show the change, the need for a successful tunnel rebuild, and what the Agent
-can't predict. Do not add automatic fixes or a new execution path before that preview is tested.
+**Preview boundary:** The Agent has no action to apply the Filtered preview. Do not add automatic
+fixes or infer that restoring a saved exclusion will route or filter a particular app's traffic.

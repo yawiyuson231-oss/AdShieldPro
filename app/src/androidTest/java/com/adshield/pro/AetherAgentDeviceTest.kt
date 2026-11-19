@@ -19,6 +19,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.service.AdShieldVpnService
@@ -80,6 +82,70 @@ class AetherAgentDeviceTest {
     }
 
     @Test
+    fun realPreviewWorksOfflineAndRefusesASelectionRemovedAfterOpeningThePicker() {
+        val state = appViewModel()
+        assertEquals(VpnStatus.DISCONNECTED, state.vpnState.value.status)
+        assertNoValidatedNetwork()
+        val original = savedSettings()
+        check(original.excludedAppPackages.isEmpty()) { "Use a fresh debug install on a disposable emulator." }
+        val target = "com.android.settings"
+        val other = "com.adshield.test.preview.notinstalled"
+        val prefs = app.preferencesRepository
+        openAgent()
+        openVpnPreview()
+        awaitText("No saved app exclusions are available to preview.")
+        closeVpnPreview()
+
+        try {
+            runBlocking { withTimeout(8_000) {
+                prefs.toggleExcludedAppPackage(target, true)
+                prefs.toggleExcludedAppPackage(other, true)
+                prefs.updateDnsFirewallPolicy(original.dnsFirewallPolicy.copy(
+                    appPolicies = mapOf(target to AppDnsPolicy.BLOCK_ALL, other to AppDnsPolicy.ALLOW_ALL),
+                    protectedTransports = setOf(NetworkTransportPolicy.WIFI),
+                    emergencyAllowlistOnly = false
+                ))
+            } }
+            val before = savedSettings()
+            val history = state.securityHistory.value
+            openVpnPreview()
+            selectPreviewTarget(target)
+            awaitText("VPN exclusion: Saved → Removed")
+            compose.onNodeWithText("Per-app DNS rule: Block all DNS for this app → Use global protection").assertExists()
+            scrollVpnPreview("preview-tunnel")
+            compose.onNodeWithText("Unknown: no current setup receipt").assertExists()
+            scrollVpnPreview("preview-network:WIFI")
+            compose.onNodeWithText("Saved: Blocked · Per-App DNS Block\nFiltered: Passes local checks").assertExists()
+            assertEquals(VpnStatus.DISCONNECTED, state.vpnState.value.status)
+            assertEquals(before.excludedAppPackages, savedSettings().excludedAppPackages)
+            assertEquals(before.dnsFirewallPolicy, savedSettings().dnsFirewallPolicy)
+            assertEquals(before.vpnShouldRemainActive, savedSettings().vpnShouldRemainActive)
+            assertEquals(before.resolverConfig, savedSettings().resolverConfig)
+            assertEquals(history, state.securityHistory.value)
+
+            compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.onNodeWithText("Filtered mode preview").assertDoesNotExist()
+
+            openVpnPreview()
+            revealPreviewTarget(target)
+            runBlocking { withTimeout(8_000) { prefs.toggleExcludedAppPackage(target, false) } }
+            compose.onNodeWithTag("preview-choice:$target").performClick()
+            awaitText("$target no longer has a saved VPN exclusion. Choose another app. Nothing was changed.")
+            compose.onNodeWithText("VPN exclusion: Saved → Removed").assertDoesNotExist()
+            assertEquals(setOf(other), savedSettings().excludedAppPackages)
+            assertEquals(before.dnsFirewallPolicy, savedSettings().dnsFirewallPolicy)
+            closeVpnPreview()
+        } finally {
+            runBlocking { withTimeout(8_000) {
+                prefs.toggleExcludedAppPackage(target, false)
+                prefs.toggleExcludedAppPackage(other, false)
+                prefs.updateDnsFirewallPolicy(original.dnsFirewallPolicy)
+            } }
+        }
+    }
+
+    @Test
     fun realTunnelReportsAcceptedRejectedAndStaleSavedExclusions() {
         val state = appViewModel()
         assertEquals(VpnStatus.DISCONNECTED, state.vpnState.value.status)
@@ -112,6 +178,19 @@ class AetherAgentDeviceTest {
             scrollReview("review-tunnel")
             compose.onNodeWithText("Saved VPN exclusions accepted: 1/2").assertExists()
             compose.onNodeWithText("Saved exclusions rejected: 1").assertExists()
+
+            val beforePreview = savedSettings()
+            compose.onNodeWithText("Preview one saved VPN exclusion").performScrollTo().performClick()
+            selectPreviewTarget(installed)
+            awaitText("VPN exclusion: Saved → Removed")
+            scrollVpnPreview("preview-tunnel")
+            compose.onNodeWithText("Applied: accepted when the tunnel was set up").assertExists()
+            compose.onNodeWithText("Tunnel #${first.generation} · Snapshot at", substring = true).assertExists()
+            closeVpnPreview()
+            assertEquals(first, state.vpnState.value.activeTunnelReceipt)
+            assertEquals(VpnStatus.CONNECTED, state.vpnState.value.status)
+            assertEquals(beforePreview.excludedAppPackages, savedSettings().excludedAppPackages)
+            assertEquals(beforePreview.dnsFirewallPolicy, savedSettings().dnsFirewallPolicy)
 
             // Change the saved list without requesting reload, to exercise the pre-rebuild gap.
             runBlocking { withTimeout(8_000) {
@@ -158,6 +237,38 @@ class AetherAgentDeviceTest {
                 for (entry in listOf(installed, nextInstalled, missing)) prefs.toggleExcludedAppPackage(entry, false)
             } }
         }
+    }
+
+    private fun awaitText(text: String) {
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    private fun openVpnPreview() {
+        scrollReview("agent-controls")
+        compose.onNodeWithText("Preview restoring an app").performScrollTo().performClick()
+    }
+
+    private fun scrollVpnPreview(key: String) {
+        compose.onNodeWithTag("aether-vpn-preview-list").performScrollToKey(key)
+    }
+
+    private fun revealPreviewTarget(packageName: String) {
+        compose.onNodeWithText("Choose a VPN-excluded app").assertExists()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Reading saved VPN exclusions…").fetchSemanticsNodes().isEmpty()
+        }
+        scrollVpnPreview("preview-choice:$packageName")
+    }
+
+    private fun selectPreviewTarget(packageName: String) {
+        revealPreviewTarget(packageName)
+        compose.onNodeWithTag("preview-choice:$packageName").performClick()
+    }
+
+    private fun closeVpnPreview() {
+        compose.onNodeWithText("Close").performClick()
     }
 
     private fun assertNoValidatedNetwork() {

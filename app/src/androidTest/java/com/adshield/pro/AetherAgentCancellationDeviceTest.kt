@@ -32,17 +32,22 @@ class AetherAgentCancellationDeviceTest {
         val missing = AetherSecurityReview.Reading.Missing(AetherSecurityReview.MissingReason.FAILED)
         var calls = 0
         var returnedAfterCancel = false
-        val viewModel = AetherPhoneAgentViewModel(suggest = { null }, execute = { approved, _, publish ->
-            assertEquals(AetherSecurityTask.SECURITY_REVIEW, approved.task)
-            calls++
-            publish(AetherTaskProgress.ReviewingSecurity)
-            try {
-                awaitCancellation()
-            } catch (_: CancellationException) {
-                returnedAfterCancel = true
-                AetherTaskResult.Review(AetherSecurityReview.Report(missing, missing, missing, emptyList(), null, emptyList(), 1))
-            }
-        })
+        val viewModel = AetherPhoneAgentViewModel(
+            suggest = { null },
+            execute = { approved, _, publish ->
+                assertEquals(AetherSecurityTask.SECURITY_REVIEW, approved.task)
+                calls++
+                publish(AetherTaskProgress.ReviewingSecurity)
+                try {
+                    awaitCancellation()
+                } catch (_: CancellationException) {
+                    returnedAfterCancel = true
+                    AetherTaskResult.Review(AetherSecurityReview.Report(missing, missing, missing, emptyList(), null, emptyList(), 1))
+                }
+            },
+            readVpnExclusions = { error("Unexpected preview") },
+            previewVpnExclusion = { error("Unexpected preview") }
+        )
         compose.setContent { AdShieldProTheme { AetherPhoneAgentScreen(onTool = {}, viewModel = viewModel) } }
         compose.onNodeWithText("Review phone, DNS and apps").performClick()
         compose.runOnIdle { assertEquals(0, calls) }

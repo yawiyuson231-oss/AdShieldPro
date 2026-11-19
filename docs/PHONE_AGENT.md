@@ -67,6 +67,29 @@ A clean result means the checks found no matching indicators, not that a device,
 is guaranteed safe. DNS benchmark latency measures a lookup, not bandwidth, privacy or geolocation.
 See the [Android Agent roadmap](AETHER_AGENT_ROADMAP.md) for work that is **not** implemented yet.
 
+## Preview restoring one excluded app
+
+Choose **Preview restoring an app** in the Agent, or **Preview one saved VPN exclusion** under
+**VPN exclusion evidence** in a review. Pick one saved package by app name and exact package ID.
+The Agent re-reads settings after the selection. If the exclusion is no longer saved, it doesn't
+show a stale diff. If Android can't provide the name, the picker shows the saved package ID.
+
+The preview shows what **Filtered** in Per-App Firewall would do: remove this one saved VPN
+exclusion and clear its per-app **Allow all DNS** or **Block all DNS** override, if present. Other
+app rules, network exceptions, the resolver, and global DNS settings stay as they are. Removing
+**Block all DNS** can let some requests pass local filtering; this is not an unconditional upgrade.
+
+The current tunnel receipt, if present, shows whether Android accepted the exclusion at setup.
+A settings change alone does not change an installed tunnel. The new exclusion list needs a
+successful tunnel rebuild or, if protection is off, a successful start. The preview sends no
+queries and never changes settings, rebuilds the VPN, or saves a history entry. Close it to discard it.
+
+The sample decisions use AdShield's real DNS policy evaluator with hypothetical inputs: no domain
+rule, a matching block rule, or a user allowlist match. The saved and Filtered columns both assume
+that a query enters the tunnel during active filtering and Android attributes it to the selected
+package. These aren't traffic observations. They don't identify the app's domains, predict app
+compatibility or upstream answers, or guarantee routing, including when apps share an Android UID.
+
 ## On-device smoke checklist
 
 1. On an emulator or test phone with airplane mode on, open **Security → AI Agent**. Tap **Review
@@ -92,3 +115,8 @@ See the [Android Agent roadmap](AETHER_AGENT_ROADMAP.md) for work that is **not*
 7. Enable network access and approve **Test DNS speed** separately. Check that it shows the selected
    protocol, live timings or failures, and does not change the configured resolver. With encrypted DNS
    unable to connect, it must report failures rather than silently send the probe over UDP/TCP.
+8. With two saved VPN exclusions, open **Preview restoring an app** and select just one. Check
+   its exact package, saved override, simulated change, and the unchanged settings after closing.
+   Try before startup, while filtering is paused, and after VPN setup. A missing receipt stays
+   unknown. Change the saved selection before tapping it; the preview should say it's no longer
+   saved, not propose a diff for it. Background the Agent with the preview open and verify it clears.

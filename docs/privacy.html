@@ -241,6 +241,7 @@
       <h3>4E. On-Device AI Agent</h3>
       <p>The Agent’s task text and findings stay on the phone. The bundled model needs no account, AI API key or provider connection. The app removes any retired Agent connection from its on-device credential store without removing other providers’ settings. This does not delete old provider-side data or revoke previously issued keys.</p>
       <p>Security review reads phone/protection reports, saved DNS policy, and metadata for Android-visible apps. It does not send the readings, open links, run DNS probes, add a scan history entry, or change settings.</p>
+      <p>The VPN exclusion preview reads saved exclusions and their local app labels when available, then compares saved rules and the local setup receipt for the package you select. It sends nothing, changes no settings, and adds no history entry.</p>
       <p>The Agent’s DNS benchmark sends fixed <code>example.com</code> queries only if approved. Settings diagnostics and benchmarks send the name you enter to the configured or tested DNS providers. When failover is enabled, selected backups may also see a DNS lookup. A custom DoH URL may need a separate system lookup for the endpoint hostname; the requested name does not fall back to plaintext.</p>
     </section>
 

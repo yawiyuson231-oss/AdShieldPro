@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.adshield.pro.data.repository.AetherSecurityTools
 import com.adshield.pro.data.repository.AetherTaskResult
+import com.adshield.pro.data.repository.AetherVpnExclusionPreviewReader
 import com.adshield.pro.engine.aether.AetherFilePickerApproval
 import com.adshield.pro.engine.aether.AetherSecurityReview
 import com.adshield.pro.engine.aether.AetherSecurityTask
 import com.adshield.pro.engine.aether.AetherTaskApproval
 import com.adshield.pro.engine.aether.AetherTaskProgress
+import com.adshield.pro.engine.aether.AetherVpnExclusionPreview
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -27,9 +29,13 @@ import javax.inject.Inject
 @HiltViewModel
 class AetherPhoneAgentViewModel internal constructor(
     private val suggest: suspend (String) -> AetherSecurityTask?,
-    private val execute: suspend (AetherTaskApproval.Approved, Uri?, (AetherTaskProgress) -> Unit) -> AetherTaskResult
+    private val execute: suspend (AetherTaskApproval.Approved, Uri?, (AetherTaskProgress) -> Unit) -> AetherTaskResult,
+    internal val readVpnExclusions: suspend () -> List<AetherVpnExclusionPreviewReader.Target>,
+    internal val previewVpnExclusion: suspend (String) -> AetherVpnExclusionPreview.Report?
 ) : ViewModel() {
-    @Inject constructor(tools: AetherSecurityTools) : this(tools::suggest, tools::run)
+    @Inject constructor(tools: AetherSecurityTools, previewReader: AetherVpnExclusionPreviewReader) : this(
+        tools::suggest, tools::run, previewReader::targets, previewReader::preview
+    )
 
     internal data class State(
         val findingTask: Boolean = false,

@@ -60,6 +60,7 @@ internal fun AetherPhoneAgentScreen(
     var request by remember { mutableStateOf("") }
     var pickerId by remember { mutableStateOf<Long?>(null) }
     var showChecks by remember { mutableStateOf(false) }
+    var showVpnPreview by remember { mutableStateOf(false) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { chosen ->
         val id = pickerId
         pickerId = null
@@ -69,6 +70,7 @@ internal fun AetherPhoneAgentScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 request = ""
+                showVpnPreview = false
                 viewModel.screenStopped()
             }
         }
@@ -77,6 +79,10 @@ internal fun AetherPhoneAgentScreen(
             lifecycle.removeObserver(observer)
             viewModel.leaveAgent()
         }
+    }
+
+    fun openVpnPreview() {
+        if (viewModel.state.value.canStart) showVpnPreview = true
     }
 
     fun select(tool: Agent.Tool) {
@@ -118,6 +124,7 @@ internal fun AetherPhoneAgentScreen(
                     enabled = state.canStart,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Review phone, DNS and apps") }
+                TextButton(onClick = ::openVpnPreview, enabled = state.canStart) { Text("Preview restoring an app") }
                 TextButton(onClick = { showChecks = !showChecks }, enabled = state.canStart) {
                     Text(if (showChecks) "Hide available checks" else "Choose a check instead")
                 }
@@ -157,7 +164,7 @@ internal fun AetherPhoneAgentScreen(
         // Results begin immediately after the single controls item.
         val result = state.result
         when (result) {
-            is AetherTaskResult.Review -> agentSecurityReviewItems(result.report, ::select, actionsEnabled = state.canStart)
+            is AetherTaskResult.Review -> agentSecurityReviewItems(result.report, ::select, ::openVpnPreview, actionsEnabled = state.canStart)
             null, is AetherTaskResult.Phone -> Unit
             else -> item(key = "task-result") { AgentTaskResult(result, ::select, actionsEnabled = state.canStart) }
         }
@@ -190,6 +197,12 @@ internal fun AetherPhoneAgentScreen(
                     section.readings.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 }
             }
+        }
+    }
+
+    if (showVpnPreview) {
+        AetherVpnExclusionPreviewDialog(viewModel.readVpnExclusions, viewModel.previewVpnExclusion) {
+            showVpnPreview = false
         }
     }
 

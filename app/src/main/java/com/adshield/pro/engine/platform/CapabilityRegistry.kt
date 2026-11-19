@@ -563,6 +563,15 @@ object CapabilityRegistry {
             "AetherSecurityReviewTest.runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps and AetherSecurityReviewTest.joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits and AetherSecurityReviewTest.readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration and AetherDnsPolicyReviewTest.savedExclusionsStayUnknownUntilTheCurrentTunnelHasAReceipt and VpnExclusionSetupTest.recordsOnlyActualUserExclusionAttemptsWithoutCountingTheAppItself"
         ),
         cap(
+            "aether-vpn-exclusion-preview", "Read-only Filtered mode preview for one VPN-excluded app", CapabilityArea.AI_INTELLIGENCE,
+            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherVpnExclusionPreview.kt", emptyList(),
+            listOf("One exact saved package selected by the user, saved firewall policy and local VPN setup evidence"),
+            listOf("Explains removing the exclusion and clearing that app's DNS override; successful VPN setup is needed for a new exclusion list",
+                "Hypothetical DNS decisions use the shipped evaluator and assume an attributed request reaches active filtering",
+                "No settings write, tunnel rebuild, DNS request, history entry or app compatibility verdict"),
+            "AetherVpnExclusionPreviewTest.acceptsOnlyAnExactSavedUserExclusionNotAnAppRuleOrOldReceipt and AetherVpnExclusionPreviewTest.allowOverrideWouldStopBypassingDomainFiltersWithoutMutatingSavedSettings and AetherVpnExclusionPreviewTest.usesAllowlistOnlyPrecedenceBeforePerAppAndNetworkExceptions and AetherVpnExclusionPreviewTest.separatesAcceptedRejectedUnrecordedAndUnknownOnlyUsingTheSampledTunnel"
+        ),
+        cap(
             "aether-selected-file", "AETHER local scan of one chosen file", CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "data/repository/AetherSecurityTools.kt", emptyList(),
             listOf("Single-use Android document picker approval and bounded reads of the selected content URI"),

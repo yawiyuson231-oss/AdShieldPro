@@ -103,6 +103,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `AetherSecurityAgentTest` | Bundled model on held-out English and Taglish requests, one supported task at a time, stale/dismissed approvals, separate explicit link input and approval |
 | `DnsResolverHardeningTest` | Question matching before UDP TC retry, RDATA and EDNS bounds, extended RCODE/EDE, encrypted failover and cancellation, uncached diagnostics and DoH transport checks |
 | `AetherSecurityReviewTest` / `AetherDnsPolicyReviewTest` | Three independent local reads, partial coverage, propagated cancellation, exact package-ID matching before display limits, saved-rule conflicts, resolver-plan eligibility, custom endpoint redaction and unknown vs. zero |
+| `AetherVpnExclusionPreviewTest` | Exact saved-package selection, no-op and stale targets, setup evidence vs. unknown, and synthetic before/after decisions for per-app rules, network exceptions and allowlist-only precedence without mutating inputs |
 | `AetherPhoneAgentTest` / `AetherSecurityReviewTest` | Phone evidence and logging opt-out, package metadata indicators, one-use file picker receipts and actual byte limits |
 | `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
@@ -118,7 +119,7 @@ DNS benchmarks, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checkl
 
 `tools/smoke_android_agent.sh` requires the **disposable CI emulator** and the exact debug APK
 already installed. It installs `app-debug-androidTest.apk` built by `:app:assembleDebugAndroidTest`,
-disables Wi-Fi and mobile data on the emulator, and fails unless all three instrumentation cases pass:
+disables Wi-Fi and mobile data on the emulator, and fails unless all four instrumentation cases pass:
 
 - **Real Agent UI:** cancel consent, background with a pending approval, approve and run the review
   with no Android-validated network, check all three evidence sources and unchanged relevant settings
@@ -126,7 +127,12 @@ disables Wi-Fi and mobile data on the emulator, and fails unless all three instr
 - **Real VPN service and UI:** use Android's VPN consent dialog and one installed and one missing
   package. Check saved vs. unknown before setup, accepted vs. rejected after setup, changed settings
   before rebuild, a new generation after rebuild, the same generation on pause/resume, and no receipt
-  after stop.
+  after stop. Preview an accepted exclusion from the review and check that the receipt and saved
+  policy stay unchanged.
+- **Filtered preview:** on the offline debug app, open the chooser with no exclusions, then
+  preview a selected app's saved exclusion and DNS override. Verify unknown setup without a tunnel,
+  unchanged settings and scan history, dismissal on background, and refusal if the exclusion was
+  removed since the picker opened.
 - **In-flight cancellation:** exercise the real Compose screen and ViewModel with a deliberately
   suspended reader that returns after cancellation; assert that no result is published.
 

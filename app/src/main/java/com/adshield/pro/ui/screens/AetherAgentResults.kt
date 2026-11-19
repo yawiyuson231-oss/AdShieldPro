@@ -96,6 +96,7 @@ internal fun AgentTaskResult(result: AetherTaskResult, onTool: (Agent.Tool) -> U
 internal fun LazyListScope.agentSecurityReviewItems(
     report: AetherSecurityReview.Report,
     onTool: (Agent.Tool) -> Unit,
+    onVpnPreview: () -> Unit,
     actionsEnabled: Boolean
 ) {
     item(key = "review-coverage") {
@@ -136,7 +137,7 @@ internal fun LazyListScope.agentSecurityReviewItems(
         }
     }
     report.dns.value?.let { dns ->
-        item(key = "review-tunnel") { AgentTunnelEvidence(dns, report.finishedAtMs) }
+        item(key = "review-tunnel") { AgentTunnelEvidence(dns, report.finishedAtMs, onVpnPreview, actionsEnabled) }
         item(key = "review-dns") { AgentSavedDnsPolicy(dns, report.dns.checkedAtMs) }
     }
     item(key = "review-cross-check") {
@@ -172,7 +173,9 @@ internal fun LazyListScope.agentSecurityReviewItems(
 }
 
 @Composable
-private fun AgentTunnelEvidence(dns: AetherDnsPolicyReview.Summary, reviewedAtMs: Long) {
+private fun AgentTunnelEvidence(
+    dns: AetherDnsPolicyReview.Summary, reviewedAtMs: Long, onVpnPreview: () -> Unit, actionsEnabled: Boolean
+) {
     AgentCard("VPN exclusion evidence") {
         val tunnel = dns.tunnel
         Text("${dns.vpnExcludedApps} saved VPN exclusions")
@@ -190,6 +193,9 @@ private fun AgentTunnelEvidence(dns: AetherDnsPolicyReview.Summary, reviewedAtMs
         }
         Text("Snapshot at ${agentDateTime(reviewedAtMs)}. Run another review after changes. " +
             "This checks tunnel setup, not DNS traffic or which resolver answered.", style = MaterialTheme.typography.bodySmall)
+        if (dns.vpnExcludedApps > 0) {
+            TextButton(onClick = onVpnPreview, enabled = actionsEnabled) { Text("Preview one saved VPN exclusion") }
+        }
     }
 }
 
@@ -222,7 +228,7 @@ private fun AgentSavedDnsPolicy(dns: AetherDnsPolicyReview.Summary, checkedAtMs:
     }
 }
 
-private fun agentDateTime(timeMs: Long): String =
+internal fun agentDateTime(timeMs: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timeMs))
 
 private fun AetherSecurityReview.Reading<*>.missingLabel(): String =

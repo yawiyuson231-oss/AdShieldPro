@@ -31,7 +31,16 @@ internal object AetherDnsPolicyReview {
         ACCEPTED("Applied: accepted when the tunnel was set up"),
         REJECTED("Rejected during tunnel setup"),
         NOT_RECORDED("Not recorded in this tunnel setup"),
-        UNKNOWN("Unknown: no current setup receipt")
+        UNKNOWN("Unknown: no current setup receipt");
+
+        companion object {
+            fun forPackage(packageName: String, receipt: VpnTunnelReceipt?): ExclusionEvidence = when {
+                receipt == null -> UNKNOWN
+                packageName in receipt.acceptedExclusions -> ACCEPTED
+                packageName in receipt.rejectedExclusions -> REJECTED
+                else -> NOT_RECORDED
+            }
+        }
     }
 
     data class TunnelComparison(
@@ -96,12 +105,7 @@ internal object AetherDnsPolicyReview {
         }
 
         fun exclusionEvidenceFor(packageName: String): ExclusionEvidence? = when (exceptionFor(packageName)) {
-            AppException.VPN_EXCLUDED, AppException.ACTIVE_ONLY -> when {
-                receipt == null -> ExclusionEvidence.UNKNOWN
-                packageName in receipt.acceptedExclusions -> ExclusionEvidence.ACCEPTED
-                packageName in receipt.rejectedExclusions -> ExclusionEvidence.REJECTED
-                else -> ExclusionEvidence.NOT_RECORDED
-            }
+            AppException.VPN_EXCLUDED, AppException.ACTIVE_ONLY -> ExclusionEvidence.forPackage(packageName, receipt)
             AppException.ALLOW_DNS, null -> null // DNS policy is evaluated per attributed request, not at setup.
         }
     }
