@@ -41,6 +41,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -171,7 +172,8 @@ class AdShieldVpnService : VpnService() {
 
         tunnelJob = serviceScope.launch {
             try {
-                val settings = preferencesRepository.getSettingsSnapshot()
+                // A rebuild must use committed settings, not the packet path's last-known cache.
+                val settings = preferencesRepository.settingsFlow.first()
                 preferencesRepository.setVpnShouldRemainActive(true)
                 val builder = Builder()
                     .setSession(getString(R.string.vpn_session_name))

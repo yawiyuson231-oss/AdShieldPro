@@ -24,8 +24,8 @@ an **Allow all DNS** rule. That changes what to review first, not what to block.
 readings are part of the report. One approval covers these three reads only; a follow-up benchmark or
 settings action is a separate decision. See the [usage and device checklist](PHONE_AGENT.md).
 
-The Android CI suite now exercises the real Agent UI on an API 29 emulator, including canceled and
-expired approvals, an offline report, leaving the Agent, and the real VPN's receipt across setup,
+The Android CI suite exercises the real Agent UI on an API 29 emulator, including dismissed and
+backgrounded approvals, an offline report, leaving the Agent, and the real VPN's receipt across setup,
 changed settings, rebuild, pause/resume and stop. A separate test uses a controlled reader to verify
 in-flight cancellation. This does not validate physical handsets, all network transitions or packet
 coverage. See [the test scope](TESTING.md#android-agent-device-tests).
