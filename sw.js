@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate this registration's caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.3-dns.1';
+const VERSION = 'omnishield-x-v5.0.3-dns.2';
 const SCOPE = self.registration.scope;
 // Cache Storage is origin-wide, even when this worker only controls one subdirectory.
 const CACHE_PREFIX = `omnishield-x:${SCOPE}:`;

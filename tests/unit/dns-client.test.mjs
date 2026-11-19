@@ -197,3 +197,45 @@ test('latency statistics are real percentiles', async () => {
   assert.ok(Array.isArray(snapshot.health));
   assert.equal(snapshot.stats.latencySamples, undefined, 'raw samples must not leak into snapshots');
 });
+
+test('DoH ages positive and SOA-backed negative TTLs before storing them', async () => {
+  const { client, cache, clock } = makeClient({ resolvers: [CF], net: { fetchImpl: async (url) => {
+    const name = new URL(url).searchParams.get('name');
+    const missing = name === 'missing.example';
+    const response = makeJson({
+      Status: missing ? 3 : 0,
+      Question: [{ name, type: 1 }],
+      ...(missing ? { Authority: [{ name, type: 6, TTL: 70, data: 'ns. hostmaster. 1 5 5 5 60' }] }
+        : { Answer: [{ name, type: 1, TTL: 60, data: '192.0.2.1' }] })
+    });
+    response.headers.set('age', '50');
+    return response;
+  } } });
+  assert.equal((await client.lookup('example.com')).ttl, 10);
+  const negative = await client.lookup('missing.example');
+  assert.equal(negative.negativeTtl, 10);
+  assert.equal(cache.get('example.com').expiresAt, clock() + 10_000);
+  assert.equal(cache.get('missing.example').expiresAt, clock() + 10_000);
+  clock.advance(10_000);
+  assert.equal(cache.get('example.com').stale, true);
+  assert.equal(cache.get('missing.example'), null);
+});
+
+test('expired, malformed, or hidden HTTP Age cannot start a local cache lifetime', async () => {
+  for (const age of ['60', 'bad', null]) {
+    const { client, cache } = makeClient({ resolvers: [CF], net: { fetchImpl: async () => {
+      const response = makeJson({
+        Status: 0,
+        Question: [{ name: 'example.com', type: 1 }],
+        Answer: [{ name: 'example.com', type: 1, TTL: 60, data: '192.0.2.1' }]
+      });
+      if (age === null) Object.defineProperty(response, 'type', { value: 'cors' });
+      else response.headers.set('age', age);
+      return response;
+    } } });
+    const reply = await client.lookup('example.com');
+    assert.equal(reply.status, 'ok');
+    assert.equal(reply.ttl, 0);
+    assert.equal(cache.get('example.com'), null);
+  }
+});

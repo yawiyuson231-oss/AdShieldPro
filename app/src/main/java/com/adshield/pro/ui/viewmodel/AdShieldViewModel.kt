@@ -595,7 +595,7 @@ class AdShieldViewModel @Inject constructor(
             val prevIpv6 = settingsState.value.resolverConfig.enableIpv6
             preferencesRepository.updateResolverConfig(config)
             upstreamDnsResolver.clearCache()
-            repository.syncRuntimeModeAndResolver(settingsState.value.protectionMode, settingsState.value.copy(resolverConfig = config))
+            repository.refreshProtectionSettings()
             if (prevIpv6 != config.enableIpv6) {
                 reloadTunnelIfConnected()
             }

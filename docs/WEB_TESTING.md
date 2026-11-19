@@ -24,7 +24,7 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Engine ladder, formats, wildcards, undo symmetry | `unit/engine.test.mjs` |
 | Production feed does not break working services | `unit/engine.test.mjs` (21 must-work hosts, real feed) |
 | DNS wire codec, hostile packets | `unit/codec.test.mjs` (hand-assembled packet + RFC vectors) |
-| TTL / negative cache / single-flight / LRU | `unit/cache.test.mjs` |
+| TTL / negative cache / single-flight / LRU | `unit/cache.test.mjs`, `unit/dns-client.test.mjs` (HTTP `Age` is subtracted; browser DoH replies with hidden age are not cached locally) |
 | DoH JSON + wire reply checks, streamed-body limits and deadlines, cooldown and hedge cancellation | `unit/dns-transport.test.mjs` |
 | DNSSEC honest classification | `unit/dns-transport.test.mjs` |
 | Full pipeline: filter-before-network, SOA-bounded negative caching, zero TTL, dual-stack, error reporting | `unit/dns-client.test.mjs` |

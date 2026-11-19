@@ -40,6 +40,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -72,6 +75,7 @@ class AdShieldRepository @Inject constructor(
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val filterMutex = Mutex()
+    private val protectionSettingsMutex = Mutex()
     private val statsMutex = Mutex()
 
     /** Guards the in-memory daily counter; see [recordDnsQueryEvent]. */
@@ -147,6 +151,12 @@ class AdShieldRepository @Inject constructor(
         repositoryScope.launch {
             initializeEngineAndSeedSources()
         }
+        repositoryScope.launch {
+            // Backup restores and other committed preference edits use the same apply path.
+            settingsFlow.map { it.protectionMode to it.resolverConfig }.distinctUntilChanged().collect {
+                refreshProtectionSettings()
+            }
+        }
     }
 
     /**
@@ -154,10 +164,8 @@ class AdShieldRepository @Inject constructor(
      * [FilterRuleEngine], and synchronizes custom rules and protection mode.
      */
     suspend fun initializeEngineAndSeedSources() = withContext(Dispatchers.IO) {
+        refreshProtectionSettings()
         filterMutex.withLock {
-            val currentSettings = prefs.getSettingsSnapshot()
-            filterEngine.updateProtectionMode(currentSettings.protectionMode)
-
             var sources = dao.getAllFilterSourcesNow()
             if (sources.isEmpty()) {
                 val defaults = buildDefaultFilterSources()
@@ -250,14 +258,18 @@ class AdShieldRepository @Inject constructor(
         }
     }
 
-    fun syncRuntimeModeAndResolver(mode: ProtectionMode, settings: AppSettingsState) {
+    /** Apply committed settings in one order, independently of how long VPN setup takes. */
+    internal suspend fun refreshProtectionSettings(): AppSettingsState = protectionSettingsMutex.withLock {
+        val settings = settingsFlow.first()
+        filterEngine.updateProtectionMode(settings.protectionMode)
         _vpnRuntimeState.update { current ->
             current.copy(
-                activeMode = mode,
+                activeMode = settings.protectionMode,
                 resolverConfig = settings.resolverConfig,
                 loadedRuleCount = filterEngine.getCurrentSnapshot().totalLoadedRules
             )
         }
+        settings
     }
 
     private fun refreshRuntimeRuleCount() {
@@ -477,8 +489,7 @@ class AdShieldRepository @Inject constructor(
 
     suspend fun selectProtectionMode(mode: ProtectionMode) {
         prefs.setProtectionMode(mode)
-        filterEngine.updateProtectionMode(mode)
-        _vpnRuntimeState.update { it.copy(activeMode = mode) }
+        refreshProtectionSettings()
     }
 
     suspend fun addCustomRule(
@@ -930,7 +941,7 @@ class AdShieldRepository @Inject constructor(
                     restored.copy(autoRevertDeadlineEpochMs = 0L)
                 }
             }
-            filterEngine.updateProtectionMode(backup.protectionMode)
+            refreshProtectionSettings()
 
             val validEntities = backup.customRules.mapNotNull { rule ->
                 filterEngine.validateAndParseRuleInput(

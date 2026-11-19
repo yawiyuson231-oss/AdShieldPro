@@ -16,8 +16,9 @@ on:
       - main
 
 concurrency:
-  group: android-build-${{ github.ref }}
-  cancel-in-progress: true
+  # A routine CI rerun cannot cancel an explicit publication.
+  group: android-build-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.public_preview && 'preview' || 'ci' }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.public_preview) }}
 
 jobs:
   build:

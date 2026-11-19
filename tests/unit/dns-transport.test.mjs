@@ -287,3 +287,31 @@ test('an all-open web resolver plan reports cooldown without sending additional 
   assert.equal((await pool.query('example.com', 'A')).ok, true);
   assert.equal(net.calls.length, 1);
 });
+
+test('valid per-name RCODE failures do not open the browser resolver circuit', async () => {
+  let calls = 0;
+  const healthy = createMockDoh();
+  const pool = new ResolverPool({
+    resolvers: [CF],
+    health: new ResolverHealth({ failureThreshold: 2 }),
+    transport: new DohTransport({ fetchImpl: (url, init) => {
+      calls++;
+      const name = new URL(url).searchParams.get('name');
+      if (name === 'broken.example') {
+        return makeJson({ Status: 2, Question: [{ name, type: 1 }] });
+      }
+      return healthy.fetchImpl(url, init);
+    } })
+  });
+  for (let i = 0; i < 4; i++) {
+    const failed = await pool.query('broken.example', 'A');
+    assert.equal(failed.ok, false);
+    assert.equal(failed.attempts[0].rcode, 2);
+    assert.equal(pool.health.isAvailable(CF.id), true);
+  }
+  const result = await pool.query('example.com', 'A');
+  assert.equal(result.status, 'ok');
+  assert.equal(result.resolver.id, CF.id);
+  assert.equal(calls, 5);
+  assert.equal(pool.health.snapshot().find((provider) => provider.id === CF.id).failures, 0);
+});

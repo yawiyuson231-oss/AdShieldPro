@@ -326,6 +326,18 @@ class DnsReplyError extends Error {
   }
 }
 
+// The Age header is not CORS-safelisted. A cross-origin reply with no visible Age can still
+// answer this lookup, but cannot safely receive a fresh local cache lifetime.
+function httpAgeSeconds(response) {
+  const age = response.headers.get('age');
+  if (age === null) return response.type === 'cors' ? null : 0;
+  return /^\d+$/.test(age) && Number.isSafeInteger(Number(age)) ? Number(age) : null;
+}
+
+function remainingDnsTtl(ttl, age) {
+  return age === null ? 0 : Math.max(0, ttl - age);
+}
+
 function nameKey(name) {
   return typeof name === 'string' ? name.trim().toLowerCase().replace(/\.$/, '') : null;
 }
@@ -414,6 +426,7 @@ export class DohTransport {
       const media = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
       if (media !== accept && !(wantJson && media === 'application/json')) throw new Error('Unexpected DoH content type');
       const bytes = await boundedBody(response, wantJson ? 256 * 1024 : 65535, controller.signal);
+      const ageSeconds = httpAgeSeconds(response);
       if (wantJson) {
         let json;
         try { json = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
@@ -430,7 +443,7 @@ export class DohTransport {
         }
         const message = jsonToMessage(json);
         if (message.flags.truncated) throw new Error('Truncated DoH JSON response');
-        return { message, transport: 'DoH-JSON' };
+        return { message, transport: 'DoH-JSON', ageSeconds };
       }
 
       const message = decodeMessage(bytes);
@@ -438,9 +451,9 @@ export class DohTransport {
       if (message.id !== 0 || message.flags.opcode !== 0 || message.flags.reservedBit || message.flags.truncated) {
         throw new Error('Invalid DoH reply ID or flags');
       }
-      if (message.edns?.version && message.rcode === 0) throw new Error('Unsupported EDNS version');
+      if (message.edns?.version && (message.rcode === 0 || message.rcode === 3)) throw new Error('Unsupported EDNS version');
       matchWireQuestion(message, name, qtype);
-      return { message, transport: 'DoH-WIRE' };
+      return { message, transport: 'DoH-WIRE', ageSeconds };
     } catch (error) {
       if (controller.signal.aborted) throw controller.signal.reason;
       throw error;
@@ -581,18 +594,20 @@ export class ResolverPool {
     const attempt = async (resolver, signal) => {
       const started = this.clock();
       try {
-        const { message, transport } = await this.transport.query(resolver, name, type, { signal });
+        const { message, transport, ageSeconds = 0 } = await this.transport.query(resolver, name, type, { signal });
         signal.throwIfAborted();
         if (message.rcode !== 0 && message.rcode !== 3) throw new DnsReplyError(message);
         const latencyMs = Math.max(0, this.clock() - started);
-        const result = this._buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached: false });
+        const result = this._buildResult({ name, type, resolver, message, transport, ageSeconds, latencyMs, attempts, cached: false });
         this.health.recordSuccess(resolver.id, latencyMs);
         record({ resolverId: resolver.id, resolverName: resolver.name, transport, ok: true, latencyMs, rcode: message.rcode });
         return { resolver, ok: true, result };
       } catch (error) {
         if (signal.aborted) return { resolver, ok: false, error }; // Abandoned hedge, not an outage.
         const latencyMs = Math.max(0, this.clock() - started);
-        this.health.recordFailure(resolver.id, error);
+        // A valid response such as SERVFAIL or REFUSED can be specific to one DNS name. Fail
+        // over for this query without excluding a reachable resolver for unrelated names.
+        if (!(error instanceof DnsReplyError)) this.health.recordFailure(resolver.id, error);
         record({
           resolverId: resolver.id,
           resolverName: resolver.name,
@@ -678,13 +693,13 @@ export class ResolverPool {
     };
   }
 
-  _buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached }) {
+  _buildResult({ name, type, resolver, message, transport, ageSeconds, latencyMs, attempts, cached }) {
     const rcode = message.rcode;
     const qtype = typeFromString(type);
     const nx = rcode === 3;
     const noData = !nx && !message.answers.some((rr) => rr.type === qtype || qtype === TYPE.ANY);
     const negative = nx || noData;
-    const negativeTtl = negative ? negativeTtlFrom(message) : undefined;
+    const negativeTtl = negative ? remainingDnsTtl(negativeTtlFrom(message), ageSeconds) : undefined;
     const status = nx ? 'nxdomain' : noData ? 'nodata' : 'ok';
     const addrs = addressesOf(message, type);
     const dnssect = assessDnssec({ message, requested: true, resolverName: resolver.name });
@@ -695,7 +710,7 @@ export class ResolverPool {
       ok: rcode === 0,
       addresses: addrs.map((a) => a.address),
       cname: chainOf(message),
-      ttl: negative ? negativeTtl : Math.max(0, minTtl(message, 0)),
+      ttl: negative ? negativeTtl : remainingDnsTtl(minTtl(message, 0), ageSeconds),
       negative,
       negativeTtl,
       resolver: { id: resolver.id, name: resolver.name, operator: resolver.operator },

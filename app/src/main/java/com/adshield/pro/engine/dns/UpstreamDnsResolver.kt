@@ -400,11 +400,15 @@ class UpstreamDnsResolver @Inject constructor(
         when (config.protocol) {
             DnsProtocol.DOH -> validate((if (config.enableIpv6) dohDualStack else dohV4Only).query(query.rawPayload, endpoint.dohUrl))
             DnsProtocol.DOT -> queryAddresses(endpoint, config.enableIpv6) { ip ->
-                validate(queryDot(query.rawPayload, endpoint, ip))
+                withTimeoutOrNull(ADDRESS_TIMEOUT_MS) { validate(queryDot(query.rawPayload, endpoint, ip)) }
+                    ?: throw SocketTimeoutException("Upstream TLS DNS timed out")
             }
             DnsProtocol.UDP_TCP -> queryAddresses(endpoint, config.enableIpv6) { ip ->
-                val udp = queryUdp(query, ip)
-                if (udp == null) validate(queryTcp(query.rawPayload, ip)) else validate(udp.wire, udp.inspection)
+                dnsUdpWithTcpRetry(
+                    tcpBudgetMs = ADDRESS_TIMEOUT_MS,
+                    udp = { queryUdp(query, ip)?.let { validate(it.wire, it.inspection) } },
+                    tcp = { validate(queryTcp(query.rawPayload, ip)) }
+                )
             }
         }
     } ?: throw SocketTimeoutException("DNS provider timed out")
@@ -423,25 +427,14 @@ class UpstreamDnsResolver @Inject constructor(
                 if (enableIpv6) endpoint.ipv6Addresses.getOrNull(i)?.let(::add)
             }
         }.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        var lastFailure: Exception? = null
-        for (ip in addresses) {
-            currentCoroutineContext().ensureActive()
-            try {
-                val literal = try {
-                    InetAddresses.parseNumericAddress(ip)
-                } catch (_: IllegalArgumentException) {
-                    throw DnsTransportException("Use a numeric IPv4 or IPv6 resolver address")
-                }
-                return withTimeoutOrNull(ADDRESS_TIMEOUT_MS) { exchange(literal) }
-                    ?: throw SocketTimeoutException("DNS address timed out")
-            } catch (c: CancellationException) {
-                throw c
-            } catch (error: Exception) {
-                // Preserve an actual upstream refusal/EDE if another address merely timed out.
-                if (lastFailure !is DnsResponseValidationException || error is DnsResponseValidationException) lastFailure = error
+        return firstUsableDnsAddress(addresses, ADDRESS_HEAD_START_MS) { ip ->
+            val literal = try {
+                InetAddresses.parseNumericAddress(ip)
+            } catch (_: IllegalArgumentException) {
+                throw DnsTransportException("Use a numeric IPv4 or IPv6 resolver address")
             }
+            exchange(literal)
         }
-        throw lastFailure ?: DnsTransportException("No usable resolver address configured")
     }
 
     private suspend fun queryDot(wire: ByteArray, endpoint: DnsProviderEndpoint, ip: InetAddress): ByteArray =
@@ -573,6 +566,7 @@ class UpstreamDnsResolver @Inject constructor(
         private const val UDP_TIMEOUT_MS = 1800
         private const val ADDRESS_SOCKET_TIMEOUT_MS = 2000
         private const val ADDRESS_TIMEOUT_MS = 2700L
+        private const val ADDRESS_HEAD_START_MS = 650L
         private const val PROVIDER_TIMEOUT_MS = 6500L
         private const val RESOLUTION_TIMEOUT_MS = 12_000L
         private const val MAX_CACHE_QUERY_BYTES = 4_096 // Bound memory for wire-exact cache keys.

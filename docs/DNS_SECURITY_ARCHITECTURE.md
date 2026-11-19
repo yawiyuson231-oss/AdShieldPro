@@ -26,7 +26,10 @@ nothing here makes AdShield Pro a general-purpose IP firewall.
 
 Supported presets include NextDNS (`https://dns.nextdns.io/dns-query`) and Control D
 (`p0.freedns.controld.com`) in addition to the previous providers. The custom preset accepts
-explicit IPv4 **and** IPv6 endpoints.
+explicit IPv4 **and** IPv6 endpoints. Within the selected provider, later configured addresses
+get a chance after a short head start even if an earlier address stalls. A matching truncated UDP
+reply gets a separate same-address TCP window, still bounded by the overall provider deadline.
+Losing requests are canceled.
 
 ## 2. Strict response validation
 

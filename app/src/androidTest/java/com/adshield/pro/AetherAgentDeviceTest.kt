@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.domain.model.ProtectionMode
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.service.AdShieldVpnService
@@ -152,7 +153,8 @@ class AetherAgentDeviceTest {
         assertEquals(VpnStatus.DISCONNECTED, state.vpnState.value.status)
         assertNoValidatedNetwork()
         val prefs = app.preferencesRepository
-        check(savedSettings().excludedAppPackages.isEmpty()) { "Use a fresh debug install on a disposable emulator." }
+        val original = savedSettings()
+        check(original.excludedAppPackages.isEmpty()) { "Use a fresh debug install on a disposable emulator." }
         val installed = "com.android.settings"
         val nextInstalled = instrumentation.context.packageName
         val missing = "com.adshield.test.receipt.notinstalled"
@@ -226,7 +228,10 @@ class AetherAgentDeviceTest {
             sendVpnAction(AdShieldVpnService.ACTION_PAUSE_VPN)
             awaitVpn(state) { it.status == VpnStatus.PAUSED }
             sendVpnAction(AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG)
+            val newMode = if (original.protectionMode == ProtectionMode.STRICT) ProtectionMode.STANDARD else ProtectionMode.STRICT
+            runBlocking { withTimeout(8_000) { prefs.setProtectionMode(newMode) } }
             awaitVpn(state) { it.activeTunnelReceipt?.generation?.let { generation -> generation > rebuilt.generation } == true }
+            awaitVpn(state) { it.activeMode == newMode }
             val pausedRebuild = requireNotNull(state.vpnState.value.activeTunnelReceipt)
             assertEquals(VpnStatus.PAUSED, state.vpnState.value.status)
             assertEquals(rebuilt.acceptedExclusions, pausedRebuild.acceptedExclusions)
@@ -250,6 +255,7 @@ class AetherAgentDeviceTest {
             }
             runBlocking { withTimeout(8_000) {
                 for (entry in listOf(installed, nextInstalled, missing)) prefs.toggleExcludedAppPackage(entry, false)
+                prefs.setProtectionMode(original.protectionMode)
             } }
         }
     }

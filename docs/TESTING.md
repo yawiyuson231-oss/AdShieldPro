@@ -101,6 +101,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
 | `AetherSecurityAgentTest` | Bundled model on held-out English and Taglish requests, one supported task at a time, stale/dismissed approvals, separate explicit link input and approval |
+| `DnsAddressFallbackTest` | Same-provider address scheduling and cancellation, fast first address, and a separate TCP allowance after a matching truncated UDP reply |
 | `DnsResolverHardeningTest` | Question matching before UDP TC retry, RDATA and EDNS bounds, extended RCODE/EDE, encrypted failover and cancellation, uncached diagnostics and DoH transport checks |
 | `AetherSecurityReviewTest` / `AetherDnsPolicyReviewTest` | Three independent local reads, partial coverage, propagated cancellation, exact package-ID matching before display limits, saved-rule conflicts, resolver-plan eligibility, custom endpoint redaction and unknown vs. zero |
 | `AetherVpnExclusionPreviewTest` | Exact saved-package selection, no-op and stale targets, setup evidence vs. unknown, and synthetic before/after decisions for per-app rules, network exceptions and allowlist-only precedence without mutating inputs |
