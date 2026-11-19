@@ -33,41 +33,28 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:preDebugUnitTestBuild
 > Task :app:processDebugJavaRes UP-TO-DATE
 > Task :app:javaPreCompileDebugUnitTest FROM-CACHE
-> Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
 > Task :app:kspDebugUnitTestKotlin
 
-> Task :app:compileDebugUnitTestKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:37:39 No value passed for parameter 'config'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:37:39 No value passed for parameter 'trapEnabled'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:38:13 No parameter with name 'enabled' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:39:13 No parameter with name 'excludedPlaintextUpstreamIps' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:41:27 Unresolved reference 'none' on receiver of type 'HardcodedDnsTrap.TrapRoutePlan'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:41:34 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:42:27 Unresolved reference 'any' on receiver of type 'HardcodedDnsTrap.TrapRoutePlan'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:42:33 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:42:60 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:43:27 Unresolved reference 'any' on receiver of type 'HardcodedDnsTrap.TrapRoutePlan'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:43:33 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:43:73 Unresolved reference 'it'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:61:35 Unresolved reference 'writeSnapshot'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:61:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:64:48 Unresolved reference 'readSnapshot'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:66:40 Unresolved reference 'blockedDomains'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:71:46 Unresolved reference 'readSnapshot'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:79:20 No value passed for parameter 'queryType'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:79:20 No value passed for parameter 'isBlocked'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:81:17 No parameter with name 'packageName' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:82:17 No parameter with name 'wasBlocked' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:88:27 Unresolved reference 'screenOffQueriesObserved' on receiver of type 'BehavioralAnomalyEngine.AnomalyRadarSnapshot'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:95:41 Unresolved reference 'Kind'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:96:25 Unresolved reference 'isHighRisk' on receiver of type 'QrPayloadInspector.QrInspectionReport'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:99:38 Unresolved reference 'crc16CcittFalse'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:102:41 Unresolved reference 'Kind'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:103:25 Unresolved reference 'isHighRisk' on receiver of type 'QrPayloadInspector.QrInspectionReport'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:125:44 No parameter with name 'provider' found.
-
 > Task :app:compileDebugUnitTestKotlin FAILED
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:39:17 No parameter with name 'provider' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:65:35 Unresolved reference 'writeSnapshot'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:65:63 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:68:48 Unresolved reference 'readSnapshot'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:70:40 Unresolved reference 'blockedDomains'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:75:46 Unresolved reference 'readSnapshot'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:83:20 No value passed for parameter 'queryType'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:83:20 No value passed for parameter 'isBlocked'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:85:17 No parameter with name 'packageName' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:86:17 No parameter with name 'wasBlocked' found.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:92:27 Unresolved reference 'screenOffQueriesObserved' on receiver of type 'BehavioralAnomalyEngine.AnomalyRadarSnapshot'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:99:41 Unresolved reference 'Kind'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:100:25 Unresolved reference 'isHighRisk' on receiver of type 'QrPayloadInspector.QrInspectionReport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:103:38 Unresolved reference 'crc16CcittFalse'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:106:41 Unresolved reference 'Kind'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:107:25 Unresolved reference 'isHighRisk' on receiver of type 'QrPayloadInspector.QrInspectionReport'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt:129:44 No parameter with name 'provider' found.
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
@@ -76,10 +63,10 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugUnitTestKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: NO_VALUE_FOR_PARAMETER
+   > Kotlin compiler: NAMED_PARAMETER_NOT_FOUND
        Kotlin compiler error
-         No value passed for parameter 'config'.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt line 37
+         No parameter with name 'provider' found.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/FeatureExpansion212TestSuite.kt line 39
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -271,7 +258,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 61 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No value passed for parameter 'config'.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No parameter with name 'provider' found.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -308,5 +295,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No value
 	... 2 more
 
 
-BUILD FAILED in 31s
+BUILD FAILED in 23s
 30 actionable tasks: 5 executed, 1 from cache, 24 up-to-date
