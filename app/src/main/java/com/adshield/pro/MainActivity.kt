@@ -70,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -514,7 +515,7 @@ private fun CyberBottomNav(currentTab: MainNavDestination, onSelect: (MainNavDes
     NavigationBar(containerColor = Color(0xFF040D1A), tonalElevation = 0.dp) {
         LazyRow(
             state = listState,
-            modifier = Modifier.fillMaxWidth().height(80.dp),
+            modifier = Modifier.fillMaxWidth().height(80.dp).testTag("main-navigation"),
             horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             itemsIndexed(MainNavDestination.entries, key = { _, destination -> destination.name }) { _, destination ->

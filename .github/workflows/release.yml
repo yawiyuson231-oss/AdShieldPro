@@ -1,270 +1,185 @@
 name: Release APK
 
-# Publishes a signed, R8-minified AdShield Pro build to GitHub Releases.
-#
-# Two entry points:
-#   1. Manual: "Run workflow" on this branch (no tag needed). Reads the version from
-#      app/build.gradle.kts and publishes tag v<versionName>, skipping if it already exists.
-#   2. Tag push: push a tag like v2.3.1 and the same pipeline builds and publishes it.
-#
-# Fails closed unless a trusted, private signing key preserves the published upgrade path.
-
+# AdShield Pro Secure starts with a new Android identity and a fresh key. Never make
+# this package GitHub's repository-wide Latest: that route belongs to legacy installs.
 on:
   workflow_dispatch:
+  workflow_call:
     inputs:
-      tag:
-        description: 'Must match v<versionName> from app/build.gradle.kts (the default)'
-        required: false
-        default: ''
-  push:
-    tags:
-      - 'v*'
+      test_only:
+        type: boolean
+        default: false
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: android-secure-release
   cancel-in-progress: false
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    environment: android-secure-release
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Require a reviewed main commit and signing configuration
+      - name: Require a reviewed main commit and Secure signing approval
         env:
-          TRUSTED_CERT: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
+          SECURE_CERT: ${{ vars.ADSHIELD_SECURE_APK_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor HEAD FETCH_HEAD; then
-            echo "::error::Release signing requires a commit already merged into main. Use an Android CI debug artifact for an unmerged PR."
+          if [[ "$GITHUB_REF" != refs/heads/main || "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]]; then
+            echo '::error::Production and signed migration candidates must be built from reviewed main. Use Android CI previews for branch tests.'
             exit 1
           fi
-          if [[ ! "$TRUSTED_CERT" =~ ^[0-9A-Fa-f]{64}$ ]]; then
-            echo "::error::APK publication is blocked until signing recovery is reviewed and ADSHIELD_TRUSTED_APK_CERT_SHA256 is configured."
+          if [[ ! "$SECURE_CERT" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+            echo '::error::Configure ADSHIELD_SECURE_APK_CERT_SHA256 for a fresh private signer in the android-secure-release environment.'
             exit 1
           fi
 
-      - name: JDK 21
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: gradle
 
-      - name: Install Android SDK
+      - name: Set up Android SDK
         run: |
+          set -euo pipefail
           SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMGR" ]; then SDKMGR=sdkmanager; fi
           yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
-          for pkg in "platforms;android-37.0" "build-tools;36.0.0" "platform-tools"; do
-            echo "--- $pkg"
-            "$SDKMGR" --install "$pkg" 2>&1 | tail -2 || true
-          done
-          ls "$ANDROID_HOME/platforms"
+          "$SDKMGR" --install 'platforms;android-37.0' 'platform-tools' 'build-tools;36.0.0'
 
-      - name: Resolve version and tag
+      - name: Resolve the version and isolated release tag
         id: meta
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_TAG: ${{ inputs.tag }}
+          TEST_ONLY: ${{ inputs.test_only }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          from tools.check_universal_release import check_build_config
+          problems = []
+          config = check_build_config(problems)
+          if problems:
+              sys.exit('\n'.join(problems))
+          version = config['versionName']
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)', version):
+              sys.exit('Release version must use canonical major.minor.patch with two-digit minor/patch limits')
+          major, minor, patch = map(int, version.split('.'))
+          code = 10_000 * major + 100 * minor + patch
+          if not 1 <= code <= 2_147_483_647 or code != config['versionCode']:
+              sys.exit('Android versionCode must exactly match the Secure release version')
+          tag = f'secure-v{version}'
+          apk = f'AdShieldPro-Secure-{version}-release.apk'
+          if os.environ.get('TEST_ONLY') == 'true':
+              tag = f'test-{tag}-run.{os.environ["GITHUB_RUN_ID"]}.{os.environ["GITHUB_RUN_ATTEMPT"]}'
+              apk = f'AdShieldPro-Secure-{version}-test.apk'
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              print(f'version={version}\ntag={tag}\napk={apk}', file=out)
+          PY
+
+      - name: Run regression suites
         run: |
           set -euo pipefail
-          VERSION_NAME="$(grep -oE 'versionName *= *"[^"]+"' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)"/\1/')"
-          VERSION_CODE="$(grep -oE 'versionCode *= *[0-9]+' app/build.gradle.kts | head -1 | grep -oE '[0-9]+')"
-          if [ "$EVENT_NAME" = "push" ]; then
-            TAG="${GITHUB_REF_NAME}"
-          elif [ -n "${INPUT_TAG:-}" ]; then
-            TAG="$INPUT_TAG"
-          else
-            TAG="v${VERSION_NAME}"
-          fi
-          if [[ ! "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$TAG" != "v$VERSION_NAME" ]]; then
-            echo "::error::Release tag must match v<versionName> from app/build.gradle.kts."
-            exit 1
-          fi
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "apk_name=AdShieldPro-${VERSION_NAME}-release.apk" >> "$GITHUB_OUTPUT"
-          echo "Releasing $TAG (versionName=$VERSION_NAME, versionCode=$VERSION_CODE)"
-
-      - name: UI performance and lazy-list gates
-        run: |
-          chmod +x tools/check_ui_performance.py
+          python3 -m unittest discover -s tools/tests
           python3 tools/check_ui_performance.py
+          ./gradlew :app:testDebugUnitTest :app:lintDebug --no-daemon --console=plain
 
-      - name: JVM unit tests
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest --no-daemon --console=plain
-
-      - name: Build APK with the approved private signing key
+      - name: Build with the approved Secure key
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
-          KEYSTORE_B64: ${{ secrets.ADSHIELD_KEYSTORE_BASE64 }}
-          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_STORE_PASSWORD }}
-          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_KEY_ALIAS }}
-          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_KEY_PASSWORD }}
-        run: bash tools/release_signing.sh build
+          GH_TOKEN: ${{ github.token }}
+          SECURE_VERSION_NAME: ${{ steps.meta.outputs.version }}
+          ADSHIELD_SECURE_APK_CERT_SHA256: ${{ vars.ADSHIELD_SECURE_APK_CERT_SHA256 }}
+          KEYSTORE_B64: ${{ secrets.ADSHIELD_SECURE_KEYSTORE_BASE64 }}
+          ADSHIELD_STORE_PASSWORD: ${{ secrets.ADSHIELD_SECURE_STORE_PASSWORD }}
+          ADSHIELD_KEY_ALIAS: ${{ secrets.ADSHIELD_SECURE_KEY_ALIAS }}
+          ADSHIELD_KEY_PASSWORD: ${{ secrets.ADSHIELD_SECURE_KEY_PASSWORD }}
+        run: bash tools/release_signing.sh build-secure
 
-      - name: Universal-build gate (blocks the release if the APK is device-specific)
-        run: |
-          set -euo pipefail
-          mkdir -p .ci
-          chmod +x tools/check_universal_release.py
-          python3 tools/check_universal_release.py "$(ls app/build/outputs/apk/release/*.apk | head -1)" | tee .ci/universal.log
-
-      - name: Verify the built APK signature
+      - name: Verify exact Secure identity, universal packaging, and signature
         env:
-          ADSHIELD_TRUSTED_APK_CERT_SHA256: ${{ vars.ADSHIELD_TRUSTED_APK_CERT_SHA256 }}
-        run: bash tools/release_signing.sh verify app/build/outputs/apk/release/app-release.apk
-
-      - name: Verify and package APK
-        id: apk
-        env:
-          APK_NAME: ${{ steps.meta.outputs.apk_name }}
+          ADSHIELD_SECURE_APK_CERT_SHA256: ${{ vars.ADSHIELD_SECURE_APK_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
-          test -s "$APK"
-          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
-          unzip -l "$APK" | grep -qE 'classes[0-9]*\.dex'
-          unzip -l "$APK" | grep -q 'resources.arsc'
-          OUT="$APK_NAME"
-          cp "$APK" "$OUT"
-          sha256sum "$OUT" | cut -d' ' -f1 > "$OUT.sha256"
-          echo "apk=$OUT" >> "$GITHUB_OUTPUT"
-          ls -l "$OUT"
-          cat "$OUT.sha256"
+          APK=app/build/outputs/apk/release/app-release.apk
+          python3 tools/check_universal_release.py "$APK"
+          python3 tools/check_apk_native_libs.py "$APK"
+          bash tools/release_signing.sh verify-secure "$APK"
+          sha256sum "$APK" > "$RUNNER_TEMP/secure-tested-apk.sha256"
 
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ steps.meta.outputs.tag }}
-          APK: ${{ steps.apk.outputs.apk }}
-          VERSION_NAME: ${{ steps.meta.outputs.version_name }}
-          VERSION_CODE: ${{ steps.meta.outputs.version_code }}
+      - name: Enable emulator acceleration
         run: |
           set -euo pipefail
-          cat > /tmp/notes.md <<EOF
-          # AdShield Pro ${VERSION_NAME}
-
-          Signed, R8-minified release build from commit \`$GITHUB_SHA\`.
-
-          ## Install
-          1. Download \`$APK\`.
-          2. Allow installing unknown apps for your browser or file manager when Android asks.
-          3. Open the APK and install. Settings, rules and history stay on the device.
-
-          Verify the download if you like: \`sha256sum $APK\` should print
-          \`$(cat "$APK.sha256")\`.
-
-          ## What is in this build
-          - **AETHER guided security plans:** build a two- or three-step plan offline, approve each
-            step separately, and see a receipt before starting the next check.
-          - **Optional AETHER API connections:** Gemini, OpenAI, and compatible HTTPS Chat Completions.
-            Review what will be sent before sending it. Testing a connection does not run a tool.
-          - **DNS Alias Shield:** check CNAME and matching HTTPS/SVCB targets in validated DNS answers
-            without extra lookups, while respecting allowlists and playback safeguards.
-          - **On-device review and scanning:** inspect Android-visible app risks and one selected file
-            with explicit limits. Scans do not execute or upload the file or prove it is safe.
-          - Security & reliability hardening across VPN/TCP-DNS/IPv6 packet framing, DoH/DoT and
-            DNSSEC-scoped caching, video-safe wildcard filtering, Privacy Browser cosmetic/scheme
-            guards and Tor \`.onion\` leak prevention, World Monitor tile & RSS/Atom feed isolation,
-            APK Signature Scheme v2/v3+ checks, verified Cloud/WebDAV/direct-download handling,
-            and repo-pinned HTTPS in-app update verification.
-          - Private search (DuckDuckGo default or Google), persistent scan journal (up to 200
-            records), exportable threat reports, SHA-256 verified file quarantine and optional
-            scheduled installed-app scanning.
-          - On-device DNS filtering over Android VpnService (no root): ad, tracker and threat lists,
-            custom block/allow rules, protection modes, background list sync.
-          - Cyber-console dashboard: dark navy/electric-blue threat overview, animated local
-            shield, block-mix donut, attack-vector bars and a real DNS activity feed — no
-            fictional enterprise endpoints or compliance badges.
-          - Aether AI decision core: explainable VERIFIED / SUSPECTED / UNKNOWN verdicts with
-            evidence and a user-controlled autonomy ceiling, plus a live network dashboard fed
-            only by this device's real DNS log.
-          - Battery Intelligence (measured telemetry and charging diagnostics) and Security Center
-            (URL/file/APK scanning, installed-app risk audit) — all on-device.
-          - 367k offline rules bundled in the APK, so a fresh install protects before any sync.
-          - Privacy Browser with request filtering, tracking-parameter stripping and pop-up blocking,
-            a search-only history with opt-in suggestions, and optional onion routing through Orbot
-            (requires Orbot installed and connected).
-          - AdShield Cloud (optional, self-hosted): account, resumable multipart uploads, folders,
-            version history, expiring share links, duplicate detection, quota reconciliation,
-            encrypted DNS-configuration backup/restore and a pre-upload malware scan. No storage
-            credentials ship in the APK, and nothing is uploaded unless you sign in.
-          - Storage Access Framework file tools: folder browsing, verified scans, duplicate grouping
-            by SHA-256, and direct HTTPS media downloads with optional publisher-checksum checks.
-          - Activity, statistics and per-app DNS analytics; AI Smart Boost, storage cleaning,
-            Game Booster and battery/thermal tools — all local, no cloud AI.
-          - In-app update checks against this repository's own releases.
-          - Smoother scrolling: lazy keyed lists, per-tab state isolation, draw-state animation
-            that stops when idle, and a scroll-to-top control on long dashboards.
-
-          ## Universal build
-          One APK for every device: any native helper library (AndroidX graphics-path,
-          DataStore) is bundled for all of arm64-v8a, armeabi-v7a, x86 and x86_64, so it
-          installs on Android 10+ (API 29-37) phones, tablets and foldables regardless of CPU.
-          Verified by \`tools/check_universal_release.py\` before this release was published.
-
-          ## Notes
-          - \`versionCode ${VERSION_CODE}\`, \`minSdk 29\`, \`targetSdk 36\`.
-          - Built and verified by the "Release APK" workflow (unit tests, APK structure checks,
-            universal-build gate, signing-continuity check against the previous release).
-          - Signing keys are not included in release assets. Previously published keystore assets
-            are considered exposed and cannot be used for production signing.
-          EOF
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            echo "::error::Release $TAG already exists. Bump the app version instead of replacing shipped assets."
-            exit 1
-          fi
-          REF="refs/tags/$TAG"
-          if git show-ref --verify --quiet "$REF"; then
-            test "$(git rev-parse "$REF^{commit}")" = "$GITHUB_SHA" || {
-              echo "::error::Tag $TAG points to a different commit; refusing to publish."
-              exit 1
-            }
-          else
-            git tag "$TAG" "$GITHUB_SHA"
-            git push origin "$REF"
-          fi
-          gh release create "$TAG" "$APK" "$APK.sha256" \
-            --title "AdShield Pro ${VERSION_NAME}" \
-            --notes-file /tmp/notes.md \
-            --verify-tag --latest
-
-      # Best effort: trigger the real Pages pipeline (docs/ at /, web platform at /app/).
-      # Pages has to be switched on once by a repository admin (Settings -> Pages ->
-      # Source: GitHub Actions); until then skip cleanly without leaving a failed step.
-      - name: Trigger website deploy (GitHub Pages)
-        if: success()
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/pages" > /dev/null 2>&1; then
-            gh workflow run deploy-website.yml --ref main || true
-          else
-            echo "GitHub Pages is not enabled yet; skipping website deploy trigger."
+          test -c /dev/kvm
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
           fi
 
-      - name: Upload workflow artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Install and launch the signed Secure APK
+        timeout-minutes: 12
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          name: adshield-pro-${{ steps.meta.outputs.version_name }}-release
-          path: |
-            AdShieldPro-*-release.apk
-            AdShieldPro-*-release.apk.sha256
-          if-no-files-found: warn
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          avd-name: adshield-secure-smoke
+          emulator-boot-timeout: 300
+          disable-linux-hw-accel: false
+          script: bash tools/smoke_android_install.sh app/build/outputs/apk/release/app-release.apk emulator-5554 com.adshield.pro.secure
+
+      - name: Publish to the independent Secure channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          APK_NAME: ${{ steps.meta.outputs.apk }}
+          TEST_ONLY: ${{ inputs.test_only }}
+        run: |
+          set -euo pipefail
+          sha256sum --check "$RUNNER_TEMP/secure-tested-apk.sha256"
+          work=$(mktemp -d "$RUNNER_TEMP/secure-release.XXXXXXXX")
+          trap 'rm -rf -- "$work"' EXIT
+          cp app/build/outputs/apk/release/app-release.apk "$work/$APK_NAME"
+          sha256sum "$work/$APK_NAME" | cut -d ' ' -f 1 > "$work/$APK_NAME.sha256"
+          legacy_before=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          [[ "$legacy_before" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          title='AdShield Pro Secure'
+          if [[ "$TEST_ONLY" == true ]]; then title='AdShield Pro Secure — migration test'; fi
+          cat > "$work/notes.md" <<EOF
+          **New application ID:** \`com.adshield.pro.secure\`. This is not an update to legacy AdShield Pro and does not share its private data.
+
+          1. Keep the old app installed. Export configuration from **Settings → Backup / Restore** and store the JSON privately.
+          2. Download \`$APK_NAME\`, open it from Android Downloads, and approve installation if prompted.
+          3. Open **AdShield Pro Secure**, restore the saved configuration, and check your rules and settings before switching. Accounts, API keys, history, and VPN consent do not transfer.
+
+          Built from \`$GITHUB_SHA\`. Android 10+; verified fresh install and launcher on the Android 10 x86_64 emulator.
+          SHA-256: \`$(cat "$work/$APK_NAME.sha256")\`.
+          GitHub marks this channel as non-Latest so the legacy updater will not offer it.
+          EOF
+          if [[ "$TEST_ONLY" == true ]]; then
+            printf '\n**Test candidate only.** The Secure app updater does not offer test tags.\n' >> "$work/notes.md"
+          fi
+          # --target does not change an existing tag. Verify its actual commit, or create a
+          # new ref atomically, before creating the release. Never attach to another source.
+          ref="refs/tags/$TAG"
+          refs=$(git ls-remote --tags origin "$ref" "$ref^{}")
+          if [[ -n "$refs" ]]; then
+            tagged=$(awk -v ref="$ref" '$2 == ref { direct=$1 } $2 == ref "^{}" { peeled=$1 } END { print peeled ? peeled : direct }' <<< "$refs")
+            if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+              echo "::error::The existing $TAG tag points to another commit. Use a new version."
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="$ref" -f sha="$GITHUB_SHA" --silent
+          fi
+          gh release create "$TAG" "$work/$APK_NAME" "$work/$APK_NAME.sha256" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --latest=false \
+            --title "$title ($TAG)" --notes-file "$work/notes.md"
+          [[ "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" == true ]]
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" == "$legacy_before" ]]
+          printf '## Verified Secure release\n\n[Download APK](https://github.com/%s/releases/download/%s/%s)\n\nLegacy Latest remains `%s`.\n' \
+            "$GITHUB_REPOSITORY" "$TAG" "$APK_NAME" "$legacy_before" >> "$GITHUB_STEP_SUMMARY"

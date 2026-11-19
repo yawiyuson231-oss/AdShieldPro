@@ -1,7 +1,6 @@
 package com.adshield.pro.engine.dns
 
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
 
 /**
  * RFC 1035 / RFC 3596 wire-format DNS message parser and synthetic response builder.
@@ -22,7 +21,11 @@ object DnsPacketCodec {
 
     const val CLASS_IN = 1
 
+    internal const val MAX_DNS_WIRE_BYTES = 65_535
     private const val MAX_RESPONSE_RECORDS = 4096
+    private const val MAX_CACHED_RESPONSE_BYTES = 8192
+    private const val MAX_CACHE_SECONDS = 1800
+    private const val TYPE_OPT = 41
 
     internal enum class AnswerAliasType { CNAME, HTTPS, SVCB }
 
@@ -59,7 +62,7 @@ object DnsPacketCodec {
      * Returns null if the packet is malformed, truncated, or is already a response (QR == 1).
      */
     fun parseQuery(payload: ByteArray, offset: Int = 0, length: Int = payload.size - offset): ParsedDnsQuery? {
-        if (length < 12 || offset < 0 || offset + length > payload.size) return null
+        if (length !in 12..MAX_DNS_WIRE_BYTES || offset < 0 || offset > payload.size - length) return null
 
         val txId = ((payload[offset].toInt() and 0xFF) shl 8) or (payload[offset + 1].toInt() and 0xFF)
         val flags = ((payload[offset + 2].toInt() and 0xFF) shl 8) or (payload[offset + 3].toInt() and 0xFF)
@@ -68,10 +71,10 @@ object DnsPacketCodec {
         if ((flags and 0x8000) != 0 || (flags and 0x7800) != 0) return null
 
         val qdCount = ((payload[offset + 4].toInt() and 0xFF) shl 8) or (payload[offset + 5].toInt() and 0xFF)
-        if (qdCount <= 0 || qdCount > 64) return null
+        if (qdCount != 1) return null
 
         val limit = offset + length
-        val nameResult = readDomainName(payload, offset, offset + 12, limit) ?: return null
+        val nameResult = readDomainName(payload, offset, offset + 12, limit, allowCompression = false) ?: return null
         val afterNameOffset = nameResult.nextOffset
 
         // Need 4 bytes for QTYPE (2) and QCLASS (2)
@@ -154,7 +157,7 @@ object DnsPacketCodec {
                 }
                 val pointerOffset = ((lenByte and 0x3F) shl 8) or (packet[pos + 1].toInt() and 0xFF)
                 val targetPos = msgStart + pointerOffset
-                if (pointerOffset < 12 || targetPos >= limit || targetPos == pos) return null
+                if (pointerOffset < 12 || targetPos >= pos) return null
                 pos = targetPos
             } else if (pointerMask == 0x00) {
                 // Standard label (1..63 bytes)
@@ -343,69 +346,164 @@ object DnsPacketCodec {
         return copy
     }
 
-    /**
-     * Extracts a conservative cache TTL (in seconds) from an upstream DNS response, clamped to [15, 1800].
-     */
-    fun extractResponseTtlSeconds(dnsResponse: ByteArray): Int {
-        if (dnsResponse.size < 12) return 60
-        val flags = ((dnsResponse[2].toInt() and 0xFF) shl 8) or (dnsResponse[3].toInt() and 0xFF)
-        val rcode = flags and 0x000F
-        if (rcode != 0) return 30 // Short cache for NXDOMAIN
+    /** A validated wire reply with offsets of the TTL fields that can be aged in place. */
+    internal class CachedResponse(
+        message: ByteArray,
+        val lifetimeSeconds: Int,
+        private val ttlFields: List<Pair<Int, Long>>
+    ) {
+        private val wire = message.copyOf()
 
-        val anCount = ((dnsResponse[6].toInt() and 0xFF) shl 8) or (dnsResponse[7].toInt() and 0xFF)
-        if (anCount <= 0) return 60
+        fun isExpired(ageMs: Long): Boolean = ageMs >= lifetimeSeconds * 1000L
 
-        // Walk all answer RRs and take the minimum TTL so a long-TTL CNAME cannot mask a short A/AAAA TTL.
-        val qdCount = u16At(dnsResponse, 4)
-        var offset = 12
-        repeat(qdCount) {
-            val qRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return 120
-            offset = qRead.nextOffset + 4
-            if (offset > dnsResponse.size) return 120
+        fun forQuery(transactionId: Int, ageMs: Long): ByteArray {
+            val reply = rewriteTransactionId(wire, transactionId)
+            // Round remaining TTL down, so a cache hit cannot extend any upstream lifetime.
+            val elapsedSeconds = ageMs.coerceAtLeast(0L).let { it / 1000L + if (it % 1000L == 0L) 0 else 1 }
+            for ((offset, original) in ttlFields) {
+                val ttl = (original - elapsedSeconds).coerceAtLeast(0L)
+                for (i in 0..3) reply[offset + i] = (ttl ushr (24 - 8 * i)).toByte()
+            }
+            return reply
         }
-        var minTtl = Long.MAX_VALUE
-        repeat(anCount.coerceAtMost(256)) {
-            val nameRead = readDomainName(dnsResponse, 0, offset, dnsResponse.size) ?: return@repeat
-            val rrHeader = nameRead.nextOffset
-            if (rrHeader + 10 > dnsResponse.size) return@repeat
-            val ttl = ByteBuffer.wrap(dnsResponse, rrHeader + 4, 4).int.toLong() and 0xFFFFFFFFL
-            val rdLength = u16At(dnsResponse, rrHeader + 8)
-            val nextOffset = rrHeader + 10 + rdLength
-            if (nextOffset > dnsResponse.size) return@repeat
-            if (ttl < minTtl) minTtl = ttl
-            offset = nextOffset
-        }
-        if (minTtl != Long.MAX_VALUE) {
-            return minTtl.coerceIn(15L, 1800L).toInt()
-        }
-        return 120
     }
 
-    /**
-     * Walks every resource record with bounds and compression-pointer checks.
-     * Returns null for malformed wire data; otherwise returns all RR types present.
-     */
-    fun inspectResponseRecordTypes(message: ByteArray): Set<Int>? {
+    private data class CacheFields(val lifetimeSeconds: Int, val records: List<Pair<Int, Long>>)
+
+    /** Seconds the full reply may be stored; zero means no caching. Never extend a short TTL. */
+    fun extractResponseTtlSeconds(dnsResponse: ByteArray): Int = cacheFields(dnsResponse)?.lifetimeSeconds ?: 0
+
+    internal fun prepareCachedResponse(message: ByteArray): CachedResponse? = cacheFields(message)?.let {
+        CachedResponse(message, it.lifetimeSeconds, it.records)
+    }
+
+    private fun cacheFields(message: ByteArray): CacheFields? {
+        if (message.size !in 12..MAX_CACHED_RESPONSE_BYTES) return null
+        val flags = u16At(message, 2)
+        if (flags and 0x8000 == 0 || flags and 0x7A40 != 0) return null
+        val rcode = flags and 0x000F
+        if (rcode != 0 && rcode != 3) return null
+        val answerCount = u16At(message, 6)
+        val authorityEnd = answerCount + u16At(message, 8)
+        val negative = rcode == 3 || answerCount == 0
+        var hasNegativeTtl = false
+        val recordTtls = mutableListOf<Pair<Int, Long>>()
+        val valid = walkResponseRecords(message) { index, _, header, end, questionClass ->
+            val type = u16At(message, header)
+            val rawTtl = u32At(message, header + 4)
+            if (type == TYPE_OPT) {
+                // OPT repurposes the TTL field for the extended RCODE, version and flags.
+                if (rawTtl ushr 16 != 0L) return null
+            } else {
+                // Signed transaction metadata cannot be replayed with a different ID or TTLs.
+                if (type == 249 || type == 250 || (type == 24 && index >= authorityEnd)) return null
+                var ttl = if (rawTtl <= Int.MAX_VALUE) rawTtl else 0L
+                if (index in answerCount until authorityEnd && type == TYPE_SOA && u16At(message, header + 2) == questionClass) {
+                    // RFC 2308: the negative TTL is min(SOA RR TTL, SOA.MINIMUM). Bound the
+                    // cached SOA itself too, so downstream caches see the remaining lifetime.
+                    val primary = readDomainName(message, 0, header + 10, end) ?: return null
+                    val contact = readDomainName(message, 0, primary.nextOffset, end) ?: return null
+                    if (end - contact.nextOffset != 20) return null // five 32-bit SOA integers
+                    ttl = minOf(ttl, u32At(message, end - 4))
+                    hasNegativeTtl = true
+                }
+                if (ttl == 0L) return null
+                recordTtls.add((header + 4) to ttl)
+            }
+        }
+        if (!valid || recordTtls.isEmpty() || (negative && !hasNegativeTtl)) return null
+        val lifetime = recordTtls.minOf { it.second }.coerceAtMost(MAX_CACHE_SECONDS.toLong()).toInt()
+        return CacheFields(lifetime, recordTtls)
+    }
+
+    internal data class ResponseRecords(
+        val ednsVersion: Int?,
+        val extendedRcode: Int,
+        val extendedErrorCodes: List<Int>,
+        val hasRrsig: Boolean,
+        val hasRequestedAnswer: Boolean
+    )
+
+    /** Verify common RDATA and EDNS framing; leave unknown RR types opaque (RFC 3597). */
+    internal fun inspectResponseRecords(message: ByteArray, questionType: Int): ResponseRecords? {
         if (message.size < 12) return null
+        val answers = u16At(message, 6)
+        val endOfAuthority = answers + u16At(message, 8)
+        var ednsVersion: Int? = null
+        var extendedRcode = 0
+        val extendedErrors = linkedSetOf<Int>()
+        var hasRrsig = false
+        var hasRequestedAnswer = false
+        val valid = walkResponseRecords(message) { index, ownerOffset, header, end, questionClass ->
+            val type = u16At(message, header)
+            val cls = u16At(message, header + 2)
+            val start = header + 10
+            if (type == TYPE_OPT) {
+                // A single OPT in Additional, with a literal root owner (RFC 6891).
+                if (index < endOfAuthority || ednsVersion != null || header != ownerOffset + 1 || message[ownerOffset] != 0.toByte()) return null
+                extendedRcode = message[header + 4].toInt() and 0xFF
+                ednsVersion = message[header + 5].toInt() and 0xFF
+                var option = start
+                while (option < end) {
+                    if (end - option < 4) return null
+                    val code = u16At(message, option)
+                    val length = u16At(message, option + 2)
+                    option += 4
+                    if (length > end - option) return null
+                    if (code == 15) { // Extended DNS Error. Never retain resolver-supplied text.
+                        if (length < 2) return null
+                        if (extendedErrors.size < 8) extendedErrors.add(u16At(message, option))
+                    }
+                    option += length
+                }
+            } else {
+                if (!validKnownRdata(message, type, cls, start, end)) return null
+                if (type == 46) hasRrsig = true
+                if (index < answers && cls == questionClass && (type == questionType || questionType == 255)) {
+                    hasRequestedAnswer = true
+                }
+            }
+        }
+        return if (valid) ResponseRecords(ednsVersion, extendedRcode, extendedErrors.toList(), hasRrsig, hasRequestedAnswer) else null
+    }
+
+    private fun validKnownRdata(message: ByteArray, type: Int, cls: Int, start: Int, end: Int): Boolean = when (type) {
+        TYPE_A -> cls != CLASS_IN || end - start == 4
+        TYPE_AAAA -> cls != CLASS_IN || end - start == 16
+        TYPE_NS, TYPE_CNAME, TYPE_PTR -> readDomainName(message, 0, start, end)?.nextOffset == end
+        TYPE_MX -> end - start >= 3 && readDomainName(message, 0, start + 2, end)?.nextOffset == end
+        TYPE_SOA -> {
+            val primary = readDomainName(message, 0, start, end)
+            val contact = primary?.let { readDomainName(message, 0, it.nextOffset, end) }
+            contact != null && end - contact.nextOffset == 20
+        }
+        TYPE_SVCB, TYPE_HTTPS -> {
+            val target = if (end - start >= 3) readDomainName(message, 0, start + 2, end, allowCompression = false) else null
+            target != null && validSvcParamFraming(message, target.nextOffset, end)
+        }
+        else -> true
+    }
+
+    private inline fun walkResponseRecords(message: ByteArray, visit: (Int, Int, Int, Int, Int) -> Unit): Boolean {
+        if (message.size !in 12..MAX_DNS_WIRE_BYTES) return false
         val qd = u16At(message, 4)
         val records = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
-        if (qd != 1 || records > MAX_RESPONSE_RECORDS) return null
-        var offset = 12
-        val question = readDomainName(message, 0, offset, message.size) ?: return null
-        offset = question.nextOffset + 4
-        if (offset > message.size) return null
-        val types = mutableSetOf<Int>()
-        repeat(records) {
-            val name = readDomainName(message, 0, offset, message.size) ?: return null
-            offset = name.nextOffset
-            if (offset + 10 > message.size) return null
-            types.add(u16At(message, offset))
-            val rdLength = u16At(message, offset + 8)
-            offset += 10 + rdLength
-            if (offset > message.size) return null
+        if (qd != 1 || records > MAX_RESPONSE_RECORDS) return false
+        val question = readDomainName(message, 0, 12, message.size, allowCompression = false) ?: return false
+        var offset = question.nextOffset + 4
+        if (offset > message.size) return false
+        val questionClass = u16At(message, question.nextOffset + 2)
+        repeat(records) { index ->
+            val ownerOffset = offset
+            val name = readDomainName(message, 0, ownerOffset, message.size) ?: return false
+            val header = name.nextOffset
+            if (header + 10 > message.size) return false
+            offset = header + 10 + u16At(message, header + 8)
+            if (offset > message.size) return false
+            visit(index, ownerOffset, header, offset, questionClass)
         }
         // Trailing bytes are not a valid DNS message and can conceal parser differentials.
-        return if (offset == message.size) types else null
+        return offset == message.size
     }
 
     /** Returns normalized CNAME targets reachable from the response question. */
@@ -512,6 +610,9 @@ object DnsPacketCodec {
 
     private fun u16At(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
+
+    private fun u32At(bytes: ByteArray, offset: Int): Long =
+        (u16At(bytes, offset).toLong() shl 16) or u16At(bytes, offset + 2).toLong()
 
     private fun writeDomainLabels(out: ByteArrayOutputStream, domain: String) {
         val labels = domain.trim('.').split('.')

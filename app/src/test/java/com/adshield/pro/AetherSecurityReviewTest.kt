@@ -1,6 +1,13 @@
 package com.adshield.pro
 
+import com.adshield.pro.domain.model.AppDnsPolicy
+import com.adshield.pro.domain.model.DnsFirewallPolicy
+import com.adshield.pro.domain.model.DnsResolverConfig
+import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.VpnTunnelReceipt
 import com.adshield.pro.engine.aether.AetherAppReview
+import com.adshield.pro.engine.aether.AetherDnsPolicyReview
 import com.adshield.pro.engine.aether.AetherFileInput
 import com.adshield.pro.engine.aether.AetherFilePickerApproval
 import com.adshield.pro.engine.aether.AetherPhoneAgent
@@ -8,14 +15,15 @@ import com.adshield.pro.engine.aether.AetherSecurityReview as Review
 import com.adshield.pro.engine.aether.AetherSecurityTask
 import com.adshield.pro.engine.aether.AetherTaskApproval
 import com.adshield.pro.engine.aether.AetherTaskProgress
-import com.adshield.pro.engine.aether.AetherTaskSource
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.FileThreatScanner
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,96 +47,191 @@ class AetherSecurityReviewTest {
         declaredComponentPermissions = setOf("android.permission.BIND_ACCESSIBILITY_SERVICE")
     ))
 
+    private fun savedDns(
+        exclusions: Set<String> = emptySet(),
+        policies: Map<String, AppDnsPolicy> = emptyMap(),
+        allowlistOnly: Boolean = false
+    ) = AetherDnsPolicyReview.inspect(
+        config = DnsResolverConfig(),
+        policy = DnsFirewallPolicy(appPolicies = policies, emergencyAllowlistOnly = allowlistOnly),
+        excluded = exclusions,
+        aliasShieldOn = true
+    )
+
     @Test
-    fun runsOnlyTheTwoReviewStepsAndReportsSkippedApps() {
+    fun runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps() = runBlocking {
+        val calls = mutableListOf<String>()
         val progress = mutableListOf<AetherTaskProgress>()
-        val report = runBlocking {
-            Review.run(
-                readPhone = { phone },
-                readApps = { AetherAppReview.from(AppRiskAuditor.VisibleAudit(3, listOf(fixtureHigh, auditor.audit(profile)))) },
-                publish = { progress += it }, now = { 900L }
-            )
-        }
-        assertEquals(listOf(AetherTaskProgress.ReadingPhone, AetherTaskProgress.ReadingApps(0, 0)), progress)
-        assertEquals(phone, report.phone.value)
+        val dns = savedDns()
+        val fixtureClean = auditor.audit(profile.copy(packageName = "com.example.clean"))
+        val audit = AppRiskAuditor.VisibleAudit(3, listOf(fixtureHigh, fixtureClean))
+        val report = Review.run(
+            readPhone = { calls += "phone"; phone },
+            readDns = { calls += "dns"; dns },
+            readApps = { calls += "apps"; audit },
+            publish = { progress += it }, now = { 900L }
+        )
+        assertEquals(listOf("apps", "dns", "phone"), calls.sorted())
+        assertEquals(listOf(AetherTaskProgress.ReviewingSecurity), progress)
+        assertEquals(Review.Reading.Received(phone, 900L), report.phone)
+        assertEquals(Review.Reading.Received(dns.summary, 900L), report.dns)
+        assertEquals(Review.Reading.Received(AetherAppReview.from(audit), 900L), report.apps)
         assertEquals(900L, report.finishedAtMs)
         assertTrue(report.hasGaps)
         val apps = requireNotNull(report.apps.value)
         assertEquals(3, apps.visible)
         assertEquals(2, apps.inspected)
         assertEquals(1, apps.unavailable)
-        assertEquals(1, apps.highRisk)
         assertEquals(listOf(fixtureHigh), apps.topFindings)
+        assertEquals(0, report.appPolicyMatchCount)
     }
 
     @Test
-    fun deadlineOrFailureLeavesTheOtherStepsEvidenceIntact() {
-        val apps = AetherAppReview.from(AppRiskAuditor.VisibleAudit(1, listOf(auditor.audit(profile))))
-        val timedOut = runBlocking {
-            Review.run(readPhone = { awaitCancellation() }, readApps = { apps }, publish = {}, phoneTimeoutMs = 15L)
-        }
-        assertEquals(Review.Reading.Missing(Review.MissingReason.TIMED_OUT), timedOut.phone)
-        assertEquals(apps, timedOut.apps.value)
-        assertTrue(timedOut.hasGaps)
-        val failed = runBlocking {
-            Review.run(readPhone = { phone }, readApps = { error("device fixture") }, publish = {})
-        }
-        assertEquals(phone, failed.phone.value)
-        assertEquals(Review.Reading.Missing(Review.MissingReason.FAILED), failed.apps)
-        assertTrue(failed.hasGaps)
-        val appsTimedOut = runBlocking {
-            Review.run(readPhone = { phone }, readApps = { awaitCancellation() }, publish = {}, appsTimeoutMs = 15L)
-        }
-        assertEquals(phone, appsTimedOut.phone.value)
-        assertEquals(Review.Reading.Missing(Review.MissingReason.TIMED_OUT), appsTimedOut.apps)
+    fun deadlineOrFailureLeavesOtherSpecialistsEvidenceIntact() = runBlocking {
+        val apps = AppRiskAuditor.VisibleAudit(1, listOf(fixtureHigh))
+        val dns = savedDns(exclusions = setOf(profile.packageName))
+        val slowPhone = Review.run(readPhone = { awaitCancellation() }, readDns = { dns }, readApps = { apps },
+            publish = {}, phoneTimeoutMs = 15L)
+        assertEquals(Review.Reading.Missing(Review.MissingReason.TIMED_OUT), slowPhone.phone)
+        assertEquals(dns.summary, slowPhone.dns.value)
+        assertEquals(1, slowPhone.appPolicyMatchCount) // Phone evidence is not needed for the exact-ID join.
+        assertTrue(slowPhone.hasGaps)
+
+        val slowDns = Review.run(readPhone = { phone }, readDns = { awaitCancellation() }, readApps = { apps },
+            publish = {}, dnsTimeoutMs = 15L)
+        assertEquals(Review.Reading.Missing(Review.MissingReason.TIMED_OUT), slowDns.dns)
+        assertEquals(phone, slowDns.phone.value)
+        assertEquals(AetherAppReview.from(apps), slowDns.apps.value)
+        assertNull(slowDns.appPolicyMatchCount)
+        assertTrue(slowDns.hasGaps)
+
+        val failedApps = Review.run(readPhone = { phone }, readDns = { dns }, readApps = { error("device fixture") }, publish = {})
+        assertEquals(Review.Reading.Missing(Review.MissingReason.FAILED), failedApps.apps)
+        assertEquals(phone, failedApps.phone.value)
+        assertEquals(dns.summary, failedApps.dns.value)
+        assertNull(failedApps.appPolicyMatchCount)
+        assertTrue(failedApps.hasGaps)
+
+        val slowApps = Review.run(readPhone = { phone }, readDns = { dns }, readApps = { awaitCancellation() },
+            publish = {}, appsTimeoutMs = 15L)
+        assertEquals(Review.Reading.Missing(Review.MissingReason.TIMED_OUT), slowApps.apps)
+        assertEquals(phone, slowApps.phone.value)
+        assertEquals(dns.summary, slowApps.dns.value)
     }
 
     @Test
-    fun externalDeadlineCancelsTheReviewRatherThanProducingAMissingStep() {
-        var startedApps = false
-        val report = runBlocking {
-            withTimeoutOrNull(40) {
-                Review.run(readPhone = { awaitCancellation() }, readApps = {
-                    startedApps = true
-                    error("Should have canceled both steps")
-                }, publish = {})
-            }
+    fun externalDeadlineCancelsTheReviewRatherThanReportingAMissingReading() = runBlocking {
+        val report = withTimeoutOrNull(50L) {
+            Review.run(readPhone = { awaitCancellation() }, readDns = { savedDns() },
+                readApps = { AppRiskAuditor.VisibleAudit(0, emptyList()) }, publish = {})
         }
         assertNull(report)
-        assertFalse(startedApps)
     }
 
     @Test
-    fun emptyMetadataIsAGapAndNotSuccessfulCoverage() {
-        val apps = AetherAppReview.from(AppRiskAuditor.VisibleAudit(0, emptyList()))
-        val noMetadata = runBlocking { Review.run(readPhone = { phone }, readApps = { apps }, publish = {}) }
+    fun noInspectedAppsIsUnknownNotZeroMatches() = runBlocking {
+        suspend fun review(audit: AppRiskAuditor.VisibleAudit, phoneReport: AetherPhoneAgent.Report = phone) =
+            Review.run(readPhone = { phoneReport }, readDns = { savedDns() }, readApps = { audit }, publish = {})
+        val noMetadata = review(AppRiskAuditor.VisibleAudit(1, emptyList()))
         assertTrue(noMetadata.hasGaps)
         assertEquals(0, noMetadata.apps.value?.inspected)
-        val observedApps = AetherAppReview.from(AppRiskAuditor.VisibleAudit(1, listOf(fixtureHigh)))
-        val bothRead = runBlocking { Review.run(readPhone = { phone }, readApps = { observedApps }, publish = {}) }
-        assertFalse(bothRead.hasGaps)
-        val missingReadings = runBlocking {
-            Review.run(readPhone = { phone.copy(hasUnavailableReadings = true) }, readApps = { observedApps }, publish = {})
-        }
-        assertTrue(missingReadings.hasGaps)
+        assertNull(noMetadata.appPolicyMatchCount)
+        val audit = AppRiskAuditor.VisibleAudit(1, listOf(fixtureHigh))
+        val allRead = review(audit)
+        assertFalse(allRead.hasGaps)
+        assertEquals(0, allRead.appPolicyMatchCount)
+        assertTrue(review(audit, phone.copy(hasUnavailableReadings = true)).hasGaps)
     }
 
     @Test
-    fun cancelingTheReviewDoesNotStartTheNextStep() {
-        var startedApps = false
-        var publishedReport = false
-        runBlocking {
-            val job = launch(start = CoroutineStart.UNDISPATCHED) {
-                Review.run(readPhone = { awaitCancellation() }, readApps = {
-                    startedApps = true
-                    error("This step must not run")
-                }, publish = {})
-                publishedReport = true
+    fun runsIndependentSpecialistsAndCancelsAllWithoutAReport() = runBlocking {
+        val live = mutableSetOf<String>()
+        val stopped = mutableSetOf<String>()
+        val allStarted = CompletableDeferred<Unit>()
+        var returned = false
+        suspend fun hold(reader: String): Nothing {
+            live += reader
+            if (live.size == 3) allStarted.complete(Unit)
+            try {
+                awaitCancellation()
+            } finally {
+                stopped += reader
             }
-            job.cancelAndJoin()
         }
-        assertFalse(startedApps)
-        assertFalse(publishedReport)
+        val job = launch {
+            Review.run(readPhone = { hold("phone") }, readDns = { hold("dns") }, readApps = { hold("apps") }, publish = {})
+            returned = true
+        }
+        withTimeout(2_000L) { allStarted.await() }
+        job.cancelAndJoin()
+        assertEquals(setOf("phone", "dns", "apps"), live)
+        assertEquals(live, stopped)
+        assertFalse(returned)
+    }
+
+    @Test
+    fun joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits() = runBlocking {
+        val topEight = (1..8).map { fixtureHigh.copy(profile = fixtureHigh.profile.copy(packageName = "com.example.high$it")) }
+        val mediums = (1..5).reversed().map { index ->
+            auditor.audit(profile.copy(packageName = "com.example.medium$index",
+                declaredComponentPermissions = setOf("android.permission.BIND_ACCESSIBILITY_SERVICE")))
+        }
+        val sameLabel = auditor.audit(profile.copy(packageName = "com.example.unflagged", appName = mediums.first().profile.appName))
+        val rows = mediums + listOf(sameLabel) + topEight
+        val exclusions = rows.filter { it !in topEight }.map { it.profile.packageName }.toSet() +
+            setOf("com.example.High1", "com.example.metadataunavailable")
+        val report = Review.run(readPhone = { phone }, readDns = { savedDns(exclusions = exclusions) },
+            readApps = { AppRiskAuditor.VisibleAudit(rows.size + 1, rows) }, publish = {})
+        assertEquals(topEight, report.apps.value?.topFindings)
+        assertTrue(report.hasGaps)
+        assertEquals(5, report.appPolicyMatchCount)
+        assertEquals((1..4).map { "com.example.medium$it" }, report.appPolicyMatches.map { it.packageName })
+        assertTrue(report.appPolicyMatches.all { it.exception == AetherDnsPolicyReview.AppException.VPN_EXCLUDED })
+        assertEquals(1, report.priorities.count { it.source == Review.Source.APP_POLICY })
+    }
+
+    @Test
+    fun keepsAppAndPolicyOverlapAdvisoryWhenOtherRulesCanTakePrecedence() = runBlocking {
+        val otherApp = fixtureHigh.copy(profile = fixtureHigh.profile.copy(packageName = "com.example.excluded"))
+        val conflicting = "com.example.conflict"
+        val dns = savedDns(
+            exclusions = setOf(otherApp.profile.packageName, conflicting),
+            policies = mapOf(profile.packageName to AppDnsPolicy.ALLOW_ALL,
+                otherApp.profile.packageName to AppDnsPolicy.ALLOW_ALL, conflicting to AppDnsPolicy.BLOCK_ALL),
+            allowlistOnly = true
+        )
+        val interrupted = phone.copy(findings = listOf(AetherPhoneAgent.Finding("DNS paused", AetherPhoneAgent.Priority.ATTENTION,
+            "The tunnel reports paused.", AetherPhoneAgent.Tool.PROTECTION)))
+        val report = Review.run(readPhone = { interrupted }, readDns = { dns },
+            readApps = { AppRiskAuditor.VisibleAudit(2, listOf(fixtureHigh, otherApp)) }, publish = {})
+        assertEquals(2, report.appPolicyMatchCount)
+        assertEquals(mapOf(profile.packageName to AetherDnsPolicyReview.AppException.ALLOW_DNS,
+            otherApp.profile.packageName to AetherDnsPolicyReview.AppException.VPN_EXCLUDED),
+            report.appPolicyMatches.associate { it.packageName to it.exception })
+        assertTrue(report.dns.value?.allowlistOnly == true)
+        assertEquals(1, report.dns.value?.excludedAppsWithBlockRules)
+        assertEquals(listOf(Review.Source.PROTECTION, Review.Source.DNS, Review.Source.APP_POLICY), report.priorities.map { it.source })
+        assertEquals(listOf(AetherPhoneAgent.Tool.PROTECTION, AetherPhoneAgent.Tool.APP_FIREWALL, AetherPhoneAgent.Tool.APP_FIREWALL),
+            report.priorities.map { it.nextTool })
+    }
+
+    @Test
+    fun readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration() = runBlocking {
+        val accepted = setOf(profile.packageName)
+        val original = VpnTunnelReceipt(51, 1, false, accepted, emptySet())
+        var runtime = VpnRuntimeState(status = VpnStatus.CONNECTED, tunnelReceipt = original)
+        var runtimeReads = 0
+        val report = Review.run(
+            readPhone = { phone }, readDns = { savedDns(exclusions = accepted) },
+            readApps = {
+                runtime = VpnRuntimeState(status = VpnStatus.STARTING)
+                AppRiskAuditor.VisibleAudit(1, listOf(fixtureHigh))
+            },
+            publish = {}, currentTunnel = { runtimeReads++; runtime }
+        )
+        assertEquals(1, runtimeReads)
+        assertNull(report.dns.value?.tunnel)
+        assertEquals(AetherDnsPolicyReview.ExclusionEvidence.UNKNOWN, report.appPolicyMatches.single().exclusionEvidence)
     }
 
     @Test
@@ -149,12 +252,12 @@ class AetherSecurityReviewTest {
     fun staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan() {
         val approvals = AetherTaskApproval()
         val picker = AetherFilePickerApproval()
-        val first = approvals.propose(AetherSecurityTask.SCAN_FILE, AetherTaskSource.ONLINE_API)
+        val first = approvals.propose(AetherSecurityTask.SCAN_FILE, suggested = true)
         assertNull(picker.consume(first.id))
         picker.await(requireNotNull(approvals.approve(first.id)))
         picker.clear()
         assertNull(picker.consume(first.id))
-        val second = approvals.propose(AetherSecurityTask.SCAN_FILE, AetherTaskSource.MANUAL)
+        val second = approvals.propose(AetherSecurityTask.SCAN_FILE)
         picker.await(requireNotNull(approvals.approve(second.id)))
         assertNull(picker.consume(first.id))
         assertEquals(AetherSecurityTask.SCAN_FILE, picker.consume(second.id)?.task)

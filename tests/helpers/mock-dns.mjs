@@ -99,14 +99,8 @@ function soa(name) {
   };
 }
 
-function makeJson(payload) {
-  return {
-    ok: true,
-    status: 200,
-    headers: { get: () => 'application/dns-json' },
-    async json() { return payload; },
-    async text() { return JSON.stringify(payload); }
-  };
+export function makeJson(payload) {
+  return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/dns-json' } });
 }
 
 /** Builds a raw DNS message for wire-transport tests. */
@@ -114,10 +108,5 @@ export function wireResponse(hex) {
   const clean = hex.replace(/[^0-9a-fA-F]/g, '');
   const bytes = new Uint8Array(clean.length / 2);
   for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(clean.substr(i * 2, 2), 16);
-  return {
-    ok: true,
-    status: 200,
-    headers: { get: () => 'application/dns-message' },
-    async arrayBuffer() { return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength); }
-  };
+  return new Response(bytes, { status: 200, headers: { 'content-type': 'application/dns-message' } });
 }

@@ -22,74 +22,62 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-data class GitHubRelease(val tag: String, val name: String, val code: Int, val apk: String, val sha256: String?, val notes: String)
-
 object GitHubReleaseClient {
     private const val API_BASE = "https://api.github.com/repos/"
+    private const val RELEASES_PER_PAGE = 50
+    private const val MAX_RELEASE_PAGES = 3
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .followSslRedirects(false)
+            .callTimeout(25, TimeUnit.SECONDS)
+            .followRedirects(false)
             .build()
     }
 
     fun latest(): GitHubRelease? {
         val repository = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
-        if (!repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) return null
-        val endpoint = API_BASE + repository + "/releases/latest"
-        val request = Request.Builder().url(endpoint)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            val json = JSONObject(response.body?.string() ?: return null)
-            val tag = json.optString("tag_name").trim()
-            val match = Regex("""v?(\d+)\.(\d+)\.(\d+)""").find(tag) ?: return null
-            val major = match.groupValues[1].toIntOrNull() ?: return null
-            val minor = match.groupValues[2].toIntOrNull() ?: return null
-            val patch = match.groupValues[3].toIntOrNull() ?: return null
-            if (minor > 99 || patch > 99) return null
-            val assets = json.optJSONArray("assets") ?: return null
-            // Releases may list more than one APK (debug builds, per-ABI splits). Prefer a single
-            // release/universal APK and never pick a debug or split artifact: installing one of
-            // those over the installed release build fails or downgrades what the user runs.
-            val candidates = (0 until assets.length())
-                .mapNotNull { assets.optJSONObject(it) }
-                .map { it to it.optString("name") }
-                .filter { (_, name) -> isInstallableReleaseApk(name) }
-            val chosen = candidates.firstOrNull { (_, name) ->
-                name.contains("release", true) || name.contains("universal", true)
-            } ?: candidates.firstOrNull()
-            val apk = chosen?.first?.optString("browser_download_url")
-            val digest = chosen?.first?.optString("digest")
-                ?.takeIf { it.startsWith("sha256:", true) }?.substringAfter(":")
-            val expectedPrefix = "https://github.com/$repository/releases/download/"
-            val trustedUrl = apk?.takeIf { it.startsWith(expectedPrefix, ignoreCase = true) } ?: return null
-            val notes = json.optString("body").takeUnless { it == "null" }?.trim().orEmpty()
-                .take(1800).ifBlank { "Performance improvements and protection updates." }
-            return GitHubRelease(tag, tag.removePrefix("v"), major * 10000 + minor * 100 + patch, trustedUrl, digest, notes)
+        if (!GitHubReleaseMetadata.isRepository(repository)) return null
+        // Neither legacy Latest nor a preview can update this package. Look through a bounded
+        // number of release pages in case test artifacts are listed before the Secure channel.
+        var best: GitHubRelease? = null
+        for (page in 1..MAX_RELEASE_PAGES) {
+            val endpoint = "$API_BASE$repository/releases?per_page=$RELEASES_PER_PAGE&page=$page"
+            val request = Request.Builder().url(endpoint)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
+            val foundMore = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("Could not read the Secure update channel (HTTP ${response.code}).")
+                val releases = JSONArray(response.body.string())
+                for (index in 0 until releases.length()) {
+                    val json = releases.optJSONObject(index) ?: continue
+                    val assets = json.optJSONArray("assets") ?: continue
+                    val release = GitHubReleaseMetadata.select(
+                        repository = repository,
+                        tag = json.optString("tag_name"),
+                        draft = json.optBoolean("draft", true),
+                        preRelease = json.optBoolean("prerelease", false),
+                        body = json.optString("body").takeUnless { it == "null" },
+                        assets = (0 until assets.length()).asSequence().mapNotNull { assetIndex ->
+                            assets.optJSONObject(assetIndex)?.let {
+                                GitHubReleaseMetadata.Asset(it.optString("name"), it.optString("browser_download_url"), it.optString("digest"))
+                            }
+                        }
+                    ) ?: continue
+                    if (release.code > (best?.code ?: 0)) best = release
+                }
+                response.header("Link")?.contains("rel=\"next\"") == true
+            }
+            if (!foundMore) break
         }
-    }
-
-    private val SPLIT_ABI = Regex("""[-_](arm64[-_]?v8a|armeabi[-_]?v7a|x86|x86_64)(?=[-_.])""")
-
-    /**
-     * True for APK assets the in-app updater is allowed to install. Debug builds and per-ABI
-     * split APKs are rejected because they cannot replace the installed release package.
-     */
-    fun isInstallableReleaseApk(name: String): Boolean {
-        val lower = name.trim().lowercase()
-        if (!lower.endsWith(".apk")) return false
-        if (lower.contains("debug")) return false
-        if (SPLIT_ABI.containsMatchIn(lower)) return false
-        return true
+        return best
     }
 }
 
@@ -98,6 +86,9 @@ class GitHubUpdateWorker @AssistedInject constructor(
     @Assisted context: Context, @Assisted params: WorkerParameters
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Debug has a different application ID and signer; a production APK is not its update.
+        // Also stop already-enqueued work when updating from an earlier debug build.
+        if (BuildConfig.DEBUG) return@withContext Result.success()
         try {
             val release = GitHubReleaseClient.latest() ?: return@withContext Result.retry()
             if (release.code <= BuildConfig.VERSION_CODE) return@withContext Result.success()
@@ -125,7 +116,7 @@ class GitHubUpdateWorker @AssistedInject constructor(
             val pending = PendingIntent.getActivity(applicationContext, release.code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             notifications.notify(ID, NotificationCompat.Builder(applicationContext, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification_shield)
-                .setContentTitle("AdShield Pro " + release.name + " is available")
+                .setContentTitle("AdShield Pro Secure " + release.name + " is available")
                 .setContentText("Tap to review the update and release notes.")
                 .setContentIntent(pending).setAutoCancel(true).build())
             prefs.edit().putInt("notified_code", release.code).apply()
@@ -139,6 +130,7 @@ class GitHubUpdateWorker @AssistedInject constructor(
         private const val CHANNEL = "app_updates"
         private const val ID = 7021
         fun schedule(context: Context) {
+            if (BuildConfig.DEBUG) return
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
             val work = WorkManager.getInstance(context)
             work.enqueueUniquePeriodicWork("adshield_update_periodic", ExistingPeriodicWorkPolicy.KEEP,
@@ -169,8 +161,11 @@ object GitHubApkDownload {
 
     suspend fun get(context: Context, release: GitHubRelease): File = withContext(Dispatchers.IO) {
         val expectedRepo = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
-        require(release.apk.startsWith("https://github.com/$expectedRepo/releases/download/", ignoreCase = true)) {
+        require(GitHubReleaseMetadata.isTrustedApkUrl(expectedRepo, release.tag, release.apk)) {
             "Untrusted APK update URL refused."
+        }
+        require(GitHubReleaseMetadata.isSha256(release.sha256)) {
+            "No valid SHA-256 checksum was provided for this update."
         }
         val request = Request.Builder().url(release.apk).header("User-Agent", "AdShieldPro-Android-Updater").get().build()
         downloadClient.newCall(request).execute().use { response ->
@@ -182,13 +177,12 @@ object GitHubApkDownload {
             val limit = 250L * 1024L * 1024L
             if (body.contentLength() > limit) throw java.io.IOException("APK exceeds the download size limit.")
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val part = File(dir, "adshield-" + release.code + ".apk.part")
-            val apk = File(dir, "adshield-" + release.code + ".apk")
+            val apk = File.createTempFile("adshield-secure-${release.code}-", ".apk", dir)
             val hash = MessageDigest.getInstance("SHA-256")
             var total = 0L
             try {
                 body.byteStream().use { input ->
-                    FileOutputStream(part).use { output ->
+                    FileOutputStream(apk).use { output ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
                             val count = input.read(buffer)
@@ -200,18 +194,32 @@ object GitHubApkDownload {
                         }
                     }
                 }
-            } catch (t: Throwable) {
-                part.delete()
-                throw t
+                val actual = hash.digest().joinToString("") { "%02x".format(it) }
+                if (!actual.equals(release.sha256, true)) {
+                    throw IOException("APK checksum verification failed; it was not installed.")
+                }
+                verifyArchive(context, apk, release)
+                apk
+            } catch (error: Throwable) {
+                apk.delete()
+                throw error
             }
-            val actual = hash.digest().joinToString("") { "%02x".format(it) }
-            if (release.sha256 != null && !actual.equals(release.sha256, true)) {
-                part.delete()
-                throw java.io.IOException("APK checksum verification failed; it was not installed.")
-            }
-            if (apk.exists()) apk.delete()
-            if (!part.renameTo(apk)) { part.copyTo(apk, true); part.delete() }
-            apk
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun verifyArchive(context: Context, apk: File, release: GitHubRelease) {
+        val pm = context.packageManager
+        val flags = PackageManager.GET_SIGNING_CERTIFICATES
+        val archive = pm.getPackageArchiveInfo(apk.absolutePath, flags)
+            ?: throw IOException("Android could not verify the downloaded APK.")
+        if (archive.packageName != context.packageName || archive.longVersionCode != release.code.toLong()) {
+            throw IOException("This APK does not match the installed Secure app and requested update version.")
+        }
+        val installedSigner = pm.getPackageInfo(context.packageName, flags).signingInfo?.apkContentsSigners?.singleOrNull()
+        val downloadSigner = archive.signingInfo?.apkContentsSigners?.singleOrNull()
+        if (installedSigner == null || downloadSigner != installedSigner) {
+            throw IOException("APK signer does not match the installed Secure app. Nothing was installed.")
         }
     }
 }

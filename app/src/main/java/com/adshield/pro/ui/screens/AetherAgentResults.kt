@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,7 +19,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.repository.AetherTaskResult
+import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.engine.aether.AetherAppReview
+import com.adshield.pro.engine.aether.AetherDnsPolicyReview
 import com.adshield.pro.engine.aether.AetherFileInput
 import com.adshield.pro.engine.aether.AetherPhoneAgent as Agent
 import com.adshield.pro.engine.aether.AetherSecurityReview
@@ -29,25 +32,11 @@ import java.text.NumberFormat
 import java.util.Date
 
 @Composable
-internal fun AgentTaskResult(result: AetherTaskResult, onTool: (Agent.Tool) -> Unit) {
+internal fun AgentTaskResult(result: AetherTaskResult, onTool: (Agent.Tool) -> Unit, actionsEnabled: Boolean) {
     when (result) {
-        is AetherTaskResult.Phone -> Unit // The full report is displayed below the request form.
-        is AetherTaskResult.Apps -> AgentAppAudit(result.review)
-        is AetherTaskResult.Review -> {
-            val report = result.report
-            AgentCard("Security review results") {
-                val finished = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(report.finishedAtMs))
-                Text(if (report.hasGaps) "Finished with gaps · $finished" else "Both checks ran · $finished")
-                val phone = report.phone.value
-                Text(if (phone != null) "Phone and protection: ${phone.findings.size} findings in the available readings"
-                    else "Phone and protection: ${report.phone.missingLabel()}")
-                val apps = report.apps.value
-                Text(if (apps != null && apps.inspected > 0) "App audit: ${apps.inspected}/${apps.visible} visible apps inspected"
-                    else "App audit: ${report.apps.missingLabel()}")
-                Text("The review didn't make changes. Check the details before acting on any finding.")
-            }
-            report.apps.value?.let { AgentAppAudit(it) }
-        }
+        // The screen renders these reports as separate lazy items.
+        is AetherTaskResult.Phone, is AetherTaskResult.Review -> Unit
+        is AetherTaskResult.Apps -> AgentAppAudit(result.review, actionsEnabled)
         is AetherTaskResult.ScannedFile -> AgentCard("File scan results") {
             val record = result.record
             Text(record.target, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -95,20 +84,161 @@ internal fun AgentTaskResult(result: AetherTaskResult, onTool: (Agent.Tool) -> U
                 Text("${entry.providerName}: ${entry.latencyMs?.let { "$it ms" } ?: "No usable response"}", style = MaterialTheme.typography.bodySmall)
             }
             Text("Lookup timing only. Your DNS provider did not change.")
-            TextButton(onClick = { onTool(Agent.Tool.DNS_SETTINGS) }) { Text("Review DNS settings") }
+            TextButton(onClick = { onTool(Agent.Tool.DNS_SETTINGS) }, enabled = actionsEnabled) { Text("Review DNS settings") }
         }
         AetherTaskResult.AliasShieldOn -> AgentCard("DNS Alias Shield enabled") {
             Text("The setting is enabled in AdShield. It applies to DNS replies that AdShield filters when protection is active.")
-            TextButton(onClick = { onTool(Agent.Tool.DNS_SETTINGS) }) { Text("Review or turn off in DNS settings") }
+            TextButton(onClick = { onTool(Agent.Tool.DNS_SETTINGS) }, enabled = actionsEnabled) { Text("Review or turn off in DNS settings") }
         }
     }
 }
 
-private fun AetherSecurityReview.Reading<*>.missingLabel(): String =
-    (this as? AetherSecurityReview.Reading.Missing)?.reason?.label ?: "No app metadata available"
+internal fun LazyListScope.agentSecurityReviewItems(
+    report: AetherSecurityReview.Report,
+    onTool: (Agent.Tool) -> Unit,
+    onVpnPreview: () -> Unit,
+    actionsEnabled: Boolean
+) {
+    item(key = "review-coverage") {
+        AgentCard("Security review results") {
+            val finished = agentDateTime(report.finishedAtMs)
+            Text(if (report.hasGaps) "Finished with gaps · $finished" else "Three checks completed · $finished")
+            val phone = report.phone.value
+            val phoneStatus = when {
+                phone == null -> report.phone.missingLabel()
+                phone.hasUnavailableReadings -> "Some readings unavailable"
+                else -> "Available"
+            }
+            val apps = report.apps.value
+            val appStatus = when {
+                apps == null -> report.apps.missingLabel()
+                apps.inspected == 0 -> "No app metadata inspected"
+                else -> "${apps.inspected}/${apps.visible} visible apps inspected"
+            }
+            Text("Phone protection: $phoneStatus")
+            Text("Saved DNS policy: ${if (report.dns.value != null) "Read" else report.dns.missingLabel()}")
+            Text("App metadata: $appStatus")
+            Text("No data was sent and no settings were changed by this review. These readings are not a safety verdict.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    if (report.priorities.isNotEmpty()) {
+        item(key = "review-priorities") {
+            AgentCard("What to review first") {
+                for (finding in report.priorities) {
+                    Text(finding.source.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(finding.title, style = MaterialTheme.typography.titleSmall)
+                    Text(finding.detail, style = MaterialTheme.typography.bodyMedium)
+                    finding.nextTool?.let { tool ->
+                        TextButton(onClick = { onTool(tool) }, enabled = actionsEnabled) { Text(tool.label) }
+                    }
+                }
+            }
+        }
+    }
+    report.dns.value?.let { dns ->
+        item(key = "review-tunnel") { AgentTunnelEvidence(dns, report.finishedAtMs, onVpnPreview, actionsEnabled) }
+        item(key = "review-dns") { AgentSavedDnsPolicy(dns, report.dns.checkedAtMs) }
+    }
+    item(key = "review-cross-check") {
+        AgentCard("App indicators and DNS exceptions") {
+            val count = report.appPolicyMatchCount
+            Text(when {
+                count == null -> "Couldn't compare. Both saved DNS policy and inspected app metadata are needed."
+                count == 0 -> "No inspected app with medium- or high-risk indicators matched the available exception evidence."
+                else -> "$count inspected app(s) with medium- or high-risk indicators matched a saved rule or a VPN exclusion in the setup receipt."
+            })
+            for (match in report.appPolicyMatches) {
+                Spacer(Modifier.height(4.dp))
+                Text(agentAppLabel(match.appName, match.packageName), style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${match.packageName} · ${match.level.name.lowercase()}-risk indicators", style = MaterialTheme.typography.bodySmall)
+                Text(match.exception.label, style = MaterialTheme.typography.labelMedium)
+                match.exclusionEvidence?.let { Text(it.label, style = MaterialTheme.typography.bodySmall) }
+                match.indicators.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+            if (count != null && count > report.appPolicyMatches.size) {
+                Text("Showing ${report.appPolicyMatches.size} of $count matches, ranked by app metadata risk.")
+            }
+            if ((report.apps.value?.unavailable ?: 0) > 0) {
+                Text("Apps without readable metadata could not be compared.", style = MaterialTheme.typography.bodySmall)
+            }
+            Text("The setup receipt does not show traffic. Allow all DNS stays a saved rule, not proof of a DNS decision. Metadata does not prove an app is malicious.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    report.apps.value?.let { apps ->
+        item(key = "review-apps") { AgentAppAudit(apps, actionsEnabled) }
+    }
+}
 
 @Composable
-private fun AgentAppAudit(apps: AetherAppReview) {
+private fun AgentTunnelEvidence(
+    dns: AetherDnsPolicyReview.Summary, reviewedAtMs: Long, onVpnPreview: () -> Unit, actionsEnabled: Boolean
+) {
+    AgentCard("VPN exclusion evidence") {
+        val tunnel = dns.tunnel
+        Text("${dns.vpnExcludedApps} saved VPN exclusions")
+        if (tunnel == null) {
+            Text("Applied state unknown: no current tunnel setup receipt.")
+        } else {
+            Text("Saved VPN exclusions accepted: ${tunnel.appliedSaved}/${dns.vpnExcludedApps}")
+            Text("Saved exclusions rejected: ${tunnel.rejectedSaved}")
+            Text("Saved exclusions not recorded at setup: ${tunnel.unrecordedSaved}")
+            Text("Accepted at setup but no longer saved: ${tunnel.appliedButNoLongerSaved}")
+            Text("DNS routes set up: ${if (tunnel.hasIpv6DnsRoute) "IPv4 and IPv6" else "IPv4"}")
+            if (tunnel.filteringPaused) Text("DNS filtering was paused; the Android tunnel was still installed.")
+            Text("Tunnel #${tunnel.generation} established ${agentDateTime(tunnel.establishedAtEpochMs)}.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+        Text("Snapshot at ${agentDateTime(reviewedAtMs)}. Run another review after changes. " +
+            "This checks tunnel setup, not DNS traffic or which resolver answered.", style = MaterialTheme.typography.bodySmall)
+        if (dns.vpnExcludedApps > 0) {
+            TextButton(onClick = onVpnPreview, enabled = actionsEnabled) { Text("Preview one saved VPN exclusion") }
+        }
+    }
+}
+
+@Composable
+private fun AgentSavedDnsPolicy(dns: AetherDnsPolicyReview.Summary, checkedAtMs: Long?) {
+    AgentCard("Saved DNS policy") {
+        checkedAtMs?.let { Text("Read ${agentDateTime(it)} · Configuration, not a live test", style = MaterialTheme.typography.bodySmall) }
+        Text("Saved primary: ${dns.primaryProvider} · ${dns.protocol.label}")
+        Text("Encrypted failover: ${dns.failover.label}")
+        if (dns.backups.isNotEmpty()) Text("Saved backups: ${dns.backups.joinToString()}")
+        Text("DNS Alias Shield: ${if (dns.aliasShieldOn) "On" else "Off"}")
+        Text("DNSSEC: ${dns.dnssecMode.label}. No local signature-chain validation.")
+        if (dns.dnssecMode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS) {
+            Text("Strict mode rejects positive upstream answers without the AD flag, including unsigned answers.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+        Text("${dns.vpnExcludedApps} saved VPN exclusions · ${dns.allowDnsOverrides} saved Allow all DNS rules")
+        if (dns.excludedAppsWithBlockRules > 0) {
+            Text("${dns.excludedAppsWithBlockRules} saved VPN exclusions overlap with Block all DNS rules.")
+        }
+        val transports = dns.networksWithoutDomainFiltering
+        Text(if (transports.isEmpty()) "Domain filters selected for all network types."
+            else "Network types set to skip domain filters: ${transports.joinToString { it.label }}.")
+        Text(if (dns.allowlistOnly) "Allowlist-only DNS is on. For requests reaching the tunnel, it can block names before per-app Allow all DNS or network exceptions are evaluated."
+            else "Allowlist-only DNS is off.", style = MaterialTheme.typography.bodySmall)
+        if (dns.subnetForwardingProviders.isNotEmpty()) {
+            Text("Preset disclosures list these providers in the plan as forwarding a client subnet: ${dns.subnetForwardingProviders.joinToString()}.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+internal fun agentDateTime(timeMs: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timeMs))
+
+private fun AetherSecurityReview.Reading<*>.missingLabel(): String =
+    (this as? AetherSecurityReview.Reading.Missing)?.reason?.label ?: "Not available"
+
+private fun agentAppLabel(name: String, packageName: String): String =
+    name.filterNot { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }.take(96).ifBlank { packageName }
+
+@Composable
+private fun AgentAppAudit(apps: AetherAppReview, actionsEnabled: Boolean) {
     val context = LocalContext.current
     var openError by remember(apps) { mutableStateOf(false) }
     AgentCard("App audit results") {
@@ -122,15 +252,14 @@ private fun AgentAppAudit(apps: AetherAppReview) {
         for (audit in apps.topFindings) {
             Spacer(Modifier.height(4.dp))
             val profile = audit.profile
-            val label = profile.appName.filterNot { it.isISOControl() || Character.getType(it) == Character.FORMAT.toInt() }.take(96)
-            Text(label.ifBlank { profile.packageName }, style = MaterialTheme.typography.titleSmall,
+            Text(agentAppLabel(profile.appName, profile.packageName), style = MaterialTheme.typography.titleSmall,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text("${profile.packageName} · ${audit.riskLevel.name.lowercase()}-risk indicators", style = MaterialTheme.typography.bodySmall)
             audit.findings.take(3).forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
             TextButton(onClick = {
                 val appInfo = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", profile.packageName, null))
                 openError = runCatching { context.startActivity(appInfo) }.isFailure
-            }) { Text("Review in Android Settings") }
+            }, enabled = actionsEnabled) { Text("Review in Android Settings") }
         }
         if (openError) Text("Couldn't open app details. Find the app in Android Settings → Apps.")
         if (apps.needsReview > apps.topFindings.size) {

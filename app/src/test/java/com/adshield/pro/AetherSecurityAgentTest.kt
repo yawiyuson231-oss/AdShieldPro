@@ -3,7 +3,6 @@ package com.adshield.pro
 import com.adshield.pro.engine.aether.AetherSecurityTask as Task
 import com.adshield.pro.engine.aether.AetherTaskApproval
 import com.adshield.pro.engine.aether.AetherTaskModel
-import com.adshield.pro.engine.aether.AetherTaskSource
 import com.adshield.pro.engine.security.UrlThreatScanner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,15 +66,42 @@ class AetherSecurityAgentTest {
     }
 
     @Test
+    fun multiStepRequestsDoNotProposePartialChecks() {
+        listOf(
+            "Audit my apps, then test DNS speed",
+            "Pacheck ang link, tapos i-scan itong file",
+            "Test DNS speed; turn on DNS Alias Shield",
+            "Audit my apps\nCheck a link"
+        ).forEach { assertNull(it, model.suggest(it)) }
+        assertEquals(Task.SCAN_LINK, model.suggest("Check a link https://example.com/a;b"))
+    }
+
+    @Test
+    fun securityReviewDoesNotOverrideNarrowerScopeOrAuthorizeAFollowUp() {
+        listOf("Security review without DNS", "Security review but only check my protection",
+            "Security review, then test DNS speed").forEach { request ->
+            assertTrue(model.suggest(request) != Task.SECURITY_REVIEW)
+        }
+        val approval = AetherTaskApproval()
+        val review = approval.propose(Task.SECURITY_REVIEW, suggested = true)
+        val approved = requireNotNull(approval.approve(review.id, "https://example.invalid"))
+        assertEquals(Task.SECURITY_REVIEW, approved.task)
+        assertNull(approved.link)
+        val benchmark = approval.propose(Task.BENCHMARK_DNS)
+        assertNull(approval.approve(review.id))
+        assertEquals(Task.BENCHMARK_DNS, approval.approve(benchmark.id)?.task)
+    }
+
+    @Test
     fun gatedTaskCanOnlyBeApprovedOnceAndNotAfterDismissalOrReplacement() {
         val approval = AetherTaskApproval()
         val task = requireNotNull(model.suggest("Turn on DNS Alias Shield"))
-        val cancelled = approval.propose(task, AetherTaskSource.OFFLINE_MODEL)
+        val cancelled = approval.propose(task, suggested = true)
         assertNull(approval.approve(cancelled.id + 1))
         approval.dismiss(cancelled.id)
         assertNull(approval.approve(cancelled.id))
-        val old = approval.propose(task, AetherTaskSource.OFFLINE_MODEL)
-        val next = approval.propose(Task.BENCHMARK_DNS, AetherTaskSource.MANUAL)
+        val old = approval.propose(task, suggested = true)
+        val next = approval.propose(Task.BENCHMARK_DNS)
         assertNull(approval.approve(old.id))
         assertEquals(Task.BENCHMARK_DNS, approval.approve(next.id, "https://example.invalid")?.task)
         assertNull(approval.approve(next.id))
@@ -87,7 +113,7 @@ class AetherSecurityAgentTest {
         val task = requireNotNull(model.suggest("Check this link for phishing https://example.invalid"))
         assertEquals(Task.SCAN_LINK, task)
         val approval = AetherTaskApproval()
-        val plan = approval.propose(task, AetherTaskSource.OFFLINE_MODEL)
+        val plan = approval.propose(task, suggested = true)
         assertNull(approval.approve(plan.id)) // Nothing can be taken from the prompt.
         assertNull(approval.approve(plan.id, "file:///secret"))
         assertNull(approval.approve(plan.id, "ftp://example.com"))

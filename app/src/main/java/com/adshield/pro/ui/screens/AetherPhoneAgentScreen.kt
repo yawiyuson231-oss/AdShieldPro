@@ -22,13 +22,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,12 +39,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.adshield.pro.data.repository.AetherTaskResult
 import com.adshield.pro.engine.aether.AetherFileInput
 import com.adshield.pro.engine.aether.AetherPhoneAgent as Agent
-import com.adshield.pro.engine.aether.AetherPlanRequest
 import com.adshield.pro.engine.aether.AetherSecurityTask as Task
 import com.adshield.pro.engine.aether.AetherTaskApproval
 import com.adshield.pro.engine.aether.AetherTaskModel
 import com.adshield.pro.engine.aether.AetherTaskProgress
-import com.adshield.pro.engine.aether.AetherTaskSource
 import com.adshield.pro.ui.viewmodel.AetherPhoneAgentViewModel
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -56,16 +54,13 @@ internal fun AetherPhoneAgentScreen(
     viewModel: AetherPhoneAgentViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val plan = state.plan
-    val resultIndex = if (plan == null) 2 else 1
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var request by remember { mutableStateOf("") }
     var pickerId by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(plan?.id) {
-        if (plan != null) listState.scrollToItem(0)
-    }
+    var showChecks by remember { mutableStateOf(false) }
+    var showVpnPreview by remember { mutableStateOf(false) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { chosen ->
         val id = pickerId
         pickerId = null
@@ -73,13 +68,21 @@ internal fun AetherPhoneAgentScreen(
     }
     DisposableEffect(lifecycle, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) viewModel.screenStopped()
+            if (event == Lifecycle.Event.ON_STOP) {
+                request = ""
+                showVpnPreview = false
+                viewModel.screenStopped()
+            }
         }
         lifecycle.addObserver(observer)
         onDispose {
             lifecycle.removeObserver(observer)
             viewModel.leaveAgent()
         }
+    }
+
+    fun openVpnPreview() {
+        if (viewModel.state.value.canStart) showVpnPreview = true
     }
 
     fun select(tool: Agent.Tool) {
@@ -94,78 +97,53 @@ internal fun AetherPhoneAgentScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("aether-agent-list"),
         state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item(key = "agent-controls") {
-            AgentCard(if (plan == null) "AETHER Security Agent" else "AETHER guided plan") {
-                if (plan == null) {
-                    Text("Check your phone and apps together, or request a guided plan of up to three steps.")
-                    Button(onClick = { viewModel.proposeTool(Task.SECURITY_REVIEW) }, enabled = state.canStart) {
-                        Text("Security review")
-                    }
-                    Text("Checks protection and app risks without changing settings.", style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = { viewModel.proposeTool(Task.SCAN_FILE) }, enabled = state.canStart) {
-                        Text("Scan a file")
-                    }
-                    OutlinedTextField(
-                        value = request,
-                        onValueChange = { if (it.length <= AetherTaskModel.MAX_REQUEST_CHARS) request = it },
-                        label = { Text("What should I check?") },
-                        placeholder = { Text(AetherPlanRequest.EXAMPLE) },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state.canStart,
-                        maxLines = 3,
-                        supportingText = { Text("Use ‘then’ between checks. Choose any file or link when you review that step.") }
-                    )
-                    if (state.api != null) {
-                        Button(onClick = { viewModel.reviewOnlineRequest(request) }, enabled = request.isNotBlank() && state.canUseApi) {
-                            Text("Ask online AI")
-                        }
-                        OutlinedButton(onClick = { viewModel.findTask(request) }, enabled = request.isNotBlank() && state.canStart) {
-                            Text("Find task offline")
-                        }
-                    } else {
-                        Button(onClick = { viewModel.findTask(request) }, enabled = request.isNotBlank() && state.canStart) {
-                            Text("Find task offline")
-                        }
-                    }
-                    OutlinedButton(onClick = viewModel::checkPhone, enabled = state.canStart) { Text("Check my phone") }
-                    TextButton(onClick = {
-                        request = AetherPlanRequest.EXAMPLE
-                        viewModel.findTask(request)
-                    }, enabled = state.canStart) { Text("Try a guided plan") }
-                } else {
-                    AetherGuidedPlanSteps(
-                        plan = plan,
-                        enabled = state.canUsePlan,
-                        onReview = viewModel::reviewPlanStep,
-                        onSkip = viewModel::skipPlanStep,
-                        onReceipt = { ref ->
-                            if (viewModel.showPlanReceipt(ref)) listState.requestScrollToItem(resultIndex)
-                        },
-                        onClose = { viewModel.closePlan(plan.id) }
-                    )
+            AgentCard("AI Agent") {
+                Text("Ask for one security check. Suggestions run on this phone with no account or API key.")
+                OutlinedTextField(
+                    value = request,
+                    onValueChange = { if (it.length <= AetherTaskModel.MAX_REQUEST_CHARS) request = it },
+                    label = { Text("What should I check?") },
+                    placeholder = { Text("Check my phone’s protection") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.canStart,
+                    singleLine = true,
+                    supportingText = { Text("Task text stays on this phone. You approve every check.") }
+                )
+                Button(onClick = {
+                    viewModel.findTask(request)
+                    request = ""
+                }, enabled = request.isNotBlank() && state.canStart) { Text("Suggest a check") }
+                OutlinedButton(
+                    onClick = { viewModel.proposeTool(Task.SECURITY_REVIEW) },
+                    enabled = state.canStart,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Review phone, DNS and apps") }
+                TextButton(onClick = ::openVpnPreview, enabled = state.canStart) { Text("Preview restoring an app") }
+                TextButton(onClick = { showChecks = !showChecks }, enabled = state.canStart) {
+                    Text(if (showChecks) "Hide available checks" else "Choose a check instead")
                 }
-                when (state.planning) {
-                    AetherTaskSource.ONLINE_API -> {
-                        Text("Waiting for the AI API…")
-                        TextButton(onClick = viewModel::stopOnlineRequest) { Text("Stop waiting") }
+                if (showChecks) {
+                    Task.entries.filter { it != Task.SECURITY_REVIEW }.forEach { task ->
+                        TextButton(onClick = { viewModel.proposeTool(task) }, enabled = state.canStart) { Text(task.title) }
                     }
-                    AetherTaskSource.OFFLINE_MODEL -> Text("Finding supported checks on this phone…")
-                    else -> Unit
                 }
+                if (state.findingTask) Text("Finding a check on this phone…")
                 if (state.fileChoiceId != null) Text("Waiting for Android’s file picker…")
                 state.running?.let { task ->
                     val status = if (state.stopping) "Stopping when the current operation returns…" else when (val progress = state.progress) {
-                        AetherTaskProgress.ReadingPhone -> "Review step 1 of 2: checking protection, connection and device readings…"
+                        AetherTaskProgress.ReviewingSecurity -> "Reviewing phone protection, DNS settings and visible apps…"
                         AetherTaskProgress.ReadingFile -> "Reading the file you chose…"
                         AetherTaskProgress.InspectingFile -> "Inspecting the local copy…"
                         is AetherTaskProgress.ReadingApps -> {
-                            val label = if (task == Task.SECURITY_REVIEW) "Review step 2 of 2: app audit" else "App audit"
-                            if (progress.visible > 0) "$label · ${progress.processed}/${progress.visible} processed" else "$label · reading Android app list…"
+                            val label = if (task == Task.SECURITY_REVIEW) "Security review · apps" else "App audit"
+                            if (progress.visible > 0) "$label · ${progress.processed}/${progress.visible} processed"
+                            else "$label · reading Android app list…"
                         }
                         null -> "Running: ${task.title}…"
                     }
@@ -176,42 +154,19 @@ internal fun AetherPhoneAgentScreen(
                 }
                 state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (state.result != null) {
-                    TextButton(onClick = { scope.launch { listState.animateScrollToItem(resultIndex) } }) {
-                        Text(if (plan == null) "View latest result" else "View selected result")
+                    TextButton(onClick = { scope.launch { listState.animateScrollToItem(1) } }) {
+                        Text("View latest result")
                     }
                 }
             }
         }
 
-        if (plan == null) {
-            item(key = "agent-connection") {
-                AgentCard("Online AI connection") {
-                    val endpoint = state.api
-                    if (state.apiStorageBusy && endpoint == null) {
-                        Text("Loading saved API settings…")
-                    } else if (endpoint == null) {
-                        Text("Optional. Use Gemini, OpenAI, or another compatible API. The offline model still works without a key.")
-                    } else {
-                        Text("${endpoint.provider.label} · ${endpoint.model}", style = MaterialTheme.typography.titleSmall)
-                        Text(state.apiStatus ?: "Saved, not tested. Tap Test API to check this model.")
-                        TextButton(onClick = viewModel::reviewApiTest, enabled = state.canUseApi) { Text("Test API") }
-                    }
-                    TextButton(onClick = viewModel::openApiSetup, enabled = state.canUseApi) {
-                        Text(if (endpoint == null) "Connect AI API" else "AI API settings")
-                    }
-                }
-            }
-        }
-
-        // Plan receipts follow the plan card; standalone results follow the API card.
+        // Results begin immediately after the single controls item.
         val result = state.result
-        if (result != null && plan != null) {
-            item(key = "back-to-plan") {
-                TextButton(onClick = { scope.launch { listState.animateScrollToItem(0) } }) { Text("Back to guided plan") }
-            }
-        }
-        if (result != null && result !is AetherTaskResult.Phone) {
-            item(key = "task-result") { AgentTaskResult(result, onTool) }
+        when (result) {
+            is AetherTaskResult.Review -> agentSecurityReviewItems(result.report, ::select, ::openVpnPreview, actionsEnabled = state.canStart)
+            null, is AetherTaskResult.Phone -> Unit
+            else -> item(key = "task-result") { AgentTaskResult(result, ::select, actionsEnabled = state.canStart) }
         }
         val phone = when (result) {
             is AetherTaskResult.Phone -> result.report
@@ -243,44 +198,14 @@ internal fun AetherPhoneAgentScreen(
                 }
             }
         }
-        if (plan == null) {
-            item {
-                AgentCard("Choose a tool yourself") {
-                    Text("These tools work offline without typing a request, except the optional DNS benchmark.")
-                    listOf(
-                        Agent.Tool.APP_AUDIT, Agent.Tool.LINK_SCAN, Agent.Tool.DNS_BENCHMARK, Agent.Tool.ENABLE_ALIAS_SHIELD,
-                        Agent.Tool.SCAN_HISTORY, Agent.Tool.DNS_ACTIVITY, Agent.Tool.NETWORK_SETTINGS,
-                        Agent.Tool.OPTIMIZER, Agent.Tool.BATTERY
-                    ).forEach { tool ->
-                        TextButton(onClick = { select(tool) }, enabled = state.canStart) { Text(tool.label) }
-                    }
-                }
-            }
-        }
+    }
 
-        item {
-            Text(
-                "Offline requests stay on the phone. Online AI receives only the task description you approve, not the app list, scan results or saved activity. " +
-                    "AdShield's tools supply the results.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    if (showVpnPreview) {
+        AetherVpnExclusionPreviewDialog(viewModel.readVpnExclusions, viewModel.previewVpnExclusion) {
+            showVpnPreview = false
         }
     }
 
-    if (state.apiSetupOpen) {
-        AetherApiSetupDialog(
-            endpoint = state.api,
-            saving = state.apiStorageBusy,
-            error = state.apiSetupError,
-            onSave = viewModel::saveApi,
-            onDisconnect = viewModel::disconnectApi,
-            onDismiss = viewModel::closeApiSetup
-        )
-    }
-    state.sendReview?.let { review ->
-        AetherApiReviewDialog(review, onSend = { viewModel.sendOnline(review.id) }, onDismiss = { viewModel.dismissSend(review.id) })
-    }
     state.proposal?.let { proposal ->
         AgentTaskDialog(
             proposal = proposal,
@@ -308,10 +233,10 @@ private fun AgentTaskDialog(proposal: AetherTaskApproval.Proposal, onApprove: (S
     val details = when (proposal.task) {
         Task.CHECK_PHONE -> "Read current protection, Wi-Fi, DNS activity and device-health readings. Nothing will change."
         Task.AUDIT_APPS -> "Check permissions and install sources of apps Android lets AdShield see. This won't read private app files or remove anything."
-        Task.SECURITY_REVIEW -> "Run two read-only checks: phone protection, connection and device readings; then permissions and install sources of visible apps. No settings will change and no network test will run."
+        Task.SECURITY_REVIEW -> "Three on-device specialists check phone protection, saved DNS policy and visible app metadata. It uses the current tunnel’s setup receipt when available, and checks for overlaps between DNS exceptions and app risk indicators. This review won't send data, read private app files or change settings."
         Task.SCAN_FILE -> "Choose one file up to ${AetherFileInput.MAX_MIB} MiB with Android’s file picker. AdShield inspects it locally and won’t launch, install, upload, or change the original."
         Task.SCAN_LINK -> "Analyze one web link on this phone without opening it. Paste only the link you want to check."
-        Task.BENCHMARK_DNS -> "Send a lookup for example.com to the built-in resolvers and your custom resolver if selected, using your configured DNS protocol. No resolver setting will change."
+        Task.BENCHMARK_DNS -> "Send a lookup for example.com to the built-in resolvers and your custom resolver if selected, using your configured DNS protocol. Your task text is not sent and no resolver setting will change."
         Task.ENABLE_ALIAS_SHIELD -> "Turn on checks for blocked destinations in DNS replies. This changes only AdShield’s Alias Shield setting. You can turn it off in DNS settings."
     }
     AlertDialog(
@@ -319,13 +244,7 @@ private fun AgentTaskDialog(proposal: AetherTaskApproval.Proposal, onApprove: (S
         title = { Text(proposal.task.title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                when (proposal.source) {
-                    AetherTaskSource.ONLINE_API -> Text("Task suggested by online AI", style = MaterialTheme.typography.labelMedium)
-                    AetherTaskSource.OFFLINE_MODEL -> Text("Task suggested by on-device AI", style = MaterialTheme.typography.labelMedium)
-                    AetherTaskSource.GUIDED_PLAN -> Text("Guided plan · Step ${requireNotNull(proposal.planStep).index + 1}",
-                        style = MaterialTheme.typography.labelMedium)
-                    AetherTaskSource.MANUAL -> Unit
-                }
+                if (proposal.suggested) Text("Suggested on this phone", style = MaterialTheme.typography.labelMedium)
                 Text(details)
                 if (proposal.task == Task.SCAN_LINK) {
                     OutlinedTextField(
@@ -346,7 +265,7 @@ private fun AgentTaskDialog(proposal: AetherTaskApproval.Proposal, onApprove: (S
                     Task.ENABLE_ALIAS_SHIELD -> "Turn on"
                     Task.SCAN_FILE -> "Choose file"
                     Task.SECURITY_REVIEW -> "Run review"
-                    else -> "Run task"
+                    else -> "Run check"
                 })
             }
         },

@@ -10,7 +10,7 @@
 
 AdShield Pro is engineered from the ground up as a local, on-device privacy and ad-blocking firewall for Android.
 - **No Root Required:** AdShield Pro operates exclusively in standard Android user space.
-- **No Developer Analytics or Data Sale:** The app includes no developer analytics, advertising, crash-tracking SDK, or developer-operated collection endpoint, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud storage, media, and optional AI) receive the requests needed to provide their service and have their own privacy policies.
+- **No Developer Analytics or Data Sale:** The app includes no developer analytics, advertising, crash-tracking SDK, or developer-operated collection endpoint, and we do not sell personal data. External providers you deliberately use (DNS, search, cloud storage, and media) receive the requests needed to provide their service and have their own privacy policies.
 - **No HTTPS Interception or Root Certificates:** AdShield Pro never installs a trusted root Certificate Authority (CA) and never decrypts, inspects, or modifies encrypted TLS/HTTPS application payloads.
 
 ---
@@ -21,8 +21,8 @@ AdShield Pro uses the Android `android.net.VpnService` API strictly to establish
 1. **DNS-Only Routing:** Only traffic destined for the virtual DNS addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) is routed into the local TUN interface. All non-DNS TCP, UDP, and QUIC application traffic flows directly over your physical Wi-Fi or mobile data interface without passing through a remote VPN server.
 2. **Local Rule Evaluation:** Each DNS query is evaluated locally in memory against your enabled blocklists and custom rules.
    - **Blocked Domains:** Immediately answered on-device with `NXDOMAIN` or `0.0.0.0` / `::` sinkhole in `< 1 ms`.
-   - **Allowed Domains:** Forwarded using the protocol you select: encrypted **DNS-over-HTTPS (DoH, RFC 8484)**, **DNS-over-TLS (DoT, RFC 7858)**, or **DNS-over-QUIC (DoQ, RFC 9250)**, or unencrypted UDP/TCP port 53. If DoH, DoT, or DoQ is unavailable, the app returns DNS `SERVFAIL` instead of silently downgrading that query to plaintext.
-3. **Resilience Controls (Local):** Per-app DNS policies, per-network (Wi-Fi / mobile data / Ethernet / other) policies, an emergency allowlist-only mode, optional failover between providers **you** select, and DNSSEC evidence reporting are all evaluated on-device from local settings. These settings never leave the device, are stored only in on-device DataStore, and are included in the local configuration backup you export yourself. Enabling failover means additional providers you selected may receive queries when the primary fails; an encrypted protocol never falls back to plaintext.
+   - **Allowed Domains:** Forwarded using the protocol you select: encrypted **DNS-over-HTTPS (DoH, RFC 8484)**, **DNS-over-TLS (DoT, RFC 7858)**, or unencrypted UDP/TCP port 53. If DoH or DoT is unavailable, the app returns DNS `SERVFAIL` instead of silently downgrading that query to plaintext.
+3. **Resilience Controls (Local):** Per-app DNS policies, per-network (Wi-Fi / mobile data / Ethernet / other) policies, an emergency allowlist-only mode, optional failover between providers **you** select, and DNSSEC evidence reporting are all evaluated on-device from local settings. These settings never leave the device, are stored only in on-device DataStore, and are included in the local configuration backup you export yourself. Enabling failover means additional providers you selected may receive queries when the primary is slow or fails; an encrypted protocol never falls back to plaintext.
 4. **Local File Scanning:** File scanning runs entirely on-device over files you choose using signature and structural checks; no YARA rule engine is bundled, and no file content, hash or verdict is uploaded.
 
 ---
@@ -69,10 +69,12 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - Inspecting or downloading a direct media URL sends that URL and normal connection metadata to its host. The app supports only direct permitted HTTPS media and does not bypass authentication, DRM or site restrictions.
 - Local download history includes source/final file metadata, destination URI, status, sizes, errors and integrity results. It remains in Room until you remove the history entry or clear app data. Removing history does not delete the downloaded document.
 
-### 4E. Optional AETHER AI API
+### 4E. On-device AI Agent
 
-- AETHER guided plans and local scans do not use an AI provider. No AI API is connected by default. If you connect one, the app stores the API configuration and key encrypted on your device with Android Keystore; you can remove the connection in **Security → Agent**.
-- Only after you review and approve a send does the app send your task text (or a fixed test prompt), model identifier and API authentication directly to the configured HTTPS provider. The request does not attach DNS history, installed-app lists, scan reports or files. The provider may retain the request and observe normal connection metadata under its own terms. Removing the connection does not revoke the key or delete any data already sent.
+- The Agent's task text and findings stay on the phone. The bundled model needs no account, AI API key or provider connection. The app removes any retired Agent connection from its on-device credential store without removing other providers’ settings. This does not delete old provider-side data or revoke previously issued keys.
+- Security review reads local phone/protection reports, saved DNS policy, and metadata for apps Android lets AdShield see. It does not send those readings, open links, run DNS probes, save a scan history entry, or change settings.
+- The VPN exclusion preview reads saved exclusions and their local app labels when available, then compares saved rules and the local setup receipt for the package you select. It sends nothing, changes no settings, and adds no history entry.
+- The Agent's DNS benchmark sends fixed `example.com` queries only if approved. Settings diagnostics and benchmarks send the name you enter to the configured or tested DNS providers. When failover is enabled, selected backups may also see a DNS lookup. A custom DoH URL may need a separate system lookup for the endpoint hostname; the requested name does not fall back to plaintext.
 
 ---
 
@@ -85,6 +87,6 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 | Files, filenames and security hashes | **No developer collection** (local by default; cloud transfer only on user action) | **User-authorized WebDAV/Nextcloud or preview/share app** | File management, security and storage |
 | Cloud account / password | **No developer collection** (username/URL local; password encrypted locally; sent to configured server for authentication) | **User-authorized storage provider** | User-requested cloud connection |
 | Direct media URL / download metadata | **No developer collection** (history stored locally; URL sent to media host on user action) | **User-selected media host** | User-requested download |
-| AETHER task text and AI API key | **No developer collection** (sent only when you approve an online request or test) | **User-selected AI provider** | Optional task suggestion and API authentication |
+| AI Agent task text and results | **No** (stay on device) | **No** | On-device suggestion and findings; approved DNS probes are listed above |
 | Installed App List (`QUERY_ALL_PACKAGES`) | **No** (Never leaves device) | **No** | Per-app VPN controls and local security audit |
 | Diagnostics / Crash Tracking SDKs | **None Included** | **No** | Zero third-party tracking SDKs |

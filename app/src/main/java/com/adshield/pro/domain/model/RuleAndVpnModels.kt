@@ -80,7 +80,14 @@ enum class VpnStatus {
     CONNECTED,
     RECONNECTING,
     PAUSED,
-    ERROR
+    ERROR;
+
+    /** An edit to routes or exclusions must also replace a pending setup. */
+    internal val acceptsTunnelConfigReload: Boolean
+        get() = when (this) {
+            STARTING, CONNECTED, RECONNECTING, PAUSED -> true
+            DISCONNECTED, ERROR -> false
+        }
 }
 
 data class VpnRuntimeState(
@@ -95,8 +102,13 @@ data class VpnRuntimeState(
     val sessionCachedQueries: Long = 0L,
     val averageLatencyMs: Int = 0,
     val loadedRuleCount: Int = 0,
-    val lastError: String? = null
+    val lastError: String? = null,
+    internal val tunnelReceipt: VpnTunnelReceipt? = null
 ) {
+    /** Pausing filtering does not dismantle the Android tunnel or change its exclusions. */
+    internal val activeTunnelReceipt: VpnTunnelReceipt?
+        get() = if (status == VpnStatus.CONNECTED || status == VpnStatus.PAUSED) tunnelReceipt else null
+
     val blockingPercentage: Float
         get() = if (sessionTotalQueries > 0L) {
             (sessionBlockedQueries.toFloat() / sessionTotalQueries.toFloat()) * 100f

@@ -221,7 +221,7 @@ test('DNS cache, client, and resolver pool handle NaN TTL, clear races, hedged f
   const queryPacket = '000001000001000000000000076578616d706c6503636f6d0000010001';
   const wireTransport = new DohTransport({
     preferJson: false,
-    fetchImpl: async () => new Response(fromHex(queryPacket), { status: 200 })
+    fetchImpl: async () => new Response(fromHex(queryPacket), { status: 200, headers: { 'content-type': 'application/dns-message' } })
   });
   await assert.rejects(
     () => wireTransport.query({ id: 'w', name: 'Wire', dohWire: 'https://w.invalid/dns-query' }, 'example.com', 'A'),

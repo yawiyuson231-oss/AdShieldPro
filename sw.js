@@ -5,15 +5,18 @@
  *  - App shell + JavaScript modules + the small curated feeds: precached.
  *  - The large bundled rule list (assets/core_lite_ads.txt): stale-while-revalidate,
  *    so the first visit caches it and later visits work fully offline.
- *  - DNS-over-HTTPS requests are NEVER cached (they must always be live);
- *    they are excluded from interception entirely.
- *  - Navigations: network-first, falling back to the cached shell offline.
+ *  - Only the checked-in app shell and bundled assets are intercepted. DNS/API
+ *    requests, query variants and paths outside the app use the browser's network.
+ *  - App-shell navigations: network-first with an offline fallback.
  *
- * Bump VERSION to invalidate caches on release.
+ * Bump VERSION to invalidate this registration's caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.3';
-const SHELL_CACHE = `${VERSION}-shell`;
-const RULES_CACHE = `${VERSION}-rules`;
+const VERSION = 'omnishield-x-v5.0.3-dns.2';
+const SCOPE = self.registration.scope;
+// Cache Storage is origin-wide, even when this worker only controls one subdirectory.
+const CACHE_PREFIX = `omnishield-x:${SCOPE}:`;
+const SHELL_CACHE = `${CACHE_PREFIX}${VERSION}-shell`;
+const RULES_CACHE = `${CACHE_PREFIX}${VERSION}-rules`;
 
 const SHELL_ASSETS = [
   './',
@@ -51,27 +54,33 @@ const SHELL_ASSETS = [
 ];
 
 const RULES_ASSETS = ['./assets/core_lite_ads.txt'];
+const INDEX = new URL('./index.html', SCOPE).href;
+const SHELL_URLS = new Set(SHELL_ASSETS.map((path) => new URL(path, SCOPE).href));
+const RULES_URLS = new Set(RULES_ASSETS.map((path) => new URL(path, SCOPE).href));
+
+const openCache = (name) => caches.open(name).catch(() => null);
+const readCache = (cache, key) => cache?.match(key).catch(() => undefined);
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    const shell = await caches.open(SHELL_CACHE);
-    // addAll fails atomically; add individually so one missing file cannot
-    // break the whole offline experience.
-    await Promise.all(SHELL_ASSETS.map(async (url) => {
-      try { await shell.add(new Request(url, { cache: 'reload' })); } catch { /* optional asset */ }
-    }));
-    const rules = await caches.open(RULES_CACHE);
-    await Promise.all(RULES_ASSETS.map(async (url) => {
-      try { await rules.add(new Request(url, { cache: 'reload' })); } catch { /* stays online-only */ }
-    }));
+    async function precache(name, urls) {
+      const cache = await openCache(name);
+      if (!cache) return;
+      // Do not abandon a usable offline shell because one optional asset failed to load.
+      await Promise.all([...urls].map((url) =>
+        cache.add(new Request(url, { cache: 'reload', redirect: 'error' })).catch(() => {})
+      ));
+    }
+    await Promise.all([precache(SHELL_CACHE, SHELL_URLS), precache(RULES_CACHE, RULES_URLS)]);
     await self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
+    const keys = await caches.keys().catch(() => []);
+    const obsolete = keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== SHELL_CACHE && key !== RULES_CACHE);
+    await Promise.all(obsolete.map((key) => caches.delete(key).catch(() => {})));
     await self.clients.claim();
   })());
 });
@@ -81,72 +90,44 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-
-  // Never touch DNS-over-HTTPS or any cross-origin API: answers must be live.
   if (url.origin !== self.location.origin) return;
 
-  // Navigation: network-first with offline shell fallback.
+  // Other pages on the same host must never be cached as the offline app shell.
   if (request.mode === 'navigate') {
+    if (url.href !== SCOPE && url.href !== INDEX) return;
     event.respondWith((async () => {
       try {
         const fresh = await fetch(request);
-        if (fresh.ok && (fresh.headers.get('content-type') || '').includes('text/html')) {
+        if (fresh.ok && !fresh.redirected && (fresh.headers.get('content-type') || '').includes('text/html')) {
           const copy = fresh.clone();
-          event.waitUntil(
-            caches.open(SHELL_CACHE).then((cache) => cache.put('./index.html', copy)).catch(() => {})
-          );
+          event.waitUntil(openCache(SHELL_CACHE).then((cache) => cache?.put(INDEX, copy)).catch(() => {}));
         }
         return fresh;
       } catch {
-        const cache = await caches.open(SHELL_CACHE);
-        return (await cache.match('./index.html')) || (await cache.match('./')) || Response.error();
+        const cache = await openCache(SHELL_CACHE);
+        return (await readCache(cache, INDEX)) || (await readCache(cache, SCOPE)) || Response.error();
       }
     })());
     return;
   }
 
-  // Bundled rules: stale-while-revalidate so offline filtering keeps working.
-  if (url.pathname.endsWith('/assets/core_lite_ads.txt') || url.pathname.endsWith('assets/core_lite_ads.txt')) {
-    event.respondWith((async () => {
-      const cache = await caches.open(RULES_CACHE);
-      const cached = await cache.match(request, { ignoreSearch: true });
-      const network = fetch(request)
-        .then(async (response) => {
-          if (response.ok) await cache.put(request, response.clone()).catch(() => {});
-          return response;
-        })
-        .catch(() => null);
-      if (cached) {
-        event.waitUntil(network);
-        return cached;
-      }
-      return (await network) || new Response('', { status: 504, statusText: 'offline and not cached' });
-    })());
-    return;
-  }
-
-  // Everything else same-origin: cache-first with background refresh.
+  // Same-origin DNS/API requests are live too. Use the exact static URL, including any query.
+  const rules = RULES_URLS.has(url.href);
+  if (!rules && !SHELL_URLS.has(url.href)) return;
   event.respondWith((async () => {
-    const cache = await caches.open(SHELL_CACHE);
-    const cached = await cache.match(request, { ignoreSearch: true });
-    if (cached) {
-      event.waitUntil(
-        fetch(request).then((response) => {
-          if (response.ok) return cache.put(request, response.clone()).catch(() => {});
-          return undefined;
-        }).catch(() => {})
-      );
-      return cached;
-    }
-    try {
-      const response = await fetch(request);
-      if (response.ok) {
+    const cache = await openCache(rules ? RULES_CACHE : SHELL_CACHE);
+    const cached = await readCache(cache, request);
+    const fresh = fetch(request).then((response) => {
+      if (cache && response.ok && !response.redirected) {
         const copy = response.clone();
         event.waitUntil(cache.put(request, copy).catch(() => {}));
       }
       return response;
-    } catch {
-      return new Response('offline', { status: 504, statusText: 'offline' });
+    }).catch(() => null);
+    if (cached) {
+      event.waitUntil(fresh);
+      return cached;
     }
+    return (await fresh) || new Response('', { status: 504, statusText: 'offline and not cached' });
   })());
 });

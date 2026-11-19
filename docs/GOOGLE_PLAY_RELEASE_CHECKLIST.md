@@ -1,6 +1,8 @@
 # AdShield Pro v2.3 — Google Play Console Release Checklist
 
-Use this checklist before submitting `app-release.aab` (`com.adshield.pro`) to Google Play Production or Closed Testing tracks.
+Use this checklist before any separately approved Play submission. The release bundle is now
+`com.adshield.pro.secure` (AdShield Pro Secure), not an update for a `com.adshield.pro` listing.
+Confirm the intended Play application identity and its signing before uploading anything.
 
 ---
 

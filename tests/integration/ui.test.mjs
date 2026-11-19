@@ -10,6 +10,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import { makeJson } from '../helpers/mock-dns.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
@@ -45,38 +46,17 @@ function installFetch() {
     if (url.hostname === 'cloudflare-dns.com' || url.hostname === 'dns.google') {
       const name = url.searchParams.get('name') || '';
       const type = Number(url.searchParams.get('type') || 1);
-      const answerable = name === 'example.com';
+      const question = [{ name: `${name}.`, type }];
       // A CNAME-cloaked hostname: first-party-looking name pointing at a blocked tracker.
       if (name === 'metrics.shop.example') {
-        return {
-          ok: true, status: 200, headers: { get: () => null },
-          async json() {
-            return {
-              Status: 0, AD: true, Question: [{ name: `${name}.`, type }],
-              Answer: [
-                { name: `${name}.`, type: 5, TTL: 60, data: 'ads.doubleclick.net.' },
-                { name: 'ads.doubleclick.net.', type: 1, TTL: 60, data: '93.184.216.34' }
-              ]
-            };
-          },
-          async text() { return ''; }
-        };
+        return makeJson({ Status: 0, AD: true, Question: question, Answer: [
+          { name: `${name}.`, type: 5, TTL: 60, data: 'ads.doubleclick.net.' },
+          { name: 'ads.doubleclick.net.', type: 1, TTL: 60, data: '93.184.216.34' }
+        ] });
       }
-      if (!answerable) {
-        return {
-          ok: true, status: 200, headers: { get: () => null },
-          async json() { return { Status: 3, AD: false, Question: [{ name: `${name}.`, type }] }; },
-          async text() { return ''; }
-        };
-      }
+      if (name !== 'example.com') return makeJson({ Status: 3, AD: false, Question: question });
       const data = type === 28 ? '2606:2800:220:1:248:1893:25c8:1946' : '93.184.216.34';
-      return {
-        ok: true, status: 200, headers: { get: () => null },
-        async json() {
-          return { Status: 0, AD: true, Question: [{ name: `${name}.`, type }], Answer: [{ name: `${name}.`, type, TTL: 120, data }] };
-        },
-        async text() { return ''; }
-      };
+      return makeJson({ Status: 0, AD: true, Question: question, Answer: [{ name: `${name}.`, type, TTL: 120, data }] });
     }
 
     // Feed updates: behaviour is switched per test.

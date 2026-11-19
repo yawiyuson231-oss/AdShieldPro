@@ -1,194 +1,122 @@
-# AETHER Security Agent (Android)
+# Android AI Agent
 
-Open **Security → Agent**.
+Open **Security → AI Agent**. Type one request, such as **“Check my phone’s protection”**, then tap
+**Suggest a check**. Review the proposed action and approve or cancel it. To start a combined review
+without typing, tap **Review phone, DNS and apps**. **Choose a check instead** lists the other tasks.
+Both entry points use the same confirmation as a model suggestion.
 
-- **Security review → Run review** checks protection and then app risks. Watch the two steps and
-  tap **View latest result** to see what was checked, what was flagged, and what was unavailable.
-  Tap **Review in Android Settings** on a flagged app to open its App Info page yourself.
-- Type a task and tap **Find task offline**, or **Ask online AI** if you connected a provider.
-  For a multi-step request, tap **Try a guided plan** or use “then” between checks and choose
-  **Find task offline**. You can also choose a tool directly.
-- To check a file, choose **Scan a file → Choose file**. Pick **one** file in Android’s picker.
-  AdShield analyzes a temporary local copy, not the rest of your storage.
+The small task model is bundled in the APK and classifies requests on the phone. There is no AI
+account, key, model download, prompt upload or cloud inference. This is not a chatbot: it picks from
+the checks below, or gives no suggestion if unsure. Ask for checks one at a time. The app's actual
+checks, not the model, produce the findings.
 
-| Try typing | What runs after you approve |
+| Request example | What approval allows |
 | --- | --- |
-| “Security review” | Two fixed local steps: phone/protection readings and Android-visible app metadata. If one step fails or times out, the other can still report its evidence. |
-| “Check my phone’s protection” | A local snapshot of AdShield settings, recent aggregate activity, connection, storage, memory, and heat. **Check my phone** runs this same read directly. |
-| “Audit my apps” | Reads permissions, declared component bindings and install metadata for apps Android exposes. Shows inspected and skipped counts and explains medium- or high-risk flags. |
-| “Scan a file” | Inspects a user-selected file (up to **24 MiB**) for static indicators. Does not launch, install, upload, change or delete the original. |
-| “Check a link” | Asks you for **one** HTTP(S) link or domain in a separate field. Checks active threat lists and local phishing indicators without visiting the link. |
-| “Test DNS speed” | Sends a fixed `example.com` query to resolver presets (including a selected custom resolver) using the configured protocol. Shows lookup timings and failures, not Wi-Fi speed. Never switches resolvers. |
-| “Turn on DNS Alias Shield” | The one tool that writes a setting. It enables AdShield’s existing Alias Shield and clears the resolver cache. Filtering still requires active protection. Turn it off again in DNS settings. |
+| **Check my phone’s protection** | Read current AdShield protection, DNS activity summaries (when enabled), connection and device readings. Missing readings stay unknown. |
+| **Audit my apps** | Inspect permission declarations and install sources of apps visible to AdShield. No private app-file access or uninstall. |
+| **Security review** | Run the three local specialists below. No network requests, new permissions, scan-history entry or settings change from this review. |
+| **Check a link** | Type or paste a single URL in the confirmation. Check it locally without opening it. The model cannot supply a URL. |
+| **Scan a file** | Pick one file with Android's document picker. AdShield reads up to 24 MiB of the selected file into a temporary copy, checks it locally and removes the copy. It never launches, installs, uploads or modifies the original. A cloud document provider may fetch the file you chose. |
+| **Test DNS speed** | Send a real `example.com` lookup to each built-in resolver (and your custom resolver if selected) using your configured DNS protocol. Resolver operators can see the DNS lookup and normal connection metadata. Task text and results are not sent. The benchmark never switches your provider or falls back to plaintext from an encrypted mode. |
+| **Turn on DNS Alias Shield** | Change only AdShield's Alias Shield setting. Review or turn it off in DNS settings. |
 
-### What the results mean
+## How Security review works
 
-The model **chooses a task**; AdShield’s Android readers and scanners **supply the evidence**.
-Neither model supplies targets, verdicts, or tools outside the allowlist. The on-device planner
-puts individually recognized checks in the order you requested. The Agent cannot run commands,
-browse links, read other apps’ private data, uninstall apps, or schedule work on its own.
+- **Phone protection** reads AdShield's runtime status, passive Android network and device readings,
+  and local activity summaries when available. It respects the detailed DNS logging preference.
+- **Saved DNS policy** checks the selected protocol, resolver plan and eligible backups, DNSSEC mode,
+  Alias Shield, allowlist-only setting, and saved network and app exceptions. It compares saved VPN
+  exclusions with a local setup receipt when there is one. It doesn't probe a resolver or confirm
+  which provider answered. DNSSEC reporting is upstream evidence, not local chain validation.
+- **App metadata** inspects declarations and install-source readings for Android-visible packages.
+  It counts unreadable entries separately. A declaration is not a grant or evidence of compromise.
 
-- **Review:** The phone and app steps have independent, cooperative time limits of 8 and 30 seconds.
-  A device reading that Android doesn't expose is not assumed healthy. Apps counted as inspected
-  had readable package metadata; not every app or install source is necessarily visible.
-  Declarations are not permission grants, observed behavior, or proof of malware.
-- **File:** The byte limit is checked against actual reads, not the provider’s reported size. A
-  larger file is rejected, not scanned as a partial copy. The Agent uses app-private cache
-  storage and attempts to remove the copy on completion or cancellation. The result shows the
-  copy size, matching indicators, and limits such as unavailable archive metadata. Archive checks
-  cover entry metadata; `.apk` can also get static manifest and bounded code checks. This does not
-  unpack nested packages, verify signatures cryptographically, or guarantee the file is safe.
-  A cloud-backed picker may need its provider to make the chosen file available on the phone.
-- **Stopping:** Use **Cancel check** on a running check. An in-progress Android read or network
-  operation may take time to return, and DNS queries already sent cannot be recalled. Leaving the
-  Agent dismisses pending local
-  approvals and cancels these reads. A picker result cannot authorize a different or already-used
-  task. **Stop waiting** cancels the online wait; the provider might already have received the text.
-- **History:** Typed requests, separately entered links, and Agent results are not written to
-  scan history. The standalone **Security → Apps / Files / Links** tools and **History** remain
-  separate workflows.
+These are fixed read-only specialists, not three language models. They run independently with
+cooperative deadlines (phone: 8 seconds; DNS: 5 seconds; apps: 30 seconds). If one fails or times out,
+completed evidence remains available. Canceling the whole review discards that run; an Android system
+read already in progress may need to return before cancellation completes.
 
-The bundled on-device model is fitted to English and Taglish task examples. It ranks seven tasks
-plus an unsupported class and can decline ambiguous wording. It needs no account, API key,
-model download, root or new permissions. It is not a chatbot. If the model is unavailable or
-doesn't match your request, choose a tool yourself.
+**VPN exclusion evidence** comes from Android's VPN setup: the service checks that a package is
+available, records which user exclusions made it into the builder or were rejected during setup,
+and publishes a receipt only when Android returns an established tunnel. The receipt includes the
+tunnel generation, setup time and DNS route families. It stays in memory. Stop, replacement/rebuild,
+revocation and setup or packet-loop failure invalidate it. Pausing filtering leaves the installed
+tunnel in place and is separately labeled. The report can show a new saved exclusion that wasn't
+recorded at setup, an exclusion rejected during setup, or one
+still accepted at setup but no longer saved. Without a current receipt it says **unknown**, not zero.
+The receipt is sampled as the review is assembled: run another review after changing settings or
+networks. It is not a traffic observation, a route-table audit, or evidence of universal coverage.
 
-## Guided plans
+The coordinator matches **exact package IDs** between all inspected apps with medium- or high-risk
+indicators and saved exceptions or accepted VPN exclusions in the receipt. It shows up to four match
+examples and up to eight separate app findings. Missing app or policy evidence is not a zero-match
+result. A saved **Allow all DNS** rule is never marked applied by a tunnel receipt: these rules require
+requests reaching the tunnel, Android app attribution, and policy evaluation. Allowlist-only mode can
+block names before an app's **Allow all DNS** rule takes effect.
 
-Try **Security → Agent → Try a guided plan**, or type **“Audit my apps, then test DNS speed”** and
-select **Find task offline**. The planner recognizes **two or three** distinct checks in an explicit
-order. Separate complete requests with `then`, `tapos`, semicolons, or new lines. For example:
+Recommendations explain the evidence and link to existing controls. They do not apply changes. Any
+suggested Agent action, including a live DNS benchmark, needs its own separate approval.
 
-- “Security review, then scan a file, then check a link”
-- “Suriin ang seguridad ng cellphone ko tapos audit my installed apps”
+Use **Cancel check** to stop an ongoing read or benchmark. A sent query cannot be recalled. The
+Agent does not start scheduled work. Leaving the Agent tab dismisses pending approvals and its latest
+result. The Android file picker can return only the file chosen for its approval. An earlier build's
+saved AI connection is removed when this build starts; this cannot revoke keys at the original provider
+or erase requests it already received. Other provider settings are not changed.
 
-1. Read the ordered steps and their scope. A plan does not start any check.
-2. Tap **Review step 1** and confirm its exact action. Supply a file or link in that step's own
-   picker or input. A DNS benchmark runs only when approved and uses `example.com`.
-3. Read the receipt and choose what to do next. **Finished with limits** means a check returned
-   partial evidence; **Needs retry or skip** means it didn't produce usable results. You can
-   **View step … result**, retry with a fresh approval, skip the current step, or end the plan.
-   The next step never runs automatically.
+A clean result means the checks found no matching indicators, not that a device, app, link or file
+is guaranteed safe. DNS benchmark latency measures a lookup, not bandwidth, privacy or geolocation.
+See the [Android Agent roadmap](AETHER_AGENT_ROADMAP.md) for work that is **not** implemented yet.
 
-An unrecognized, conditional, overlapping, or setting-changing step rejects the plan instead of
-silently running a subset. For example, use **Security review** or a separate **Audit installed
-apps**, not both in one plan. To turn on DNS Alias Shield, make a separate request.
+## Preview restoring one excluded app
 
-Planning runs on the phone with the same bundled model. Plan receipts stay in memory until you
-close the plan or leave the Agent; they aren't uploaded or added to History. Putting the app in
-the background cancels running checks and dismisses approval dialogs. The one Android picker
-opened for an approved file step can still return its chosen file while the plan is open.
-**Ask online AI** still suggests one task at a time; explicit plan requests are not sent.
+Choose **Preview restoring an app** in the Agent, or **Preview one saved VPN exclusion** under
+**VPN exclusion evidence** in a review. Pick one saved package by app name and exact package ID.
+The Agent re-reads settings after the selection. If the exclusion is no longer saved, it doesn't
+show a stale diff. If Android can't provide the name, the picker shows the saved package ID.
 
-## Optional: connect your own AI API
+The preview shows what **Filtered** in Per-App Firewall would do: remove this one saved VPN
+exclusion and clear its per-app **Allow all DNS** or **Block all DNS** override, if present. Other
+app rules, network exceptions, the resolver, and global DNS settings stay as they are. Removing
+**Block all DNS** can let some requests pass local filtering; this is not an unconditional upgrade.
 
-In **Security → Agent → Connect AI API**, choose a provider. Paste your key directly into the
-app, not into the Agent's task field or a chat.
+The current tunnel receipt, if present, shows whether Android accepted the exclusion at setup.
+A settings change alone does not change an installed tunnel. The new exclusion list needs a
+successful tunnel rebuild or, if protection is off, a successful start. The preview sends no
+queries and never changes settings, rebuilds the VPN, or saves a history entry. Close it to discard it.
 
-| Provider | What to enter |
-| --- | --- |
-| **Google Gemini** | A Gemini Developer API key from [Google AI Studio](https://aistudio.google.com/api-keys). Keep `gemini-3.5-flash-lite` or use a text model your project can access. AdShield uses Google's native `generateContent` endpoint with `x-goog-api-key`; no URL is needed. |
-| **OpenAI** | An OpenAI API key and a text model ID that supports [Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/) with `developer` messages and `max_completion_tokens`. The URL is set for you. |
-| **Other compatible API** | Your gateway's HTTPS API base URL (for example, `https://api.example.com/v1`) or full `/chat/completions` URL, model ID, and bearer token. AdShield appends `/chat/completions` to a base URL as entered. Select `max_completion_tokens` instead of `max_tokens` if your provider requires it. |
+The sample decisions use AdShield's real DNS policy evaluator with hypothetical inputs: no domain
+rule, a matching block rule, or a user allowlist match. The saved and Filtered columns both assume
+that a query enters the tunnel during active filtering and Android attributes it to the selected
+package. These aren't traffic observations. They don't identify the app's domains, predict app
+compatibility or upstream answers, or guarantee routing, including when apps share an Android UID.
 
-A custom endpoint must accept non-streaming Chat Completions requests with `system` and `user`
-messages, and return an assistant text choice. Not every API uses that format. Responses-only,
-native Anthropic Messages and Vertex AI endpoints, HTTP-only servers, and routes that need keys
-in the URL or extra authentication headers aren't supported directly. A compatible HTTPS gateway
-can translate a different provider protocol.
+## On-device smoke checklist
 
-1. Tap **Save & review test**. The key is saved locally. Review the provider, destination, model
-   and fixed text (“Audit my installed apps”). Tap **Send test** to make one request, or **Cancel**
-   to keep the settings without sending anything. You can retest from **Test API**.
-2. The test passes only when the model returns the matching task ID. **No audit or other tool
-   runs**, even if the model returns a different supported task.
-3. To use the connection, type a task and tap **Ask online AI**. Review the exact text, model and
-   destination. **Send** approves that request once. If the model suggests a task, approve the
-   on-phone action separately. **Find task offline** and the direct tools don't need the API.
-
-| If the test reports… | Check… |
-| --- | --- |
-| **Key or access rejected** | Paste the API key itself, not `Bearer` plus the key. Check that it belongs to the selected provider, can use the API, and has access to the model. |
-| **Model or API route not found** | Copy the model ID from your provider. For a custom API, use the documented API base (including any version path) or the final Chat Completions URL. |
-| **Quota, billing, or project requirement** | Check your provider's usage limits, billing, and project or region eligibility. A chat subscription alone may not include API access. |
-| **Output token setting rejected** | In **AI API settings** for a custom provider, switch to the limit field it documents. Re-enter the key to save changes. |
-| **No valid or finished task response** | Try a fast text model that supports the selected API, or use **Find task offline**. |
-| **Connection, timeout, or certificate problem** | Check internet access and the HTTPS hostname and certificate. A timed-out request may still have reached the provider. |
-
-A provider can charge for a test or online task request. It receives the approved text and fixed
-task instructions via the reviewed endpoint, with the key sent in a header. AdShield does not
-attach settings, app lists, results, activity, files, or links entered into the separate scanner.
-The app rejects common web addresses, email addresses and IPs in online task text, but cannot
-recognize every secret. AdShield does not follow redirects, replay the POST, display raw provider
-errors, or execute provider text. Requests have a 40-second call limit and replies over 64 KiB
-are rejected.
-
-The provider, endpoint, model ID and key are stored together as Android Keystore-backed
-ciphertext and aren't included in AdShield backups. Existing valid saved Chat Completions
-connections remain under **Other compatible API** and keep using the `max_tokens` field. To switch
-protocol settings, choose the new provider preset and re-enter your key. **AI API settings →
-Disconnect** removes the saved connection locally; revoke the key with your provider if needed.
-There is no bundled key or hosted AI service.
-For a shared deployment, keep upstream keys on your own server and issue scoped gateway tokens.
-
-### Phone evidence and limits
-
-- **Protection:** AdShield’s reported VPN state and rule count, DNS transport, Alias Shield,
-  exclusions, browser cookie settings, and scan and update settings.
-- **Connection:** Android’s default network, validation, captive portal, and connected Wi-Fi
-  security and signal when exposed. AdShield does not collect SSID or BSSID in this check or
-  guess which connection lies behind a VPN.
-- **DNS:** Up to 250 existing log rows from the past hour if detailed logging is enabled. p95
-  requires five or more positive timings for unblocked, non-SERVFAIL queries. When logging is
-  off, old detailed rows are not read.
-- **Device and activity:** Android’s low-memory flag, storage available to AdShield, thermal
-  status, aggregate DNS activity, and counts of retained scan records. No automatic cleanup,
-  app killing, performance guarantee or assumption that past findings are current.
-
-## Verification
-
-```sh
-python3 tools/train_aether_tasks.py --check
-./gradlew :app:testDebugUnitTest \
-  --tests 'com.adshield.pro.Aether*Test' \
-  --tests 'com.adshield.pro.SecurityCenterTestSuite'
-```
-
-The model is reproducible from `tools/aether_agent/train.tsv` (411 authored examples, not collected
-user data). On the 94-example development holdout, v2 matched **90**, made **no wrong task
-suggestions**, and declined four supported requests. The holdout is not used in fitting; these are
-regression results, not an independent estimate of real-world accuracy. The JVM tests exercise the
-Kotlin model, guide composition and step approvals, both review deadlines, cancellation, partial
-readings, byte limits, and static scanner results. Transport fixtures cover the Gemini and Chat Completions request
-formats, reply parsing, legacy settings, cancellation and diagnostics. They do not test a live
-API account.
-
-### On-device smoke checklist
-
-1. In airplane mode, type **Security review** and cancel the suggestion. Verify neither check runs.
-   Approve it, verify both receipts and the current visible/inspected counts, and check that the
-   review does not modify settings or add a History entry. If there is a flagged app, tap its App
-   Info button and verify Android opens the matching package.
-2. Cancel while a check runs. Try changing tabs and returning, and sending the app to the
-   background. Verify no second review starts. Some in-progress Android reads can delay cancellation.
-3. Select **Scan a file**. Back out of the picker; nothing should be scanned. Repeat with a small
-   local text file, then with a file larger than 24 MiB. Verify the size or explicit rejection,
-   and verify the original is unchanged. Rotate or leave during selection; a stale picker result
-   should not start another scan. Check that **Security → Files** and **History** still work separately.
-4. Check a harmless documentation link, such as `http://192.0.2.1/login/verify`, and verify that
-   no browser opens. Approve a DNS benchmark while connected and confirm the resolver setting does
-   not change. Cancel and then approve an Alias Shield change with the toggle initially off.
-5. Check the phone with filtering on, paused and off. Disable detailed DNS logging; old rows
-   should not appear in the report. Check that redacted readings are not presented as healthy.
-6. Select **Google Gemini**, enter a key in the app and tap **Save & review test**. Cancel the
-   review and check that the provider shows no request. Tap **Test API → Send test** and check
-   that a pass does not open an audit or run a tool. Repeat with an invalid key or unknown model
-   and verify the error, then confirm offline tasks still work.
-7. Repeat with **OpenAI** or a compatible gateway. For a gateway, try its base URL as well as the
-   full route and check the reviewed destination. Kill and reopen the app to check the stored
-   connection, then disconnect and verify the **Ask online AI** button is gone. Approve an online
-   file suggestion but dismiss the separate task approval; the picker should not launch.
-8. Try a guided plan. Dismiss the first approval and verify nothing runs, then approve it and
-   verify the second step waits. Open the first receipt after the second check or skip. Cancel
-   a file picker in a plan and verify its step says **Needs retry or skip**. Leave and reenter
-   the Agent to check that the plan and its receipts were cleared.
+1. On an emulator or test phone with airplane mode on, open **Security → AI Agent**. Tap **Review
+   phone, DNS and apps**, then cancel the confirmation. Confirm no review runs. Repeat and approve:
+   verify all three coverage entries, check that missing Android readings are labeled, and confirm
+   that saved DNS settings and scan history did not change. To verify no requests from the review
+   with networking enabled, capture on an isolated test setup and distinguish existing background DNS
+   and scheduled work from the confirmed review interval.
+2. In a disposable test profile, choose an app with a medium- or high-risk indicator in **Security →
+   Apps**. Save an **Allow all DNS** rule for its exact package in **Settings → Per-App Firewall &
+   Split-Tunnel**. Rerun the review and confirm the pair is labeled **saved**, not observed. Switch
+   it back to filtered and confirm the pair disappears on the next run. No app permission grant or
+   live connection is needed. The JVM tests cover this case with synthetic app metadata. With a saved
+   VPN exclusion, also test before starting the tunnel, after consent and setup, during a rebuild and
+   after stopping. Check that receipt evidence is about setup, not packets.
+3. Ask for **“Audit my apps, then test DNS speed”**. Confirm no plan, suggestion or network request.
+   If a result offers **Run DNS benchmark**, tap it and confirm a new approval is required; cancel it.
+4. Choose **Check a link**. Confirm the approval dialog starts empty and the link is not launched.
+5. Choose **Scan a file**, approve and cancel Android's picker. Repeat, choose a small local file and
+   check the result. Try a file over 24 MiB: it must be refused, not partially scanned.
+6. Start a review, tap **Cancel check** or background the app before it completes, and confirm that
+   no canceled result or stale approval can run on return. Check the report at large font sizes.
+7. Enable network access and approve **Test DNS speed** separately. Check that it shows the selected
+   protocol, live timings or failures, and does not change the configured resolver. With encrypted DNS
+   unable to connect, it must report failures rather than silently send the probe over UDP/TCP.
+8. With two saved VPN exclusions, open **Preview restoring an app** and select just one. Check
+   its exact package, saved override, simulated change, and the unchanged settings after closing.
+   Try before startup, while filtering is paused, and after VPN setup. A missing receipt stays
+   unknown. Change the saved selection before tapping it; the preview should say it's no longer
+   saved, not propose a diff for it. Background the Agent with the preview open and verify it clears.

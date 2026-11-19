@@ -21,7 +21,7 @@ import com.adshield.pro.engine.dns.DnsProviderRegistry
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.DnsMediaPlaybackGuard
 import com.adshield.pro.engine.filter.FilterRuleEngine
-import com.adshield.pro.update.GitHubReleaseClient
+import com.adshield.pro.update.GitHubReleaseMetadata
 import com.adshield.pro.engine.optimizer.RuleBasedOptimizationPredictor
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -551,7 +551,8 @@ class AdShieldEngineTestSuite {
     @Test
     fun testOnlyNoerrorAndNxdomainAnswersAreCacheable() {
         val query = DnsPacketCodec.parseQuery(buildRawDnsQueryPacket())!!
-        assertTrue(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, false)))
+        // NXDOMAIN is cacheable only when the authority section supplies a usable SOA TTL.
+        assertFalse(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, false)))
         assertTrue(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildBlockedResponse(query, true)))
         assertFalse(UpstreamDnsResolver.shouldCacheDnsResponse(DnsPacketCodec.buildServFailResponse(query)))
 
@@ -763,21 +764,21 @@ class AdShieldEngineTestSuite {
 
     @Test
     fun testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks() {
-        // A release page can list a debug build, split APKs or both before the real APK.
-        val assets = listOf(
-            "app-debug.apk",
-            "AdShieldPro-2.3.0-arm64-v8a-release.apk",
+        val repo = "example/AdShieldPro"
+        val tag = "secure-v2.3.0"
+        val baseUrl = "https://github.com/$repo/releases/download/$tag"
+        val hash = "AB".repeat(32)
+        val assets = sequenceOf(
+            "app-debug-release.apk",
+            "AdShieldPro-Secure-2.3.0-arm64-v8a-release.apk",
             "AdShieldPro-2.3.0-release.apk",
-            "AdShieldPro-2.3.0-release.apk.sha256"
-        )
-        val installable = assets.filter { GitHubReleaseClient.isInstallableReleaseApk(it) }
-        assertEquals(listOf("AdShieldPro-2.3.0-release.apk"), installable)
-
-        assertTrue(GitHubReleaseClient.isInstallableReleaseApk("AdShieldPro-2.3.0.apk"))
-        assertTrue(GitHubReleaseClient.isInstallableReleaseApk("adshield-pro-universal-release.APK"))
-        assertFalse(GitHubReleaseClient.isInstallableReleaseApk("app-debug.apk"))
-        assertFalse(GitHubReleaseClient.isInstallableReleaseApk("AdShieldPro-x86_64-release.apk"))
-        assertFalse(GitHubReleaseClient.isInstallableReleaseApk("AdShieldPro-2.3.0-release.apk.sha256"))
-        assertFalse(GitHubReleaseClient.isInstallableReleaseApk("checksums.txt"))
+            "AdShieldPro-Secure-2.3.0-test.apk",
+            "AdShieldPro-Secure-2.3.0-release.apk.sha256",
+            "AdShieldPro-Secure-2.3.0-release.apk"
+        ).map { GitHubReleaseMetadata.Asset(it, "$baseUrl/$it", "sha256:$hash") }
+        val chosen = requireNotNull(GitHubReleaseMetadata.select(repo, tag, false, true, "Notes", assets))
+        assertEquals("$baseUrl/AdShieldPro-Secure-2.3.0-release.apk", chosen.apk)
+        assertEquals(20_300, chosen.code)
+        assertEquals(hash.lowercase(), chosen.sha256)
     }
 }

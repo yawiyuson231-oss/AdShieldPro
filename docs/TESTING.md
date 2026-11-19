@@ -49,12 +49,14 @@ requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 2. Bundled AETHER task model reproducibility/holdout (`tools/train_aether_tasks.py --check`) and
    UI performance gates (`tools/check_ui_performance.py`)
 3. `:app:compileDebugKotlin` — fails fast on toolchain problems
-4. `:app:assembleDebug` — APK packaging
+4. `:app:assembleDebug :app:assembleDebugAndroidTest` — debug APK and separate instrumentation APK
 5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
    universal ABI gate (`tools/check_universal_release.py`)
 6. `:app:testDebugUnitTest` — then discovers every `@Test` case in `app/src/test` and asserts the
    JUnit XML reports the same number, with zero failures/errors/skips
 7. `:app:lintDebug` — hard gate, the build fails on any lint error
+8. API 29 emulator — verify both APKs install and launch, and require the debug Agent instrumentation
+   cases to pass before uploading or publishing a preview.
 
 The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 
@@ -98,9 +100,13 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
-| `AetherSecurityAgentTest` / `AetherOnlinePlannerTest` / `AetherOnlineHttpTest` | Offline intent model, separate send and run consent, Gemini and Chat Completions wire formats, legacy config reads, stale approvals, reply/error bounds and cancellation (fixtures, not live accounts) |
-| `AetherGuidedPlanTest` | Real bundled model on explicit English/Taglish sequences, no partial plan on unclear or disallowed steps, step-bound one-use approvals, retries, skips and receipt coverage |
-| `AetherSecurityReviewTest` / `AetherPhoneAgentTest` | Independent review steps, partial or failed coverage, propagated cancellation, package metadata indicators, one-use file picker receipts, actual byte limits and existing phone-evidence rules |
+| `AetherSecurityAgentTest` | Bundled model on held-out English and Taglish requests, one supported task at a time, stale/dismissed approvals, separate explicit link input and approval |
+| `DnsAddressFallbackTest` | Same-provider address scheduling and cancellation, fast first address, and a separate TCP allowance after a matching truncated UDP reply |
+| `DnsResolverHardeningTest` | Question matching before UDP TC retry, RDATA and EDNS bounds, extended RCODE/EDE, encrypted failover and cancellation, uncached diagnostics and DoH transport checks |
+| `AetherSecurityReviewTest` / `AetherDnsPolicyReviewTest` | Three independent local reads, partial coverage, propagated cancellation, exact package-ID matching before display limits, saved-rule conflicts, resolver-plan eligibility, custom endpoint redaction and unknown vs. zero |
+| `VpnExclusionSetupTest` | Only real user exclusions are attempted; saved route and exclusion changes can invalidate pending setup as well as an installed tunnel |
+| `AetherVpnExclusionPreviewTest` | Exact saved-package selection, no-op and stale targets, setup evidence vs. unknown, and synthetic before/after decisions for per-app rules, network exceptions and allowlist-only precedence without mutating inputs |
+| `AetherPhoneAgentTest` / `AetherSecurityReviewTest` | Phone evidence and logging opt-out, package metadata indicators, one-use file picker receipts and actual byte limits |
 | `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
 | `IntelligenceMapTestSuite` | Event sanitizer (evidence required, size bounds, secret/PII redaction, severity escalation), factory routing (DNS/scan/battery/VPN/automation), aggregator state derivation from real inputs only, dedupe policy, repository round-trip/prune/corrupt rows, hit-testing, pinch focal stability, tap-vs-drag, camera lerp/clamping, recommendations, aggregation performance budget |
@@ -109,7 +115,33 @@ Instrumentation (`androidTest`) and manual on-device checks are still required f
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
 browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
 For the Agent's actual Compose UI, file picker, Android App Info, package visibility and live
-provider setup, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
+DNS benchmarks, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
+
+## Android Agent device tests
+
+`tools/smoke_android_agent.sh` requires the **disposable CI emulator** and the exact debug APK
+already installed. It installs `app-debug-androidTest.apk` built by `:app:assembleDebugAndroidTest`,
+disables Wi-Fi and mobile data on the emulator, and fails unless all four instrumentation cases pass:
+
+- **Real Agent UI:** cancel consent, background with a pending approval, approve and run the review
+  with no Android-validated network, check all three evidence sources and unchanged relevant settings
+  and scan history, then verify leaving the tab clears the result.
+- **Real VPN service and UI:** use Android's VPN consent dialog and one installed and one missing
+  package. Check saved vs. unknown before setup, accepted vs. rejected after setup, changed settings
+  before rebuild, a new generation after rebuild, the same generation on pause/resume, a new receipt
+  when rebuilding without ending a pause, and no receipt after stop. Preview an accepted exclusion
+  from the review and check that the receipt and saved
+  policy stay unchanged.
+- **Filtered preview:** on the offline debug app, open the chooser with no exclusions, then
+  preview a selected app's saved exclusion and DNS override. Verify unknown setup without a tunnel,
+  unchanged settings and scan history, dismissal on background, and refusal if the exclusion was
+  removed since the picker opened.
+- **In-flight cancellation:** exercise the real Compose screen and ViewModel with a deliberately
+  suspended reader that returns after cancellation; assert that no result is published.
+
+The separate Secure APK is test-signed in CI and receives only the install/launch smoke. These
+cases do not capture packets, validate egress, or establish handset compatibility. For the remaining
+manual coverage, see [the Agent smoke checklist](PHONE_AGENT.md#on-device-smoke-checklist).
 
 ## Manual smoke test (device / emulator, API 29+)
 

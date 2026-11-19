@@ -31,8 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.adshield.pro.BuildConfig
 import com.adshield.pro.update.GitHubApkDownload
 import com.adshield.pro.update.GitHubRelease
+import com.adshield.pro.update.GitHubReleaseMetadata
 import com.adshield.pro.ui.theme.AdShieldProTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,6 +52,7 @@ class UpdatePromptActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG) { finish(); return }
         release = read(intent)
         if (release == null) { finish(); return }
         render()
@@ -58,6 +61,7 @@ class UpdatePromptActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         release = read(intent)
+        if (release == null) { finish(); return }
         render()
     }
     private fun render() {
@@ -70,7 +74,7 @@ class UpdatePromptActivity : ComponentActivity() {
                     title = { Text("Update available") },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("AdShield Pro " + item.name)
+                            Text("AdShield Pro Secure " + item.name)
                             Text(item.notes, style = MaterialTheme.typography.bodyMedium)
                             status?.let { Spacer(Modifier.height(4.dp)); Text(it, color = MaterialTheme.colorScheme.error) }
                             if (downloading) { CircularProgressIndicator(modifier = Modifier.size(28.dp)); Text("Downloading and verifying…") }
@@ -113,7 +117,10 @@ class UpdatePromptActivity : ComponentActivity() {
         val tag = intent.getStringExtra(TAG) ?: return null
         val name = intent.getStringExtra(NAME) ?: return null
         val apk = intent.getStringExtra(APK) ?: return null
-        return GitHubRelease(tag, name, intent.getIntExtra(CODE, 0), apk, intent.getStringExtra(SHA), intent.getStringExtra(NOTES).orEmpty())
+        val sha256 = intent.getStringExtra(SHA)?.takeIf(GitHubReleaseMetadata::isSha256) ?: return null
+        val code = GitHubReleaseMetadata.versionCode(tag) ?: return null
+        if (code <= BuildConfig.VERSION_CODE || code != intent.getIntExtra(CODE, 0)) return null
+        return GitHubRelease(tag, name, code, apk, sha256, intent.getStringExtra(NOTES).orEmpty())
     }
     companion object {
         const val TAG = "update_tag"

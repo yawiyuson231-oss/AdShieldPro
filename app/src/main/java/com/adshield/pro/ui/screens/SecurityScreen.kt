@@ -90,7 +90,7 @@ import java.util.Date
 /**
  * AdShield Pro — Security Center (Anti-Virus & Anti-Phishing).
  *
- * Sub-tabs: Protection posture, Security Agent, App audit, File scanner, Link/URL scanner, Scan history.
+ * Sub-tabs: Protection posture, AI Agent, App audit, File scanner, Link/URL scanner, Scan history.
  */
 @Composable
 fun SecurityScreen(
@@ -139,7 +139,7 @@ fun SecurityScreen(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 SecurityTabChip("Shield", Icons.Default.Security, selectedSubTab == 0, Modifier) { selectedSubTab = 0 }
-                SecurityTabChip("Agent", Icons.Default.Shield, selectedSubTab == 5, Modifier) { selectedSubTab = 5 }
+                SecurityTabChip("AI Agent", Icons.Default.Shield, selectedSubTab == 5, Modifier) { selectedSubTab = 5 }
                 SecurityTabChip("Apps", Icons.Default.GppGood, selectedSubTab == 1, Modifier) { selectedSubTab = 1 }
                 SecurityTabChip("Files", Icons.Default.Description, selectedSubTab == 2, Modifier) { selectedSubTab = 2 }
                 SecurityTabChip("Links", Icons.Default.Link, selectedSubTab == 3, Modifier) { selectedSubTab = 3 }

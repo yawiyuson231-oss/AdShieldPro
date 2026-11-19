@@ -46,8 +46,7 @@ test('negative caching uses the SOA-derived TTL, clamped', () => {
   assert.ok(cache.stats.negativeHits >= 1);
 
   cache.set('tiny.example', 'A', {}, { ttl: 0 });
-  const tiny = cache.entries.get(DnsCache.key('tiny.example', 'A'));
-  assert.equal(tiny.ttl, 1, 'TTL is clamped to a 1s floor');
+  assert.equal(cache.get('tiny.example', 'A'), null, 'TTL zero means no cache entry');
   cache.set('huge.example', 'A', {}, { ttl: 10_000_000 });
   assert.equal(cache.entries.get(DnsCache.key('huge.example', 'A')).ttl, 86400, 'TTL is capped at 24h');
 });

@@ -27,7 +27,7 @@ internal class AetherTaskModel private constructor(
     private val weights: Map<String, DoubleArray>
 ) {
     fun suggest(request: String): AetherSecurityTask? {
-        if (request.length > MAX_REQUEST_CHARS) return null
+        if (request.length > MAX_REQUEST_CHARS || AetherTaskPolicy.isSequence(request)) return null
         val tokens = AetherTaskPolicy.tokens(request)
         if (tokens.size < 2 || !AetherTaskPolicy.isAffirmativeRequest(tokens)) return null
         val features = buildSet {
@@ -82,10 +82,11 @@ internal class AetherTaskModel private constructor(
     }
 }
 
-/** The same narrow guard applies to both online and offline model suggestions. */
+/** Keep local suggestions within the scope of a single supported check or setting. */
 internal object AetherTaskPolicy {
     private val word = Regex("[a-z0-9]+(?:'[a-z]+)?")
     private val link = Regex("\\b(?:https?://|www\\.)\\S+")
+    private val sequence = Regex("""(?i)\b(?:then|tapos|saka|atsaka)\b|[;\r\n]""")
     private val unsupportedRequest = Regex("^(please )?(do not|don't|never|avoid|stop|skip|cancel|wag|huwag|ayaw|open|visit|launch|download|upload|install|uninstall|delete|remove|quarantine)\\b")
     private val enableVerb = Regex("\\b(enable|activate|turn on|switch on|buksan|pabukas|i on)\\b")
     private val explanation = Regex("\\b(why|how|what|whether|paano|bakit)\\b")
@@ -97,6 +98,10 @@ internal object AetherTaskPolicy {
     private val appScope = Regex("\\b(apps?|applications?|permissions?)\\b")
     private val selectedFileScope = Regex("\\b(files?|archives?|attachments?|documents?|dokumento\\w*|pdf|apks?|xapk|zip|(application|downloaded|local|saved|package) installer|spreadsheet|screenshot)\\b")
     private val negation = Regex("\\b(never|not|no|off|disable|disabling|wag|huwag|ayaw)\\b|n't\\b")
+
+    fun isSequence(request: String): Boolean = sequence.containsMatchIn(
+        link.replace(Normalizer.normalize(request, Normalizer.Form.NFKC).lowercase(Locale.ROOT), " link ")
+    )
 
     fun tokens(request: String): List<String> {
         val text = Normalizer.normalize(request, Normalizer.Form.NFKC)
@@ -124,26 +129,21 @@ internal object AetherTaskPolicy {
     }
 }
 
-internal enum class AetherTaskSource { MANUAL, OFFLINE_MODEL, ONLINE_API, GUIDED_PLAN }
-
 /** One pending action at a time. A stale dialog or repeated tap cannot approve another task. */
 internal class AetherTaskApproval {
-    data class Proposal(val id: Long, val task: AetherSecurityTask, val source: AetherTaskSource, val planStep: AetherGuidedPlan.Ref?)
+    data class Proposal(val id: Long, val task: AetherSecurityTask, val suggested: Boolean)
     class Approved internal constructor(
         val id: Long,
         val task: AetherSecurityTask,
-        val link: String?,
-        val planStep: AetherGuidedPlan.Ref?
+        val link: String?
     )
 
     private var sequence = 0L
     var pending: Proposal? = null
         private set
 
-    fun propose(task: AetherSecurityTask, source: AetherTaskSource, planStep: AetherGuidedPlan.Ref? = null): Proposal {
-        require((source == AetherTaskSource.GUIDED_PLAN) == (planStep != null))
-        return Proposal(++sequence, task, source, planStep).also { pending = it }
-    }
+    fun propose(task: AetherSecurityTask, suggested: Boolean = false): Proposal =
+        Proposal(++sequence, task, suggested).also { pending = it }
 
     fun dismiss(id: Long) {
         if (pending?.id == id) pending = null
@@ -156,7 +156,7 @@ internal class AetherTaskApproval {
             urlInput.trim().takeIf(::isLinkInput) ?: return null
         } else null
         pending = null
-        return Approved(current.id, current.task, url, current.planStep)
+        return Approved(current.id, current.task, url)
     }
 
     companion object {

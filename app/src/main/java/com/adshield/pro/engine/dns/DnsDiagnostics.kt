@@ -11,10 +11,13 @@ data class DnsDiagnosticReport(
     val successful: Boolean,
     val transportAndProvider: String,
     val latencyMs: Int,
-    val fromCache: Boolean,
     val dnssecStatus: DnssecStatus?,
     val responseCode: Int?,
     val answerCount: Int?,
+    val outcome: String,
+    val ednsVersion: Int?,
+    val extendedErrorCodes: List<Int>,
+    val issues: List<DnsResolverIssue>,
     val providerHealth: List<DnsProviderHealth>
 )
 
@@ -23,7 +26,9 @@ object DnsDiagnosticQueryFactory {
 
     /** Builds an A query with EDNS0 and the DNSSEC OK bit so upstream AD/RRSIG evidence can be reported. */
     fun build(domainInput: String, transactionId: Int = random.nextInt(65536)): ByteArray {
-        val domain = domainInput.trim().trimEnd('.').split('.').joinToString(".") {
+        val input = domainInput.trim().removeSuffix(".")
+        require(input.length in 1..253) { "Enter a valid DNS name" }
+        val domain = input.split('.').joinToString(".") {
             IDN.toASCII(it, IDN.USE_STD3_ASCII_RULES)
         }
         require(domain.isNotBlank() && domain.length <= 253) { "Enter a valid DNS name" }
@@ -60,17 +65,49 @@ object DnsDiagnosticQueryFactory {
 suspend fun UpstreamDnsResolver.runDiagnostics(domain: String, config: DnsResolverConfig): DnsDiagnosticReport {
     val wire = DnsDiagnosticQueryFactory.build(domain)
     val query = DnsPacketCodec.parseQuery(wire) ?: error("Could not construct diagnostic query")
-    val result = resolve(query, config)
-    val inspection = runCatching { DnsResponseValidator.validate(wire, result.responseBytes) }.getOrNull()
+    val result = resolve(query, config, useCache = false)
+    val reply = result.inspection
     return DnsDiagnosticReport(
         domain = query.questionDomain,
-        successful = inspection?.responseCode == 0 || inspection?.responseCode == 3,
+        successful = reply != null,
         transportAndProvider = result.protocolUsed,
         latencyMs = result.latencyMs,
-        fromCache = result.fromCache,
-        dnssecStatus = result.dnssecStatus ?: inspection?.dnssecStatus,
-        responseCode = inspection?.responseCode,
-        answerCount = inspection?.answerCount,
-        providerHealth = providerHealthSnapshots()
+        dnssecStatus = reply?.dnssecStatus,
+        responseCode = reply?.responseCode,
+        answerCount = reply?.answerCount,
+        outcome = when {
+            reply == null -> "No usable reply (local SERVFAIL)"
+            reply.responseCode == 3 -> "NXDOMAIN · upstream reports the name does not exist"
+            reply.hasRequestedAnswer -> "NOERROR · A record received"
+            else -> "NOERROR · no A record returned"
+        },
+        ednsVersion = reply?.ednsVersion,
+        extendedErrorCodes = reply?.extendedErrorCodes.orEmpty(),
+        issues = result.issues,
+        providerHealth = providerHealthSnapshots().filter { it.protocol == config.protocol }
     )
+}
+
+/** RFC 8914 and common registered codes. Never show untrusted free text from a reply. */
+internal fun dnsExtendedErrorLabel(code: Int): String {
+    val detail = when (code) {
+        3 -> "Stale answer"
+        6 -> "DNSSEC bogus"
+        7 -> "Signature expired"
+        8 -> "Signature not yet valid"
+        9 -> "DNSKEY missing"
+        10 -> "RRSIGs missing"
+        13 -> "Cached error"
+        14 -> "Not ready"
+        15 -> "Blocked"
+        16 -> "Censored"
+        17 -> "Filtered"
+        18 -> "Prohibited"
+        19 -> "Stale NXDOMAIN answer"
+        22 -> "No reachable authority"
+        23 -> "Network error"
+        24 -> "Invalid data"
+        else -> null
+    }
+    return if (detail == null) "EDE $code" else "EDE $code: $detail"
 }

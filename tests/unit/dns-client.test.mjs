@@ -7,7 +7,7 @@ import { DnsClient } from '../../dns/client.js';
 import { DnsCache } from '../../dns/cache.js';
 import { DohTransport, ResolverPool, RESOLVER_BY_ID, ResolverHealth } from '../../dns/resolvers.js';
 import { OmniShieldFilterEngine } from '../../engine.js';
-import { createMockDoh } from '../helpers/mock-dns.mjs';
+import { createMockDoh, makeJson } from '../helpers/mock-dns.mjs';
 
 const [CF, GOOGLE] = [RESOLVER_BY_ID.cloudflare, RESOLVER_BY_ID.google];
 
@@ -107,18 +107,39 @@ test('stale-while-revalidate serves immediately and refreshes in the background'
 });
 
 test('NXDOMAIN is negatively cached using the SOA-derived TTL', async () => {
-  const { client, net, cache } = makeClient({ net: createMockDoh({ nxdomain: new Set(['gone.example']) }) });
+  const { client, net, cache, clock } = makeClient({ net: createMockDoh({ nxdomain: new Set(['gone.example']) }) });
   const first = await client.lookup('gone.example');
   assert.equal(first.status, 'nxdomain');
   assert.equal(first.ok, false);
   assert.match(first.reasons.join(' '), /NXDOMAIN/);
   const entry = cache.get('gone.example', 'A');
   assert.equal(entry.negative, true);
-  assert.equal(entry.ttl, 300, 'negative TTL comes from the SOA minimum');
+  assert.equal(entry.ttl, 60, 'negative TTL is the lower of the SOA TTL and SOA minimum');
 
   await client.lookup('gone.example');
   assert.equal(net.calls.length, 1);
   assert.equal(client.stats.nxdomain, 1);
+  clock.advance(60_000);
+  assert.equal((await client.lookup('gone.example')).cached, false, 'expired negative answers are never served stale');
+  assert.equal(net.calls.length, 2);
+});
+
+test('an NXDOMAIN or NODATA reply without SOA and a zero-TTL answer are not cached', async () => {
+  for (const [extra, expected] of [
+    [{ Status: 3 }, 'nxdomain'],
+    [{ Status: 0 }, 'nodata'],
+    [{ Status: 0, Answer: [{ name: 'example.com.', type: 1, TTL: 0, data: '192.0.2.1' }] }, 'ok']
+  ]) {
+    let calls = 0;
+    const net = { fetchImpl: async () => {
+      calls++;
+      return makeJson({ ...extra, Question: [{ name: 'example.com.', type: 1 }] });
+    } };
+    const { client } = makeClient({ net });
+    assert.equal((await client.lookup('example.com')).status, expected);
+    assert.equal((await client.lookup('example.com')).cached, false);
+    assert.equal(calls, 2);
+  }
 });
 
 test('network failure is surfaced honestly (no plaintext fallback, no fake answer)', async () => {
@@ -175,4 +196,46 @@ test('latency statistics are real percentiles', async () => {
   assert.ok(snapshot.cache.entries > 0);
   assert.ok(Array.isArray(snapshot.health));
   assert.equal(snapshot.stats.latencySamples, undefined, 'raw samples must not leak into snapshots');
+});
+
+test('DoH ages positive and SOA-backed negative TTLs before storing them', async () => {
+  const { client, cache, clock } = makeClient({ resolvers: [CF], net: { fetchImpl: async (url) => {
+    const name = new URL(url).searchParams.get('name');
+    const missing = name === 'missing.example';
+    const response = makeJson({
+      Status: missing ? 3 : 0,
+      Question: [{ name, type: 1 }],
+      ...(missing ? { Authority: [{ name, type: 6, TTL: 70, data: 'ns. hostmaster. 1 5 5 5 60' }] }
+        : { Answer: [{ name, type: 1, TTL: 60, data: '192.0.2.1' }] })
+    });
+    response.headers.set('age', '50');
+    return response;
+  } } });
+  assert.equal((await client.lookup('example.com')).ttl, 10);
+  const negative = await client.lookup('missing.example');
+  assert.equal(negative.negativeTtl, 10);
+  assert.equal(cache.get('example.com').expiresAt, clock() + 10_000);
+  assert.equal(cache.get('missing.example').expiresAt, clock() + 10_000);
+  clock.advance(10_000);
+  assert.equal(cache.get('example.com').stale, true);
+  assert.equal(cache.get('missing.example'), null);
+});
+
+test('expired, malformed, or hidden HTTP Age cannot start a local cache lifetime', async () => {
+  for (const age of ['60', 'bad', null]) {
+    const { client, cache } = makeClient({ resolvers: [CF], net: { fetchImpl: async () => {
+      const response = makeJson({
+        Status: 0,
+        Question: [{ name: 'example.com', type: 1 }],
+        Answer: [{ name: 'example.com', type: 1, TTL: 60, data: '192.0.2.1' }]
+      });
+      if (age === null) Object.defineProperty(response, 'type', { value: 'cors' });
+      else response.headers.set('age', age);
+      return response;
+    } } });
+    const reply = await client.lookup('example.com');
+    assert.equal(reply.status, 'ok');
+    assert.equal(reply.ttl, 0);
+    assert.equal(cache.get('example.com'), null);
+  }
 });

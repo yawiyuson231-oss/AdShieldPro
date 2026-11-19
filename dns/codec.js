@@ -23,7 +23,7 @@ export const CLASS = Object.freeze({ IN: 1, CH: 3, ANY: 255 });
 
 export const RCODE = Object.freeze({
   0: 'NOERROR', 1: 'FORMERR', 2: 'SERVFAIL', 3: 'NXDOMAIN', 4: 'NOTIMP',
-  5: 'REFUSED', 6: 'YXDOMAIN', 7: 'YXRRSET', 8: 'NXRRSET', 9: 'NOTAUTH', 10: 'NOTZONE'
+  5: 'REFUSED', 6: 'YXDOMAIN', 7: 'YXRRSET', 8: 'NXRRSET', 9: 'NOTAUTH', 10: 'NOTZONE', 16: 'BADVERS'
 });
 
 /** Pseudo-RR for the root of a DNSKEY trust chain (RFC 4034 §2). */
@@ -159,7 +159,7 @@ class Reader {
   slice(n) { this.need(n); const s = this.bytes.subarray(this.pos, this.pos + n); this.pos += n; return s; }
 
   /** Reads a (possibly compressed) name. */
-  name() {
+  name(question = false) {
     const labels = [];
     let jumps = 0;
     let pos = this.pos;
@@ -187,7 +187,9 @@ class Reader {
       }
       if (len > 63) throw new DnsFormatError('invalid label length');
       if (pos + 1 + len > this.bytes.length) throw new DnsFormatError('truncated label');
-      labels.push(new TextDecoder().decode(this.bytes.subarray(pos + 1, pos + 1 + len)));
+      const label = new TextDecoder().decode(this.bytes.subarray(pos + 1, pos + 1 + len));
+      if (question && !NAME_LABEL_RE.test(label)) throw new DnsFormatError('invalid question label');
+      labels.push(label);
       pos += 1 + len;
       if (labels.join('.').length > 253) throw new DnsFormatError('name too long');
     }
@@ -348,6 +350,7 @@ export function fromHex(hex) {
  */
 export function decodeMessage(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.length > 0xffff) throw new DnsFormatError('DNS message is too large');
   const reader = new Reader(bytes);
   reader.need(12);
   const id = reader.u16();
@@ -368,6 +371,7 @@ export function decodeMessage(input) {
     truncated: (flagsWord & 0x0200) !== 0,
     recursionDesired: (flagsWord & 0x0100) !== 0,
     recursionAvailable: (flagsWord & 0x0080) !== 0,
+    reservedBit: (flagsWord & 0x0040) !== 0,
     authenticatedData: (flagsWord & 0x0020) !== 0,   // AD
     checkingDisabled: (flagsWord & 0x0010) !== 0,    // CD
     rcode: flagsWord & 0x000f
@@ -375,34 +379,47 @@ export function decodeMessage(input) {
 
   const questions = [];
   for (let i = 0; i < qdcount; i++) {
-    const name = reader.name();
+    const name = reader.name(true);
     const type = reader.u16();
     const qclass = reader.u16();
     questions.push({ name, type, typeName: typeToString(type), class: qclass });
   }
 
-  const readRecords = (count) => {
+  let edns = null;
+  const readRecords = (count, additional = false) => {
     const records = [];
     for (let i = 0; i < count; i++) {
+      const ownerOffset = reader.pos;
       const name = reader.name();
       const type = reader.u16();
       const rclass = reader.u16();
       const ttl = reader.u32();
       const rdlength = reader.u16();
       if (type === TYPE.OPT) {
-        // OPT: class = UDP payload size, ttl = extended rcode/version/flags
-        const data = decodeRdata(reader, type, rdlength);
-        records.push({
+        if (!additional || edns || bytes[ownerOffset] !== 0) throw new DnsFormatError('invalid EDNS OPT placement');
+        const options = new Reader(reader.slice(rdlength));
+        const extendedErrors = [];
+        while (options.pos < options.bytes.length) {
+          const code = options.u16();
+          const value = options.slice(options.u16());
+          if (code === 15) {
+            if (value.length < 2) throw new DnsFormatError('truncated extended DNS error');
+            const ede = (value[0] << 8) | value[1];
+            if (extendedErrors.length < 8 && !extendedErrors.includes(ede)) extendedErrors.push(ede);
+          }
+        }
+        edns = {
           name, type, typeName: 'OPT', udpSize: rclass, ttl,
           dnssecOk: (ttl & 0x8000) !== 0,
           extendedRcode: (ttl >>> 24) & 0xff,
           version: (ttl >>> 16) & 0xff,
-          data
-        });
+          extendedErrors
+        };
+        records.push(edns);
         continue;
       }
       const data = decodeRdata(reader, type, rdlength);
-      records.push({ name, type, typeName: typeToString(type), class: rclass, ttl, data });
+      records.push({ name, type, typeName: typeToString(type), class: rclass, ttl: ttl <= 0x7fffffff ? ttl : 0, data });
       if (reader.pos > bytes.length) throw new DnsFormatError('record overflow');
     }
     return records;
@@ -410,13 +427,15 @@ export function decodeMessage(input) {
 
   const answers = readRecords(ancount);
   const authorities = readRecords(nscount);
-  const additionals = readRecords(arcount);
+  const additionals = readRecords(arcount, true);
+  if (reader.pos !== bytes.length) throw new DnsFormatError('trailing bytes after DNS records');
+  const rcode = ((edns?.extendedRcode ?? 0) << 4) | flags.rcode;
 
   return {
-    id, flags, rcode: flags.rcode, rcodeName: rcodeToString(flags.rcode),
+    id, flags, rcode, rcodeName: rcodeToString(rcode),
     counts: { questions: qdcount, answers: ancount, authorities: nscount, additionals: arcount },
     questions, answers, authorities, additionals,
-    edns: additionals.find((r) => r.type === TYPE.OPT) || null,
+    edns,
     bytesRead: reader.pos,
     size: bytes.length
   };

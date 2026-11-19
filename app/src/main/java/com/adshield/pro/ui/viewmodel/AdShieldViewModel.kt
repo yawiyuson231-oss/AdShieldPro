@@ -327,13 +327,17 @@ class AdShieldViewModel @Inject constructor(
     }
 
     fun checkForUpdates() {
+        if (BuildConfig.DEBUG) {
+            showFeedback("This is a debug build. Get a newer debug APK from GitHub Actions instead of installing a production update.")
+            return
+        }
         if (_isCheckingForUpdates.value) return
         viewModelScope.launch {
             _isCheckingForUpdates.value = true
             try {
                 val release = withContext(Dispatchers.IO) { GitHubReleaseClient.latest() }
                 when {
-                    release == null -> showFeedback("Couldn't check for updates. Check your internet connection and try again.")
+                    release == null -> showFeedback("Couldn't verify update information from GitHub. Try again later or check GitHub Releases.")
                     release.code <= BuildConfig.VERSION_CODE -> showFeedback("AdShield Pro is up to date.")
                     else -> {
                         val intent = Intent(appContext, UpdatePromptActivity::class.java).apply {
@@ -591,9 +595,9 @@ class AdShieldViewModel @Inject constructor(
             val prevIpv6 = settingsState.value.resolverConfig.enableIpv6
             preferencesRepository.updateResolverConfig(config)
             upstreamDnsResolver.clearCache()
-            repository.syncRuntimeModeAndResolver(settingsState.value.protectionMode, settingsState.value.copy(resolverConfig = config))
+            repository.refreshProtectionSettings()
             if (prevIpv6 != config.enableIpv6) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("DNS Resolver updated to ${config.preset.displayName} (${config.protocol.label})")
         }
@@ -603,6 +607,7 @@ class AdShieldViewModel @Inject constructor(
         if (_isRunningDnsDiagnostics.value) return
         viewModelScope.launch {
             _isRunningDnsDiagnostics.value = true
+            _dnsDiagnosticReport.value = null
             try {
                 _dnsDiagnosticReport.value = upstreamDnsResolver.runDiagnostics(domain, settingsState.value.resolverConfig)
             } catch (error: Throwable) {
@@ -856,7 +861,7 @@ class AdShieldViewModel @Inject constructor(
         viewModelScope.launch {
             preferencesRepository.toggleExcludedAppPackage(packageName, excluded)
             loadInstalledApps()
-            reloadTunnelIfConnected()
+            reloadTunnelIfActive()
             showFeedback(
                 if (excluded) "Excluded $packageName from VPN tunnel."
                 else "Included $packageName in VPN protection."
@@ -882,7 +887,7 @@ class AdShieldViewModel @Inject constructor(
                 refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
             )
             if (wasExcluded && policy != AppDnsPolicy.DEFAULT) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("${packageName}: ${policy.label}")
         }
@@ -898,7 +903,7 @@ class AdShieldViewModel @Inject constructor(
                 refreshed.excludedAppPackages, refreshed.dnsFirewallPolicy.appPolicies
             )
             if (hadExclusions) {
-                reloadTunnelIfConnected()
+                reloadTunnelIfActive()
             }
             showFeedback("Reset all per-app split-tunnel and DNS firewall overrides.")
         }
@@ -1123,11 +1128,8 @@ class AdShieldViewModel @Inject constructor(
         }
     }
 
-    private fun reloadTunnelIfConnected() {
-        val currentStatus = vpnState.value.status
-        if (currentStatus == com.adshield.pro.domain.model.VpnStatus.CONNECTED ||
-            currentStatus == com.adshield.pro.domain.model.VpnStatus.PAUSED
-        ) {
+    private fun reloadTunnelIfActive() {
+        if (vpnState.value.status.acceptsTunnelConfigReload) {
             val intent = Intent(appContext, AdShieldVpnService::class.java).apply {
                 action = AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG
             }

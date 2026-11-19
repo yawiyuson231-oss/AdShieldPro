@@ -200,7 +200,7 @@ class CybersecurityPlatformTestSuite {
         var calls = 0
         resolver.providerTransport = UpstreamDnsResolver.ProviderTransport { parsed, _, _ ->
             calls++
-            DnsPacketCodec.buildBlockedResponse(parsed, false)
+            DnsPacketCodec.buildBlockedResponse(parsed, true)
         }
         val config = DnsResolverConfig(preset = DnsProviderPreset.CLOUDFLARE, protocol = DnsProtocol.DOH)
         val parsed = query("cache-hit.example")
