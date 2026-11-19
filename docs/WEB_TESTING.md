@@ -25,9 +25,11 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Production feed does not break working services | `unit/engine.test.mjs` (21 must-work hosts, real feed) |
 | DNS wire codec, hostile packets | `unit/codec.test.mjs` (hand-assembled packet + RFC vectors) |
 | TTL / negative cache / single-flight / LRU | `unit/cache.test.mjs` |
-| DoH JSON + wire, DoT codec, timeouts, breaker, fallback | `unit/dns-transport.test.mjs` |
+| DoH JSON + wire reply checks, streamed-body limits and deadlines, cooldown and hedge cancellation | `unit/dns-transport.test.mjs` |
 | DNSSEC honest classification | `unit/dns-transport.test.mjs` |
-| Full pipeline: filter-before-network, cache, dual-stack, error honesty | `unit/dns-client.test.mjs` |
+| Full pipeline: filter-before-network, SOA-bounded negative caching, zero TTL, dual-stack, no-address honesty, error reporting | `unit/dns-client.test.mjs`, `integration/ui.test.mjs` |
+| Service-worker registration scope, offline shell, Cache Storage failure | `unit/service_worker.test.mjs` |
+| Verified release metadata stays atomic on the marketing site | `integration/website.test.mjs` |
 | Lexical features, IDN/punycode, typosquat, corpus false positives | `unit/lexical.test.mjs` |
 | Classifier determinism, holdout metrics, thresholds, serialization | `unit/classifier.test.mjs` |
 | Reputation weights, floors, guardrails, feedback, state round-trip | `unit/reputation.test.mjs` |
@@ -58,9 +60,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 
 Run `npm test` and `npm run verify` for live numbers. At the time of writing:
 
-- 166 unit tests, 19 integration tests — all passing.
-- Static verification: 86 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
-- `npm run lint` — 25 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
+- 232 unit tests, 29 integration tests — all passing.
+- Static verification: 102 checks passing (module graph, routing, precache, XSS sinks, claim policy, weights = 100, assets, manifest, accessibility landmarks, workflow loadability, deploy packaging).
+- `npm run lint` — 26 runtime files, 0 findings (no console.log/debugger/alert, no HTML-injection or eval sinks, no placeholder markers, no unused imports, no orphan modules).
 - Extension builder (`tests/unit/extension.test.mjs`): rule selection/dedup, safety-allowlist
   exclusion, static-rule cap, deterministic ZIP round-trip, manifest generation, and the
   repository archive being inside Chrome's guaranteed limit.

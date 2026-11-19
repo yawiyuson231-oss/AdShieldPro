@@ -1688,7 +1688,9 @@ p { overflow-wrap: break-word; }
     });
   }
 
-  // Progressive sync: keep direct APK URL, version, size and SHA-256 aligned with future GitHub releases.
+  // Progressive sync: replace the direct APK URL, version, size, SHA-256 and structured
+  // data together, and only when the whole future release can be verified. A partial
+  // update would otherwise pair a new APK with the previous release's checksum.
   const RELEASE_PREFIX = 'https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/';
   if (typeof fetch === 'function' && /^https?:$/.test(location.protocol)) {
     fetch('https://api.github.com/repos/yawiyuson231-oss/AdShieldPro/releases/latest', {
@@ -1696,31 +1698,48 @@ p { overflow-wrap: break-word; }
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((rel) => {
-        if (!rel || !Array.isArray(rel.assets) || typeof rel.tag_name !== 'string') return;
-        const tag = /^v\d+\.\d+(?:\.\d+)?$/.test(rel.tag_name) ? rel.tag_name : null;
-        const apk = rel.assets.find((a) => typeof a.name === 'string' && a.name.endsWith('.apk')
-          && typeof a.browser_download_url === 'string' && a.browser_download_url.startsWith(RELEASE_PREFIX));
-        if (!tag || !apk) return;
-        const shaAsset = rel.assets.find((a) => a.name === `${apk.name}.sha256`
-          && typeof a.browser_download_url === 'string' && a.browser_download_url.startsWith(RELEASE_PREFIX));
-        const digestMatch = typeof apk.digest === 'string' ? /^sha256:([0-9a-f]{64})$/.exec(apk.digest) : null;
-        document.querySelectorAll('[data-apk-link]').forEach((a) => a.setAttribute('href', apk.browser_download_url));
+        if (!rel || rel.draft !== false || rel.prerelease !== false || !Array.isArray(rel.assets)
+            || typeof rel.tag_name !== 'string') return;
+        const tag = /^v\d+\.\d+\.\d+$/.test(rel.tag_name) ? rel.tag_name : null;
+        if (!tag) return;
+        const version = tag.slice(1);
+        const apkName = `AdShieldPro-${version}-release.apk`;
+        const releasePrefix = `${RELEASE_PREFIX}${tag}/`;
+        const apkUrl = `${releasePrefix}${apkName}`;
+        const shaUrl = `${apkUrl}.sha256`;
+        const apkLinks = document.querySelectorAll('[data-apk-link]');
+        const shaLink = document.querySelector('[data-sha-link]');
+        const apk = rel.assets.find((a) => a && a.name === apkName && a.browser_download_url === apkUrl);
+        const shaAsset = rel.assets.find((a) => a && a.name === `${apkName}.sha256`
+          && a.browser_download_url === shaUrl);
+        const digestMatch = typeof apk?.digest === 'string' ? /^sha256:([0-9a-f]{64})$/i.exec(apk.digest) : null;
+        // All displayed integrity fields must come from this exact, non-draft release.
+        if (!apk || !shaAsset || !digestMatch || !shaCodeEl || !shaLink || !apkLinks.length) return;
+
+        const sha256 = digestMatch[1].toLowerCase();
+        apkLinks.forEach((a) => a.setAttribute('href', apkUrl));
         document.querySelectorAll('[data-apk-cta]').forEach((s) => { s.textContent = `Download APK · ${tag}`; });
         const badge = document.querySelector('[data-release-badge]');
         if (badge) badge.textContent = `${tag} · Open source · Android 10+`;
         const lead = document.querySelector('[data-release-lead]');
-        if (lead) lead.textContent = `Download the signed AdShield Pro ${tag.slice(1)} release directly from GitHub, or open the companion browser platform with no install.`;
+        if (lead) lead.textContent = `Download the signed AdShield Pro ${version} release directly from GitHub, or open the companion browser platform with no install.`;
         const meta = document.querySelector('[data-apk-meta]');
-        if (meta && Number.isFinite(apk.size)) {
-          meta.textContent = `${apk.name} · ${(apk.size / 1048576).toFixed(1)} MB`;
+        if (meta) {
+          meta.textContent = Number.isFinite(apk.size)
+            ? `${apkName} · ${(apk.size / 1048576).toFixed(1)} MB`
+            : apkName;
         }
-        if (shaCodeEl && digestMatch) {
-          shaCodeEl.textContent = digestMatch[1];
-          shaCodeEl.setAttribute('title', digestMatch[1]);
-        }
-        const shaLink = document.querySelector('[data-sha-link]');
-        if (shaLink) {
-          shaLink.setAttribute('href', shaAsset ? shaAsset.browser_download_url : 'https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest');
+        shaCodeEl.textContent = sha256;
+        shaCodeEl.setAttribute('title', sha256);
+        shaLink.setAttribute('href', shaUrl);
+        const ldEl = document.querySelector('script[type="application/ld+json"]');
+        if (ldEl) {
+          try {
+            const ld = JSON.parse(ldEl.textContent);
+            ld.softwareVersion = version;
+            ld.downloadUrl = apkUrl;
+            ldEl.textContent = JSON.stringify(ld, null, 2);
+          } catch { /* keep the verified static structured data */ }
         }
       })
       .catch(() => { /* keep statically verified release metadata */ });

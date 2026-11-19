@@ -10,6 +10,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import { makeJson } from '../helpers/mock-dns.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
@@ -45,38 +46,19 @@ function installFetch() {
     if (url.hostname === 'cloudflare-dns.com' || url.hostname === 'dns.google') {
       const name = url.searchParams.get('name') || '';
       const type = Number(url.searchParams.get('type') || 1);
-      const answerable = name === 'example.com';
+      const question = [{ name: `${name}.`, type }];
       // A CNAME-cloaked hostname: first-party-looking name pointing at a blocked tracker.
       if (name === 'metrics.shop.example') {
-        return {
-          ok: true, status: 200, headers: { get: () => null },
-          async json() {
-            return {
-              Status: 0, AD: true, Question: [{ name: `${name}.`, type }],
-              Answer: [
-                { name: `${name}.`, type: 5, TTL: 60, data: 'ads.doubleclick.net.' },
-                { name: 'ads.doubleclick.net.', type: 1, TTL: 60, data: '93.184.216.34' }
-              ]
-            };
-          },
-          async text() { return ''; }
-        };
+        return makeJson({ Status: 0, AD: true, Question: question, Answer: [
+          { name: `${name}.`, type: 5, TTL: 60, data: 'ads.doubleclick.net.' },
+          { name: 'ads.doubleclick.net.', type: 1, TTL: 60, data: '93.184.216.34' }
+        ] });
       }
-      if (!answerable) {
-        return {
-          ok: true, status: 200, headers: { get: () => null },
-          async json() { return { Status: 3, AD: false, Question: [{ name: `${name}.`, type }] }; },
-          async text() { return ''; }
-        };
-      }
+      // NOERROR/NODATA: a successful DNS reply that carries no address at all.
+      if (name === 'no-address.example') return makeJson({ Status: 0, AD: false, Question: question });
+      if (name !== 'example.com') return makeJson({ Status: 3, AD: false, Question: question });
       const data = type === 28 ? '2606:2800:220:1:248:1893:25c8:1946' : '93.184.216.34';
-      return {
-        ok: true, status: 200, headers: { get: () => null },
-        async json() {
-          return { Status: 0, AD: true, Question: [{ name: `${name}.`, type }], Answer: [{ name: `${name}.`, type, TTL: 120, data }] };
-        },
-        async text() { return ''; }
-      };
+      return makeJson({ Status: 0, AD: true, Question: question, Answer: [{ name: `${name}.`, type, TTL: 120, data }] });
     }
 
     // Feed updates: behaviour is switched per test.
@@ -332,6 +314,25 @@ test('DNS lab refuses to invent an answer for an unresolvable name', async () =>
   const out = text('#dns-result');
   assert.match(out, /NXDOMAIN|not resolved/i);
   assert.equal(out.includes('93.184.216.34'), false, 'must not leak another domain\'s answer');
+});
+
+test('NOERROR with no address is never presented as a successful resolution', async () => {
+  app.state.client.cache.clear();
+  app.navigate('dns');
+  $('#dns-input').value = 'no-address.example';
+
+  $('#dns-type').value = 'dual';
+  await app.resolveDomain();
+  const dual = text('#dns-result');
+  assert.match(dual, /no address returned/);
+  assert.doesNotMatch(dual, /— resolved/);
+  assert.ok($('#dns-result .verdict.error'), 'dual-stack NODATA must not be styled as an allowed verdict');
+
+  $('#dns-type').value = 'A';
+  await app.resolveDomain();
+  const single = text('#dns-result');
+  assert.match(single, /NOERROR, but no A record/);
+  assert.ok($('#dns-result .verdict.error'), 'single-family NODATA must not be styled as an allowed verdict');
 });
 
 test('DNS Lab flushes aggregate analytics without persisting the hostname', async () => {

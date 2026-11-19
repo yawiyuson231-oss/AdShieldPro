@@ -13,7 +13,6 @@
 
 const DEFAULT_MAX_ENTRIES = 2048;
 const MAX_TTL_SECONDS = 86400;
-const MIN_TTL_SECONDS = 1;
 
 export class DnsCache {
   /**
@@ -66,12 +65,16 @@ export class DnsCache {
   set(name, type, data, meta = {}) {
     const key = DnsCache.key(name, type);
     const negative = !!meta.negative;
-    const candidateTtl = Number(negative ? (meta.negativeTtl ?? 60) : (meta.ttl ?? 60));
-    const safeTtl = Number.isFinite(candidateTtl) ? candidateTtl : 60;
-    const ttl = Math.min(Math.max(Math.round(safeTtl), MIN_TTL_SECONDS), MAX_TTL_SECONDS);
+    const candidateTtl = Number(negative ? (meta.negativeTtl ?? 0) : (meta.ttl ?? 60));
+    const safeTtl = Number.isFinite(candidateTtl) ? candidateTtl : negative ? 0 : 60;
+    const ttl = Math.min(Math.floor(safeTtl), MAX_TTL_SECONDS);
+    if (ttl <= 0) {
+      this.entries.delete(key);
+      return null;
+    }
     const now = this._now();
     const rawGrace = Number(meta.staleGrace ?? 60);
-    const staleGrace = (Number.isFinite(rawGrace) && rawGrace >= 0 ? rawGrace : 60) * 1000;
+    const staleGrace = negative ? 0 : (Number.isFinite(rawGrace) && rawGrace >= 0 ? rawGrace : 60) * 1000;
     const entry = {
       key, name, type: String(type).trim().toUpperCase(), data, negative,
       storedAt: now,

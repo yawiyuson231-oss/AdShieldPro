@@ -36,8 +36,10 @@ coverage/
 # Locally assembled deploy tree (scripts/stage-site.mjs)
 _site/
 
-# CI log mirrors are force-added by the workflow only for failed runs
-.ci/
+# CI logs are transient. Keep the directory, ignore generated files; the workflow
+# force-adds logs only for failed runs when it needs to mirror them into the branch.
+.ci/*
+!.ci/.gitkeep
 .ci-mirror/
 
 # Python bytecode from repo tooling

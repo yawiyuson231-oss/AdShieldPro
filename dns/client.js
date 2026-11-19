@@ -145,7 +145,7 @@ export class DnsClient {
       name, type,
       status: data.status, ok: data.ok, addresses: data.addresses, cname: data.cname,
       blocked: false, cached: true, stale,
-      ttl: data.ttl, resolver: data.resolver, transport: data.transport,
+      ttl: Math.max(0, Math.floor((hit.expiresAt - this.clock()) / 1000)), resolver: data.resolver, transport: data.transport,
       dnssec: data.dnssec,
       latencyMs: this.clock() - started,
       reasons: [
@@ -192,7 +192,9 @@ export class DnsClient {
         : [
           result.status === 'nxdomain'
             ? 'The resolver returned NXDOMAIN (the name does not exist).'
-            : `${result.addresses.length} address record(s) received over ${result.transport} from ${result.resolver?.name}.`,
+            : result.status === 'nodata'
+              ? `The resolver returned NOERROR, but no ${type} record.`
+              : `${result.addresses.length} address record(s) received over ${result.transport} from ${result.resolver?.name}.`,
           result.dnssec?.detail
         ].filter(Boolean),
       pipeline: ['normalize', 'filter:allowed', 'cache:miss', `transport:${result.transport || 'none'}`, `dnssec:${result.dnssec?.status || 'n/a'}`]

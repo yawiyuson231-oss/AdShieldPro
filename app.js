@@ -259,10 +259,12 @@ function handleObservation(event) {
     state.firewall.observe({ domain, app: 'browser', at: event.at });
     return;
   }
+  const answered = event.ok && Boolean(event.addresses?.length);
+  const kind = answered ? 'allowed' : (event.status === 'nodata' || event.status === 'nxdomain' ? event.status : 'error');
   state.monitor.record({ kind: 'lookup', domain, status: event.status, latencyMs: event.latencyMs, at: event.at });
-  state.analytics.record({ kind: event.ok ? 'allowed' : 'error', category: 'DNS', domain, at: event.at });
+  state.analytics.record({ kind, category: 'DNS', domain, at: event.at });
   scheduleAnalyticsSave();
-  if (event.ok) {
+  if (answered) {
     state.aether.observe(domain, { blocked: false, at: event.at });
     state.firewall.observe({ domain, app: 'browser', at: event.at });
   }
@@ -907,14 +909,15 @@ function renderDnsResult(out, result, type) {
   if (type === 'dual') {
     const a = result.results.a;
     const aaaa = result.results.aaaa;
-    const cls = result.blocked ? 'blocked' : (a.ok || aaaa.ok) ? 'allowed' : 'error';
+    const hasAddress = Boolean(a.addresses.length || aaaa.addresses.length);
+    const cls = result.blocked ? 'blocked' : hasAddress ? 'allowed' : 'error';
     const cacheLabel = a.cached && aaaa.cached ? 'hit' : (a.cached || aaaa.cached ? 'partial hit' : 'miss');
     const primaryReasons = a.reasons?.length ? a.reasons : (aaaa.reasons || []);
     const cnameSource = a.cname?.length ? a : (aaaa.cname?.length ? aaaa : null);
     const video = classifyVideoHost(result.name);
     mount(out,
       h('div', { class: `verdict ${cls}` },
-        h('h3', { text: `${result.name} — ${result.blocked ? 'blocked' : a.ok || aaaa.ok ? 'resolved' : 'not resolved'}` }),
+        h('h3', { text: `${result.name} — ${result.blocked ? 'blocked' : hasAddress ? 'resolved' : 'no address returned'}` }),
         h('ul', {},
           h('li', { text: `IPv4: ${a.addresses.join(', ') || '—'} ${a.status !== 'ok' ? `(${a.status})` : ''}` }),
           h('li', { text: `IPv6: ${aaaa.addresses.join(', ') || '—'} ${aaaa.status !== 'ok' ? `(${aaaa.status})` : ''}` }),
@@ -939,7 +942,8 @@ function renderDnsResult(out, result, type) {
     return;
   }
 
-  const cls = result.blocked ? 'blocked' : result.ok ? 'allowed' : 'error';
+  const answered = Boolean(result.addresses?.length);
+  const cls = result.blocked ? 'blocked' : answered ? 'allowed' : 'error';
   const video = classifyVideoHost(result.name);
   mount(out,
     h('div', { class: `verdict ${cls}` },
@@ -964,7 +968,10 @@ function renderDnsResult(out, result, type) {
       ['Cached', result.cached ? (result.stale ? 'stale (refreshing)' : 'yes') : 'no'],
       ['Latency', `${result.latencyMs} ms`],
       ['Pipeline', (result.pipeline || []).join(' → ')],
-      ['Fallback attempts', (result.attempts || []).length ? (result.attempts || []).map((a) => `${a.resolverId}:${a.ok ? 'ok' : a.reason || a.code}`).join(', ') : 'single attempt']
+      ['Resolver attempts', result.attempts?.map((a) => {
+        const codes = a.extendedErrors?.length ? ` (EDE ${a.extendedErrors.join(', ')})` : '';
+        return `${a.resolverId}: ${a.ok ? 'ok' : a.error || a.code}${codes}`;
+      }).join(' · ') || '—']
     ]),
     ...(result.cname?.length ? chainAuditNodes(chainAuditFor(result)) : [])
   );

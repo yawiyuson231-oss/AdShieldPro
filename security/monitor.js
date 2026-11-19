@@ -59,8 +59,11 @@ export class SecurityMonitor {
         break;
       case 'lookup':
         this.totals.lookups++; bucket.lookups++;
-        if (event.status === 'error') { this.totals.errors++; bucket.errors++; }
-        else { this.totals.allowed++; bucket.allowed++; }
+        // A DNS reply without an address is not a successful resolution. Negative
+        // and invalid answers must not inflate the allowed counter.
+        if (['error', 'nxdomain', 'nodata', 'invalid'].includes(event.status)) {
+          this.totals.errors++; bucket.errors++;
+        } else { this.totals.allowed++; bucket.allowed++; }
         break;
       case 'validation':
         if (!event.ok) { this.totals.errors++; bucket.errors++; }

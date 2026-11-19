@@ -56,8 +56,8 @@ export class PrivateAnalytics {
 
   /**
    * Records an event. `domain` is hashed immediately and never stored in the clear.
-   * @param {{kind:'blocked'|'allowed'|'analysis'|'firewall', category?:string,
-   *          domain?:string, at?:number}} event
+   * @param {{kind:'blocked'|'allowed'|'nodata'|'nxdomain'|'error'|'analysis'|'firewall',
+   *          category?:string, domain?:string, at?:number}} event
    */
   record(event) {
     const at = event.at ?? this.clock();

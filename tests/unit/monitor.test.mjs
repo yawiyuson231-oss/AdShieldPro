@@ -45,6 +45,17 @@ test('counters follow real recorded events', () => {
   assert.equal(metrics.blockedRatio, 33.3, '1 blocked of 3 processed requests');
 });
 
+test('negative and invalid DNS answers are not counted as successful resolutions', () => {
+  const m = new SecurityMonitor({ clock: clockAt() });
+  m.record({ kind: 'lookup', domain: 'gone.example', status: 'nxdomain' });
+  m.record({ kind: 'lookup', domain: 'no-address.example', status: 'nodata' });
+  m.record({ kind: 'lookup', domain: 'not a hostname', status: 'invalid' });
+  const metrics = m.metrics();
+  assert.equal(metrics.lookups, 3);
+  assert.equal(metrics.allowed, 0);
+  assert.equal(metrics.errors, 3);
+});
+
 test('time buckets form a gap-free series', () => {
   const clock = clockAt();
   const m = new SecurityMonitor({ clock, bucketMs: 60_000, buckets: 10 });
