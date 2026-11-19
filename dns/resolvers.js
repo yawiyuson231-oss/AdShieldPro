@@ -15,7 +15,7 @@
  * NOT IMPLEMENTED (never claimed): DoQ, DNSCrypt, local recursive resolution.
  */
 
-import { encodeQuery, decodeMessage, addressesOf, chainOf, minTtl, typeFromString, TYPE, toBase64Url } from './codec.js';
+import { encodeQuery, decodeMessage, addressesOf, chainOf, minTtl, typeFromString, rcodeToString, CLASS, TYPE, toBase64Url } from './codec.js';
 import { assessDnssec } from './dnssec.js';
 import { classify as classifyMediaHost } from '../guard/video-safety.js';
 
@@ -257,7 +257,9 @@ function jsonToMessage(json) {
   /** Converts a DoH JSON reply into the generic message shape used platform-wide. */
   const toRr = (rr) => {
     const type = Number(rr.type);
-    const base = { name: String(rr.name || '').replace(/\.$/, ''), type, typeName: typeNameSafe(type), ttl: Number(rr.TTL ?? rr.ttl ?? 0) };
+    const reportedTtl = Number(rr.TTL ?? rr.ttl ?? 0);
+    const ttl = Number.isInteger(reportedTtl) && reportedTtl >= 0 && reportedTtl <= 0x7fffffff ? reportedTtl : 0;
+    const base = { name: String(rr.name || '').replace(/\.$/, ''), type, typeName: typeNameSafe(type), ttl };
     if (type === TYPE.A) return { ...base, data: { address: rr.data } };
     if (type === TYPE.AAAA) return { ...base, data: { address: rr.data } };
     if (type === TYPE.CNAME || type === TYPE.NS || type === TYPE.PTR) return { ...base, data: { target: String(rr.data || '').replace(/\.$/, '') } };
@@ -272,7 +274,7 @@ function jsonToMessage(json) {
     id: 0,
     flags: {
       qr: true,
-      authenticatedData: !!json.AD,
+      authenticatedData: json.AD === true,
       checkingDisabled: !!json.CD,
       truncated: !!json.TC,
       recursionDesired: !!json.RD,
@@ -280,7 +282,7 @@ function jsonToMessage(json) {
       rcode: Number(json.Status ?? 0)
     },
     rcode: Number(json.Status ?? 0),
-    rcodeName: ['NOERROR', 'FORMERR', 'SERVFAIL', 'NXDOMAIN', 'NOTIMP', 'REFUSED'][Number(json.Status ?? 0)] || `RCODE${json.Status}`,
+    rcodeName: rcodeToString(Number(json.Status ?? 0)),
     questions: (json.Question || []).map((q) => ({
       name: String(q.name || '').replace(/\.$/, ''), type: Number(q.type), typeName: typeNameSafe(Number(q.type))
     })),
@@ -304,16 +306,67 @@ function typeNameSafe(type) {
  * form (`"ns. hostmaster. serial refresh retry expire minimum"`).
  */
 function negativeTtlFrom(message) {
-  const clamp = (v) => Math.min(Math.max(Math.round(v), 1), 3600);
   const soa = message.authorities.find((r) => r.type === TYPE.SOA);
-  if (Number.isFinite(soa?.data?.minimum)) return clamp(soa.data.minimum);
-  const text = soa?.data?.text;
-  if (typeof text === 'string') {
-    const fields = text.trim().split(/\s+/);
-    const last = Number(fields[fields.length - 1]);
-    if (Number.isFinite(last)) return clamp(last);
+  if (!soa) return 0;
+  let minimum = soa.data?.minimum;
+  if (typeof soa.data?.text === 'string') {
+    const fields = soa.data.text.trim().split(/\s+/);
+    if (fields.length === 7 && /^\d+$/.test(fields[6])) minimum = Number(fields[6]);
   }
-  return 60;
+  if (![soa.ttl, minimum].every((n) => Number.isInteger(n) && n >= 0 && n <= 0x7fffffff)) return 0;
+  return Math.min(soa.ttl, minimum, minTtl(message, 3600), 3600);
+}
+
+class DnsReplyError extends Error {
+  constructor(message) {
+    super(`Upstream DNS failure: ${rcodeToString(message.rcode)}`);
+    this.code = 'UPSTREAM_RCODE';
+    this.rcode = message.rcode;
+    this.extendedErrors = message.edns?.extendedErrors ?? [];
+  }
+}
+
+function nameKey(name) {
+  return typeof name === 'string' ? name.trim().toLowerCase().replace(/\.$/, '') : null;
+}
+
+function matchWireQuestion(message, name, qtype) {
+  const question = message.questions[0];
+  if (message.questions.length !== 1 || nameKey(question?.name) !== nameKey(name)
+      || question.type !== qtype || question.class !== CLASS.IN) {
+    throw new Error('DNS reply question did not match the request');
+  }
+}
+
+async function boundedBody(response, limit, signal) {
+  if (Number(response.headers.get('content-length')) > limit) throw new Error('DoH response is too large');
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('DoH response had no body');
+  const abort = () => { reader.cancel().catch(() => {}); };
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    const chunks = [];
+    let size = 0;
+    while (true) {
+      signal.throwIfAborted();
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) throw new Error('DoH response is too large');
+      chunks.push(value);
+    }
+    signal.throwIfAborted();
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return bytes;
+  } finally {
+    signal.removeEventListener('abort', abort);
+    reader.releaseLock();
+  }
 }
 
 export class DohTransport {
@@ -326,64 +379,77 @@ export class DohTransport {
     this.preferJson = options.preferJson ?? true;
   }
 
-  _fetch() {
-    if (!this.fetchImpl) {
-      throw new UnsupportedTransportError('fetch is unavailable in this environment');
-    }
-    return this.fetchImpl;
-  }
-
-  async _withTimeout(url, init, resolverId) {
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    const timer = setTimeout(() => controller?.abort(), this.timeoutMs);
-    try {
-      return await this._fetch()(url, { ...init, signal: controller?.signal ?? undefined });
-    } catch (err) {
-      if (err?.name === 'AbortError') throw new ResolverTimeoutError(resolverId, this.timeoutMs);
-      throw err;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  /**
-   * Resolves a name against one resolver.
-   * @returns {Promise<{message:object, transport:string}>}
-   */
-  async query(resolver, name, type) {
+  async query(resolver, name, type, { signal } = {}) {
     const wantJson = this.preferJson && !!resolver.dohJson;
+    const endpoint = wantJson ? resolver.dohJson : resolver.dohWire;
+    if (!this.fetchImpl || !endpoint) throw new UnsupportedTransportError('DoH endpoint or browser fetch unavailable');
+    const url = new URL(endpoint);
+    if (url.protocol !== 'https:') throw new UnsupportedTransportError('DoH requires HTTPS');
+    const qtype = typeFromString(String(type));
     if (wantJson) {
-      const url = new URL(resolver.dohJson);
       url.searchParams.set('name', name);
-      // The JSON API accepts names, but numeric types are unambiguous.
-      url.searchParams.set('type', String(typeFromString(String(type))));
+      url.searchParams.set('type', String(qtype));
       url.searchParams.set('do', '1');
-      const res = await this._withTimeout(url.toString(), {
-        headers: { accept: 'application/dns-json' },
+    } else {
+      // RFC 8484 §4.1: use ID 0 for HTTP cache compatibility and privacy.
+      url.searchParams.set('dns', toBase64Url(encodeQuery({ id: 0, name, type: qtype, dnssec: true }).bytes));
+    }
+    const accept = wantJson ? 'application/dns-json' : 'application/dns-message';
+    const controller = new AbortController();
+    const cancel = () => controller.abort(signal.reason);
+    signal?.throwIfAborted();
+    signal?.addEventListener('abort', cancel, { once: true });
+    const timer = setTimeout(() => controller.abort(new ResolverTimeoutError(resolver.id, this.timeoutMs)), this.timeoutMs);
+    let response;
+    try {
+      response = await this.fetchImpl(url.toString(), {
+        headers: { accept },
         cache: 'no-store',
         credentials: 'omit',
-        referrerPolicy: 'no-referrer'
-      }, resolver.id);
-      if (!res.ok) throw new Error(`HTTP ${res.status} from ${resolver.name}`);
-      const json = await res.json();
-      return { message: jsonToMessage(json), transport: 'DoH-JSON' };
-    }
+        referrerPolicy: 'no-referrer',
+        redirect: 'error',
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status} from ${resolver.name}`);
+      const media = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase();
+      if (media !== accept && !(wantJson && media === 'application/json')) throw new Error('Unexpected DoH content type');
+      const bytes = await boundedBody(response, wantJson ? 256 * 1024 : 65535, controller.signal);
+      if (wantJson) {
+        let json;
+        try { json = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+        catch { throw new Error('Malformed DoH JSON response'); }
+        if (!Number.isInteger(json?.Status) || json.Status < 0 || json.Status > 4095
+            || !Array.isArray(json.Question) || json.Question.length !== 1
+            || (json.Answer != null && (!Array.isArray(json.Answer) || json.Answer.length > 512))
+            || (json.Authority != null && (!Array.isArray(json.Authority) || json.Authority.length > 256))) {
+          throw new Error('Malformed DoH JSON response');
+        }
+        const question = json.Question[0];
+        if (typeof question?.name !== 'string' || nameKey(question.name) !== nameKey(name) || question.type !== qtype) {
+          throw new Error('DNS reply question did not match the request');
+        }
+        const message = jsonToMessage(json);
+        if (message.flags.truncated) throw new Error('Truncated DoH JSON response');
+        return { message, transport: 'DoH-JSON' };
+      }
 
-    if (!resolver.dohWire) throw new UnsupportedTransportError(`${resolver.name} offers no DoH endpoint usable from a browser`);
-    // RFC 8484 §4.1: use ID 0 for HTTP cache compatibility and privacy.
-    const query = encodeQuery({ id: 0, name, type, dnssec: true });
-    const url = `${resolver.dohWire}${resolver.dohWire.includes('?') ? '&' : '?'}dns=${toBase64Url(query.bytes)}`;
-    const res = await this._withTimeout(url, {
-      headers: { accept: 'application/dns-message' },
-      cache: 'no-store',
-      credentials: 'omit',
-      referrerPolicy: 'no-referrer'
-    }, resolver.id);
-    if (!res.ok) throw new Error(`HTTP ${res.status} from ${resolver.name}`);
-    const buf = new Uint8Array(await res.arrayBuffer());
-    const message = decodeMessage(buf);
-    if (!message.flags?.qr) throw new Error(`Invalid DoH wire reply from ${resolver.name}: QR flag not set`);
-    return { message, transport: 'DoH-WIRE' };
+      const message = decodeMessage(bytes);
+      if (!message.flags.qr) throw new Error('Invalid DoH reply: QR flag not set');
+      if (message.id !== 0 || message.flags.opcode !== 0 || message.flags.reservedBit || message.flags.truncated) {
+        throw new Error('Invalid DoH reply ID or flags');
+      }
+      if (message.edns?.version && message.rcode === 0) throw new Error('Unsupported EDNS version');
+      matchWireQuestion(message, name, qtype);
+      return { message, transport: 'DoH-WIRE' };
+    } catch (error) {
+      if (controller.signal.aborted) throw controller.signal.reason;
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
+      // Close even when rejected based on headers or the first oversized chunk.
+      response?.body?.cancel().catch(() => {});
+    }
   }
 }
 
@@ -486,14 +552,13 @@ export class ResolverPool {
    * @param {{preferredIds?:string[], mediaIds?:string[], race?:boolean}} [options]
    */
   async query(name, type = 'A', options = {}) {
-    const ordered = this.order();
+    const lookupStarted = this.clock();
+    const elapsed = () => Math.max(0, this.clock() - lookupStarted);
+    const finish = (outcome) => ({ ...outcome.result, latencyMs: elapsed() });
+    const ordered = this.order().filter((r) => this.health.isAvailable(r.id));
     const preference = options.mediaIds ?? options.preferredIds ?? this._mediaPreference(name);
-
     const preferred = preference?.length
       ? ordered.slice().sort((a, b) => {
-        const aOpen = this.health.isAvailable(a.id) ? 0 : 1;
-        const bOpen = this.health.isAvailable(b.id) ? 0 : 1;
-        if (aOpen !== bOpen) return aOpen - bOpen;
         const ai = preference.indexOf(a.id);
         const bi = preference.indexOf(b.id);
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
@@ -513,34 +578,33 @@ export class ResolverPool {
      * One resolver attempt, wrapped so it can never reject. A settled outcome is
      * `{resolver, ok, result|error, latencyMs}`.
      */
-    const attempt = (resolver) => {
+    const attempt = async (resolver, signal) => {
       const started = this.clock();
-      return this.transport.query(resolver, name, type).then(
-        ({ message, transport }) => {
-          const latencyMs = Math.max(0, this.clock() - started);
-          this.health.recordSuccess(resolver.id, latencyMs);
-          record({ resolverId: resolver.id, resolverName: resolver.name, transport, ok: true, latencyMs, rcode: message.rcode });
-          return {
-            resolver,
-            ok: true,
-            latencyMs,
-            result: this._buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached: false })
-          };
-        },
-        (error) => {
-          const latencyMs = Math.max(0, this.clock() - started);
-          this.health.recordFailure(resolver.id, error);
-          record({
-            resolverId: resolver.id,
-            resolverName: resolver.name,
-            ok: false,
-            latencyMs,
-            error: error?.message || String(error),
-            code: error?.code || 'ERROR'
-          });
-          return { resolver, ok: false, error, latencyMs };
-        }
-      );
+      try {
+        const { message, transport } = await this.transport.query(resolver, name, type, { signal });
+        signal.throwIfAborted();
+        if (message.rcode !== 0 && message.rcode !== 3) throw new DnsReplyError(message);
+        const latencyMs = Math.max(0, this.clock() - started);
+        const result = this._buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached: false });
+        this.health.recordSuccess(resolver.id, latencyMs);
+        record({ resolverId: resolver.id, resolverName: resolver.name, transport, ok: true, latencyMs, rcode: message.rcode });
+        return { resolver, ok: true, result };
+      } catch (error) {
+        if (signal.aborted) return { resolver, ok: false, error }; // Abandoned hedge, not an outage.
+        const latencyMs = Math.max(0, this.clock() - started);
+        this.health.recordFailure(resolver.id, error);
+        record({
+          resolverId: resolver.id,
+          resolverName: resolver.name,
+          ok: false,
+          latencyMs,
+          error: error?.message || String(error),
+          code: error?.code || 'ERROR',
+          rcode: error?.rcode,
+          extendedErrors: error?.extendedErrors
+        });
+        return { resolver, ok: false, error };
+      }
     };
 
     const TIMEOUT = 'TIMEOUT';
@@ -551,11 +615,12 @@ export class ResolverPool {
     while (index < preferred.length) {
       const resolver = preferred[index];
       const runnerUp = preferred[index + 1];
-      const pending = attempt(resolver);
+      const firstController = new AbortController();
+      const pending = attempt(resolver, firstController.signal);
 
       if (!raceEnabled || !runnerUp) {
         const settled = await pending;
-        if (settled.ok) return settled.result;
+        if (settled.ok) return finish(settled);
         lastError = settled.error;
         index += 1;
         continue;
@@ -570,25 +635,23 @@ export class ResolverPool {
       clearTimeout(timer);
 
       if (early !== TIMEOUT) {
-        if (early.ok) return early.result;
+        if (early.ok) return finish(early);
         lastError = early.error;
         index += 1;
         continue;
       }
 
-      const second = attempt(runnerUp);
+      const secondController = new AbortController();
+      const second = attempt(runnerUp, secondController.signal);
       const settled = await Promise.race([pending, second]);
-      // Both promises are already settled-safe; swallow the loser explicitly so a
-      // later rejection can never surface as an unhandled promise rejection.
-      pending.catch(() => {});
-      second.catch(() => {});
-
       if (settled.ok) {
+        const loser = settled.resolver.id === resolver.id ? secondController : firstController;
+        loser.abort();
         this.racedCount = (this.racedCount || 0) + 1;
         settled.result.attempts = attempts;
         settled.result.raced = true;
         settled.result.abandoned = settled.resolver.id === resolver.id ? runnerUp.id : resolver.id;
-        return settled.result;
+        return finish(settled);
       }
 
       // First finisher failed — still await the surviving competitor before moving on.
@@ -598,7 +661,7 @@ export class ResolverPool {
         this.racedCount = (this.racedCount || 0) + 1;
         otherSettled.result.attempts = attempts;
         otherSettled.result.raced = true;
-        return otherSettled.result;
+        return finish(otherSettled);
       }
 
       lastError = otherSettled.error || settled.error;
@@ -609,20 +672,20 @@ export class ResolverPool {
     return {
       name, type, status: 'error', ok: false, addresses: [], cname: [],
       ttl: 0, negative: false, attempts, transport: null, resolver: null,
-      latencyMs: attempts.reduce((sum, a) => sum + (a.latencyMs || 0), 0),
-      error: lastError?.message || 'all resolvers failed',
+      latencyMs: elapsed(),
+      error: lastError?.message || (this.resolvers.length ? 'all resolvers are cooling down' : 'no resolvers configured'),
       dnssec: assessDnssec({ message: null, requested: true, transportFailed: true })
     };
   }
 
   _buildResult({ name, type, resolver, message, transport, latencyMs, attempts, cached }) {
-    const rcode = Number(message.rcode ?? 0);
+    const rcode = message.rcode;
+    const qtype = typeFromString(type);
     const nx = rcode === 3;
-    const servfail = rcode === 2;
-    const refused = rcode === 5;
-    const status = rcode === 0
-      ? 'ok'
-      : nx ? 'nxdomain' : servfail ? 'servfail' : refused ? 'refused' : 'rcode-error';
+    const noData = !nx && !message.answers.some((rr) => rr.type === qtype || qtype === TYPE.ANY);
+    const negative = nx || noData;
+    const negativeTtl = negative ? negativeTtlFrom(message) : undefined;
+    const status = nx ? 'nxdomain' : noData ? 'nodata' : 'ok';
     const addrs = addressesOf(message, type);
     const dnssect = assessDnssec({ message, requested: true, resolverName: resolver.name });
     return {
@@ -632,9 +695,9 @@ export class ResolverPool {
       ok: rcode === 0,
       addresses: addrs.map((a) => a.address),
       cname: chainOf(message),
-      ttl: nx ? negativeTtlFrom(message) : Math.max(0, minTtl(message, 60)),
-      negative: nx,
-      negativeTtl: nx ? negativeTtlFrom(message) : undefined,
+      ttl: negative ? negativeTtl : Math.max(0, minTtl(message, 0)),
+      negative,
+      negativeTtl,
       resolver: { id: resolver.id, name: resolver.name, operator: resolver.operator },
       transport,
       latencyMs,

@@ -25,9 +25,9 @@ npm run serve    # http://localhost:8080 (needed: ES modules require HTTP)
 | Production feed does not break working services | `unit/engine.test.mjs` (21 must-work hosts, real feed) |
 | DNS wire codec, hostile packets | `unit/codec.test.mjs` (hand-assembled packet + RFC vectors) |
 | TTL / negative cache / single-flight / LRU | `unit/cache.test.mjs` |
-| DoH JSON + wire, DoT codec, timeouts, breaker, fallback | `unit/dns-transport.test.mjs` |
+| DoH JSON + wire reply checks, streamed-body limits and deadlines, cooldown and hedge cancellation | `unit/dns-transport.test.mjs` |
 | DNSSEC honest classification | `unit/dns-transport.test.mjs` |
-| Full pipeline: filter-before-network, cache, dual-stack, error honesty | `unit/dns-client.test.mjs` |
+| Full pipeline: filter-before-network, SOA-bounded negative caching, zero TTL, dual-stack, error reporting | `unit/dns-client.test.mjs` |
 | Lexical features, IDN/punycode, typosquat, corpus false positives | `unit/lexical.test.mjs` |
 | Classifier determinism, holdout metrics, thresholds, serialization | `unit/classifier.test.mjs` |
 | Reputation weights, floors, guardrails, feedback, state round-trip | `unit/reputation.test.mjs` |

@@ -180,14 +180,17 @@ test('download URL, version and SHA-256 switch together to the newest verified S
   } finally { dom.window.close(); }
 });
 
-test('privacy page renders full policy sections, DoQ disclosure, and Play Data Safety table', () => {
+test('privacy page renders full policy sections, Android DNS transports, on-device Agent, and Play Data Safety table', () => {
   const { dom, doc, errors } = mountPage('docs/privacy.html', {
     url: 'https://yawiyuson231-oss.github.io/AdShieldPro/privacy.html'
   });
   try {
     assert.deepEqual(errors, []);
     assert.equal(doc.querySelectorAll('section.card').length, 5);
-    assert.match(doc.body.textContent, /DNS-over-QUIC \(DoQ, RFC 9250\)/);
+    assert.match(doc.body.textContent, /DNS-over-HTTPS \(DoH, RFC 8484\)/);
+    assert.match(doc.body.textContent, /DNS-over-TLS \(DoT, RFC 7858\)/);
+    assert.doesNotMatch(doc.body.textContent, /DNS-over-QUIC/);
+    assert.match(doc.body.textContent, /model needs no account, AI API key or provider connection/);
     assert.ok(doc.querySelectorAll('table tbody tr').length >= 7);
     assert.ok(doc.querySelector('a[href="./"]'), 'must link back to site home');
     assert.ok(doc.querySelector('a[href="app/"]'), 'must link to web platform');

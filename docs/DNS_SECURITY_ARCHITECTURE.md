@@ -166,3 +166,15 @@ HTTPS content-type and size checks with simulated replies.
 - Unit fixtures and APK launch tests do not prove handset VPN routing, attribution, or live resolver
   interoperability. See [device checks](TESTING.md). No external leak test, local DNSSEC validator,
   DoQ or general IP-level firewall is included.
+
+## 9. Browser DNS lab (separate from the Android VPN)
+
+The web lab issues explicit DoH lookups using browser HTTPS. It checks the expected question and,
+for wire replies, the transaction ID, flags and EDNS framing. HTTPS redirects are refused, and time
+and size limits cover the entire response body. Unusable RCODEs advance to another HTTPS resolver;
+a canceled hedge is not an outage. The lab uses whole-answer, in-memory caching. Zero-TTL and
+unproven negative lifetimes are not cached; negative entries require an SOA and expire without a
+stale grace period. Positive stale results are labeled and refreshed in the background.
+
+The web lab does not install DNS system-wide, open DoT sockets, verify DNSSEC locally, or emulate
+Android Alias Shield and VPN policy. Its tests use in-memory DoH response fixtures.

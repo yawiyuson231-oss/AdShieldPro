@@ -7,7 +7,7 @@ import { DnsClient } from '../../dns/client.js';
 import { DnsCache } from '../../dns/cache.js';
 import { DohTransport, ResolverPool, RESOLVER_BY_ID, ResolverHealth } from '../../dns/resolvers.js';
 import { OmniShieldFilterEngine } from '../../engine.js';
-import { createMockDoh } from '../helpers/mock-dns.mjs';
+import { createMockDoh, makeJson } from '../helpers/mock-dns.mjs';
 
 const [CF, GOOGLE] = [RESOLVER_BY_ID.cloudflare, RESOLVER_BY_ID.google];
 
@@ -107,18 +107,39 @@ test('stale-while-revalidate serves immediately and refreshes in the background'
 });
 
 test('NXDOMAIN is negatively cached using the SOA-derived TTL', async () => {
-  const { client, net, cache } = makeClient({ net: createMockDoh({ nxdomain: new Set(['gone.example']) }) });
+  const { client, net, cache, clock } = makeClient({ net: createMockDoh({ nxdomain: new Set(['gone.example']) }) });
   const first = await client.lookup('gone.example');
   assert.equal(first.status, 'nxdomain');
   assert.equal(first.ok, false);
   assert.match(first.reasons.join(' '), /NXDOMAIN/);
   const entry = cache.get('gone.example', 'A');
   assert.equal(entry.negative, true);
-  assert.equal(entry.ttl, 300, 'negative TTL comes from the SOA minimum');
+  assert.equal(entry.ttl, 60, 'negative TTL is the lower of the SOA TTL and SOA minimum');
 
   await client.lookup('gone.example');
   assert.equal(net.calls.length, 1);
   assert.equal(client.stats.nxdomain, 1);
+  clock.advance(60_000);
+  assert.equal((await client.lookup('gone.example')).cached, false, 'expired negative answers are never served stale');
+  assert.equal(net.calls.length, 2);
+});
+
+test('an NXDOMAIN or NODATA reply without SOA and a zero-TTL answer are not cached', async () => {
+  for (const [extra, expected] of [
+    [{ Status: 3 }, 'nxdomain'],
+    [{ Status: 0 }, 'nodata'],
+    [{ Status: 0, Answer: [{ name: 'example.com.', type: 1, TTL: 0, data: '192.0.2.1' }] }, 'ok']
+  ]) {
+    let calls = 0;
+    const net = { fetchImpl: async () => {
+      calls++;
+      return makeJson({ ...extra, Question: [{ name: 'example.com.', type: 1 }] });
+    } };
+    const { client } = makeClient({ net });
+    assert.equal((await client.lookup('example.com')).status, expected);
+    assert.equal((await client.lookup('example.com')).cached, false);
+    assert.equal(calls, 2);
+  }
 });
 
 test('network failure is surfaced honestly (no plaintext fallback, no fake answer)', async () => {
