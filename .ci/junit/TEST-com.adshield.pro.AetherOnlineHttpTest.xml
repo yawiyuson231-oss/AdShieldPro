@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.AetherOnlineHttpTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:22.920Z" hostname="runnervmccnms" time="0.267">
+  <properties/>
+  <testcase name="mapsTransportAndHttpFailuresAndBoundsReplyReads" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.209"/>
+  <testcase name="sendsOneHttpsPostWithBearerAuthenticationAndReturnsOnlyTheTaskId" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.003"/>
+  <testcase name="stoppingTheWaitCancelsTheHttpCallWithoutReturningATask" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.045"/>
+  <testcase name="sendsGeminiKeyOnlyToPinnedNativeEndpointAndParsesTheReply" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.004"/>
+  <testcase name="turnsGeminiBadRequestForAnInvalidKeyIntoAnAuthError" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.002"/>
+  <testcase name="rejectsOversizedRepliesWithNoContentLength" classname="com.adshield.pro.AetherOnlineHttpTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

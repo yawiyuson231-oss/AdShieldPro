@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.DnsAliasShieldTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:27.636Z" hostname="runnervmccnms" time="0.014">
+  <properties/>
+  <testcase name="checksSvcbServiceModeNamesButDoesNotInterpretOpaqueParametersAsNames" classname="com.adshield.pro.DnsAliasShieldTest" time="0.004"/>
+  <testcase name="ignoresMalformedBindingNamesAndParameterFraming" classname="com.adshield.pro.DnsAliasShieldTest" time="0.0"/>
+  <testcase name="respectsQueryAndTargetAllowlistsAndPassthroughOnTheSameAnswer" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="followsHttpsAliasModeAndCnamesInUnorderedAnswers" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="blockedServiceBindingsReturnNoDataWithoutClaimingTheNameDoesNotExist" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="protectsPlaybackTargetsButHonorsExplicitBlockRulesAndKnownAdvertMatches" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="ignoresUnrelatedRecordsAndUsesOnlyMatchingTypesAndClassInTheAnswer" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="aliasModeTakesPrecedenceAndRootTargetsDoNotNameAnotherHost" classname="com.adshield.pro.DnsAliasShieldTest" time="0.002"/>
+  <testcase name="readsCompressedCnameTargets" classname="com.adshield.pro.DnsAliasShieldTest" time="0.001"/>
+  <testcase name="terminatesAliasCyclesWithoutCheckingUnreachableCnames" classname="com.adshield.pro.DnsAliasShieldTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

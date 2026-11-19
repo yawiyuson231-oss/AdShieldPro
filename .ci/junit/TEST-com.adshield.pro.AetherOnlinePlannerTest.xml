@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.AetherOnlinePlannerTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:23.190Z" hostname="runnervmccnms" time="0.028">
+  <properties/>
+  <testcase name="acceptsOnlyWholeLabelsFromTextOrHarmlessWrappers" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.003"/>
+  <testcase name="approvalToSendDoesNotApproveAnOnlineSuggestedTask" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.001"/>
+  <testcase name="restoresOldConnectionsWithoutResavingKeysAndBindsApprovalToARevision" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.003"/>
+  <testcase name="outboundReviewContainsOnlyTypedTaskTextAndNeverIncludesScannedLinks" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="geminiUsesOnlyFinalTextAndRejectsIncompleteRepliesAndToolCalls" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="recognizesProviderErrorCodesWithoutLeakingPrivateErrorText" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.001"/>
+  <testcase name="pinsGeminiAndOpenAiAndNormalizesCompatibleBaseUrls" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.004"/>
+  <testcase name="supportsReviewAndFileToolsWithoutAllowingExpandedOrDestructiveRequests" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="onlineProviderCannotConvertStatusQuestionsOrNegationIntoASettingChange" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="savesTokenAndDestinationTogetherAndRejectsUnsafeEndpoints" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="nativeGeminiSendsOnlyOneTextTurnAndOpenAiUsesModernOutputLimit" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="acceptsOnlyOneLabelAndRejectsToolCallsAndMalformedReplies" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.002"/>
+  <testcase name="httpFailuresAreDistinguishedWithoutDisplayingProviderBodies" classname="com.adshield.pro.AetherOnlinePlannerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

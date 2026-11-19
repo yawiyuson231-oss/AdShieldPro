@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.AetherSecurityReviewTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:23.359Z" hostname="runnervmccnms" time="0.12">
+  <properties/>
+  <testcase name="boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.008"/>
+  <testcase name="staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.0"/>
+  <testcase name="runsOnlyTheTwoReviewStepsAndReportsSkippedApps" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.005"/>
+  <testcase name="cancelingTheReviewDoesNotStartTheNextStep" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.005"/>
+  <testcase name="declaredServiceBindingIsEvidenceButSpoofedPermissionSuffixesAreNot" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.0"/>
+  <testcase name="deadlineOrFailureLeavesTheOtherStepsEvidenceIntact" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.049"/>
+  <testcase name="externalDeadlineCancelsTheReviewRatherThanProducingAMissingStep" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.043"/>
+  <testcase name="cancelDuringFileReadPreventsWritingTheNextChunk" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.001"/>
+  <testcase name="emptyMetadataIsAGapAndNotSuccessfulCoverage" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

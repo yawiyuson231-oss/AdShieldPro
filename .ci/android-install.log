@@ -1,0 +1,6 @@
+Performing Streamed Install
+Success
+package:/data/app/com.adshield.pro.debug-8tn1g6l2MZAhJpH_kXiYwQ==/base.apk
+Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] pkg=com.adshield.pro.debug }
+Error: Activity not started, unable to resolve Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.adshield.pro.debug }
+::error::Android did not report a successful launcher start.
