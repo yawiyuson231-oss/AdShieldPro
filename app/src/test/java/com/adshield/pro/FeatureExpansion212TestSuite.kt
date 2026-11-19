@@ -34,13 +34,17 @@ class FeatureExpansion212TestSuite {
 
     @Test
     fun hardcodedDnsTrapExcludesActivePlaintextUpstream() {
-        val routes = HardcodedDnsTrap.buildTrapRoutes(
-            enabled = true,
-            excludedPlaintextUpstreamIps = setOf("8.8.8.8")
+        val plan = HardcodedDnsTrap.buildTrapRoutes(
+            config = DnsResolverConfig(
+                provider = DnsProviderPreset.GOOGLE,
+                protocol = DnsProtocol.UDP_TCP,
+                enableIpv6 = true
+            ),
+            trapEnabled = true
         )
-        assertTrue(routes.none { it.address == "8.8.8.8" })
-        assertTrue(routes.any { it.address == "1.1.1.1" && it.prefixLength == 32 })
-        assertTrue(routes.any { it.address == "2606:4700:4700::1111" && it.prefixLength == 128 })
+        assertTrue(plan.ipv4Routes.none { it.address == "8.8.8.8" })
+        assertTrue(plan.ipv4Routes.any { it.address == "1.1.1.1" && it.prefixLength == 32 })
+        assertTrue(plan.ipv6Routes.any { it.address == "2606:4700:4700::1111" && it.prefixLength == 128 })
     }
 
     @Test
