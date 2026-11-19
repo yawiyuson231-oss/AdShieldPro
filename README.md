@@ -14,7 +14,8 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
 
 ### Publishing a release
 
-Every published build comes from one pipeline, [`.github/workflows/release.yml`](.github/workflows/release.yml):
+Production APKs are published only by [`.github/workflows/release.yml`](.github/workflows/release.yml),
+after the signing prerequisites below are met:
 
 ```bash
 # build the version currently in app/build.gradle.kts and publish tag v<versionName>
@@ -30,11 +31,11 @@ must match the app version. The workflow never overwrites an existing production
 an existing tag. The in-app updater only offers stable release APKs with a valid SHA-256 asset
 digest from GitHub. Android still checks signing compatibility when you approve installation.
 
-**Signing recovery is required before publishing another APK.** A historical release exposed the
-private signing key. Changing its password or moving it into Actions secrets does not make that
-key trustworthy, and choosing an unrelated key will not automatically upgrade existing installs.
-Decide how existing GitHub APK users will move to a trusted signer before resuming publication.
-After recovery, configure the reviewed public certificate SHA-256 in the Actions variable
+**Production APK publication is on hold.** The [public APK signing audit](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44484928398)
+confirmed that v2.11.0 still uses the signing certificate whose private key was exposed in v2.10.9.
+Changing its password or copying it into Actions secrets does not restore trust. A different key
+will not update the existing package in place. See the [signing recovery guide](docs/BUILD_AND_SIGNING_GUIDE.md#production-signing-recovery)
+before changing any installation or release. After reviewed recovery, configure the public certificate SHA-256 in the Actions variable
 `ADSHIELD_TRUSTED_APK_CERT_SHA256` and provision the private `ADSHIELD_KEYSTORE_BASE64`,
 `ADSHIELD_STORE_PASSWORD`, and optional `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD` as Actions
 secrets. Never share the keystore or passwords in a release, commit, or chat. The workflow checks
@@ -78,7 +79,15 @@ while signed in to GitHub. Under **Artifacts**, download `adshield-pro-debug-apk
 ZIP, not an installer. In Android's **Files → Downloads**, extract the ZIP, open `app-debug.apk`
 from the extracted folder, then tap **Install** in Android's installer. If prompted, grant the
 Files app permission to install this APK. It appears as **AdShield Pro (Debug)** alongside the
-production app. The debug build does not use production in-app updates.
+production app. The debug build does not use production in-app updates. If it conflicts with an
+older CI-signed **debug** build, remove only that older debug app (its debug data will be lost).
+Do not remove production to install a debug build.
+
+**Public preview, without GitHub sign-in:** a maintainer can manually run **Android build & test**
+on a branch and select **Publish a PUBLIC debug APK after tests**. This only runs after the exact
+APK installs and opens on the Android 10 emulator. The workflow summary links directly to the
+APK and its SHA-256 in a clearly labeled public pre-release. Regular builds never publish it, and
+it never becomes the production Latest release. Treat the preview as a test app, not production.
 
 ## OmniShield X web platform (browser)
 

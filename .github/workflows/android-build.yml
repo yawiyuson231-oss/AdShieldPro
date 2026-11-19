@@ -2,6 +2,11 @@ name: Android build & test
 
 on:
   workflow_dispatch:
+    inputs:
+      public_preview:
+        description: 'Publish a PUBLIC debug APK after tests (separate app, never Latest)'
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -23,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Start fresh CI reports
         run: |
@@ -188,6 +195,26 @@ jobs:
           ls -l "$APK"
           sha256sum "$APK"
 
+      - name: Enable emulator acceleration for the CI runner
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm || { echo '::error::This runner has no KVM device for the install smoke test.'; exit 1; }
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            sudo chown "$(id -u):$(id -g)" /dev/kvm
+          fi
+
+      - name: Install and launch debug APK on Android 10
+        timeout-minutes: 12
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          avd-name: adshield-install-smoke
+          emulator-boot-timeout: 300
+          disable-linux-hw-accel: false
+          script: bash -o pipefail -c 'bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log'
+
       # The log-mirror step below commits .ci/ into the branch, so the checkout must never
       # carry those artifacts (and must not fail when Gradle did not get far enough to write them).
       - name: Clean CI log mirrors before mirroring
@@ -207,21 +234,29 @@ jobs:
             | head -20 | while IFS= read -r line; do echo "::error::$line"; done || true
 
       - name: Upload debug APK
-        if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: adshield-pro-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish explicitly requested public debug preview
+        if: github.event_name == 'workflow_dispatch' && inputs.public_preview && github.ref_type == 'branch' && !github.event.repository.private
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLIC_PREVIEW: ${{ inputs.public_preview }}
+        run: bash tools/publish_android_preview.sh
 
       - name: Upload reports
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gradle-reports
+          include-hidden-files: true
           path: |
-            .ci/**
+            .ci/*.log
+            .ci/junit/*.xml
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.*
             app/build/test-results/**
@@ -232,7 +267,10 @@ jobs:
       - name: Mirror logs into the branch (only when something failed)
         if: failure() && github.event_name == 'push'
         continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          gh auth setup-git --hostname github.com
           git config user.name "AdShield CI"
           git config user.email "ci@adshield.local"
           git add -f .ci || exit 0
