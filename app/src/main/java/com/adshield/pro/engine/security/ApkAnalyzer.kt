@@ -48,8 +48,8 @@ class ApkAnalyzer {
 
     fun analyzeApk(
         file: File,
-        installedAppSignerSha256: String? = null,
-        checkpoint: () -> Unit = {}
+        checkpoint: () -> Unit = {},
+        installedAppSignerSha256: String? = null
     ): ApkReport {
         val reasons = ArrayList<String>()
         val limitations = ArrayList<String>()

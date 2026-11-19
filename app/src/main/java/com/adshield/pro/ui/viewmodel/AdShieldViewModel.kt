@@ -155,12 +155,12 @@ class AdShieldViewModel @Inject constructor(
     val recentLogs: StateFlow<List<DnsActivityRecord>> = repository.recentLogsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val anomalyRadarReport: StateFlow<BehavioralAnomalyEngine.BehavioralRadarReport> = recentLogs
-        .map { behavioralAnomalyEngine.snapshotReport() }
+    val anomalyRadarReport: StateFlow<BehavioralAnomalyEngine.AnomalyRadarSnapshot> = recentLogs
+        .map { behavioralAnomalyEngine.buildSnapshot() }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            behavioralAnomalyEngine.snapshotReport()
+            behavioralAnomalyEngine.buildSnapshot()
         )
 
     val liveTopApps: StateFlow<List<AppDnsActivity>> = repository.liveTopAppsFlow

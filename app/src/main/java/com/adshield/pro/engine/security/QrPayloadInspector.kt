@@ -162,7 +162,7 @@ object QrPayloadInspector {
             if (cleaned.removedParams.isNotEmpty()) {
                 findings += "Stripped ${cleaned.removedParams.size} tracking parameter(s): ${cleaned.removedParams.take(4).joinToString(", ")}"
             }
-            findings.addAll(urlVerdict.reasons)
+            findings.addAll(urlVerdict.findings)
             val score = maxOf(
                 urlVerdict.riskScore,
                 if (lower.startsWith("http://")) 35 else 0,

@@ -170,13 +170,15 @@ class BatteryAlertWorker @AssistedInject constructor(
                 else -> null
             } ?: return null
 
-            if (lastAlertKindName == candidate.kind.name &&
+            val decision = candidate ?: return null
+
+            if (lastAlertKindName == decision.kind.name &&
                 lastAlertEpochMs > 0L &&
                 (nowEpochMs - lastAlertEpochMs) in 0L until COOLDOWN_MS
             ) {
                 return null
             }
-            return candidate
+            return decision
         }
 
         fun applySchedule(context: Context, enabled: Boolean) {

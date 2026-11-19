@@ -84,9 +84,9 @@ class FeatureExpansion212TestSuite {
                 timestampEpochMs = baseTs + i * 30_000L
             )
         }
-        val report = engine.snapshotReport()
-        assertTrue(report.screenOffTrackerHits >= 6)
-        assertTrue(report.beaconAlerts.any { it.domain == "telemetry.beacon.example" })
+        val report = engine.buildSnapshot()
+        assertTrue(report.screenOffQueriesObserved >= 6)
+        assertTrue(report.findings.any { it.domain == "telemetry.beacon.example" })
     }
 
     @Test
