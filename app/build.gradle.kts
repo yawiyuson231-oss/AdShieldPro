@@ -101,6 +101,8 @@ android {
             isMinifyEnabled = false
         }
         release {
+            // Fresh package identity for signing recovery. Never replace legacy com.adshield.pro.
+            applicationIdSuffix = ".secure"
             isMinifyEnabled = true
             isShrinkResources = true
             val releaseSign = signingConfigs.getByName("releaseConfig")

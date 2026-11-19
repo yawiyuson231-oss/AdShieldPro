@@ -29,9 +29,14 @@ class PackagedApkMetadataTest(unittest.TestCase):
         return problems
 
     def test_accepts_metadata_for_both_variants_including_debug_suffixes(self):
-        self.assertNotEqual(self.config("debug")["applicationId"], self.config("release")["applicationId"])
+        self.assertEqual(self.config("debug")["applicationId"], "com.adshield.pro.debug")
+        self.assertEqual(self.config("release")["applicationId"], "com.adshield.pro.secure")
         self.assertEqual(self.check("debug"), [])
         self.assertEqual(self.check("release"), [])
+
+    def test_retired_package_cannot_pass_as_the_secure_release(self):
+        problems = self.check("release", {"applicationId": "com.adshield.pro"})
+        self.assertIn("APK manifest applicationId: expected com.adshield.pro.secure, got com.adshield.pro", problems)
 
     def test_accepts_older_aapt2_sdk_version_spelling(self):
         self.assertEqual(self.check("release", min_sdk_label="sdkVersion"), [])

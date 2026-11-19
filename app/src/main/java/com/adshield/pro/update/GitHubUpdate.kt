@@ -22,46 +22,62 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 object GitHubReleaseClient {
     private const val API_BASE = "https://api.github.com/repos/"
+    private const val RELEASES_PER_PAGE = 50
+    private const val MAX_RELEASE_PAGES = 3
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .followSslRedirects(false)
+            .callTimeout(25, TimeUnit.SECONDS)
+            .followRedirects(false)
             .build()
     }
 
     fun latest(): GitHubRelease? {
         val repository = BuildConfig.GITHUB_UPDATE_REPOSITORY.trim()
         if (!GitHubReleaseMetadata.isRepository(repository)) return null
-        val endpoint = API_BASE + repository + "/releases/latest"
-        val request = Request.Builder().url(endpoint)
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
-        httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return null
-            val json = JSONObject(response.body.string())
-            val assets = json.optJSONArray("assets") ?: return null
-            return GitHubReleaseMetadata.select(
-                repository = repository,
-                tag = json.optString("tag_name"),
-                draft = json.optBoolean("draft", true),
-                preRelease = json.optBoolean("prerelease", true),
-                body = json.optString("body").takeUnless { it == "null" },
-                assets = (0 until assets.length()).asSequence().mapNotNull { index ->
-                    assets.optJSONObject(index)?.let {
-                        GitHubReleaseMetadata.Asset(it.optString("name"), it.optString("browser_download_url"), it.optString("digest"))
-                    }
+        // Neither legacy Latest nor a preview can update this package. Look through a bounded
+        // number of release pages in case test artifacts are listed before the Secure channel.
+        var best: GitHubRelease? = null
+        for (page in 1..MAX_RELEASE_PAGES) {
+            val endpoint = "$API_BASE$repository/releases?per_page=$RELEASES_PER_PAGE&page=$page"
+            val request = Request.Builder().url(endpoint)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "AdShieldPro-Android-Updater").get().build()
+            val foundMore = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) throw IOException("Could not read the Secure update channel (HTTP ${response.code}).")
+                val releases = JSONArray(response.body.string())
+                for (index in 0 until releases.length()) {
+                    val json = releases.optJSONObject(index) ?: continue
+                    val assets = json.optJSONArray("assets") ?: continue
+                    val release = GitHubReleaseMetadata.select(
+                        repository = repository,
+                        tag = json.optString("tag_name"),
+                        draft = json.optBoolean("draft", true),
+                        preRelease = json.optBoolean("prerelease", false),
+                        body = json.optString("body").takeUnless { it == "null" },
+                        assets = (0 until assets.length()).asSequence().mapNotNull { assetIndex ->
+                            assets.optJSONObject(assetIndex)?.let {
+                                GitHubReleaseMetadata.Asset(it.optString("name"), it.optString("browser_download_url"), it.optString("digest"))
+                            }
+                        }
+                    ) ?: continue
+                    if (release.code > (best?.code ?: 0)) best = release
                 }
-            )
+                response.header("Link")?.contains("rel=\"next\"") == true
+            }
+            if (!foundMore) break
         }
+        return best
     }
 }
 
@@ -100,7 +116,7 @@ class GitHubUpdateWorker @AssistedInject constructor(
             val pending = PendingIntent.getActivity(applicationContext, release.code, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             notifications.notify(ID, NotificationCompat.Builder(applicationContext, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification_shield)
-                .setContentTitle("AdShield Pro " + release.name + " is available")
+                .setContentTitle("AdShield Pro Secure " + release.name + " is available")
                 .setContentText("Tap to review the update and release notes.")
                 .setContentIntent(pending).setAutoCancel(true).build())
             prefs.edit().putInt("notified_code", release.code).apply()
@@ -161,13 +177,12 @@ object GitHubApkDownload {
             val limit = 250L * 1024L * 1024L
             if (body.contentLength() > limit) throw java.io.IOException("APK exceeds the download size limit.")
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-            val part = File(dir, "adshield-" + release.code + ".apk.part")
-            val apk = File(dir, "adshield-" + release.code + ".apk")
+            val apk = File.createTempFile("adshield-secure-${release.code}-", ".apk", dir)
             val hash = MessageDigest.getInstance("SHA-256")
             var total = 0L
             try {
                 body.byteStream().use { input ->
-                    FileOutputStream(part).use { output ->
+                    FileOutputStream(apk).use { output ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                         while (true) {
                             val count = input.read(buffer)
@@ -179,18 +194,32 @@ object GitHubApkDownload {
                         }
                     }
                 }
-            } catch (t: Throwable) {
-                part.delete()
-                throw t
+                val actual = hash.digest().joinToString("") { "%02x".format(it) }
+                if (!actual.equals(release.sha256, true)) {
+                    throw IOException("APK checksum verification failed; it was not installed.")
+                }
+                verifyArchive(context, apk, release)
+                apk
+            } catch (error: Throwable) {
+                apk.delete()
+                throw error
             }
-            val actual = hash.digest().joinToString("") { "%02x".format(it) }
-            if (!actual.equals(release.sha256, true)) {
-                part.delete()
-                throw java.io.IOException("APK checksum verification failed; it was not installed.")
-            }
-            if (apk.exists()) apk.delete()
-            if (!part.renameTo(apk)) { part.copyTo(apk, true); part.delete() }
-            apk
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun verifyArchive(context: Context, apk: File, release: GitHubRelease) {
+        val pm = context.packageManager
+        val flags = PackageManager.GET_SIGNING_CERTIFICATES
+        val archive = pm.getPackageArchiveInfo(apk.absolutePath, flags)
+            ?: throw IOException("Android could not verify the downloaded APK.")
+        if (archive.packageName != context.packageName || archive.longVersionCode != release.code.toLong()) {
+            throw IOException("This APK does not match the installed Secure app and requested update version.")
+        }
+        val installedSigner = pm.getPackageInfo(context.packageName, flags).signingInfo?.apkContentsSigners?.singleOrNull()
+        val downloadSigner = archive.signingInfo?.apkContentsSigners?.singleOrNull()
+        if (installedSigner == null || downloadSigner != installedSigner) {
+            throw IOException("APK signer does not match the installed Secure app. Nothing was installed.")
         }
     }
 }

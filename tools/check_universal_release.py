@@ -59,9 +59,16 @@ def check_build_config(problems: list[str], variant: str = "release") -> dict:
         "versionCode": read_int(r"versionCode\s*=\s*(\d+)", text, "versionCode"),
         "versionName": read_string("versionName", text),
     }
+    # Read the suffix from the requested build type, not the first suffix in the file.
+    block = re.search(rf"^ {{8}}{variant} \{{\n(.*?)^ {{8}}\}}", text, re.MULTILINE | re.DOTALL)
+    if not block:
+        raise SystemExit(f"could not read the {variant} build type from app/build.gradle.kts")
+    info["applicationId"] += read_string("applicationIdSuffix", block.group(1))
     if variant == "debug":
-        info["applicationId"] += read_string("applicationIdSuffix", text)
-        info["versionName"] += read_string("versionNameSuffix", text)
+        info["versionName"] += read_string("versionNameSuffix", block.group(1))
+    expected_id = "com.adshield.pro.debug" if variant == "debug" else "com.adshield.pro.secure"
+    if info["applicationId"] != expected_id:
+        problems.append(f"APK build identity must be {expected_id}, not {info['applicationId']}")
     if info["minSdk"] != MIN_SDK_REQUIRED:
         problems.append(f"minSdk is {info['minSdk']}, expected {MIN_SDK_REQUIRED} (universal baseline)")
     if info["targetSdk"] < MIN_SDK_REQUIRED:

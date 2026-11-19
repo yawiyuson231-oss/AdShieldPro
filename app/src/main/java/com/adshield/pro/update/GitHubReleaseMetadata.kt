@@ -9,16 +9,14 @@ data class GitHubRelease(
     val notes: String
 )
 
-/** Validates metadata before offering a GitHub release as an in-app update. */
+/** Only releases for AdShield Pro Secure can update the replacement app. */
 internal object GitHubReleaseMetadata {
     data class Asset(val name: String, val downloadUrl: String, val digest: String?)
 
+    private const val TAG_PREFIX = "secure-v"
     private val REPOSITORY = Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
-    private val STABLE_TAG = Regex("""v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)""")
+    private val STABLE_TAG = Regex("""$TAG_PREFIX(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)""")
     private val SHA256 = Regex("[0-9a-fA-F]{64}")
-    private val APK_FILE = Regex("""[A-Za-z0-9_.-]+\.[aA][pP][kK]""")
-    private val SPLIT_ABI = Regex("""[-_](arm64[-_]?v8a|armeabi[-_]?v7a|x86|x86_64)(?=[-_.])""")
-    private val TEST_APK = Regex("""(?:^|[-_.])test(?=[-_.])""")
 
     fun isRepository(value: String): Boolean = value.matches(REPOSITORY) &&
         value.split('/').none { it == "." || it == ".." }
@@ -35,28 +33,17 @@ internal object GitHubReleaseMetadata {
 
     fun isSha256(value: String): Boolean = value.matches(SHA256)
 
-    fun isInstallableReleaseApk(name: String): Boolean {
-        val lower = name.lowercase()
-        return name.matches(APK_FILE) && !lower.contains("debug") &&
-            !SPLIT_ABI.containsMatchIn(lower) && !TEST_APK.containsMatchIn(lower)
-    }
+    private fun apkName(tag: String): String = "AdShieldPro-Secure-${tag.removePrefix(TAG_PREFIX)}-release.apk"
 
-    private fun apkFileName(repository: String, tag: String, url: String): String? {
-        // GitHub supplies a canonical HTTPS URL, not a URL template. Restrict the path to the
-        // selected release tag and a single APK filename, without query/fragment/extra segments.
+    fun isTrustedApkUrl(repository: String, tag: String, url: String): Boolean {
+        if (!isRepository(repository) || versionCode(tag) == null) return false
         val root = "https://github.com/"
-        if (!url.startsWith(root)) return null
+        if (!url.startsWith(root)) return false
         val repoPrefix = "$repository/"
         val path = url.removePrefix(root)
-        if (!path.startsWith(repoPrefix, ignoreCase = true)) return null
-        val releasePrefix = "releases/download/$tag/"
-        val releasePath = path.substring(repoPrefix.length)
-        if (!releasePath.startsWith(releasePrefix)) return null
-        return releasePath.substring(releasePrefix.length).takeIf(::isInstallableReleaseApk)
+        return path.startsWith(repoPrefix, ignoreCase = true) &&
+            path.substring(repoPrefix.length) == "releases/download/$tag/${apkName(tag)}"
     }
-
-    fun isTrustedApkUrl(repository: String, tag: String, url: String): Boolean =
-        isRepository(repository) && versionCode(tag) != null && apkFileName(repository, tag, url) != null
 
     fun select(
         repository: String,
@@ -66,20 +53,17 @@ internal object GitHubReleaseMetadata {
         body: String?,
         assets: Sequence<Asset>
     ): GitHubRelease? {
-        if (draft || preRelease || !isRepository(repository)) return null
+        // GitHub's pre-release flag intentionally keeps this separate identity off the
+        // legacy app's /releases/latest route. Only the exact secure-v* channel is supported.
+        if (draft || !preRelease || !isRepository(repository)) return null
         val code = versionCode(tag) ?: return null
-        val name = tag.removePrefix("v")
+        val name = tag.removePrefix(TAG_PREFIX)
+        val asset = assets.singleOrNull { it.name == apkName(tag) } ?: return null
+        if (!isTrustedApkUrl(repository, tag, asset.downloadUrl)) return null
+        val digest = asset.digest ?: return null
+        if (!digest.startsWith("sha256:", ignoreCase = true)) return null
+        val sha = digest.substringAfter(':').takeIf(::isSha256)?.lowercase() ?: return null
         val notes = body.orEmpty().trim().take(1800).ifBlank { "Performance improvements and protection updates." }
-        var fallback: GitHubRelease? = null
-        for (asset in assets) {
-            if (apkFileName(repository, tag, asset.downloadUrl) != asset.name) continue
-            val digest = asset.digest ?: continue
-            if (!digest.startsWith("sha256:", ignoreCase = true)) continue
-            val sha256 = digest.substringAfter(':').takeIf(::isSha256)?.lowercase() ?: continue
-            val release = GitHubRelease(tag, name, code, asset.downloadUrl, sha256, notes)
-            if (asset.name.contains("release", true) || asset.name.contains("universal", true)) return release
-            if (fallback == null) fallback = release
-        }
-        return fallback
+        return GitHubRelease(tag, name, code, asset.downloadUrl, sha, notes)
     }
 }

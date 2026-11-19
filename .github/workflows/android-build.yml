@@ -203,7 +203,7 @@ jobs:
             sudo chown "$(id -u):$(id -g)" /dev/kvm
           fi
 
-      - name: Install and launch debug APK on Android 10
+      - name: Install and launch debug and Secure APKs on Android 10
         timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -213,7 +213,9 @@ jobs:
           avd-name: adshield-install-smoke
           emulator-boot-timeout: 300
           disable-linux-hw-accel: false
-          script: bash -o pipefail -c 'bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log'
+          script: >-
+            bash -o pipefail -c 'bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log &&
+            bash tools/smoke_android_install.sh app/build/outputs/apk/release/app-release.apk emulator-5554 com.adshield.pro.secure 2>&1 | tee -a .ci/android-install.log'
 
       # The log-mirror step below commits .ci/ into the branch, so the checkout must never
       # carry those artifacts (and must not fail when Gradle did not get far enough to write them).

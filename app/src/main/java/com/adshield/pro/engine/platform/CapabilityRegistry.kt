@@ -470,8 +470,8 @@ object CapabilityRegistry {
         cap(
             "update-check", "In-app update check against GitHub releases", CapabilityArea.UPDATES,
             CapabilityStatus.IMPLEMENTED, "update/GitHubUpdate.kt", listOf(PERM_INTERNET),
-            listOf("GitHub Releases API for this repository"),
-            listOf("Requires the user to approve installation; no silent updates"),
+            listOf("Official secure-v release tags in this repository"),
+            listOf("Separate from legacy and testing channels; the user must approve installation"),
             "AdShieldEngineTestSuite.testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks"
         ),
         cap(

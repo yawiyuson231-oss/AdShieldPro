@@ -74,7 +74,7 @@ class UpdatePromptActivity : ComponentActivity() {
                     title = { Text("Update available") },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("AdShield Pro " + item.name)
+                            Text("AdShield Pro Secure " + item.name)
                             Text(item.notes, style = MaterialTheme.typography.bodyMedium)
                             status?.let { Spacer(Modifier.height(4.dp)); Text(it, color = MaterialTheme.colorScheme.error) }
                             if (downloading) { CircularProgressIndicator(modifier = Modifier.size(28.dp)); Text("Downloading and verifying…") }

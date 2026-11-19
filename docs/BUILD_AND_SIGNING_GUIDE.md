@@ -73,12 +73,29 @@ the displayed JSON privately. It backs up supported configuration such as custom
 mode, DNS settings, and exclusions. It is not a full device backup: it does not transfer scan
 history, account credentials, API keys, or Android VPN consent.
 
-**For maintainers:** plan a separate application ID and a fresh private production signer rather
-than silently replacing the old app. A separate install lets users confirm their backup and restore
-before removing the old application. A clean reinstall under the original ID would require
-uninstalling the existing app first, which deletes its local data. Do not publish either migration
-until the package identity, separate update channel, signing custody, and recovery instructions are
-reviewed. Never upload a private keystore to a release or provide it in chat.
+**Replacement:** the production build now installs separately as **AdShield Pro Secure**
+(`com.adshield.pro.secure`). Keep the old app until you have imported and checked your settings in
+Secure. Only one app can run the VPN at a time; stop the old VPN before enabling the replacement.
+Account sign-in, AETHER API keys, and VPN consent must be set up again. Do not uninstall the old app
+until you have verified what migrated.
+
+**Before publishing (repo maintainer):**
+
+1. Create a new private Android signing keystore locally and back it up securely. Use a new key
+   pair, not a new password on a legacy key. `keytool -genkeypair` can prompt for passwords at your
+   terminal; do not put passwords on the command line or in the repository.
+2. Create the GitHub Actions environment **`android-secure-release`**. Restrict deployments to
+   reviewed `main` and configure required reviewers where available.
+3. In that environment set **`ADSHIELD_SECURE_APK_CERT_SHA256`** to the 64-hex SHA-256 of the signed
+   key's public certificate (`keytool -exportcert ... | sha256sum`). Add environment secrets
+   **`ADSHIELD_SECURE_KEYSTORE_BASE64`** (base64 of the new key file), **`ADSHIELD_SECURE_STORE_PASSWORD`**,
+   and optionally **`ADSHIELD_SECURE_KEY_ALIAS`** (default `adshield`) and
+   **`ADSHIELD_SECURE_KEY_PASSWORD`** (defaults to the store password). The private key material
+   belongs in the protected environment only.
+4. Once the reviewed changes are on `main`, run **Test APK (pre-release)**, test the export/restore
+   and VPN switch on a phone, then run **Release APK** after approving the signed candidate. The
+   real release uses `secure-v<version>`, never overwrites a tag, and must leave legacy Latest
+   unchanged. A `test-secure-` tag is not offered as an update.
 
 **For testing only:** the opt-in GitHub **Android build & test** public preview uses the separate
 `com.adshield.pro.debug` package and a CI debug signer. It does not use the exposed key or replace

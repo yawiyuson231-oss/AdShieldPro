@@ -12,7 +12,10 @@ import { JSDOM } from 'jsdom';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(resolve(ROOT, p), 'utf8');
 
-function mountPage(relPath, { url = 'https://yawiyuson231-oss.github.io/AdShieldPro/', reducedMotion = false } = {}) {
+function mountPage(relPath, {
+  url = 'https://yawiyuson231-oss.github.io/AdShieldPro/', reducedMotion = false,
+  fetch = async () => ({ ok: false, status: 503, json: async () => null })
+} = {}) {
   const errors = [];
   const clipboardWrites = [];
   const dom = new JSDOM(read(relPath), {
@@ -41,7 +44,7 @@ function mountPage(relPath, { url = 'https://yawiyuson231-oss.github.io/AdShield
         unobserve() {}
         disconnect() {}
       };
-      win.fetch = async () => ({ ok: false, status: 503, json: async () => null });
+      win.fetch = fetch;
       Object.defineProperty(win.navigator, 'clipboard', {
         configurable: true,
         value: {
@@ -117,13 +120,64 @@ test('marketing page boots cleanly, exposes accessible hero title, and wires int
       );
     }
 
-    // Structured data is valid JSON matching v2.11.0.
+    // Structured data sends readers to the recovery notice, not a retired APK.
     const ld = JSON.parse(doc.querySelector('script[type="application/ld+json"]').textContent);
-    assert.equal(ld.softwareVersion, '2.11.0');
-    assert.match(ld.downloadUrl, /AdShieldPro-2\.11\.0-release\.apk$/);
+    assert.match(ld.downloadUrl, /AdShieldPro\/#download$/);
+    assert.match(doc.querySelector('[data-release-lead]').textContent, /signing key was exposed/);
   } finally {
     dom.window.close();
   }
+});
+
+const secureRepo = 'yawiyuson231-oss/AdShieldPro';
+function secureFixture(version, { tag = `secure-v${version}`, digest = `sha256:${'ab'.repeat(32)}`,
+  prerelease = true, draft = false } = {}) {
+  const name = `AdShieldPro-Secure-${version}-release.apk`;
+  const apk = `https://github.com/${secureRepo}/releases/download/${tag}/${name}`;
+  return { tag_name: tag, draft, prerelease, assets: [
+    { name, browser_download_url: apk, digest, size: 58_000_000 },
+    { name: `${name}.sha256`, browser_download_url: `${apk}.sha256` }
+  ] };
+}
+
+function mockReleases(releases) {
+  return async (url) => {
+    assert.equal(url, `https://api.github.com/repos/${secureRepo}/releases?per_page=50&page=1`);
+    return { ok: true, json: async () => releases };
+  };
+}
+
+test('download status does not redirect users to previews, legacy or unverified APKs', async () => {
+  const fetch = mockReleases([
+    secureFixture('2.99.0', { tag: 'v2.99.0', prerelease: false }),
+    secureFixture('2.99.1', { tag: 'test-secure-v2.99.1' }),
+    secureFixture('2.99.2', { tag: 'preview-v2.99.2-run.123.1' }),
+    secureFixture('2.99.3', { digest: null }),
+    secureFixture('2.99.4', { draft: true })
+  ]);
+  const { dom, doc, errors } = mountPage('docs/index.html', { reducedMotion: true, fetch });
+  try {
+    await new Promise((r) => setTimeout(r, 30));
+    assert.deepEqual(errors, []);
+    assert.match(doc.querySelector('[data-release-lead]').textContent, /not published yet/);
+    assert.ok([...doc.querySelectorAll('[data-apk-link]')].every((a) => !a.href.includes('/releases/download/')));
+  } finally { dom.window.close(); }
+});
+
+test('download URL, version and SHA-256 switch together to the newest verified Secure release', async () => {
+  const chosen = secureFixture('2.11.2');
+  const mismatched = secureFixture('2.11.3');
+  mismatched.assets[0].browser_download_url = chosen.assets[0].browser_download_url;
+  const fetch = mockReleases([mismatched, secureFixture('2.11.1'), chosen]);
+  const { dom, doc, errors } = mountPage('docs/index.html', { reducedMotion: true, fetch });
+  try {
+    await new Promise((r) => setTimeout(r, 30));
+    assert.deepEqual(errors, []);
+    assert.ok([...doc.querySelectorAll('[data-apk-link]')].every((a) => a.href === chosen.assets[0].browser_download_url));
+    assert.match(doc.querySelector('[data-apk-cta]').textContent, /Secure APK · v2\.11\.2/);
+    assert.equal(doc.getElementById('apk-sha256').textContent, 'ab'.repeat(32));
+    assert.equal(doc.querySelector('[data-sha-link]').href, chosen.assets[1].browser_download_url);
+  } finally { dom.window.close(); }
 });
 
 test('privacy page renders full policy sections, DoQ disclosure, and Play Data Safety table', () => {

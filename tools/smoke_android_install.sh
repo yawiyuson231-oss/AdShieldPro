@@ -3,11 +3,13 @@
 set -euo pipefail
 apk=${1:?Pass the verified debug APK path}
 serial=${2:-emulator-5554}
-package=com.adshield.pro.debug
+package=${3:-com.adshield.pro.debug}
 activity="$package/com.adshield.pro.MainActivity"
 
-[[ -s "$apk" ]] || { echo '::error::Debug APK is missing or empty.' >&2; exit 1; }
+[[ -s "$apk" ]] || { echo '::error::APK is missing or empty.' >&2; exit 1; }
 [[ "$serial" =~ ^emulator-[0-9]+$ ]] || { echo '::error::Install smoke test requires a disposable emulator.' >&2; exit 1; }
+[[ "$package" == com.adshield.pro.debug || "$package" == com.adshield.pro.secure ]] ||
+    { echo '::error::Refusing to smoke-test an unrecognized application ID.' >&2; exit 1; }
 adb=("${ANDROID_HOME:?}/platform-tools/adb" -s "$serial")
 
 fail() {
@@ -32,7 +34,8 @@ printf '%s\n' "$install_result"
 
 # Launchers resolve MAIN/LAUNCHER first, then start the component explicitly. An implicit
 # am start additionally needs CATEGORY_DEFAULT, which launcher filters do not normally have.
-resolved=$("${adb[@]}" shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$package" | tr -d '\r')
+resolved=$("${adb[@]}" shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p "$package" | tr -d '\r') ||
+    fail 'Android could not resolve an installed launcher entry.'
 grep -Fx "$activity" <<< "$resolved" || fail "No AdShield Pro launcher entry: $resolved"
 launch=$("${adb[@]}" shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n "$activity" 2>&1) ||
     fail "Android could not launch the app: $launch"

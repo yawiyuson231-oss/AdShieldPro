@@ -9,9 +9,9 @@ fail() {
 }
 
 approved_certificate() {
-    local trusted=${ADSHIELD_TRUSTED_APK_CERT_SHA256:-}
+    local trusted=${ADSHIELD_SECURE_APK_CERT_SHA256:-}
     [[ "$trusted" =~ ^[0-9A-Fa-f]{64}$ ]] || fail \
-        'APK publication is blocked until signing recovery is reviewed and ADSHIELD_TRUSTED_APK_CERT_SHA256 is configured.'
+        'Secure APK publication requires the approved ADSHIELD_SECURE_APK_CERT_SHA256 variable.'
     printf '%s\n' "${trusted,,}"
 }
 
@@ -48,6 +48,27 @@ read_public_signers() {
     published=$(certificate_sha256 "$work/$previous_apk")
 }
 
+verify_secure_continuity() {
+    local tags predecessor apk attrs
+    local next="secure-v${SECURE_VERSION_NAME:?}"
+    local tag_pattern='^secure-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)$'
+    [[ "$next" =~ $tag_pattern ]] || fail 'Invalid Secure release version.'
+    tags=$(gh api --paginate "repos/${GITHUB_REPOSITORY:?}/releases?per_page=100" \
+        --jq '.[] | select(.draft == false) | .tag_name') || fail 'Cannot inspect existing Secure releases.'
+    predecessor=$(printf '%s\n' "$tags" | { grep -E "$tag_pattern" || true; } | sort -V | tail -n 1)
+    if [[ -z "$predecessor" ]]; then
+        echo 'No prior Secure APK; verifying the first independent installation signer.'
+        return
+    fi
+    [[ "$predecessor" != "$next" && "$(printf '%s\n%s\n' "$predecessor" "$next" | sort -V | tail -n 1)" == "$next" ]] ||
+        fail 'Secure version must be newer than the published Secure channel.'
+    apk="AdShieldPro-Secure-${predecessor#secure-v}-release.apk"
+    gh release download "$predecessor" --pattern "$apk" --dir "$work" || fail 'Cannot download the prior Secure APK.'
+    [[ "$(certificate_sha256 "$work/$apk")" == "$trusted" ]] || fail 'The prior Secure APK uses another signer.'
+    attrs=$("$ANDROID_HOME/build-tools/36.0.0/aapt2" dump badging "$work/$apk") || fail 'Cannot validate the prior Secure APK identity.'
+    grep -q "^package: name='com\.adshield\.pro\.secure' " <<< "$attrs" || fail 'The prior Secure APK has another package identity.'
+}
+
 case "${1:-}" in
     audit)
         prepare_workspace
@@ -66,16 +87,15 @@ case "${1:-}" in
                 "$summary" "$exposed" "$latest" "$published" >> "$GITHUB_STEP_SUMMARY"
         fi
         ;;
-    build)
+    build-secure)
         trusted=$(approved_certificate)
         [[ -n "${KEYSTORE_B64:-}" && -n "${ADSHIELD_STORE_PASSWORD:-}" ]] || fail \
-            'Set the private release keystore and store password in GitHub Actions secrets.'
+            'Set the private Secure keystore and store password in the release environment.'
         prepare_workspace
         read_public_signers
-        [[ "$trusted" != "$exposed" ]] || fail \
-            'The configured signing certificate was exposed. A new password or secret does not change the key.'
-        [[ "$trusted" == "$published" ]] || fail \
-            'The trusted signer does not match the current production APK. Resolve the Android migration before publishing.'
+        [[ "$trusted" != "$exposed" && "$trusted" != "$published" ]] || fail \
+            'Secure must use a fresh signer. The exposed and legacy APK certificates cannot be reused.'
+        verify_secure_continuity
 
         keystore="$work/release.jks"
         printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore" || fail 'Invalid release keystore encoding.'
@@ -88,13 +108,14 @@ case "${1:-}" in
         export ADSHIELD_KEYSTORE_PASSWORD="$ADSHIELD_STORE_PASSWORD"
         export ADSHIELD_KEY_ALIAS="${ADSHIELD_KEY_ALIAS:-adshield}"
         export ADSHIELD_KEY_PASSWORD="${ADSHIELD_KEY_PASSWORD:-$ADSHIELD_STORE_PASSWORD}"
+        export GITHUB_UPDATE_REPOSITORY="$GITHUB_REPOSITORY"
         ./gradlew :app:assembleRelease --no-daemon --console=plain
         ;;
-    verify)
+    verify-secure)
         trusted=$(approved_certificate)
         built=$(certificate_sha256 "${2:?pass the built release APK}")
         [[ "$trusted" == "$built" ]] || fail 'The built APK does not match the approved signing certificate.'
         echo "Verified APK signing certificate: $trusted"
         ;;
-    *) fail 'Usage: release_signing.sh audit | build | verify <apk>' ;;
+    *) fail 'Usage: release_signing.sh audit | build-secure | verify-secure <apk>; legacy publication is retired' ;;
 esac

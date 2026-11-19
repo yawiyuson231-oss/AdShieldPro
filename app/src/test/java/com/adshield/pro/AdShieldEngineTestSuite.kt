@@ -765,20 +765,19 @@ class AdShieldEngineTestSuite {
     @Test
     fun testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks() {
         val repo = "example/AdShieldPro"
-        val tag = "v2.3.0"
+        val tag = "secure-v2.3.0"
         val baseUrl = "https://github.com/$repo/releases/download/$tag"
         val hash = "AB".repeat(32)
         val assets = sequenceOf(
             "app-debug-release.apk",
-            "AdShieldPro-2.3.0-arm64-v8a-release.apk",
-            "AdShieldPro-x86_64-release.APK",
-            "AdShieldPro-2.3.0-test-release.apk",
-            "AdShieldPro-2.3.0.apk",
-            "AdShieldPro-2.3.0-release.apk.sha256",
-            "AdShieldPro-2.3.0-release.apk"
+            "AdShieldPro-Secure-2.3.0-arm64-v8a-release.apk",
+            "AdShieldPro-2.3.0-release.apk",
+            "AdShieldPro-Secure-2.3.0-test.apk",
+            "AdShieldPro-Secure-2.3.0-release.apk.sha256",
+            "AdShieldPro-Secure-2.3.0-release.apk"
         ).map { GitHubReleaseMetadata.Asset(it, "$baseUrl/$it", "sha256:$hash") }
-        val chosen = requireNotNull(GitHubReleaseMetadata.select(repo, tag, false, false, "Notes", assets))
-        assertEquals("$baseUrl/AdShieldPro-2.3.0-release.apk", chosen.apk)
+        val chosen = requireNotNull(GitHubReleaseMetadata.select(repo, tag, false, true, "Notes", assets))
+        assertEquals("$baseUrl/AdShieldPro-Secure-2.3.0-release.apk", chosen.apk)
         assertEquals(20_300, chosen.code)
         assertEquals(hash.lowercase(), chosen.sha256)
     }

@@ -9,67 +9,29 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
   [docs/](docs), deployed by [`.github/workflows/deploy-website.yml`](.github/workflows/deploy-website.yml).
   One-time setup: repository **Settings → Pages → Source: GitHub Actions** (a repository admin has
   to click it once; the deploy workflow reports it if it is still off).
-- **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
-- [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+- **Android downloads:** [installation and signing status](https://yawiyuson231-oss.github.io/AdShieldPro/#download)
+  · [GitHub releases and public previews](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 
-### Publishing a release
+### AdShield Pro Secure: the replacement Android app
 
-Production APKs are published only by [`.github/workflows/release.yml`](.github/workflows/release.yml),
-after the signing prerequisites below are met:
+The [public APK signing audit](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44484928398)
+confirmed that the old v2.11.0 APK still uses the key exposed in v2.10.9. **Do not reuse that key.**
+The release build now produces **AdShield Pro Secure** (`com.adshield.pro.secure`). It installs
+alongside legacy AdShield Pro and does not replace its data. Before switching, export supported
+settings from the old app; see the [production signing recovery guide](docs/BUILD_AND_SIGNING_GUIDE.md#production-signing-recovery).
 
-```bash
-# build the version currently in app/build.gradle.kts and publish tag v<versionName>
-gh workflow run "Release APK" --ref main
+After review and private signer setup, an authorized maintainer can run **Test APK (pre-release)**
+from `main` for a signed migration candidate, then **Release APK** for production. Both pipelines
+verify the Secure package, signing continuity, actual installation and launch, and the SHA-256.
+Production uses `secure-v<version>` tags (e.g. `secure-v2.11.1`), not the legacy GitHub Latest URL.
+GitHub labels them non-Latest pre-releases to keep the legacy updater from offering the wrong app.
+Secure only offers exact `secure-v` releases; it ignores test/preview tags and checks the APK digest,
+package ID, version, and certificate before opening Android's installer.
 
-# or publish a specific version: bump versionCode/versionName, commit, then
-git tag v2.3.1 && git push origin v2.3.1
-```
-
-The workflow runs the JVM unit tests, builds the R8-minified release APK, checks its structure,
-publishes it to GitHub Releases with a SHA-256 checksum and refreshes GitHub Pages. Release tags
-must match the app version. The workflow never overwrites an existing production release or moves
-an existing tag. The in-app updater only offers stable release APKs with a valid SHA-256 asset
-digest from GitHub. Android still checks signing compatibility when you approve installation.
-
-**Production APK publication is on hold.** The [public APK signing audit](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44484928398)
-confirmed that v2.11.0 still uses the signing certificate whose private key was exposed in v2.10.9.
-Changing its password or copying it into Actions secrets does not restore trust. A different key
-will not update the existing package in place. See the [signing recovery guide](docs/BUILD_AND_SIGNING_GUIDE.md#production-signing-recovery)
-before changing any installation or release. After reviewed recovery, configure the public certificate SHA-256 in the Actions variable
-`ADSHIELD_TRUSTED_APK_CERT_SHA256` and provision the private `ADSHIELD_KEYSTORE_BASE64`,
-`ADSHIELD_STORE_PASSWORD`, and optional `ADSHIELD_KEY_ALIAS` / `ADSHIELD_KEY_PASSWORD` as Actions
-secrets. Never share the keystore or passwords in a release, commit, or chat. The workflow checks
-that the new build matches the approved certificate and the production upgrade path, and rejects
-the exposed signer. The website and debug CI builds do not need this key.
-
-### Test APK before publishing
-
-[`.github/workflows/test-apk.yml`](.github/workflows/test-apk.yml) builds and publishes **the same
-signed, R8-minified APK as a GitHub pre-release**, so it can be installed and exercised on a real
-device before the real release goes out:
-
-```bash
-# test the merged version on main after signing recovery
-gh workflow run "Test APK (pre-release)" --ref main
-
-# a second round on the same version uses a separate tag
-gh workflow run "Test APK (pre-release)" --ref main -f tag=test-v2.11.1-rc2
-```
-
-It runs the unit tests, UI-performance gate, universal-build gate and a signing-continuity check,
-then creates tag `test-v<versionName>` with `AdShieldPro-<versionName>-test.apk` and its SHA-256.
-Design guarantees, enforced by the workflow itself:
-
-- **Signed with the published release key**, never a throwaway one — the test APK installs *over*
-  the current release as an update, and the real release later replaces it in place. If no release
-  keystore passes the same signing checks as production, the job fails.
-- **Always a pre-release**, so `/releases/latest` — what the in-app updater and the website download
-  link resolve — keeps pointing at the shipped version. A final step asserts this and fails if the
-  test build ever became *Latest*.
-- **Tags must start with `test-`**, so the build cannot match the `v*` tag trigger of the release
-  pipeline. The keystore is never attached to a test release or a new production release.
-
-Once the test build is verified, publish for real with the **Release APK** workflow above.
+A first Secure release requires a **new** private keystore and public certificate pin in the
+`android-secure-release` GitHub environment. Do not send private signing data in chat or attach it
+to releases. The build rejects the exposed and legacy signing certificates and will not switch
+signers after the first Secure release.
 
 ### Install a debug build on an Android phone
 
@@ -365,7 +327,7 @@ AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Archite
 
 ### Layer 2 — High-Throughput Local VPN Service (`service/AdShieldVpnService.kt`)
 - **DNS-Only TUN Routing**: Routes only virtual DNS server addresses (`10.215.173.2/32` and `fd00:ad5:1e1d::2/128`) into the TUN interface. Non-DNS application traffic flows directly over the physical network interface at native OS speed.
-- **Loop Prevention**: Protects all upstream DoH, DoT, and UDP/TCP sockets via `VpnService.protect(socket)` and excludes `com.adshield.pro` from the tunnel.
+- **Loop Prevention**: Protects all upstream DoH, DoT, and UDP/TCP sockets via `VpnService.protect(socket)` and excludes the installed app's package from the tunnel.
 - **Per-App Split Tunneling**: Supports per-app VPN exclusion via `VpnService.Builder.addDisallowedApplication()`.
 - **Network Recovery & Boot Restoration**: Monitors Wi-Fi / Mobile Data transitions via `ConnectivityManager.NetworkCallback` and restores protection after device reboot via `BootCompletedReceiver`.
 
