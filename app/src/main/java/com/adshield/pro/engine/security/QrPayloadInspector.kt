@@ -154,19 +154,19 @@ object QrPayloadInspector {
         if (lower.startsWith("http://") || lower.startsWith("https://")) {
             val cleaned = LinkSanitizer.sanitize(trimmed)
             val targetUrl = cleaned.cleanedUrl
-            val urlVerdict = urlScanner.scanUrl(targetUrl)
+            val urlVerdict = urlScanner.scan(targetUrl)
             val findings = ArrayList<String>()
-            if (cleaned.unwrappedFromHost != null) {
-                findings += "Unwrapped hidden redirect wrapper from ${cleaned.unwrappedFromHost}"
+            if (cleaned.unwrappedFromHosts.isNotEmpty()) {
+                findings += "Unwrapped hidden redirect wrapper from ${cleaned.unwrappedFromHosts.joinToString(", ")}"
             }
-            if (cleaned.removedParameters.isNotEmpty()) {
-                findings += "Stripped ${cleaned.removedParameters.size} tracking parameter(s): ${cleaned.removedParameters.take(4).joinToString(", ")}"
+            if (cleaned.removedParams.isNotEmpty()) {
+                findings += "Stripped ${cleaned.removedParams.size} tracking parameter(s): ${cleaned.removedParams.take(4).joinToString(", ")}"
             }
             findings.addAll(urlVerdict.reasons)
             val score = maxOf(
                 urlVerdict.riskScore,
                 if (lower.startsWith("http://")) 35 else 0,
-                if (cleaned.unwrappedFromHost != null) 25 else 0
+                if (cleaned.unwrappedFromHosts.isNotEmpty()) 25 else 0
             ).coerceIn(0, 100)
             val level = when {
                 urlVerdict.threatLevel == UrlThreatScanner.ThreatLevel.DANGEROUS || score >= 65 -> VerdictLevel.DANGEROUS

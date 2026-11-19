@@ -164,7 +164,7 @@ object HardcodedDnsTrap {
                 seqNum = tcpPacket.acknowledgmentNumber and 0xFFFFFFFFL,
                 ackNum = 0L,
                 flags = IpPacketFraming.TCP_FLAG_RST,
-                payload = ByteArray(0)
+                tcpPayload = ByteArray(0)
             )
         } else {
             IpPacketFraming.buildTcpResponsePacket(
@@ -172,7 +172,7 @@ object HardcodedDnsTrap {
                 seqNum = 0L,
                 ackNum = (tcpPacket.sequenceNumber + segAdvance) and 0xFFFFFFFFL,
                 flags = IpPacketFraming.TCP_FLAG_RST or IpPacketFraming.TCP_FLAG_ACK,
-                payload = ByteArray(0)
+                tcpPayload = ByteArray(0)
             )
         }
     }

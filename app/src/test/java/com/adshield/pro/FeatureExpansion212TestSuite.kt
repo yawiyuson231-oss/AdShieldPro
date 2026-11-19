@@ -45,8 +45,8 @@ class FeatureExpansion212TestSuite {
 
     @Test
     fun obliviousDohCodecRejectsPrivateRelayAndBuildsValidRelayUrl() {
-        assertNull(ObliviousDohCodec.buildRelayQueryUrl("https://127.0.0.1/proxy", "https://dns.google/dns-query"))
-        val built = ObliviousDohCodec.buildRelayQueryUrl(
+        assertNull(ObliviousDohCodec.buildRelayRequestUrl("https://127.0.0.1/proxy", "https://dns.google/dns-query"))
+        val built = ObliviousDohCodec.buildRelayRequestUrl(
             "https://odoh.example.org/proxy",
             "https://cloudflare-dns.com/dns-query"
         )

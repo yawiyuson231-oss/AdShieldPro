@@ -422,7 +422,7 @@ class UpstreamDnsResolver @Inject constructor(
     ): ByteArray = when (config.protocol) {
         DnsProtocol.DOH -> {
             val effectiveDohUrl = if (config.odohRelayUrl.isNotBlank()) {
-                ObliviousDohCodec.buildRelayQueryUrl(config.odohRelayUrl, endpoint.dohUrl) ?: endpoint.dohUrl
+                ObliviousDohCodec.buildRelayRequestUrl(config.odohRelayUrl, endpoint.dohUrl) ?: endpoint.dohUrl
             } else {
                 endpoint.dohUrl
             }

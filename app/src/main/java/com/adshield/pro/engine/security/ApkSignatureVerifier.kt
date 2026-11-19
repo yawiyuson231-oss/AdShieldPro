@@ -16,7 +16,7 @@ import java.util.zip.ZipFile
  *
  * Extracts real X.509 signing certificates from both:
  * - **APK Signature Scheme v2 (`0x7109871a`) & v3 (`0xf05368c0`)** inside `"APK Sig Block 42"`
- * - **JAR v1 (`META-INF/*.RSA`, `*.EC`, `*.DSA`)** PKCS#7 / X.509 certificate blocks
+ * - **JAR v1 (`META-INF/<cert>.RSA`, `.EC`, `.DSA`)** PKCS#7 / X.509 certificate blocks
  *
  * Detects:
  * - **Repackaged Clones (`SIGNATURE_MISMATCH_WITH_INSTALLED`)**: When a sideloaded APK shares the
