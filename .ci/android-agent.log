@@ -3,22 +3,24 @@ Success
 
 com.adshield.pro.AetherAgentDeviceTest:
 Error in realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(com.adshield.pro.AetherAgentDeviceTest):
-androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 15000 ms
-	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:901)
-	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:500)
-	at com.adshield.pro.AetherAgentDeviceTest.allowVpnThroughAndroidConsent(AetherAgentDeviceTest.kt:229)
-	at com.adshield.pro.AetherAgentDeviceTest.realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(AetherAgentDeviceTest.kt:92)
+java.lang.AssertionError: expected:<[com.android.settings]> but was:<[com.android.settings, com.adshield.test.receipt.notinstalled]>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at com.adshield.pro.AetherAgentDeviceTest.realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(AetherAgentDeviceTest.kt:108)
 .
 com.adshield.pro.AetherAgentCancellationDeviceTest:.
 
-Time: 20.75
+Time: 18.784
 There was 1 failure:
 1) realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(com.adshield.pro.AetherAgentDeviceTest)
-androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 15000 ms
-	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:901)
-	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:500)
-	at com.adshield.pro.AetherAgentDeviceTest.allowVpnThroughAndroidConsent(AetherAgentDeviceTest.kt:229)
-	at com.adshield.pro.AetherAgentDeviceTest.realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(AetherAgentDeviceTest.kt:92)
+java.lang.AssertionError: expected:<[com.android.settings]> but was:<[com.android.settings, com.adshield.test.receipt.notinstalled]>
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at org.junit.Assert.assertEquals(Assert.java:146)
+	at com.adshield.pro.AetherAgentDeviceTest.realTunnelReportsAcceptedRejectedAndStaleSavedExclusions(AetherAgentDeviceTest.kt:108)
 
 FAILURES!!!
 Tests run: 3,  Failures: 1

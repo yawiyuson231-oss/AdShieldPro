@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.CloudPlatformTestSuite" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:08.102Z" hostname="ip-10-0-140-34" time="3.725">
+<testsuite name="com.adshield.pro.CloudPlatformTestSuite" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:42:31.764Z" hostname="runnervmccnms" time="3.808">
   <properties/>
-  <testcase name="backupCodecRoundTripsAndRefusesATamperedPayload" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.032"/>
-  <testcase name="cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.12"/>
-  <testcase name="vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.026"/>
-  <testcase name="uploadEngineResumesOnlyThePartsTheServerIsStillMissing" classname="com.adshield.pro.CloudPlatformTestSuite" time="2.467"/>
-  <testcase name="uploadEngineCancelsCleanlyAndTellsTheServerToCancelTheSession" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.075"/>
-  <testcase name="uploadEngineRetriesATransientPartFailureAndThenSucceeds" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.824"/>
-  <testcase name="backupCodecSummaryAndSupportChecksReportTheTruth" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.002"/>
-  <testcase name="uploadEnginePausesAndResumesWithoutLosingTheBytesAlreadyStored" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.125"/>
-  <testcase name="uploadEngineStreamsEveryPartWithItsRealSha1AndCompletes" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.029"/>
-  <testcase name="uploadEngineReportsProgressAsBytesAreCommitted" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.016"/>
-  <testcase name="cloudApiBuildsTheDocumentedPathsAndParsesRealResponses" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.007"/>
+  <testcase name="backupCodecRoundTripsAndRefusesATamperedPayload" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.022"/>
+  <testcase name="cloudApiSendsAuthenticationAndTurnsServerErrorsIntoExceptionsWithTheServerMessage" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.128"/>
+  <testcase name="vaultEncryptsWithTheRightPassphraseAndRefusesTheWrongOne" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.028"/>
+  <testcase name="uploadEngineResumesOnlyThePartsTheServerIsStillMissing" classname="com.adshield.pro.CloudPlatformTestSuite" time="2.471"/>
+  <testcase name="uploadEngineCancelsCleanlyAndTellsTheServerToCancelTheSession" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.121"/>
+  <testcase name="uploadEngineRetriesATransientPartFailureAndThenSucceeds" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.848"/>
+  <testcase name="backupCodecSummaryAndSupportChecksReportTheTruth" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.001"/>
+  <testcase name="uploadEnginePausesAndResumesWithoutLosingTheBytesAlreadyStored" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.127"/>
+  <testcase name="uploadEngineStreamsEveryPartWithItsRealSha1AndCompletes" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.034"/>
+  <testcase name="uploadEngineReportsProgressAsBytesAreCommitted" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.018"/>
+  <testcase name="cloudApiBuildsTheDocumentedPathsAndParsesRealResponses" classname="com.adshield.pro.CloudPlatformTestSuite" time="0.009"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

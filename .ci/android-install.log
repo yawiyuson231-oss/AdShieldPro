@@ -1,13 +1,13 @@
 Performing Streamed Install
 Success
-package:/data/app/com.adshield.pro.debug-OEjvPeSyHbbaHGNq2oi1gg==/base.apk
+package:/data/app/com.adshield.pro.debug-dUP6GEed1lp1aJ7sTb091w==/base.apk
 com.adshield.pro.debug/com.adshield.pro.MainActivity
 Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.adshield.pro.debug/com.adshield.pro.MainActivity }
 Status: ok
 LaunchState: COLD
 Activity: com.adshield.pro.debug/com.adshield.pro.MainActivity
-TotalTime: 3165
-WaitTime: 3170
+TotalTime: 5387
+WaitTime: 5396
 Complete
-    mResumedActivity: ActivityRecord{a10d2fb u0 com.adshield.pro.debug/com.adshield.pro.MainActivity t6}
+    mResumedActivity: ActivityRecord{b6c04e0 u0 com.adshield.pro.debug/com.adshield.pro.MainActivity t6}
 PASSED: Installed and opened com.adshield.pro.debug on Android 10 (API 29, x86_64).

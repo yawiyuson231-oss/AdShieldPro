@@ -7,8 +7,8 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:preBuild
 > Task :app:preReleaseBuild
 > Task :app:mergeReleaseJniLibFolders
-> Task :app:mergeReleaseNativeLibs
 > Task :app:checkReleaseDuplicateClasses
+> Task :app:mergeReleaseNativeLibs
 > Task :app:mergeReleaseArtProfile
 > Task :app:generateReleaseBuildConfig FROM-CACHE
 > Task :app:generateReleaseResources FROM-CACHE
@@ -122,6 +122,6 @@ w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshie
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 4m 7s
+BUILD SUCCESSFUL in 4m 26s
 58 actionable tasks: 41 executed, 17 from cache
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html
