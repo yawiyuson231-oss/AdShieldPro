@@ -238,7 +238,11 @@ class AdShieldVpnService : VpnService() {
         }
     }
 
+    @Suppress("DEPRECATION") // Use the same PackageManager lookup on the API 29 path.
     private fun tryAddExclusion(builder: Builder, packageName: String): Boolean = try {
+        // Some Android versions accept an unknown package name in Builder but omit its UID
+        // from the established VPN. Don't count an unavailable package as an accepted exclusion.
+        packageManager.getApplicationInfo(packageName, 0)
         builder.addDisallowedApplication(packageName)
         true
     } catch (cancelled: CancellationException) {

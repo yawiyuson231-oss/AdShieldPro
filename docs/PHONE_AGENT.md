@@ -36,12 +36,13 @@ cooperative deadlines (phone: 8 seconds; DNS: 5 seconds; apps: 30 seconds). If o
 completed evidence remains available. Canceling the whole review discards that run; an Android system
 read already in progress may need to return before cancellation completes.
 
-**VPN exclusion evidence** comes from Android's `VpnService.Builder`: the service records which
-user exclusions the builder accepted or rejected and publishes a receipt only when Android returns
-an established tunnel. The receipt includes the tunnel generation, setup time and DNS route families.
-It stays in memory. Stop, replacement/rebuild, revocation and setup or packet-loop failure invalidate
-it; pausing filtering leaves the installed tunnel in place and is separately labeled. The report
-can show a new saved exclusion that wasn't recorded at setup, an exclusion Android rejected, or one
+**VPN exclusion evidence** comes from Android's VPN setup: the service checks that a package is
+available, records which user exclusions made it into the builder or were rejected during setup,
+and publishes a receipt only when Android returns an established tunnel. The receipt includes the
+tunnel generation, setup time and DNS route families. It stays in memory. Stop, replacement/rebuild,
+revocation and setup or packet-loop failure invalidate it. Pausing filtering leaves the installed
+tunnel in place and is separately labeled. The report can show a new saved exclusion that wasn't
+recorded at setup, an exclusion rejected during setup, or one
 still accepted at setup but no longer saved. Without a current receipt it says **unknown**, not zero.
 The receipt is sampled as the review is assembled: run another review after changing settings or
 networks. It is not a traffic observation, a route-table audit, or evidence of universal coverage.
