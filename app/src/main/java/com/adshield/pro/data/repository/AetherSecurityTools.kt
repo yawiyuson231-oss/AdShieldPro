@@ -6,7 +6,6 @@ import android.provider.OpenableColumns
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.engine.aether.AetherAppReview
 import com.adshield.pro.engine.aether.AetherFileInput
-import com.adshield.pro.engine.aether.AetherPlanRequest
 import com.adshield.pro.engine.aether.AetherSecurityReview
 import com.adshield.pro.engine.aether.AetherSecurityTask
 import com.adshield.pro.engine.aether.AetherTaskApproval
@@ -40,8 +39,8 @@ class AetherSecurityTools @Inject constructor(
         AetherTaskModel.read(context.assets.open("aether/task_model.tsv").reader(Charsets.UTF_8))
     }
 
-    internal suspend fun plan(request: String): AetherPlanRequest.Result = withContext(Dispatchers.IO) {
-        AetherPlanRequest.build(request) { model.suggest(it) }
+    internal suspend fun suggest(request: String): AetherSecurityTask? = withContext(Dispatchers.IO) {
+        model.suggest(request)
     }
 
     internal suspend fun run(

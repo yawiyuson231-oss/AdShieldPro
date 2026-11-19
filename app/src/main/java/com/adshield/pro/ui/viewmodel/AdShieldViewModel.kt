@@ -607,6 +607,7 @@ class AdShieldViewModel @Inject constructor(
         if (_isRunningDnsDiagnostics.value) return
         viewModelScope.launch {
             _isRunningDnsDiagnostics.value = true
+            _dnsDiagnosticReport.value = null
             try {
                 _dnsDiagnosticReport.value = upstreamDnsResolver.runDiagnostics(domain, settingsState.value.resolverConfig)
             } catch (error: Throwable) {

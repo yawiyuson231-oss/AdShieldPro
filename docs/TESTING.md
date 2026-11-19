@@ -98,8 +98,8 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `RuleBasedOptimizationPredictor` | Healthy vs. stressed device scoring, bottleneck severities, `formatBytes` formatting |
 | `DashboardPresentation` | Counter scope selection and clamping, event titles/severity, motion gating, nav scroll targeting, stable live-event ids |
 | `PrivateSearch` | Provider fallback for corrupt prefs, HTTPS-only search endpoints, percent-encoding (UTF-8, reserved chars), query-injection resistance, address-vs-search resolution |
-| `AetherSecurityAgentTest` / `AetherOnlinePlannerTest` / `AetherOnlineHttpTest` | Offline intent model, separate send and run consent, Gemini and Chat Completions wire formats, legacy config reads, stale approvals, reply/error bounds and cancellation (fixtures, not live accounts) |
-| `AetherGuidedPlanTest` | Real bundled model on explicit English/Taglish sequences, no partial plan on unclear or disallowed steps, step-bound one-use approvals, retries, skips and receipt coverage |
+| `AetherSecurityAgentTest` | Bundled model on held-out English and Taglish requests, one supported task at a time, stale/dismissed approvals, separate explicit link input and approval |
+| `DnsResolverHardeningTest` | Question matching before UDP TC retry, RDATA and EDNS bounds, extended RCODE/EDE, encrypted failover and cancellation, uncached diagnostics and DoH transport checks |
 | `AetherSecurityReviewTest` / `AetherPhoneAgentTest` | Independent review steps, partial or failed coverage, propagated cancellation, package metadata indicators, one-use file picker receipts, actual byte limits and existing phone-evidence rules |
 | `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
@@ -109,7 +109,7 @@ Instrumentation (`androidTest`) and manual on-device checks are still required f
 that touches Android framework services — `VpnService` tunnel establishment, the WebView
 browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
 For the Agent's actual Compose UI, file picker, Android App Info, package visibility and live
-provider setup, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
+DNS benchmarks, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
 
 ## Manual smoke test (device / emulator, API 29+)
 

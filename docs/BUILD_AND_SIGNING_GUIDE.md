@@ -76,7 +76,7 @@ history, account credentials, API keys, or Android VPN consent.
 **Replacement:** the production build now installs separately as **AdShield Pro Secure**
 (`com.adshield.pro.secure`). Keep the old app until you have imported and checked your settings in
 Secure. Only one app can run the VPN at a time; stop the old VPN before enabling the replacement.
-Account sign-in, AETHER API keys, and VPN consent must be set up again. Do not uninstall the old app
+Account sign-in and VPN consent must be set up again. The AI Agent does not require an API key. Do not uninstall the old app
 until you have verified what migrated.
 
 **Before publishing (repo maintainer):**

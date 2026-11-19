@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
+import com.adshield.pro.data.repository.ProviderCredentialStore
 import com.adshield.pro.engine.intelligence.IntelligenceMonitor
 import com.adshield.pro.update.GitHubUpdateWorker
 import com.adshield.pro.worker.FilterUpdateWorker
@@ -25,6 +26,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var intelligenceMonitor: IntelligenceMonitor
+    @Inject lateinit var credentialStore: ProviderCredentialStore
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -46,6 +48,7 @@ class AdShieldApplication : Application(), Configuration.Provider {
         WorldMonitorWatchWorker.schedule(this)
         GitHubUpdateWorker.schedule(this)
         appScope.launch {
+            credentialStore.removeRetiredAgentCredential()
             val settings = preferencesRepository.getSettingsSnapshot()
             FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(
                 context = this@AdShieldApplication,

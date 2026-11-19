@@ -260,14 +260,13 @@ test or stable, can upgrade to it in place.
 
 ## What AdShield Pro does
 
-- **Run security tasks with AETHER:** In **Security → Agent**, run a **Security review** to check
-  protection and app risks together, or choose **Scan a file** to check one file locally. You can
-  ask for two or three checks (for example, “Audit my apps, then test DNS speed”) and get a
-  guided plan from the offline model. Approve each step and review its receipt separately.
-  **Connect AI API** supports your own Gemini, OpenAI, or HTTPS Chat Completions-compatible
-  provider. **Test API** checks the saved connection without running a tool. Online task
-  suggestions send only the approved task description, not device findings. See
-  [API setup and supported tasks](docs/PHONE_AGENT.md).
+- **Use the on-device AI Agent:** Open **Security → AI Agent** and ask for one check, or choose one
+  directly. The bundled model suggests a task without an account, key, cloud inference or prompt
+  upload. Approve the check before it runs. The optional DNS benchmark sends real DNS probes only
+  after approval. See [supported checks](docs/PHONE_AGENT.md).
+- **Check your DNS resolver:** Run a live, uncached probe in Settings to see which provider replied,
+  its DNSSEC and EDNS evidence, and why selected backups were needed. DoH and DoT remain encrypted
+  during opt-in failover. [DNS architecture and limits](docs/DNS_SECURITY_ARCHITECTURE.md).
 - **Device-wide DNS filtering:** Run a local Android VPN service that routes DNS requests to AdShield's on-device filter. Other app traffic continues over the device's normal network connection; AdShield does not send it through a remote VPN server.
 - **Choose protection modes:** Standard, Strict, Privacy, and Custom modes control which categories and lists are active. Strict mode can interfere with some apps or sign-ins.
 - **Manage blocklists and rules:** Enable built-in ad, tracker, and threat lists; add custom HTTPS list sources; create custom block and allow rules; and review rule conflicts. Filter lists can sync in the background.

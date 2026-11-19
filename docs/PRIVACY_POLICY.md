@@ -69,10 +69,10 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 - Inspecting or downloading a direct media URL sends that URL and normal connection metadata to its host. The app supports only direct permitted HTTPS media and does not bypass authentication, DRM or site restrictions.
 - Local download history includes source/final file metadata, destination URI, status, sizes, errors and integrity results. It remains in Room until you remove the history entry or clear app data. Removing history does not delete the downloaded document.
 
-### 4E. Optional AETHER AI API
+### 4E. On-device AI Agent
 
-- AETHER guided plans and local scans do not use an AI provider. No AI API is connected by default. If you connect one, the app stores the API configuration and key encrypted on your device with Android Keystore; you can remove the connection in **Security → Agent**.
-- Only after you review and approve a send does the app send your task text (or a fixed test prompt), model identifier and API authentication directly to the configured HTTPS provider. The request does not attach DNS history, installed-app lists, scan reports or files. The provider may retain the request and observe normal connection metadata under its own terms. Removing the connection does not revoke the key or delete any data already sent.
+- The Agent's task text and findings stay on the phone. The bundled model needs no account, AI API key or provider connection. The app removes any retired Agent connection from its on-device credential store without removing other providers’ settings. This does not delete old provider-side data or revoke previously issued keys.
+- The Agent's DNS benchmark sends fixed `example.com` queries only if approved. Settings diagnostics and benchmarks send the name you enter to the configured or tested DNS providers. When failover is enabled, selected backups may also see a DNS lookup. A custom DoH URL may need a separate system lookup for the endpoint hostname; the requested name does not fall back to plaintext.
 
 ---
 
@@ -85,6 +85,6 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 | Files, filenames and security hashes | **No developer collection** (local by default; cloud transfer only on user action) | **User-authorized WebDAV/Nextcloud or preview/share app** | File management, security and storage |
 | Cloud account / password | **No developer collection** (username/URL local; password encrypted locally; sent to configured server for authentication) | **User-authorized storage provider** | User-requested cloud connection |
 | Direct media URL / download metadata | **No developer collection** (history stored locally; URL sent to media host on user action) | **User-selected media host** | User-requested download |
-| AETHER task text and AI API key | **No developer collection** (sent only when you approve an online request or test) | **User-selected AI provider** | Optional task suggestion and API authentication |
+| AI Agent task text and results | **No** (stay on device) | **No** | On-device suggestion and findings; approved DNS probes are listed above |
 | Installed App List (`QUERY_ALL_PACKAGES`) | **No** (Never leaves device) | **No** | Per-app VPN controls and local security audit |
 | Diagnostics / Crash Tracking SDKs | **None Included** | **No** | Zero third-party tracking SDKs |

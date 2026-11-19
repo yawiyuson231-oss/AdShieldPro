@@ -60,6 +60,7 @@ import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.DnsBenchmarkReport
 import com.adshield.pro.engine.dns.DnsDiagnosticReport
+import com.adshield.pro.engine.dns.dnsExtendedErrorLabel
 import com.adshield.pro.ui.components.CompactStatusChip
 import com.adshield.pro.ui.components.StatusPill
 import com.adshield.pro.ui.model.ProtectionPipelineStatus
@@ -405,7 +406,7 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Automatic encrypted provider failover", style = MaterialTheme.typography.bodyLarge)
-                            Text("Uses only the providers selected below", style = MaterialTheme.typography.labelSmall)
+                            Text("DoH or DoT only. A slow or failed request may also go to a backup selected below.", style = MaterialTheme.typography.labelSmall)
                         }
                         Switch(
                             checked = settings.resolverConfig.failoverEnabled,
@@ -447,6 +448,8 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Text("Diagnostics sends this name to your configured DNS plan without using AdShield’s cache or local filters. The benchmark sends it to every tested resolver.",
+                        style = MaterialTheme.typography.bodySmall)
                     Button(
                         onClick = { onRunDnsDiagnostics(diagnosticDomain) },
                         enabled = !isRunningDnsDiagnostics && !isRunningDnsBenchmark,
@@ -534,12 +537,22 @@ fun SettingsScreen(
                     dnsDiagnosticReport?.let { report ->
                         Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(10.dp)) {
                             Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(if (report.successful) "Upstream query completed" else "Upstream query failed", fontWeight = FontWeight.SemiBold)
-                                Text("${report.domain} · RCODE ${report.responseCode ?: "invalid"} · ${report.answerCount ?: 0} answer(s)")
+                                Text(report.outcome, fontWeight = FontWeight.SemiBold)
+                                Text("${report.domain} · A query")
                                 Text(report.transportAndProvider, style = MaterialTheme.typography.bodySmall)
-                                Text("${report.latencyMs} ms${if (report.fromCache) " · cache" else " · network"}", style = MaterialTheme.typography.bodySmall)
+                                Text("${report.latencyMs} ms total · live probe (no local cache)", style = MaterialTheme.typography.bodySmall)
+                                if (report.successful) {
+                                    val edns = report.ednsVersion?.let { "EDNS$it" } ?: "No EDNS in reply"
+                                    Text("RCODE ${report.responseCode} · ${report.answerCount} answer record(s) · $edns", style = MaterialTheme.typography.bodySmall)
+                                }
                                 Text(report.dnssecStatus?.label ?: "No DNSSEC evidence available", style = MaterialTheme.typography.bodySmall)
-                                Text("This validates the configured resolver path. It is not an external DNS leak test.", style = MaterialTheme.typography.labelSmall)
+                                report.extendedErrorCodes.forEach { code -> Text(dnsExtendedErrorLabel(code), style = MaterialTheme.typography.bodySmall) }
+                                if (report.issues.isNotEmpty()) Text("Resolver issues", style = MaterialTheme.typography.labelLarge)
+                                report.issues.forEach { issue ->
+                                    val errors = issue.extendedErrorCodes.joinToString("; ", transform = ::dnsExtendedErrorLabel)
+                                    Text("${issue.providerName}: ${issue.reason}${if (errors.isEmpty()) "" else " · $errors"}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text("AD is upstream evidence, not local DNSSEC validation. This is not a DNS leak test.", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }

@@ -8,7 +8,6 @@ import com.adshield.pro.engine.aether.AetherSecurityReview as Review
 import com.adshield.pro.engine.aether.AetherSecurityTask
 import com.adshield.pro.engine.aether.AetherTaskApproval
 import com.adshield.pro.engine.aether.AetherTaskProgress
-import com.adshield.pro.engine.aether.AetherTaskSource
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.FileThreatScanner
 import kotlinx.coroutines.CoroutineStart
@@ -149,12 +148,12 @@ class AetherSecurityReviewTest {
     fun staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan() {
         val approvals = AetherTaskApproval()
         val picker = AetherFilePickerApproval()
-        val first = approvals.propose(AetherSecurityTask.SCAN_FILE, AetherTaskSource.ONLINE_API)
+        val first = approvals.propose(AetherSecurityTask.SCAN_FILE, suggested = true)
         assertNull(picker.consume(first.id))
         picker.await(requireNotNull(approvals.approve(first.id)))
         picker.clear()
         assertNull(picker.consume(first.id))
-        val second = approvals.propose(AetherSecurityTask.SCAN_FILE, AetherTaskSource.MANUAL)
+        val second = approvals.propose(AetherSecurityTask.SCAN_FILE)
         picker.await(requireNotNull(approvals.approve(second.id)))
         assertNull(picker.consume(first.id))
         assertEquals(AetherSecurityTask.SCAN_FILE, picker.consume(second.id)?.task)

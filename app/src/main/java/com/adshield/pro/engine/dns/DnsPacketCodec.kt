@@ -21,7 +21,9 @@ object DnsPacketCodec {
 
     const val CLASS_IN = 1
 
+    internal const val MAX_DNS_WIRE_BYTES = 65_535
     private const val MAX_RESPONSE_RECORDS = 4096
+    private const val MAX_CACHED_RESPONSE_BYTES = 8192
     private const val MAX_CACHE_SECONDS = 1800
     private const val TYPE_OPT = 41
 
@@ -60,7 +62,7 @@ object DnsPacketCodec {
      * Returns null if the packet is malformed, truncated, or is already a response (QR == 1).
      */
     fun parseQuery(payload: ByteArray, offset: Int = 0, length: Int = payload.size - offset): ParsedDnsQuery? {
-        if (length < 12 || offset < 0 || offset + length > payload.size) return null
+        if (length !in 12..MAX_DNS_WIRE_BYTES || offset < 0 || offset > payload.size - length) return null
 
         val txId = ((payload[offset].toInt() and 0xFF) shl 8) or (payload[offset + 1].toInt() and 0xFF)
         val flags = ((payload[offset + 2].toInt() and 0xFF) shl 8) or (payload[offset + 3].toInt() and 0xFF)
@@ -69,10 +71,10 @@ object DnsPacketCodec {
         if ((flags and 0x8000) != 0 || (flags and 0x7800) != 0) return null
 
         val qdCount = ((payload[offset + 4].toInt() and 0xFF) shl 8) or (payload[offset + 5].toInt() and 0xFF)
-        if (qdCount <= 0 || qdCount > 64) return null
+        if (qdCount != 1) return null
 
         val limit = offset + length
-        val nameResult = readDomainName(payload, offset, offset + 12, limit) ?: return null
+        val nameResult = readDomainName(payload, offset, offset + 12, limit, allowCompression = false) ?: return null
         val afterNameOffset = nameResult.nextOffset
 
         // Need 4 bytes for QTYPE (2) and QCLASS (2)
@@ -155,7 +157,7 @@ object DnsPacketCodec {
                 }
                 val pointerOffset = ((lenByte and 0x3F) shl 8) or (packet[pos + 1].toInt() and 0xFF)
                 val targetPos = msgStart + pointerOffset
-                if (pointerOffset < 12 || targetPos >= limit || targetPos == pos) return null
+                if (pointerOffset < 12 || targetPos >= pos) return null
                 pos = targetPos
             } else if (pointerMask == 0x00) {
                 // Standard label (1..63 bytes)
@@ -376,7 +378,7 @@ object DnsPacketCodec {
     }
 
     private fun cacheFields(message: ByteArray): CacheFields? {
-        if (message.size < 12) return null
+        if (message.size !in 12..MAX_CACHED_RESPONSE_BYTES) return null
         val flags = u16At(message, 2)
         if (flags and 0x8000 == 0 || flags and 0x7A40 != 0) return null
         val rcode = flags and 0x000F
@@ -386,12 +388,12 @@ object DnsPacketCodec {
         val negative = rcode == 3 || answerCount == 0
         var hasNegativeTtl = false
         val recordTtls = mutableListOf<Pair<Int, Long>>()
-        val valid = walkResponseRecords(message) { index, header, end, questionClass ->
+        val valid = walkResponseRecords(message) { index, _, header, end, questionClass ->
             val type = u16At(message, header)
             val rawTtl = u32At(message, header + 4)
             if (type == TYPE_OPT) {
                 // OPT repurposes the TTL field for the extended RCODE, version and flags.
-                if (rawTtl ushr 24 != 0L) return null
+                if (rawTtl ushr 16 != 0L) return null
             } else {
                 // Signed transaction metadata cannot be replayed with a different ID or TTLs.
                 if (type == 249 || type == 250 || (type == 24 && index >= authorityEnd)) return null
@@ -414,32 +416,91 @@ object DnsPacketCodec {
         return CacheFields(lifetime, recordTtls)
     }
 
-    /**
-     * Walks every resource record with bounds and compression-pointer checks.
-     * Returns null for malformed wire data; otherwise returns all RR types present.
-     */
-    fun inspectResponseRecordTypes(message: ByteArray): Set<Int>? {
-        val types = mutableSetOf<Int>()
-        val valid = walkResponseRecords(message) { _, header, _, _ -> types.add(u16At(message, header)) }
-        return if (valid) types else null
+    internal data class ResponseRecords(
+        val ednsVersion: Int?,
+        val extendedRcode: Int,
+        val extendedErrorCodes: List<Int>,
+        val hasRrsig: Boolean,
+        val hasRequestedAnswer: Boolean
+    )
+
+    /** Verify common RDATA and EDNS framing; leave unknown RR types opaque (RFC 3597). */
+    internal fun inspectResponseRecords(message: ByteArray, questionType: Int): ResponseRecords? {
+        if (message.size < 12) return null
+        val answers = u16At(message, 6)
+        val endOfAuthority = answers + u16At(message, 8)
+        var ednsVersion: Int? = null
+        var extendedRcode = 0
+        val extendedErrors = linkedSetOf<Int>()
+        var hasRrsig = false
+        var hasRequestedAnswer = false
+        val valid = walkResponseRecords(message) { index, ownerOffset, header, end, questionClass ->
+            val type = u16At(message, header)
+            val cls = u16At(message, header + 2)
+            val start = header + 10
+            if (type == TYPE_OPT) {
+                // A single OPT in Additional, with a literal root owner (RFC 6891).
+                if (index < endOfAuthority || ednsVersion != null || header != ownerOffset + 1 || message[ownerOffset] != 0.toByte()) return null
+                extendedRcode = message[header + 4].toInt() and 0xFF
+                ednsVersion = message[header + 5].toInt() and 0xFF
+                var option = start
+                while (option < end) {
+                    if (end - option < 4) return null
+                    val code = u16At(message, option)
+                    val length = u16At(message, option + 2)
+                    option += 4
+                    if (length > end - option) return null
+                    if (code == 15) { // Extended DNS Error. Never retain resolver-supplied text.
+                        if (length < 2) return null
+                        if (extendedErrors.size < 8) extendedErrors.add(u16At(message, option))
+                    }
+                    option += length
+                }
+            } else {
+                if (!validKnownRdata(message, type, cls, start, end)) return null
+                if (type == 46) hasRrsig = true
+                if (index < answers && cls == questionClass && (type == questionType || questionType == 255)) {
+                    hasRequestedAnswer = true
+                }
+            }
+        }
+        return if (valid) ResponseRecords(ednsVersion, extendedRcode, extendedErrors.toList(), hasRrsig, hasRequestedAnswer) else null
     }
 
-    private inline fun walkResponseRecords(message: ByteArray, visit: (Int, Int, Int, Int) -> Unit): Boolean {
-        if (message.size < 12) return false
+    private fun validKnownRdata(message: ByteArray, type: Int, cls: Int, start: Int, end: Int): Boolean = when (type) {
+        TYPE_A -> cls != CLASS_IN || end - start == 4
+        TYPE_AAAA -> cls != CLASS_IN || end - start == 16
+        TYPE_NS, TYPE_CNAME, TYPE_PTR -> readDomainName(message, 0, start, end)?.nextOffset == end
+        TYPE_MX -> end - start >= 3 && readDomainName(message, 0, start + 2, end)?.nextOffset == end
+        TYPE_SOA -> {
+            val primary = readDomainName(message, 0, start, end)
+            val contact = primary?.let { readDomainName(message, 0, it.nextOffset, end) }
+            contact != null && end - contact.nextOffset == 20
+        }
+        TYPE_SVCB, TYPE_HTTPS -> {
+            val target = if (end - start >= 3) readDomainName(message, 0, start + 2, end, allowCompression = false) else null
+            target != null && validSvcParamFraming(message, target.nextOffset, end)
+        }
+        else -> true
+    }
+
+    private inline fun walkResponseRecords(message: ByteArray, visit: (Int, Int, Int, Int, Int) -> Unit): Boolean {
+        if (message.size !in 12..MAX_DNS_WIRE_BYTES) return false
         val qd = u16At(message, 4)
         val records = u16At(message, 6) + u16At(message, 8) + u16At(message, 10)
         if (qd != 1 || records > MAX_RESPONSE_RECORDS) return false
-        val question = readDomainName(message, 0, 12, message.size) ?: return false
+        val question = readDomainName(message, 0, 12, message.size, allowCompression = false) ?: return false
         var offset = question.nextOffset + 4
         if (offset > message.size) return false
         val questionClass = u16At(message, question.nextOffset + 2)
         repeat(records) { index ->
-            val name = readDomainName(message, 0, offset, message.size) ?: return false
+            val ownerOffset = offset
+            val name = readDomainName(message, 0, ownerOffset, message.size) ?: return false
             val header = name.nextOffset
             if (header + 10 > message.size) return false
             offset = header + 10 + u16At(message, header + 8)
             if (offset > message.size) return false
-            visit(index, header, offset, questionClass)
+            visit(index, ownerOffset, header, offset, questionClass)
         }
         // Trailing bytes are not a valid DNS message and can conceal parser differentials.
         return offset == message.size

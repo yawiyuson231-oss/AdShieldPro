@@ -20,12 +20,12 @@ class ProviderCredentialStore @Inject constructor(
 ) {
     private val preferences = context.getSharedPreferences("infinity_provider_credentials", Context.MODE_PRIVATE)
 
-    fun put(providerId: String, password: String, durable: Boolean = false) {
+    fun put(providerId: String, password: String) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val encrypted = cipher.doFinal(password.toByteArray(Charsets.UTF_8))
         val payload = cipher.iv + encrypted
-        finishWrite(preferences.edit().putString(providerId, Base64.encodeToString(payload, Base64.NO_WRAP)), durable)
+        preferences.edit().putString(providerId, Base64.encodeToString(payload, Base64.NO_WRAP)).apply()
     }
 
     fun get(providerId: String): String? {
@@ -41,12 +41,14 @@ class ProviderCredentialStore @Inject constructor(
         }.getOrNull()
     }
 
-    fun remove(providerId: String, durable: Boolean = false) {
-        finishWrite(preferences.edit().remove(providerId), durable)
+    fun remove(providerId: String) {
+        preferences.edit().remove(providerId).apply()
     }
 
-    private fun finishWrite(editor: android.content.SharedPreferences.Editor, durable: Boolean) {
-        if (durable) check(editor.commit()) { "Couldn't save provider credentials" } else editor.apply()
+    internal fun removeRetiredAgentCredential() {
+        // No decryption. Keep WebDAV, World Monitor and the shared Keystore key intact.
+        val retiredSlot = "aether.online.agent.v1"
+        if (preferences.contains(retiredSlot)) remove(retiredSlot)
     }
 
     @Synchronized

@@ -8,7 +8,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import java.net.SocketTimeoutException
 
 data class DnsBenchmarkEntry(
     val preset: DnsProviderPreset,
@@ -74,87 +75,40 @@ object DnsResolverBenchmark {
         nowEpochMs: Long = System.currentTimeMillis()
     ): DnsBenchmarkReport {
         val cleanDomain = domainInput.trim().ifBlank { DEFAULT_PROBE_DOMAIN }
-        // Validate domain syntax up front using the same EDNS0+DO factory as DNS diagnostics.
-        DnsDiagnosticQueryFactory.build(cleanDomain)
+        val normalizedName = requireNotNull(DnsPacketCodec.parseQuery(DnsDiagnosticQueryFactory.build(cleanDomain))) {
+            "Enter a valid DNS name"
+        }.questionDomain
 
-        // Probe in REPORT_ONLY DNSSEC mode so unsigned responses still report status honestly
-        // instead of failing providers that do not set the AD bit on a given name.
+        // Normal unsigned answers remain eligible in a reachability test.
         val probeConfig = config.copy(dnssecMode = DnssecMode.REPORT_ONLY)
-        val presets = candidatePresets(config)
-
         val rawEntries = coroutineScope {
-            presets.map { preset ->
+            candidatePresets(config).map { preset ->
                 async {
                     val endpoint = DnsProviderRegistry.endpoint(preset, probeConfig)
-                    val wire = DnsDiagnosticQueryFactory.build(cleanDomain)
-                    val query = DnsPacketCodec.parseQuery(wire)
-                        ?: return@async DnsBenchmarkEntry(
-                            preset = preset,
-                            providerName = preset.displayName,
-                            reachable = false,
-                            latencyMs = null,
-                            responseCode = null,
-                            answerCount = null,
-                            dnssecStatus = null,
-                            forwardsClientSubnet = preset.forwardsClientSubnet,
-                            isCurrentlySelected = preset == config.preset,
-                            errorMessage = "Invalid probe query"
-                        )
+                    val query = requireNotNull(DnsPacketCodec.parseQuery(DnsDiagnosticQueryFactory.build(normalizedName)))
+                    val emptyEntry = DnsBenchmarkEntry(preset, preset.displayName, false, null, null, null, null,
+                        preset.forwardsClientSubnet, preset == config.preset)
                     try {
-                        val result = withTimeout(PER_PROVIDER_TIMEOUT_MS) {
+                        val result = withTimeoutOrNull(PER_PROVIDER_TIMEOUT_MS) {
                             resolver.probeEndpoint(query, probeConfig, endpoint)
-                        }
-                        val inspection = runCatching {
-                            DnsResponseValidator.validate(wire, result.responseBytes, DnssecMode.REPORT_ONLY)
-                        }.getOrNull()
-                        val ok = inspection != null && (inspection.responseCode == 0 || inspection.responseCode == 3)
-                        DnsBenchmarkEntry(
-                            preset = preset,
-                            providerName = preset.displayName,
-                            reachable = ok,
-                            latencyMs = if (ok) result.latencyMs else null,
-                            responseCode = inspection?.responseCode,
-                            answerCount = inspection?.answerCount,
-                            dnssecStatus = result.dnssecStatus ?: inspection?.dnssecStatus,
-                            forwardsClientSubnet = preset.forwardsClientSubnet,
-                            isCurrentlySelected = preset == config.preset,
-                            errorMessage = if (ok) null else "RCODE ${inspection?.responseCode ?: "invalid"}"
-                        )
-                    } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
-                        DnsBenchmarkEntry(
-                            preset = preset,
-                            providerName = preset.displayName,
-                            reachable = false,
-                            latencyMs = null,
-                            responseCode = null,
-                            answerCount = null,
-                            dnssecStatus = null,
-                            forwardsClientSubnet = preset.forwardsClientSubnet,
-                            isCurrentlySelected = preset == config.preset,
-                            errorMessage = "Timed out"
-                        )
-                    } catch (c: CancellationException) {
-                        throw c
-                    } catch (t: Throwable) {
-                        DnsBenchmarkEntry(
-                            preset = preset,
-                            providerName = preset.displayName,
-                            reachable = false,
-                            latencyMs = null,
-                            responseCode = null,
-                            answerCount = null,
-                            dnssecStatus = null,
-                            forwardsClientSubnet = preset.forwardsClientSubnet,
-                            isCurrentlySelected = preset == config.preset,
-                            errorMessage = (t.message ?: t.javaClass.simpleName).take(80)
-                        )
+                        } ?: throw SocketTimeoutException("DNS benchmark timed out")
+                        val reply = requireNotNull(result.inspection)
+                        emptyEntry.copy(reachable = true, latencyMs = result.latencyMs, responseCode = reply.responseCode,
+                            answerCount = reply.answerCount, dnssecStatus = reply.dnssecStatus)
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        val reply = (error as? DnsResponseValidationException)?.inspection
+                        val details = reply?.extendedErrorCodes.orEmpty().joinToString("; ", transform = ::dnsExtendedErrorLabel)
+                        emptyEntry.copy(responseCode = reply?.responseCode,
+                            errorMessage = dnsFailureReason(error) + if (details.isEmpty()) "" else " · $details")
                     }
                 }
             }.awaitAll()
         }
 
         return DnsBenchmarkReport(
-            probeDomain = cleanDomain.trimEnd('.').lowercase(),
+            probeDomain = normalizedName,
             protocol = config.protocol,
             testedAtEpochMs = nowEpochMs,
             entries = rankEntries(rawEntries)

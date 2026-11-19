@@ -238,9 +238,9 @@
       <h3>4D. Direct-Media Downloads</h3>
       <p>Inspecting or downloading a permitted direct HTTPS media URL contacts that media host directly and stores download history locally in Room until you delete it. AdShield Pro does not bypass authentication, DRM, or site restrictions.</p>
 
-      <h3>4E. Optional AETHER AI API</h3>
-      <p>AETHER guided plans and local scans do not use an AI provider. No AI API is connected by default. If you connect one, the app stores the configuration and key encrypted on-device using Android Keystore. You can remove the connection in <strong>Security → Agent</strong>.</p>
-      <p>Only after you review and approve a send does your task text (or a fixed test prompt), model identifier and API authentication go directly to the configured HTTPS provider. DNS history, installed-app lists, scan reports and files are not attached. The provider may retain the request and observe normal connection metadata under its own terms. Removing the connection does not revoke the key or erase data already sent.</p>
+      <h3>4E. On-Device AI Agent</h3>
+      <p>The Agent’s task text and findings stay on the phone. The bundled model needs no account, AI API key or provider connection. The app removes any retired Agent connection from its on-device credential store without removing other providers’ settings. This does not delete old provider-side data or revoke previously issued keys.</p>
+      <p>The Agent’s DNS benchmark sends fixed <code>example.com</code> queries only if approved. Settings diagnostics and benchmarks send the name you enter to the configured or tested DNS providers. When failover is enabled, selected backups may also see a DNS lookup. A custom DoH URL may need a separate system lookup for the endpoint hostname; the requested name does not fall back to plaintext.</p>
     </section>
 
     <section class="card" aria-labelledby="s5">
@@ -287,10 +287,10 @@
               <td>User-requested download</td>
             </tr>
             <tr>
-              <td>AETHER task text and AI API key</td>
-              <td><strong>No developer collection</strong> (sent only when you approve an online request or test)</td>
-              <td><strong>User-selected AI provider</strong></td>
-              <td>Optional task suggestion and API authentication</td>
+              <td>AI Agent task text and results</td>
+              <td><strong>No</strong> (stay on device)</td>
+              <td><strong>No</strong></td>
+              <td>On-device suggestion and findings; approved DNS probes are listed above</td>
             </tr>
             <tr>
               <td>Installed app list (<code>QUERY_ALL_PACKAGES</code>)</td>

@@ -138,17 +138,17 @@ object CapabilityRegistry {
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsProviderRegistry.kt", listOf(PERM_INTERNET, PERM_VPN),
             listOf("Real per-query success/failure counts, EWMA latency and circuit-breaker cooldowns from DnsProviderHealthMonitor"),
             listOf(
-                "Only providers the user selected are used, responses are never merged, and an encrypted protocol never falls back to plaintext port 53",
+                "Only selected providers on the same transport. Fast failures skip the hedge delay; a losing exchange is canceled. No encrypted-to-plaintext fallback",
                 "Health is per-process: it is reset when the VPN service is restarted"
             ),
-            "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt"
+            "CybersecurityPlatformTestSuite.resolverFailsOverOnlyAfterValidationAndDoesNotDowngrade and CybersecurityPlatformTestSuite.resolverCircuitSkipsKnownOpenProviderWithoutExtendingIt and DnsResolverHardeningTest.refusalFallsBackToSelectedEncryptedResolverWithDetails and DnsResolverHardeningTest.cancelsSlowHedgeWithoutRecordingItsCancellationAsAnOutage"
         ),
         cap(
             "dns-response-validation", "Strict upstream response validation before caching or answering", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsResponseValidator.kt", emptyList(),
-            listOf("Full resource-record walk of the upstream wire response (DnsPacketCodec.inspectResponseRecordTypes)"),
-            listOf("Rejects transaction/opcode/question mismatches, reserved Z bit, truncated UDP answers, SERVFAIL/REFUSED/FORMERR and trailing bytes"),
-            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData"
+            listOf("Matched question and complete record/EDNS walk of the upstream wire response (DnsPacketCodec.inspectResponseRecords)"),
+            listOf("Checks question, RDATA framing, EDNS OPT placement and full RCODE; malformed datagrams cannot trigger TCP retry on a mismatched question"),
+            "CybersecurityPlatformTestSuite.validatorRejectsWrongQuestionTruncationServfailAndTrailingData and DnsResolverHardeningTest.rejectsMalformedRecordDataAndInvalidEdnsPlacementOrLength and DnsResolverHardeningTest.usesExtendedRcodeAndReportsOnlyNumericExtendedErrorEvidence and DnsResolverHardeningTest.dohRequiresHttpsAndAcceptsOnlyBoundedDnsMessageBodies"
         ),
         cap(
             "dnssec-evidence", "Upstream DNSSEC evidence reporting and strict AD mode", CapabilityArea.DNS_PROTECTION,
@@ -173,9 +173,9 @@ object CapabilityRegistry {
         cap(
             "dns-diagnostics", "Real resolver diagnostics against the configured upstream", CapabilityArea.DNS_PROTECTION,
             CapabilityStatus.IMPLEMENTED, "engine/dns/DnsDiagnostics.kt", listOf(PERM_INTERNET, PERM_VPN),
-            listOf("A genuine A query with EDNS0 DO bit, measured latency, RCODE, answer count and provider health"),
-            listOf("Validates the configured resolver path; it is not an external DNS leak test and no third-party echo service is contacted"),
-            "CybersecurityPlatformTestSuite.diagnosticQueryUsesEdns0AndNormalisesCase"
+            listOf("A live A query with EDNS0 DO bit, total latency, upstream RCODE, answer count, Extended DNS Errors and per-resolver failure reasons"),
+            listOf("Tests the upstream path without local cache or filters. No external leak test or local DNSSEC chain validation"),
+            "CybersecurityPlatformTestSuite.diagnosticQueryUsesEdns0AndNormalisesCase and DnsResolverHardeningTest.liveDiagnosticsDoNotReadOrChangeTheNormalReplyCache"
         ),
         cap(
             "dns-leak-detect", "DNS leak detection", CapabilityArea.DNS_PROTECTION,
@@ -546,18 +546,11 @@ object CapabilityRegistry {
             "AetherPhoneAgentTest.identifiesReportedOpenWifiWeakSignalAndSignInAsSeparateIssues and AetherPhoneAgentTest.honoursLoggingOptOutAndDoesNotEchoRawActivity"
         ),
         cap(
-            "aether-security-tasks", "AETHER task selection with a bundled on-device model", CapabilityArea.AI_INTELLIGENCE,
+            "aether-security-tasks", "AI Agent with a bundled on-device model", CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "engine/aether/AetherTaskModel.kt", emptyList(),
             listOf("A fitted intent model, AdShield scanners, Android app metadata and phone readings"),
-            listOf("Classifies one supported task per input clause; the user approves each actual check; no general chat or scheduled work"),
-            "AetherSecurityAgentTest.shippedModelMatchesHoldoutWithoutWrongTaskSuggestions and AetherSecurityAgentTest.realLocalScannerReceivesOnlyAnExplicitlyApprovedLink"
-        ),
-        cap(
-            "aether-guided-plans", "AETHER guided plans with separate step approvals", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.IMPLEMENTED, "engine/aether/AetherGuidedPlan.kt", emptyList(),
-            listOf("On-device intent classification of explicit task clauses, followed by user-approved AdShield checks"),
-            listOf("Two or three read-only steps; no automatic next step or provider send; DNS benchmark sends fixed probes only if approved; receipts cleared on exit"),
-            "AetherGuidedPlanTest.shippedModelBuildsOrderedEnglishAndTaglishPlansWithoutChangingSingleTaskBehavior and AetherGuidedPlanTest.rejectsTheWholePlanIfAnyStepIsUnclearRestrictedOrChangesSettings and AetherGuidedPlanTest.onlyTheMatchingStepApprovalCanStartOrFinishAnAttempt and AetherGuidedPlanTest.failedOrCanceledChecksStayOnTheSameStepAndRequireFreshApproval and AetherGuidedPlanTest.receiptsDistinguishMissingEvidenceFromCompletedChecksWithLimits"
+            listOf("Suggests a single check for approval. No account, key, cloud inference, prompt uploads or general chat."),
+            "AetherSecurityAgentTest.shippedModelMatchesHoldoutWithoutWrongTaskSuggestions and AetherSecurityAgentTest.multiStepRequestsDoNotProposePartialChecks and AetherSecurityAgentTest.realLocalScannerReceivesOnlyAnExplicitlyApprovedLink"
         ),
         cap(
             "aether-security-review", "AETHER local protection and app-risk review", CapabilityArea.AI_INTELLIGENCE,
@@ -573,13 +566,6 @@ object CapabilityRegistry {
             listOf("Single-use Android document picker approval and bounded reads of the selected content URI"),
             listOf("24 MiB maximum, static checks of a temporary local copy, no install, upload, original modification or Agent history entry"),
             "AetherSecurityReviewTest.boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy and AetherSecurityReviewTest.staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan and AetherSecurityReviewTest.cancelDuringFileReadPreventsWritingTheNextChunk"
-        ),
-        cap(
-            "aether-online-api", "Optional user-configured AETHER online AI API", CapabilityArea.AI_INTELLIGENCE,
-            CapabilityStatus.IMPLEMENTED, "data/repository/AetherOnlinePlanner.kt", listOf("android.permission.INTERNET"),
-            listOf("User-owned Gemini Developer API, OpenAI or compatible HTTPS Chat Completions access; Keystore-encrypted settings and separately approved task text"),
-            listOf("API test sends a real request but runs no tool; requires a supported text model and provider account; response can only propose an allowlisted task"),
-            "AetherOnlinePlannerTest.outboundReviewContainsOnlyTypedTaskTextAndNeverIncludesScannedLinks and AetherOnlinePlannerTest.approvalToSendDoesNotApproveAnOnlineSuggestedTask and AetherOnlinePlannerTest.restoresOldConnectionsWithoutResavingKeysAndBindsApprovalToARevision and AetherOnlinePlannerTest.geminiUsesOnlyFinalTextAndRejectsIncompleteRepliesAndToolCalls and AetherOnlineHttpTest.sendsOneHttpsPostWithBearerAuthenticationAndReturnsOnlyTheTaskId and AetherOnlineHttpTest.sendsGeminiKeyOnlyToPinnedNativeEndpointAndParsesTheReply and AetherOnlineHttpTest.stoppingTheWaitCancelsTheHttpCallWithoutReturningATask"
         ),
         cap(
             "live-network-dashboard", "Live DNS traffic dashboard with real event feed", CapabilityArea.DNS_PROTECTION,
