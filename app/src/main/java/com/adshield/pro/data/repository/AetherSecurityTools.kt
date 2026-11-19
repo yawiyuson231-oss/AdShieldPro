@@ -59,7 +59,8 @@ class AetherSecurityTools @Inject constructor(
                 readPhone = phoneReader::check,
                 readDns = ::readDnsPolicy,
                 readApps = { readAppMetadata(onProgress) },
-                publish = onProgress
+                publish = onProgress,
+                currentTunnel = { repository.vpnRuntimeState.value }
             ))
             AetherSecurityTask.SCAN_FILE -> scanSelectedFile(chosenFile, onProgress)
             AetherSecurityTask.SCAN_LINK -> {

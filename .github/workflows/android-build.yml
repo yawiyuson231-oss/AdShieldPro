@@ -98,10 +98,10 @@ jobs:
           set -o pipefail
           tools/gradle-ci.sh .ci/compile.log :app:compileDebugKotlin
 
-      - name: Assemble debug APK
+      - name: Assemble debug APK and Agent instrumentation tests
         run: |
           set -o pipefail
-          tools/gradle-ci.sh .ci/assemble.log :app:assembleDebug
+          tools/gradle-ci.sh .ci/assemble.log :app:assembleDebug :app:assembleDebugAndroidTest
 
       - name: Verify debug APK identity, universal packaging and signature
         run: |
@@ -203,7 +203,7 @@ jobs:
             sudo chown "$(id -u):$(id -g)" /dev/kvm
           fi
 
-      - name: Install and launch debug and Secure APKs on Android 10
+      - name: Verify installation and Agent workflow on Android 10
         timeout-minutes: 12
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -213,8 +213,10 @@ jobs:
           avd-name: adshield-install-smoke
           emulator-boot-timeout: 300
           disable-linux-hw-accel: false
+          disable-animations: true
           script: >-
             bash -o pipefail -c 'bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log &&
+            bash tools/smoke_android_agent.sh app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk 2>&1 | tee .ci/android-agent.log &&
             bash tools/smoke_android_install.sh app/build/outputs/apk/release/app-release.apk emulator-5554 com.adshield.pro.secure 2>&1 | tee -a .ci/android-install.log'
 
       # The log-mirror step below commits .ci/ into the branch, so the checkout must never

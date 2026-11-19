@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -90,7 +91,7 @@ internal fun AetherPhoneAgentScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("aether-agent-list"),
         state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -219,7 +220,7 @@ private fun AgentTaskDialog(proposal: AetherTaskApproval.Proposal, onApprove: (S
     val details = when (proposal.task) {
         Task.CHECK_PHONE -> "Read current protection, Wi-Fi, DNS activity and device-health readings. Nothing will change."
         Task.AUDIT_APPS -> "Check permissions and install sources of apps Android lets AdShield see. This won't read private app files or remove anything."
-        Task.SECURITY_REVIEW -> "Three on-device specialists check phone protection, saved DNS policy and visible app metadata. The report compares app indicators with saved DNS exceptions. This review won't send data, read private app files or change settings."
+        Task.SECURITY_REVIEW -> "Three on-device specialists check phone protection, saved DNS policy and visible app metadata. It uses the current tunnel’s setup receipt when available, and checks for overlaps between DNS exceptions and app risk indicators. This review won't send data, read private app files or change settings."
         Task.SCAN_FILE -> "Choose one file up to ${AetherFileInput.MAX_MIB} MiB with Android’s file picker. AdShield inspects it locally and won’t launch, install, upload, or change the original."
         Task.SCAN_LINK -> "Analyze one web link on this phone without opening it. Paste only the link you want to check."
         Task.BENCHMARK_DNS -> "Send a lookup for example.com to the built-in resolvers and your custom resolver if selected, using your configured DNS protocol. Your task text is not sent and no resolver setting will change."

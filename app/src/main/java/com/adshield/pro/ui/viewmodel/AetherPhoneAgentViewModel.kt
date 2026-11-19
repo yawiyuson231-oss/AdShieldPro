@@ -25,9 +25,12 @@ import javax.inject.Inject
 
 /** Foreground, on-device suggestions. Only a separate user approval can run a check. */
 @HiltViewModel
-class AetherPhoneAgentViewModel @Inject constructor(
-    private val tools: AetherSecurityTools
+class AetherPhoneAgentViewModel internal constructor(
+    private val suggest: suspend (String) -> AetherSecurityTask?,
+    private val execute: suspend (AetherTaskApproval.Approved, Uri?, (AetherTaskProgress) -> Unit) -> AetherTaskResult
 ) : ViewModel() {
+    @Inject constructor(tools: AetherSecurityTools) : this(tools::suggest, tools::run)
+
     internal data class State(
         val findingTask: Boolean = false,
         val proposal: AetherTaskApproval.Proposal? = null,
@@ -54,7 +57,7 @@ class AetherPhoneAgentViewModel @Inject constructor(
         _state.update { it.copy(findingTask = true, message = null) }
         suggestionJob = viewModelScope.launch {
             try {
-                val task = withTimeout(5_000) { tools.suggest(request) }
+                val task = withTimeout(5_000) { suggest(request) }
                 ensureActive()
                 if (task == null) {
                     _state.update { it.copy(findingTask = false,
@@ -150,8 +153,8 @@ class AetherPhoneAgentViewModel @Inject constructor(
         _state.update { it.copy(running = task, progress = null, stopping = false, result = null, message = null) }
         // Install cancellation handling before dispatching I/O so an immediate stop clears the check.
         taskJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            val execute: suspend () -> AetherTaskResult = {
-                tools.run(approved, chosenFile) { progress ->
+            val runApproved: suspend () -> AetherTaskResult = {
+                execute(approved, chosenFile) { progress ->
                     _state.update { state ->
                         if (state.running == task && !state.stopping) state.copy(progress = progress) else state
                     }
@@ -166,7 +169,7 @@ class AetherPhoneAgentViewModel @Inject constructor(
                     AetherSecurityTask.SCAN_FILE -> 35_000L
                     else -> AetherSecurityReview.PHONE_TIMEOUT_MS
                 }
-                val result = if (timeout == null) execute() else withTimeout(timeout) { execute() }
+                val result = if (timeout == null) runApproved() else withTimeout(timeout) { runApproved() }
                 ensureActive()
                 finishTask(result)
             } catch (_: TimeoutCancellationException) {

@@ -30,6 +30,7 @@ import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.VpnTunnelReceipt
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -216,7 +217,8 @@ class AdShieldRepository @Inject constructor(
     fun updateVpnStatus(
         status: VpnStatus,
         networkLabel: String? = null,
-        error: String? = null
+        error: String? = null,
+        establishedTunnel: VpnTunnelReceipt? = null
     ) {
         val previousStatus = _vpnRuntimeState.value.status
         _vpnRuntimeState.update { current ->
@@ -230,7 +232,12 @@ class AdShieldRepository @Inject constructor(
                 connectedSinceEpochMs = nowConnectedSince,
                 activeNetworkLabel = networkLabel ?: current.activeNetworkLabel,
                 loadedRuleCount = filterEngine.getCurrentSnapshot().totalLoadedRules,
-                lastError = error
+                lastError = error,
+                tunnelReceipt = when (status) {
+                    VpnStatus.CONNECTED -> establishedTunnel ?: current.activeTunnelReceipt
+                    VpnStatus.PAUSED -> current.activeTunnelReceipt
+                    else -> null
+                }
             )
         }
         if (status != previousStatus) {

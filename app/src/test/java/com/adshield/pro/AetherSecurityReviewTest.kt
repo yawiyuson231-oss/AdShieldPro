@@ -3,6 +3,9 @@ package com.adshield.pro
 import com.adshield.pro.domain.model.AppDnsPolicy
 import com.adshield.pro.domain.model.DnsFirewallPolicy
 import com.adshield.pro.domain.model.DnsResolverConfig
+import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.VpnTunnelReceipt
 import com.adshield.pro.engine.aether.AetherAppReview
 import com.adshield.pro.engine.aether.AetherDnsPolicyReview
 import com.adshield.pro.engine.aether.AetherFileInput
@@ -210,6 +213,25 @@ class AetherSecurityReviewTest {
         assertEquals(listOf(Review.Source.PROTECTION, Review.Source.DNS, Review.Source.APP_POLICY), report.priorities.map { it.source })
         assertEquals(listOf(AetherPhoneAgent.Tool.PROTECTION, AetherPhoneAgent.Tool.APP_FIREWALL, AetherPhoneAgent.Tool.APP_FIREWALL),
             report.priorities.map { it.nextTool })
+    }
+
+    @Test
+    fun readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration() = runBlocking {
+        val accepted = setOf(profile.packageName)
+        val original = VpnTunnelReceipt(51, 1, false, accepted, emptySet())
+        var runtime = VpnRuntimeState(status = VpnStatus.CONNECTED, tunnelReceipt = original)
+        var runtimeReads = 0
+        val report = Review.run(
+            readPhone = { phone }, readDns = { savedDns(exclusions = accepted) },
+            readApps = {
+                runtime = VpnRuntimeState(status = VpnStatus.STARTING)
+                AppRiskAuditor.VisibleAudit(1, listOf(fixtureHigh))
+            },
+            publish = {}, currentTunnel = { runtimeReads++; runtime }
+        )
+        assertEquals(1, runtimeReads)
+        assertNull(report.dns.value?.tunnel)
+        assertEquals(AetherDnsPolicyReview.ExclusionEvidence.UNKNOWN, report.appPolicyMatches.single().exclusionEvidence)
     }
 
     @Test

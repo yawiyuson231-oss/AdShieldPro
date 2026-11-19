@@ -7,9 +7,12 @@ import com.adshield.pro.domain.model.DnsProviderPreset
 import com.adshield.pro.domain.model.DnsResolverConfig
 import com.adshield.pro.domain.model.DnssecMode
 import com.adshield.pro.domain.model.NetworkTransportPolicy
+import com.adshield.pro.domain.model.VpnRuntimeState
+import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.domain.model.VpnTunnelReceipt
 import com.adshield.pro.engine.dns.DnsProviderRegistry
 
-/** Reviews saved settings, not traffic. No resolver, network, or write capability. */
+/** Compares saved settings with a local setup receipt. Never probes or observes traffic. */
 internal object AetherDnsPolicyReview {
     enum class Failover(val label: String) {
         OFF("Off"),
@@ -20,8 +23,27 @@ internal object AetherDnsPolicyReview {
 
     enum class AppException(val label: String) {
         VPN_EXCLUDED("Saved VPN exclusion"),
+        ACTIVE_ONLY("VPN exclusion no longer saved"),
         ALLOW_DNS("Saved Allow all DNS rule")
     }
+
+    enum class ExclusionEvidence(val label: String) {
+        ACCEPTED("Applied: accepted when the tunnel was set up"),
+        REJECTED("Rejected during tunnel setup"),
+        NOT_RECORDED("Not recorded in this tunnel setup"),
+        UNKNOWN("Unknown: no current setup receipt")
+    }
+
+    data class TunnelComparison(
+        val generation: Long,
+        val establishedAtEpochMs: Long,
+        val hasIpv6DnsRoute: Boolean,
+        val filteringPaused: Boolean,
+        val appliedSaved: Int,
+        val rejectedSaved: Int,
+        val unrecordedSaved: Int,
+        val appliedButNoLongerSaved: Int
+    )
 
     data class Summary(
         val primaryProvider: String,
@@ -35,20 +57,52 @@ internal object AetherDnsPolicyReview {
         val allowDnsOverrides: Int,
         val excludedAppsWithBlockRules: Int,
         val networksWithoutDomainFiltering: List<NetworkTransportPolicy>,
-        val subnetForwardingProviders: List<String>
+        val subnetForwardingProviders: List<String>,
+        val tunnel: TunnelComparison? = null
     )
 
-    /** Package IDs are needed for one in-memory join. Only the summary escapes the coordinator. */
+    /** Package IDs stay in memory; the report exposes counts and only bounded matched details. */
     class Snapshot internal constructor(
         val summary: Summary,
         private val excluded: Set<String>,
-        private val allowDns: Set<String>
+        private val allowDns: Set<String>,
+        private val receipt: VpnTunnelReceipt? = null
     ) {
-        /** If both are saved, show the VPN exclusion: DNS rules require a request to reach the tunnel. */
-        fun exceptionFor(packageName: String): AppException? = when (packageName) {
-            in excluded -> AppException.VPN_EXCLUDED
-            in allowDns -> AppException.ALLOW_DNS
+        /** Take a single runtime snapshot when the report is assembled, not before the app scan. */
+        fun compareWith(runtime: VpnRuntimeState): Snapshot {
+            val current = runtime.activeTunnelReceipt
+            val comparison = current?.let {
+                val applied = excluded.count { it in current.acceptedExclusions }
+                val rejected = excluded.count { it in current.rejectedExclusions }
+                TunnelComparison(
+                    generation = current.generation,
+                    establishedAtEpochMs = current.establishedAtEpochMs,
+                    hasIpv6DnsRoute = current.hasIpv6DnsRoute,
+                    filteringPaused = runtime.status == VpnStatus.PAUSED,
+                    appliedSaved = applied,
+                    rejectedSaved = rejected,
+                    unrecordedSaved = excluded.size - applied - rejected,
+                    appliedButNoLongerSaved = current.acceptedExclusions.count { it !in excluded }
+                )
+            }
+            return Snapshot(summary.copy(tunnel = comparison), excluded, allowDns, current)
+        }
+
+        fun exceptionFor(packageName: String): AppException? = when {
+            packageName in excluded -> AppException.VPN_EXCLUDED
+            receipt?.acceptedExclusions?.contains(packageName) == true -> AppException.ACTIVE_ONLY
+            packageName in allowDns -> AppException.ALLOW_DNS
             else -> null
+        }
+
+        fun exclusionEvidenceFor(packageName: String): ExclusionEvidence? = when (exceptionFor(packageName)) {
+            AppException.VPN_EXCLUDED, AppException.ACTIVE_ONLY -> when {
+                receipt == null -> ExclusionEvidence.UNKNOWN
+                packageName in receipt.acceptedExclusions -> ExclusionEvidence.ACCEPTED
+                packageName in receipt.rejectedExclusions -> ExclusionEvidence.REJECTED
+                else -> ExclusionEvidence.NOT_RECORDED
+            }
+            AppException.ALLOW_DNS, null -> null // DNS policy is evaluated per attributed request, not at setup.
         }
     }
 

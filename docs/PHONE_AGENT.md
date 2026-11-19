@@ -25,9 +25,9 @@ checks, not the model, produce the findings.
 - **Phone protection** reads AdShield's runtime status, passive Android network and device readings,
   and local activity summaries when available. It respects the detailed DNS logging preference.
 - **Saved DNS policy** checks the selected protocol, resolver plan and eligible backups, DNSSEC mode,
-  Alias Shield, allowlist-only setting, and saved network and app exceptions. It doesn't probe a
-  resolver or confirm which settings the live tunnel applied. DNSSEC reporting is upstream evidence,
-  not local signature-chain validation.
+  Alias Shield, allowlist-only setting, and saved network and app exceptions. It compares saved VPN
+  exclusions with a local setup receipt when there is one. It doesn't probe a resolver or confirm
+  which provider answered. DNSSEC reporting is upstream evidence, not local chain validation.
 - **App metadata** inspects declarations and install-source readings for Android-visible packages.
   It counts unreadable entries separately. A declaration is not a grant or evidence of compromise.
 
@@ -36,13 +36,22 @@ cooperative deadlines (phone: 8 seconds; DNS: 5 seconds; apps: 30 seconds). If o
 completed evidence remains available. Canceling the whole review discards that run; an Android system
 read already in progress may need to return before cancellation completes.
 
+**VPN exclusion evidence** comes from Android's `VpnService.Builder`: the service records which
+user exclusions the builder accepted or rejected and publishes a receipt only when Android returns
+an established tunnel. The receipt includes the tunnel generation, setup time and DNS route families.
+It stays in memory. Stop, replacement/rebuild, revocation and setup or packet-loop failure invalidate
+it; pausing filtering leaves the installed tunnel in place and is separately labeled. The report
+can show a new saved exclusion that wasn't recorded at setup, an exclusion Android rejected, or one
+still accepted at setup but no longer saved. Without a current receipt it says **unknown**, not zero.
+The receipt is sampled as the review is assembled: run another review after changing settings or
+networks. It is not a traffic observation, a route-table audit, or evidence of universal coverage.
+
 The coordinator matches **exact package IDs** between all inspected apps with medium- or high-risk
-indicators and saved VPN exclusions or **Allow all DNS** rules. It reports the full match count and
-shows up to four examples; the separate app summary shows up to eight flagged apps. Missing app or
-policy evidence is not a zero-match result. The report also flags saved **Block all DNS** rules that
-overlap with VPN exclusions. An exclusion only matters if it was applied to the tunnel, and a DNS rule
-only matters for a request that enters it. For those requests, allowlist-only mode can block names
-before an app's **Allow all DNS** rule takes effect. Check again after changing settings or networks.
+indicators and saved exceptions or accepted VPN exclusions in the receipt. It shows up to four match
+examples and up to eight separate app findings. Missing app or policy evidence is not a zero-match
+result. A saved **Allow all DNS** rule is never marked applied by a tunnel receipt: these rules require
+requests reaching the tunnel, Android app attribution, and policy evaluation. Allowlist-only mode can
+block names before an app's **Allow all DNS** rule takes effect.
 
 Recommendations explain the evidence and link to existing controls. They do not apply changes. Any
 suggested Agent action, including a live DNS benchmark, needs its own separate approval.
@@ -68,8 +77,10 @@ See the [Android Agent roadmap](AETHER_AGENT_ROADMAP.md) for work that is **not*
 2. In a disposable test profile, choose an app with a medium- or high-risk indicator in **Security →
    Apps**. Save an **Allow all DNS** rule for its exact package in **Settings → Per-App Firewall &
    Split-Tunnel**. Rerun the review and confirm the pair is labeled **saved**, not observed. Switch
-   it back to filtered and confirm the pair disappears on the next run. No permission grant or live
-   connection is needed. The JVM tests use synthetic app metadata to cover this case independently.
+   it back to filtered and confirm the pair disappears on the next run. No app permission grant or
+   live connection is needed. The JVM tests cover this case with synthetic app metadata. With a saved
+   VPN exclusion, also test before starting the tunnel, after consent and setup, during a rebuild and
+   after stopping. Check that receipt evidence is about setup, not packets.
 3. Ask for **“Audit my apps, then test DNS speed”**. Confirm no plan, suggestion or network request.
    If a result offers **Run DNS benchmark**, tap it and confirm a new approval is required; cancel it.
 4. Choose **Check a link**. Confirm the approval dialog starts empty and the link is not launched.

@@ -49,12 +49,14 @@ requests. It installs JDK 21 + Android SDK Platform 37.x and runs, in order:
 2. Bundled AETHER task model reproducibility/holdout (`tools/train_aether_tasks.py --check`) and
    UI performance gates (`tools/check_ui_performance.py`)
 3. `:app:compileDebugKotlin` — fails fast on toolchain problems
-4. `:app:assembleDebug` — APK packaging
+4. `:app:assembleDebug :app:assembleDebugAndroidTest` — debug APK and separate instrumentation APK
 5. `:app:assembleRelease` — R8 minification + resource shrinking (throwaway CI keystore), then the
    universal ABI gate (`tools/check_universal_release.py`)
 6. `:app:testDebugUnitTest` — then discovers every `@Test` case in `app/src/test` and asserts the
    JUnit XML reports the same number, with zero failures/errors/skips
 7. `:app:lintDebug` — hard gate, the build fails on any lint error
+8. API 29 emulator — verify both APKs install and launch, and require the debug Agent instrumentation
+   cases to pass before uploading or publishing a preview.
 
 The debug APK is uploaded as the `adshield-pro-<version>-debug-apk` artifact.
 
@@ -111,6 +113,26 @@ that touches Android framework services — `VpnService` tunnel establishment, t
 browser, notifications, WorkManager scheduling and Room migrations on a real upgrade path.
 For the Agent's actual Compose UI, file picker, Android App Info, package visibility and live
 DNS benchmarks, use the [device checklist](PHONE_AGENT.md#on-device-smoke-checklist).
+
+## Android Agent device tests
+
+`tools/smoke_android_agent.sh` requires the **disposable CI emulator** and the exact debug APK
+already installed. It installs `app-debug-androidTest.apk` built by `:app:assembleDebugAndroidTest`,
+disables Wi-Fi and mobile data on the emulator, and fails unless all three instrumentation cases pass:
+
+- **Real Agent UI:** cancel consent, background with a pending approval, approve and run the review
+  with no Android-validated network, check all three evidence sources and unchanged relevant settings
+  and scan history, then verify leaving the tab clears the result.
+- **Real VPN service and UI:** use Android's VPN consent dialog and one installed and one missing
+  package. Check saved vs. unknown before setup, accepted vs. rejected after setup, changed settings
+  before rebuild, a new generation after rebuild, the same generation on pause/resume, and no receipt
+  after stop.
+- **In-flight cancellation:** exercise the real Compose screen and ViewModel with a deliberately
+  suspended reader that returns after cancellation; assert that no result is published.
+
+The separate Secure APK is test-signed in CI and receives only the install/launch smoke. These
+cases do not capture packets, validate egress, or establish handset compatibility. For the remaining
+manual coverage, see [the Agent smoke checklist](PHONE_AGENT.md#on-device-smoke-checklist).
 
 ## Manual smoke test (device / emulator, API 29+)
 

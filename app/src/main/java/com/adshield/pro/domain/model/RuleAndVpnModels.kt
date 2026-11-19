@@ -95,8 +95,13 @@ data class VpnRuntimeState(
     val sessionCachedQueries: Long = 0L,
     val averageLatencyMs: Int = 0,
     val loadedRuleCount: Int = 0,
-    val lastError: String? = null
+    val lastError: String? = null,
+    internal val tunnelReceipt: VpnTunnelReceipt? = null
 ) {
+    /** Pausing filtering does not dismantle the Android tunnel or change its exclusions. */
+    internal val activeTunnelReceipt: VpnTunnelReceipt?
+        get() = if (status == VpnStatus.CONNECTED || status == VpnStatus.PAUSED) tunnelReceipt else null
+
     val blockingPercentage: Float
         get() = if (sessionTotalQueries > 0L) {
             (sessionBlockedQueries.toFloat() / sessionTotalQueries.toFloat()) * 100f

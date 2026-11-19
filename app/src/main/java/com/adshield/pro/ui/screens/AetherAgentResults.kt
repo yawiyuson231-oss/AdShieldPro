@@ -136,15 +136,16 @@ internal fun LazyListScope.agentSecurityReviewItems(
         }
     }
     report.dns.value?.let { dns ->
+        item(key = "review-tunnel") { AgentTunnelEvidence(dns, report.finishedAtMs) }
         item(key = "review-dns") { AgentSavedDnsPolicy(dns, report.dns.checkedAtMs) }
     }
     item(key = "review-cross-check") {
-        AgentCard("App indicators and saved DNS exceptions") {
+        AgentCard("App indicators and DNS exceptions") {
             val count = report.appPolicyMatchCount
             Text(when {
                 count == null -> "Couldn't compare. Both saved DNS policy and inspected app metadata are needed."
-                count == 0 -> "No inspected app with medium- or high-risk indicators matched a saved exception."
-                else -> "$count inspected app(s) with medium- or high-risk indicators also had a saved VPN exclusion or Allow all DNS rule."
+                count == 0 -> "No inspected app with medium- or high-risk indicators matched the available exception evidence."
+                else -> "$count inspected app(s) with medium- or high-risk indicators matched a saved rule or a VPN exclusion in the setup receipt."
             })
             for (match in report.appPolicyMatches) {
                 Spacer(Modifier.height(4.dp))
@@ -152,6 +153,7 @@ internal fun LazyListScope.agentSecurityReviewItems(
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text("${match.packageName} · ${match.level.name.lowercase()}-risk indicators", style = MaterialTheme.typography.bodySmall)
                 Text(match.exception.label, style = MaterialTheme.typography.labelMedium)
+                match.exclusionEvidence?.let { Text(it.label, style = MaterialTheme.typography.bodySmall) }
                 match.indicators.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
             if (count != null && count > report.appPolicyMatches.size) {
@@ -160,12 +162,34 @@ internal fun LazyListScope.agentSecurityReviewItems(
             if ((report.apps.value?.unavailable ?: 0) > 0) {
                 Text("Apps without readable metadata could not be compared.", style = MaterialTheme.typography.bodySmall)
             }
-            Text("Saved settings don't confirm what the tunnel applied or that an app used an exception. Metadata does not prove an app is malicious.",
+            Text("The setup receipt does not show traffic. Allow all DNS stays a saved rule, not proof of a DNS decision. Metadata does not prove an app is malicious.",
                 style = MaterialTheme.typography.bodySmall)
         }
     }
     report.apps.value?.let { apps ->
         item(key = "review-apps") { AgentAppAudit(apps, actionsEnabled) }
+    }
+}
+
+@Composable
+private fun AgentTunnelEvidence(dns: AetherDnsPolicyReview.Summary, reviewedAtMs: Long) {
+    AgentCard("VPN exclusion evidence") {
+        val tunnel = dns.tunnel
+        Text("${dns.vpnExcludedApps} saved VPN exclusions")
+        if (tunnel == null) {
+            Text("Applied state unknown: no current tunnel setup receipt.")
+        } else {
+            Text("Saved VPN exclusions accepted: ${tunnel.appliedSaved}/${dns.vpnExcludedApps}")
+            Text("Saved exclusions rejected: ${tunnel.rejectedSaved}")
+            Text("Saved exclusions not recorded at setup: ${tunnel.unrecordedSaved}")
+            Text("Accepted at setup but no longer saved: ${tunnel.appliedButNoLongerSaved}")
+            Text("DNS routes set up: ${if (tunnel.hasIpv6DnsRoute) "IPv4 and IPv6" else "IPv4"}")
+            if (tunnel.filteringPaused) Text("DNS filtering was paused; the Android tunnel was still installed.")
+            Text("Tunnel #${tunnel.generation} established ${agentDateTime(tunnel.establishedAtEpochMs)}.",
+                style = MaterialTheme.typography.bodySmall)
+        }
+        Text("Snapshot at ${agentDateTime(reviewedAtMs)}. Run another review after changes. " +
+            "This checks tunnel setup, not DNS traffic or which resolver answered.", style = MaterialTheme.typography.bodySmall)
     }
 }
 

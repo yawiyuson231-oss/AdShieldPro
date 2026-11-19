@@ -7,7 +7,7 @@ review next?”** Every important claim should say what was observed, what was m
 what Android did not let us check. Better answers and safer actions matter more than more models.
 This roadmap covers the Android Agent, not the browser platform's separate AETHER system.
 
-## Implemented in this change
+## Implemented
 
 **Security → AI Agent → Review phone, DNS and apps** runs one approved workflow. The bundled intent
 model can also suggest **Security review**, but can't choose targets, authorize tools, or score threats.
@@ -15,7 +15,7 @@ model can also suggest **Security review**, but can't choose targets, authorize 
 | Component | Input and job | Boundary |
 | --- | --- | --- |
 | Phone protection specialist | Local tunnel status, passive Android readings and permitted summaries; identifies protection interruptions and relevant device context. | No active network probe. Missing readings stay unknown. |
-| DNS policy specialist | Saved resolver plan, DNSSEC and filtering settings; identifies configured coverage gaps and rule conflicts. | No lookup or claim that a selected resolver responded or an exclusion took effect. |
+| DNS policy specialist | Saved resolver plan and filtering settings, plus the current tunnel's in-memory receipt for accepted/rejected VPN exclusions. | Setup evidence only. No lookup, observed traffic, or claimed per-query rule enforcement. |
 | App-risk specialist | Android-visible package declarations and install-source evidence; counts inspected and unavailable metadata. | Not a malware verdict, proof of permission use, or access to private app data. |
 | Coordinator | Runs the three readers independently, joins indicators to saved exceptions by exact package ID, and ranks evidence-linked follow-ups. | Fixed local code. No data sent, policy changes, background tasks or model-to-tool calls. |
 
@@ -24,12 +24,18 @@ an **Allow all DNS** rule. That changes what to review first, not what to block.
 readings are part of the report. One approval covers these three reads only; a follow-up benchmark or
 settings action is a separate decision. See the [usage and device checklist](PHONE_AGENT.md).
 
+The Android CI suite now exercises the real Agent UI on an API 29 emulator, including canceled and
+expired approvals, an offline report, leaving the Agent, and the real VPN's receipt across setup,
+changed settings, rebuild, pause/resume and stop. A separate test uses a controlled reader to verify
+in-flight cancellation. This does not validate physical handsets, all network transitions or packet
+coverage. See [the test scope](TESTING.md#android-agent-device-tests).
+
 ## What to build next, in order
 
 | Priority | Proposed delivery | Evidence required before shipping |
 | --- | --- | --- |
-| **P0 · Verify this workflow and the release channel** | Automate the approval/run/cancel/leave flow on Android. Exercise it on a low-memory phone and a current phone, offline and during VPN/network changes. Keep development APKs separate from the private Secure signer and exact-source release process. | Device traces for each flow, no review-initiated network I/O or writes, no canceled task publishing a result, R8 build and clean install/upgrade. CI test-signing is not production signing. |
-| **P1 · Verify what protection actually applied** | Add a short-lived **tunnel receipt** from successful tunnel setup: generation, selected transport, and accepted/rejected exclusions. Show **saved vs. applied vs. unknown** and invalidate the receipt on reconnect/stop. Add remaining known scope gaps when Android exposes reliable evidence. | Match receipts against emulator and handset fixtures for VPN restart, missing/uninstalled apps, IPv6, network switches, and changed settings. Never infer packet or per-app coverage from a configuration flag. |
+| **P0 · Validate on handsets and protect the release channel** | Extend API 29 coverage to a low-memory handset and a current handset, including actual network switches, Android revocation, IPv6 routing and configuration changes. Keep public previews separate from private Secure signing. | Device traces for approval, cancel, VPN transitions and controlled egress. Verify fresh install and upgrade; CI test-signing is not production signing. |
+| **P1 · Extend applied evidence only where measurable** | Keep setup receipts separate from per-query policy decisions. Where Android provides reliable attribution and logging is allowed, consider bounded summaries tagged with source, freshness and unknown attribution. | Verify receipt and per-query summaries on controlled fixtures; never infer packet or per-app coverage from a configuration flag. |
 | **P2 · Make safe fixes reviewable** | Add a policy preview specialist that computes a before/after diff using the existing DNS policy evaluator. Start with one narrowly scoped change and show what it cannot predict. Bind approval to exact inputs, recheck the settings revision before applying, and provide undo without overwriting later changes. | Test policy precedence, no-op, stale/double approval, timeout, partial failure, undo, and app compatibility. No silent auto-block, uninstall, permission grant or rollback over a newer edit. |
 | **P3 · Expand defensive evidence, then models** | Run link and file specialists only on one explicitly supplied URL or picker-selected file. Use versioned local indicators with source and age; report stale or conflicting evidence instead of hiding it. Improve English and Taglish task routing and abstention. Evaluate optional on-device summarization of the structured evidence if it measurably helps users. | Separate task-routing and threat-quality test sets, privacy/retention checks, false-positive review, and measured low-end phone cost. Generated prose must not introduce new evidence or authorize an action. Keep deterministic reports as the fallback. |
 
@@ -61,6 +67,6 @@ claiming AdShield is better than another app:
   repeat trials and report sample sizes and uncertainty. Compare only overlapping features, disclose
   constraints and misses, and get independent verification before a superiority claim.
 
-**Next engineering deliverable:** a tunnel receipt with a regression test proving that a saved
-exception does not become an “applied” exception before the current tunnel accepts it, paired with
-an end-to-end device test of the reviewed workflow.
+**Next implementation:** start with a read-only preview for restoring one saved VPN exclusion to
+filtered. It should show the change, the need for a successful tunnel rebuild, and what the Agent
+can't predict. Do not add automatic fixes or a new execution path before that preview is tested.

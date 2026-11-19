@@ -2,6 +2,7 @@ package com.adshield.pro.engine.aether
 
 import com.adshield.pro.domain.model.DnsProtocol
 import com.adshield.pro.domain.model.DnssecMode
+import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.engine.security.AppRiskAuditor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -56,7 +57,7 @@ internal object AetherSecurityReview {
     }
 
     enum class Source(val label: String) {
-        PROTECTION("Phone protection"), DNS("Saved DNS policy"), APPS("App metadata"), APP_POLICY("App metadata + saved DNS policy")
+        PROTECTION("Phone protection"), DNS("Saved DNS policy"), APPS("App metadata"), APP_POLICY("App metadata + DNS policy")
     }
 
     sealed interface Reading<out T> {
@@ -73,6 +74,7 @@ internal object AetherSecurityReview {
         val appName: String,
         val level: AppRiskAuditor.RiskLevel,
         val exception: AetherDnsPolicyReview.AppException,
+        val exclusionEvidence: AetherDnsPolicyReview.ExclusionEvidence?,
         val indicators: List<String>
     )
 
@@ -98,6 +100,7 @@ internal object AetherSecurityReview {
         phoneTimeoutMs: Long = PHONE_TIMEOUT_MS,
         dnsTimeoutMs: Long = DNS_POLICY_TIMEOUT_MS,
         appsTimeoutMs: Long = APPS_TIMEOUT_MS,
+        currentTunnel: () -> VpnRuntimeState = { VpnRuntimeState() },
         now: () -> Long = System::currentTimeMillis
     ): Report = coroutineScope {
         ensureActive()
@@ -106,7 +109,12 @@ internal object AetherSecurityReview {
         val phone = async { readStep(phoneTimeoutMs, now, readPhone) }
         val dns = async { readStep(dnsTimeoutMs, now, readDns) }
         val apps = async { readStep(appsTimeoutMs, now, readApps) }
-        val result = combine(phone.await(), dns.await(), apps.await(), now())
+        val phoneReading = phone.await()
+        val savedDns = dns.await()
+        val appReading = apps.await()
+        ensureActive()
+        val dnsWithTunnel = savedDns.map { it.compareWith(currentTunnel()) }
+        val result = combine(phoneReading, dnsWithTunnel, appReading, now())
         ensureActive()
         result
     }
@@ -147,7 +155,8 @@ internal object AetherSecurityReview {
             priorities = prioritize(phone.value, dnsSummary.value, appSummary.value, matches?.size),
             appPolicyMatchCount = matches?.size,
             appPolicyMatches = matches.orEmpty().take(MAX_APP_MATCH_DETAILS).map { (app, exception) ->
-                AppPolicyMatch(app.profile.packageName, app.profile.appName, app.riskLevel, exception, app.findings.take(3))
+                AppPolicyMatch(app.profile.packageName, app.profile.appName, app.riskLevel, exception,
+                    settings?.exclusionEvidenceFor(app.profile.packageName), app.findings.take(3))
             },
             finishedAtMs = finishedAtMs
         )
@@ -170,11 +179,18 @@ internal object AetherSecurityReview {
         }
         if (matches != null && matches > 0) {
             add(PriorityFinding(Source.APP_POLICY, "App indicators and DNS exceptions overlap",
-                "$matches inspected app(s) with review indicators also have a saved DNS exception. Review whether the exceptions are still needed. This does not show that an app is malicious or sent traffic.",
+                "$matches inspected app(s) with review indicators also have a saved exception or a VPN exclusion in the tunnel receipt. Review whether the exceptions are still needed. This does not show that an app is malicious or sent traffic.",
                 AetherPhoneAgent.Tool.APP_FIREWALL))
         } else if (apps != null && apps.highRisk > 0) {
             add(PriorityFinding(Source.APPS, "Review high-risk app indicators",
                 "${apps.highRisk} inspected app(s) had high-risk metadata indicators. See the app evidence below; declared permissions do not prove use or abuse."))
+        }
+        dns?.tunnel?.let { tunnel ->
+            if (tunnel.appliedButNoLongerSaved > 0 || tunnel.unrecordedSaved > 0 || tunnel.rejectedSaved > 0) {
+                add(PriorityFinding(Source.DNS, "Saved VPN exclusions differ from tunnel setup",
+                    "${tunnel.unrecordedSaved} saved exclusions not recorded at setup, ${tunnel.rejectedSaved} rejected, and ${tunnel.appliedButNoLongerSaved} applied but no longer saved. Review the settings; this report won't rebuild the tunnel.",
+                    AetherPhoneAgent.Tool.APP_FIREWALL))
+            }
         }
         if (dns?.failover == AetherDnsPolicyReview.Failover.NO_BACKUPS) {
             add(PriorityFinding(Source.DNS, "Encrypted failover has no eligible backup",

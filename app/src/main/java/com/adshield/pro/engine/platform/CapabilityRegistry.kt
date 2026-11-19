@@ -556,11 +556,11 @@ object CapabilityRegistry {
             "aether-security-review", "AETHER on-device security review with three specialists", CapabilityArea.AI_INTELLIGENCE,
             CapabilityStatus.IMPLEMENTED, "engine/aether/AetherSecurityReview.kt",
             listOf("android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE", "android.permission.QUERY_ALL_PACKAGES"),
-            listOf("Current phone/protection readings, saved DNS policy and metadata from Android-visible packages"),
-            listOf("One approval for three fixed read-only checks with independent time limits",
-                "Compares inspected app indicators with saved DNS exceptions by exact package ID; shows missing evidence",
-                "No data sent, settings changes, or claim that a saved exception was applied or an app is malicious"),
-            "AetherSecurityReviewTest.runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps and AetherSecurityReviewTest.deadlineOrFailureLeavesOtherSpecialistsEvidenceIntact and AetherSecurityReviewTest.runsIndependentSpecialistsAndCancelsAllWithoutAReport and AetherSecurityReviewTest.joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits and AetherDnsPolicyReviewTest.usesEligibleProvidersFromTheActualSavedPlanNotAnInventedFallback"
+            listOf("Phone/protection readings, saved DNS policy, the current VPN setup receipt when present, and metadata from Android-visible packages"),
+            listOf("One approval for three read-only checks with independent time limits",
+                "Compares saved VPN exclusions with Android setup outcomes; rejects evidence from an inactive tunnel",
+                "No network probe or settings changes; the receipt is not proof of traffic or per-query DNS enforcement"),
+            "AetherSecurityReviewTest.runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps and AetherSecurityReviewTest.joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits and AetherSecurityReviewTest.readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration and AetherDnsPolicyReviewTest.savedExclusionsStayUnknownUntilTheCurrentTunnelHasAReceipt and VpnExclusionSetupTest.recordsOnlyActualUserExclusionAttemptsWithoutCountingTheAppItself"
         ),
         cap(
             "aether-selected-file", "AETHER local scan of one chosen file", CapabilityArea.AI_INTELLIGENCE,
