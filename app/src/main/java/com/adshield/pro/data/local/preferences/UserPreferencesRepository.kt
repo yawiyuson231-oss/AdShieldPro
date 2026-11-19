@@ -89,7 +89,14 @@ data class AppSettingsState(
     val usbDebuggingTileConfig: UsbDebuggingTileConfig = UsbDebuggingTileConfig(),
     // --- DNS Alias Shield (retains the original CNAME setting) & Timed Auto-Resume Pause ---
     val cnameUncloakingEnabled: Boolean = true,
-    val vpnSnoozeUntilEpochMs: Long = 0L
+    val vpnSnoozeUntilEpochMs: Long = 0L,
+    // --- Next-Gen Power Expansion (Trap, Automation, Battery Alerts, Zero-Knowledge, Browser HTTPS-First) ---
+    val hardcodedDnsTrapEnabled: Boolean = true,
+    val contextAutomationEnabled: Boolean = false,
+    val batteryAlertsEnabled: Boolean = true,
+    val zeroKnowledgeCloudFilesEnabled: Boolean = false,
+    val scheduledSafScanEnabled: Boolean = false,
+    val browserHttpsFirstEnabled: Boolean = true
 )
 
 enum class DarkThemePreference(val label: String) {
@@ -137,6 +144,8 @@ class UserPreferencesRepository @Inject constructor(
         val DNS_FAILOVER_PROVIDERS = stringSetPreferencesKey("dns_failover_providers")
         val DNS_FASTEST_HEALTHY = booleanPreferencesKey("dns_fastest_healthy")
         val DNS_PREFER_MEDIA_ECS = booleanPreferencesKey("dns_prefer_media_ecs")
+        val DNS_SERVE_STALE = booleanPreferencesKey("dns_serve_stale_on_outage")
+        val DNS_ODOH_RELAY_URL = stringPreferencesKey("dns_odoh_relay_url")
         val DNSSEC_MODE = stringPreferencesKey("dnssec_mode")
         val DNS_FIREWALL_POLICY = stringPreferencesKey("dns_firewall_policy_json")
         val ENABLE_IPV6 = booleanPreferencesKey("enable_ipv6")
@@ -184,6 +193,12 @@ class UserPreferencesRepository @Inject constructor(
         // Keep the stored CNAME key for DNS Alias Shield and existing backups.
         val CNAME_UNCLOAKING_ENABLED = booleanPreferencesKey("cname_uncloaking_enabled")
         val VPN_SNOOZE_UNTIL_MS = longPreferencesKey("vpn_snooze_until_epoch_ms")
+        val HARDCODED_DNS_TRAP_ENABLED = booleanPreferencesKey("hardcoded_dns_trap_enabled")
+        val CONTEXT_AUTOMATION_ENABLED = booleanPreferencesKey("context_automation_enabled")
+        val BATTERY_ALERTS_ENABLED = booleanPreferencesKey("battery_alerts_enabled")
+        val ZK_CLOUD_FILES_ENABLED = booleanPreferencesKey("zero_knowledge_cloud_files_enabled")
+        val SCHEDULED_SAF_SCAN_ENABLED = booleanPreferencesKey("scheduled_saf_scan_enabled")
+        val BROWSER_HTTPS_FIRST_ENABLED = booleanPreferencesKey("browser_https_first_enabled")
     }
 
     val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
@@ -266,7 +281,9 @@ class UserPreferencesRepository @Inject constructor(
                 failoverProviderIds = prefs[Keys.DNS_FAILOVER_PROVIDERS] ?: emptySet(),
                 fastestHealthyProvider = prefs[Keys.DNS_FASTEST_HEALTHY] ?: false,
                 dnssecMode = dnssecMode,
-                preferGeoAccurateMediaDns = prefs[Keys.DNS_PREFER_MEDIA_ECS] ?: true
+                preferGeoAccurateMediaDns = prefs[Keys.DNS_PREFER_MEDIA_ECS] ?: true,
+                serveStaleOnOutage = prefs[Keys.DNS_SERVE_STALE] ?: true,
+                odohRelayUrl = prefs[Keys.DNS_ODOH_RELAY_URL] ?: ""
             ),
             dnsFirewallPolicy = dnsFirewallPolicy,
             detailedDnsLoggingEnabled = prefs[Keys.DETAILED_LOGGING] ?: true,
@@ -304,7 +321,13 @@ class UserPreferencesRepository @Inject constructor(
             privateDnsTileConfig = privateDnsTileConfig,
             usbDebuggingTileConfig = usbDebuggingTileConfig,
             cnameUncloakingEnabled = prefs[Keys.CNAME_UNCLOAKING_ENABLED] ?: true,
-            vpnSnoozeUntilEpochMs = (prefs[Keys.VPN_SNOOZE_UNTIL_MS] ?: 0L).coerceAtLeast(0L)
+            vpnSnoozeUntilEpochMs = (prefs[Keys.VPN_SNOOZE_UNTIL_MS] ?: 0L).coerceAtLeast(0L),
+            hardcodedDnsTrapEnabled = prefs[Keys.HARDCODED_DNS_TRAP_ENABLED] ?: true,
+            contextAutomationEnabled = prefs[Keys.CONTEXT_AUTOMATION_ENABLED] ?: false,
+            batteryAlertsEnabled = prefs[Keys.BATTERY_ALERTS_ENABLED] ?: true,
+            zeroKnowledgeCloudFilesEnabled = prefs[Keys.ZK_CLOUD_FILES_ENABLED] ?: false,
+            scheduledSafScanEnabled = prefs[Keys.SCHEDULED_SAF_SCAN_ENABLED] ?: false,
+            browserHttpsFirstEnabled = prefs[Keys.BROWSER_HTTPS_FIRST_ENABLED] ?: true
         )
     }
 
@@ -426,9 +449,49 @@ class UserPreferencesRepository @Inject constructor(
             prefs[Keys.DNS_FAILOVER_PROVIDERS] = config.failoverProviderIds
             prefs[Keys.DNS_FASTEST_HEALTHY] = config.fastestHealthyProvider
             prefs[Keys.DNS_PREFER_MEDIA_ECS] = config.preferGeoAccurateMediaDns
+            prefs[Keys.DNS_SERVE_STALE] = config.serveStaleOnOutage
+            prefs[Keys.DNS_ODOH_RELAY_URL] = config.odohRelayUrl.trim()
             prefs[Keys.DNSSEC_MODE] = config.dnssecMode.name
             prefs[Keys.ENABLE_IPV6] = config.enableIpv6
         }
+    }
+
+    suspend fun setHardcodedDnsTrapEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        try {
+            context.adShieldDataStore.edit { it[Keys.HARDCODED_DNS_TRAP_ENABLED] = enabled }
+        } finally {
+            invalidateSettingsCache()
+        }
+    }
+
+    suspend fun setContextAutomationEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        try {
+            context.adShieldDataStore.edit { it[Keys.CONTEXT_AUTOMATION_ENABLED] = enabled }
+        } finally {
+            invalidateSettingsCache()
+        }
+    }
+
+    suspend fun setBatteryAlertsEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.BATTERY_ALERTS_ENABLED] = enabled }
+    }
+
+    suspend fun setZeroKnowledgeCloudFilesEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.ZK_CLOUD_FILES_ENABLED] = enabled }
+    }
+
+    suspend fun setScheduledSafScanEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.SCHEDULED_SAF_SCAN_ENABLED] = enabled }
+    }
+
+    suspend fun setBrowserHttpsFirstEnabled(enabled: Boolean) {
+        invalidateSettingsCache()
+        context.adShieldDataStore.edit { it[Keys.BROWSER_HTTPS_FIRST_ENABLED] = enabled }
     }
 
     suspend fun updateDnsFirewallPolicy(policy: DnsFirewallPolicy) {

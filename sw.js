@@ -39,6 +39,7 @@ const SHELL_ASSETS = [
   './aether/lexical.js',
   './aether/typosquat.js',
   './aether/reputation.js',
+  './aether/anomaly.js',
   './aether/classifier.js',
   './security/monitor.js',
   './security/firewall-ai.js',

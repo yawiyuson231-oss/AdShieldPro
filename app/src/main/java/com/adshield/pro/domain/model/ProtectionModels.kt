@@ -217,7 +217,11 @@ data class DnsResolverConfig(
      * first healthy provider that forwards a client subnet (the selected provider
      * when it already does), while everything else keeps the configured order.
      */
-    val preferGeoAccurateMediaDns: Boolean = true
+    val preferGeoAccurateMediaDns: Boolean = true,
+    /** RFC 8767 Serve-Stale fallback when all configured upstreams fail during a transient outage. */
+    val serveStaleOnOutage: Boolean = true,
+    /** Optional RFC 9230 Oblivious DoH relay URL (HTTPS) to decouple client IP from DoH target. */
+    val odohRelayUrl: String = ""
 ) {
     val activeDohUrl: String
         get() = if (preset == DnsProviderPreset.CUSTOM) customDohUrl.ifBlank { preset.dohUrl } else preset.dohUrl
@@ -249,6 +253,10 @@ enum class DnssecMode(val label: String, val description: String) {
         "Report upstream DNSSEC status",
         "Preserves normal unsigned DNS resolution and reports AD/RRSIG evidence; does not claim local chain validation."
     ),
+    VERIFY_LOCAL_WHEN_SIGNED(
+        "Verify signed answers locally (RRSIG + DNSKEY)",
+        "Cryptographically verifies embedded RRSIG + DNSKEY records on-device (RSA/ECDSA) when returned, while still allowing unsigned domains."
+    ),
     REQUIRE_AUTHENTICATED_ANSWERS(
         "Strict: require AD on answers",
         "Rejects positive answers without the upstream Authenticated Data bit. This intentionally blocks unsigned domains and is not local DNSSEC validation."
@@ -259,7 +267,10 @@ enum class DnssecMode(val label: String, val description: String) {
 enum class AppDnsPolicy(val label: String) {
     DEFAULT("Use global protection"),
     ALLOW_ALL("Allow all DNS (bypass domain filters)"),
-    BLOCK_ALL("Block all DNS for this app")
+    BLOCK_ALL("Block all DNS for this app"),
+    BLOCK_WIFI("Block DNS on Wi-Fi"),
+    BLOCK_CELLULAR("Block DNS on mobile data"),
+    BLOCK_SCREEN_OFF("Block DNS when screen is off")
 }
 
 @Serializable

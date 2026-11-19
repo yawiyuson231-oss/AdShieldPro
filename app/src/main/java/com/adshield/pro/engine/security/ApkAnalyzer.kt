@@ -37,12 +37,20 @@ class ApkAnalyzer {
         val isSigned: Boolean,
         val usesDynamicCodeLoading: Boolean,
         val usesPackerOrObfuscator: Boolean,
-        val limitations: List<String> = emptyList()
+        val limitations: List<String> = emptyList(),
+        val signerSha256: String? = null,
+        val signerSubject: String? = null,
+        val signatureSchemeVersion: Int = 0,
+        val cloneMismatchDetected: Boolean = false
     ) {
         val isClean: Boolean get() = threatLevel == ThreatLevel.CLEAN
     }
 
-    fun analyzeApk(file: File, checkpoint: () -> Unit = {}): ApkReport {
+    fun analyzeApk(
+        file: File,
+        installedAppSignerSha256: String? = null,
+        checkpoint: () -> Unit = {}
+    ): ApkReport {
         val reasons = ArrayList<String>()
         val limitations = ArrayList<String>()
         checkpoint()
@@ -157,6 +165,18 @@ class ApkAnalyzer {
             reasons.add("No APK signing markers found in the inspected metadata")
             score += 12
         }
+        val sigReport = ApkSignatureVerifier.inspectApkSignatures(
+            apkFile = file,
+            packageName = packageName,
+            installedAppSignerSha256 = installedAppSignerSha256
+        )
+        if (sigReport.hasSignatureMarkers) {
+            isSigned = true
+        }
+        if (sigReport.addedRiskScore > 0) {
+            score += sigReport.addedRiskScore
+            reasons.addAll(sigReport.findings)
+        }
         if (dynamicLoading && !packer) {
             reasons.add("Contains dynamic code loading references; behavior was not observed")
             score += 10
@@ -182,7 +202,11 @@ class ApkAnalyzer {
             isSigned = isSigned,
             usesDynamicCodeLoading = dynamicLoading,
             usesPackerOrObfuscator = packer,
-            limitations = limitations
+            limitations = limitations,
+            signerSha256 = sigReport.primarySha256,
+            signerSubject = sigReport.primarySubject,
+            signatureSchemeVersion = sigReport.schemeVersion,
+            cloneMismatchDetected = sigReport.cloneMismatchDetected
         )
     }
 

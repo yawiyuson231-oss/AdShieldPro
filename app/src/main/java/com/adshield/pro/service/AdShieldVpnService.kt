@@ -15,6 +15,7 @@ import android.net.VpnService
 import android.os.Process
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.adshield.pro.MainActivity
 import com.adshield.pro.R
@@ -25,6 +26,7 @@ import com.adshield.pro.domain.model.NetworkTransportPolicy
 import com.adshield.pro.engine.dns.CnameCloakingInspector
 import com.adshield.pro.engine.dns.DnsPacketCodec
 import com.adshield.pro.engine.dns.DnsFirewallPolicyDecider
+import com.adshield.pro.engine.dns.HardcodedDnsTrap
 import com.adshield.pro.engine.dns.IpPacketFraming
 import com.adshield.pro.engine.dns.UpstreamDnsResolver
 import com.adshield.pro.engine.filter.FilterRuleEngine
@@ -173,6 +175,18 @@ class AdShieldVpnService : VpnService() {
                     builder.addDnsServer(VIRTUAL_IPV6_DNS)
                 }
 
+                // Route hardcoded public DNS server literals into the local filter when enabled
+                val trapPlan = HardcodedDnsTrap.buildTrapRoutes(
+                    config = settings.resolverConfig,
+                    trapEnabled = settings.hardcodedDnsTrapEnabled
+                )
+                for (route in trapPlan.ipv4Routes) {
+                    runCatching { builder.addRoute(route.address, route.prefixLength) }
+                }
+                for (route in trapPlan.ipv6Routes) {
+                    runCatching { builder.addRoute(route.address, route.prefixLength) }
+                }
+
                 // Always exclude AdShield Pro itself so upstream requests never loop
                 runCatching { builder.addDisallowedApplication(packageName) }
 
@@ -254,6 +268,10 @@ class AdShieldVpnService : VpnService() {
                         if (parsedPacket.destinationPort == 53) {
                             serviceScope.launch {
                                 handleTcpDnsPacket(parsedPacket, outputStream)
+                            }
+                        } else if (HardcodedDnsTrap.isTrappedPublicResolverIp(parsedPacket.destinationAddress)) {
+                            HardcodedDnsTrap.buildFastFailTcpReset(parsedPacket)?.let { rst ->
+                                writeToTunSafe(outputStream, rst)
                             }
                         }
                     }
@@ -372,6 +390,7 @@ class AdShieldVpnService : VpnService() {
         app: AppAttribution?
     ): ByteArray {
         val currentSettings = preferencesRepository.getSettingsSnapshot()
+        val interactive = isScreenCurrentlyInteractive()
 
         // Opportunistically end timed pause on the very first packet after its deadline even if
         // Doze deferred AlarmManager's inexact wake-up slightly.
@@ -404,7 +423,8 @@ class AdShieldVpnService : VpnService() {
                 protocolUsed = upstream.protocolUsed,
                 fromCache = upstream.fromCache,
                 appPackageName = app?.packageName,
-                appName = app?.label
+                appName = app?.label,
+                isScreenInteractive = interactive
             )
             return upstream.responseBytes
         }
@@ -416,7 +436,8 @@ class AdShieldVpnService : VpnService() {
             evaluation = evaluation,
             appPackageName = app?.packageName,
             transport = currentTransport,
-            policy = currentSettings.dnsFirewallPolicy
+            policy = currentSettings.dnsFirewallPolicy,
+            isScreenInteractive = interactive
         )
 
         if (decision.isBlocked) {
@@ -436,7 +457,8 @@ class AdShieldVpnService : VpnService() {
                 protocolUsed = if (mode.blockSinkholeZeroIp) "Sinkhole 0.0.0.0" else "Local NXDOMAIN",
                 fromCache = false,
                 appPackageName = app?.packageName,
-                appName = app?.label
+                appName = app?.label,
+                isScreenInteractive = interactive
             )
             maybeRefreshNotificationCounter()
             return blockedBytes
@@ -470,7 +492,8 @@ class AdShieldVpnService : VpnService() {
                 protocolUsed = blockedReply.label,
                 fromCache = upstreamResult.fromCache,
                 appPackageName = app?.packageName,
-                appName = app?.label
+                appName = app?.label,
+                isScreenInteractive = interactive
             )
             maybeRefreshNotificationCounter()
             return blockedReply.bytes
@@ -487,7 +510,8 @@ class AdShieldVpnService : VpnService() {
             protocolUsed = upstreamResult.protocolUsed,
             fromCache = upstreamResult.fromCache,
             appPackageName = app?.packageName,
-            appName = app?.label
+            appName = app?.label,
+            isScreenInteractive = interactive
         )
         maybeRefreshNotificationCounter()
         return upstreamResult.responseBytes
@@ -500,6 +524,11 @@ class AdShieldVpnService : VpnService() {
                 outputStream.flush()
             }
         }
+    }
+
+    private fun isScreenCurrentlyInteractive(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
+        return runCatching { pm.isInteractive }.getOrDefault(true)
     }
 
     private fun registerNetworkCallback() {

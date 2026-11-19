@@ -37,7 +37,7 @@ const MODULE_FILES = [
   'dns/codec.js', 'dns/cache.js', 'dns/client.js', 'dns/dnssec.js', 'dns/chain.js', 'dns/resolvers.js',
   'guard/video-safety.js',
   'aether/index.js', 'aether/data.js', 'aether/domain.js', 'aether/lexical.js',
-  'aether/typosquat.js', 'aether/reputation.js', 'aether/classifier.js',
+  'aether/typosquat.js', 'aether/reputation.js', 'aether/anomaly.js', 'aether/classifier.js',
   'security/monitor.js', 'security/firewall-ai.js', 'security/feedmanager.js',
   'security/backup.js', 'security/privacy.js', 'security/power.js', 'security/sha256.js', 'security/storage.js'
 ];

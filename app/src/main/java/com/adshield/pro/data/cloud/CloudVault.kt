@@ -2,7 +2,10 @@ package com.adshield.pro.data.cloud
 
 import android.content.Context
 import android.util.Base64
+import com.adshield.pro.engine.storage.ZeroKnowledgeFileCipher
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -134,6 +137,27 @@ class CloudVault @Inject constructor(
             GCMParameterSpec(GCM_TAG_BITS, payload.copyOfRange(0, NONCE_BYTES))
         )
         return cipher.doFinal(payload.copyOfRange(NONCE_BYTES, payload.size))
+    }
+
+    /**
+     * Streaming Zero-Knowledge AES-256-GCM file encryption (`OSZK` v1) using the unlocked vault key,
+     * allowing arbitrarily large Cloud, WebDAV, or Telegram uploads with constant ~64 KiB memory.
+     */
+    fun encryptFileStream(
+        source: InputStream,
+        sink: OutputStream
+    ): ZeroKnowledgeFileCipher.EncryptedStreamSummary {
+        val key = masterKey ?: error("vault is locked")
+        return ZeroKnowledgeFileCipher.encryptStreamWithKey(source, sink, key, random = random)
+    }
+
+    /** Decrypts and authenticates a streaming `OSZK` v1 file using the unlocked vault key. */
+    fun decryptFileStream(
+        source: InputStream,
+        sink: OutputStream
+    ): ZeroKnowledgeFileCipher.DecryptedStreamSummary {
+        val key = masterKey ?: error("vault is locked")
+        return ZeroKnowledgeFileCipher.decryptStreamWithKey(source, sink, key)
     }
 
     private fun derive(passphrase: CharArray, salt: ByteArray, iterations: Int): SecretKey {

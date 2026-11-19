@@ -1,0 +1,38 @@
+<resources>
+    <string name="app_name">AdShield Pro</string>
+    <string name="vpn_notification_channel_name">Katayuan ng Proteksyon ng AdShield</string>
+    <string name="vpn_notification_channel_desc">Nagpapakita ng aktwal na katayuan ng lokal na VPN at pagharang ng ad sa DNS</string>
+    <string name="vpn_session_name">AdShield Pro Lokal na DNS Firewall</string>
+    <string name="tile_adshield_label">AdShield</string>
+    <string name="tile_private_dns_label">Pribadong DNS</string>
+    <string name="tile_usb_debugging_label">USB Debugging</string>
+    <string name="share_clean_link_label">Linisin at Suriin ang Link</string>
+    <string name="widget_adshield_description">Aktwal na katayuan ng DNS shield, bilang ng naharang na query, isang-tap na switch, at 15-minutong pansamantalang hinto.</string>
+    <string name="widget_default_status">PATAY</string>
+    <string name="widget_default_subtitle">Pindutin ang Protektahan upang buhayin ang DNS shield</string>
+    <string name="widget_default_count">0</string>
+    <string name="widget_blocked_label">Naharang</string>
+    <string name="widget_default_rate">Lokal na non-root DNS firewall</string>
+    <string name="widget_action_protect">Protektahan</string>
+    <string name="widget_action_open">Buksan</string>
+
+    <!-- 5-Pillar Navigation & Quick Search (Filipino / Tagalog) -->
+    <string name="pillar_shield">Panangga</string>
+    <string name="pillar_security">Seguridad</string>
+    <string name="pillar_intel">Intel</string>
+    <string name="pillar_vault">Vault</string>
+    <string name="pillar_system">Sistema</string>
+    <string name="quick_search_title">Mabilisang Paghahanap ng Module</string>
+    <string name="quick_search_placeholder">Maghanap ng module, firewall, QR scanner, DNS, vault…</string>
+
+    <!-- Power Expansion Features (Filipino / Tagalog) -->
+    <string name="hardcoded_dns_trap_title">Bitag Laban sa Hardcoded DNS Bypass</string>
+    <string name="hardcoded_dns_trap_subtitle">Pinadadaan sa lokal na filter ang mga app na gumagamit ng direktang 8.8.8.8 / 1.1.1.1 / 9.9.9.9</string>
+    <string name="context_automation_title">Awtomatikong Proteksyon Ayon sa Konteksto</string>
+    <string name="context_automation_subtitle">Pinahihigpit ang DNS sa bukas na Wi-Fi at ipinagpapaliban ang sync habang naglalaro o mababa ang baterya</string>
+    <string name="battery_alerts_title">Abiso sa Sobrang Init at Punong Baterya</string>
+    <string name="qr_scan_camera_button">I-scan ang QR gamit ang Kamera</string>
+    <string name="qr_pick_image_button">Pumili ng Larawan ng QR</string>
+    <string name="zk_encryption_title">Zero-Knowledge AES-256-GCM File Vault</string>
+    <string name="anomaly_radar_title">AETHER Radar sa Kakaibang Kilos at Tracker Habang Nakapatay ang Screen</string>
+</resources>

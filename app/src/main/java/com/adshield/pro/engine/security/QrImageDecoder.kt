@@ -75,18 +75,26 @@ object QrImageDecoder {
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         }.getOrNull() ?: return Result.failure(IllegalArgumentException("The image could not be decoded"))
         return try {
-            val width = bitmap.width
-            val height = bitmap.height
-            val pixels = IntArray(width * height)
-            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-            val decoded = decodeArgb(width, height, pixels)
-            if (decoded == null) {
-                Result.failure(IllegalStateException("No QR or Data Matrix code was found in this image"))
-            } else {
-                Result.success(decoded)
-            }
+            decodeBitmap(bitmap)
         } finally {
             bitmap.recycle()
+        }
+    }
+
+    /** Decodes an in-memory [Bitmap] (for example from Camera capture preview) locally on-device. */
+    fun decodeBitmap(bitmap: Bitmap): Result<Decoded> {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0 || width.toLong() * height.toLong() > MAX_PIXELS) {
+            return Result.failure(IllegalArgumentException("Bitmap dimensions out of bounds"))
+        }
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val decoded = decodeArgb(width, height, pixels)
+        return if (decoded == null) {
+            Result.failure(IllegalStateException("No QR or Data Matrix code was found in this image"))
+        } else {
+            Result.success(decoded)
         }
     }
 

@@ -237,6 +237,15 @@ fun AppFirewallScreen(
                     onSelectBlockDns = {
                         onSetAppDnsPolicy(app.packageName, AppDnsPolicy.BLOCK_ALL)
                     },
+                    onSelectBlockWifi = {
+                        onSetAppDnsPolicy(app.packageName, AppDnsPolicy.BLOCK_WIFI)
+                    },
+                    onSelectBlockCellular = {
+                        onSetAppDnsPolicy(app.packageName, AppDnsPolicy.BLOCK_CELLULAR)
+                    },
+                    onSelectBlockScreenOff = {
+                        onSetAppDnsPolicy(app.packageName, AppDnsPolicy.BLOCK_SCREEN_OFF)
+                    },
                     onSelectBypassVpn = {
                         if (!app.isExcludedFromVpn) onToggleAppExclusion(app.packageName, true)
                     }
@@ -280,11 +289,17 @@ private fun AppFirewallRowCard(
     onSelectFiltered: () -> Unit,
     onSelectAllowDns: () -> Unit,
     onSelectBlockDns: () -> Unit,
+    onSelectBlockWifi: () -> Unit,
+    onSelectBlockCellular: () -> Unit,
+    onSelectBlockScreenOff: () -> Unit,
     onSelectBypassVpn: () -> Unit
 ) {
     val (statusText, statusColor) = when {
         app.isExcludedFromVpn -> "BYPASS VPN" to WarningAmber
         app.dnsPolicy == AppDnsPolicy.BLOCK_ALL -> "DNS BLOCKED" to AlertRed
+        app.dnsPolicy == AppDnsPolicy.BLOCK_WIFI -> "NO WI-FI DNS" to AlertRed
+        app.dnsPolicy == AppDnsPolicy.BLOCK_CELLULAR -> "NO CELL DNS" to AlertRed
+        app.dnsPolicy == AppDnsPolicy.BLOCK_SCREEN_OFF -> "SCREEN-OFF BLOCK" to WarningAmber
         app.dnsPolicy == AppDnsPolicy.ALLOW_ALL -> "UNFILTERED" to CyberCyan
         else -> "FILTERED" to EmeraldPrimary
     }
@@ -366,6 +381,21 @@ private fun AppFirewallRowCard(
                     selected = !app.isExcludedFromVpn && app.dnsPolicy == AppDnsPolicy.BLOCK_ALL,
                     onClick = onSelectBlockDns,
                     label = { Text("Block DNS", style = MaterialTheme.typography.labelSmall) }
+                )
+                FilterChip(
+                    selected = !app.isExcludedFromVpn && app.dnsPolicy == AppDnsPolicy.BLOCK_WIFI,
+                    onClick = onSelectBlockWifi,
+                    label = { Text("No Wi-Fi", style = MaterialTheme.typography.labelSmall) }
+                )
+                FilterChip(
+                    selected = !app.isExcludedFromVpn && app.dnsPolicy == AppDnsPolicy.BLOCK_CELLULAR,
+                    onClick = onSelectBlockCellular,
+                    label = { Text("No Cell", style = MaterialTheme.typography.labelSmall) }
+                )
+                FilterChip(
+                    selected = !app.isExcludedFromVpn && app.dnsPolicy == AppDnsPolicy.BLOCK_SCREEN_OFF,
+                    onClick = onSelectBlockScreenOff,
+                    label = { Text("Screen-Off Block", style = MaterialTheme.typography.labelSmall) }
                 )
                 FilterChip(
                     selected = app.isExcludedFromVpn,

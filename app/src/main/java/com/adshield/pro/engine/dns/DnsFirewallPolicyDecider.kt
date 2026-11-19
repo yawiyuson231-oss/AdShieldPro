@@ -19,7 +19,8 @@ object DnsFirewallPolicyDecider {
         evaluation: FilterEvaluationResult,
         appPackageName: String?,
         transport: NetworkTransportPolicy,
-        policy: DnsFirewallPolicy
+        policy: DnsFirewallPolicy,
+        isScreenInteractive: Boolean = true
     ): DnsPolicyDecision {
         val explicitlyAllowed = evaluation.sourceName == "User Allowlist" ||
             evaluation.sourceName == "System Safety Allowlist" ||
@@ -36,8 +37,19 @@ object DnsFirewallPolicyDecider {
         }
 
         val appPolicy = appPackageName?.let { policy.appPolicies[it] } ?: AppDnsPolicy.DEFAULT
-        if (appPolicy == AppDnsPolicy.BLOCK_ALL) {
-            return DnsPolicyDecision(true, false, "Per-App DNS Block", appPackageName)
+        when {
+            appPolicy == AppDnsPolicy.BLOCK_ALL -> {
+                return DnsPolicyDecision(true, false, "Per-App DNS Block", appPackageName)
+            }
+            appPolicy == AppDnsPolicy.BLOCK_WIFI && transport == NetworkTransportPolicy.WIFI -> {
+                return DnsPolicyDecision(true, false, "Per-App Wi-Fi DNS Lock", appPackageName)
+            }
+            appPolicy == AppDnsPolicy.BLOCK_CELLULAR && transport == NetworkTransportPolicy.CELLULAR -> {
+                return DnsPolicyDecision(true, false, "Per-App Mobile Data DNS Lock", appPackageName)
+            }
+            appPolicy == AppDnsPolicy.BLOCK_SCREEN_OFF && !isScreenInteractive -> {
+                return DnsPolicyDecision(true, false, "Per-App Screen-Off DNS Lock", appPackageName)
+            }
         }
         if (transport !in policy.protectedTransports) {
             return DnsPolicyDecision(false, true, "Network Policy Passthrough (${transport.label})")

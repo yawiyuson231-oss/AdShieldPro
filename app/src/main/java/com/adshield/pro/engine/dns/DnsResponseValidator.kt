@@ -5,6 +5,7 @@ import java.io.IOException
 
 /** DNSSEC evidence visible in a response. AD is upstream validation evidence, not local chain validation. */
 enum class DnssecStatus(val label: String) {
+    LOCALLY_CRYPTO_VERIFIED("Cryptographically verified on-device (RRSIG + DNSKEY)"),
     UPSTREAM_AUTHENTICATED("Authenticated by upstream resolver (AD)"),
     SIGNATURES_PRESENT_UNVALIDATED("DNSSEC signatures present; not locally validated"),
     NOT_AUTHENTICATED("No authenticated DNSSEC status")
@@ -57,13 +58,30 @@ object DnsResponseValidator {
         val recordTypes = DnsPacketCodec.inspectResponseRecordTypes(responseBytes)
             ?: throw DnsResponseValidationException("Malformed DNS resource records or trailing data")
         val hasRrsig = 46 in recordTypes
+        val hasDnskey = 48 in recordTypes
         val ad = flags and 0x0020 != 0
+
+        val localVerification = if (hasRrsig && hasDnskey) {
+            LocalDnssecVerifier.verifyWireResponse(responseBytes, emptyList())
+        } else {
+            null
+        }
+        if (mode == DnssecMode.VERIFY_LOCAL_WHEN_SIGNED && localVerification != null &&
+            (localVerification.verdict == LocalDnssecVerifier.VerificationVerdict.BOGUS_SIGNATURE ||
+                localVerification.verdict == LocalDnssecVerifier.VerificationVerdict.EXPIRED_OR_NOT_YET_VALID)
+        ) {
+            throw DnsResponseValidationException("Local DNSSEC cryptographic check failed: ${localVerification.detail}")
+        }
+
         val status = when {
+            localVerification?.isAuthentic == true -> DnssecStatus.LOCALLY_CRYPTO_VERIFIED
             ad -> DnssecStatus.UPSTREAM_AUTHENTICATED
             hasRrsig -> DnssecStatus.SIGNATURES_PRESENT_UNVALIDATED
             else -> DnssecStatus.NOT_AUTHENTICATED
         }
-        if (mode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS && rcode == 0 && answerCount > 0 && !ad) {
+        if (mode == DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS && rcode == 0 && answerCount > 0 &&
+            !ad && localVerification?.isAuthentic != true
+        ) {
             throw DnsResponseValidationException("Strict DNSSEC policy rejected an answer without AD")
         }
         return DnsResponseInspection(

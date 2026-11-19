@@ -54,7 +54,10 @@ import com.adshield.pro.data.repository.BatteryIntelligenceRepository
 import com.adshield.pro.engine.battery.BatteryDiagnostic
 import com.adshield.pro.engine.battery.BatteryDiagnostics
 import com.adshield.pro.engine.battery.BatterySession
+import com.adshield.pro.engine.aether.BehavioralAnomalyEngine
 import com.adshield.pro.engine.aether.LiveNetworkModel
+import com.adshield.pro.worker.BatteryAlertWorker
+import com.adshield.pro.worker.SafFolderScanWorker
 import com.adshield.pro.engine.battery.BatteryTelemetry
 import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.browser.LinkSanitizer
@@ -140,7 +143,8 @@ class AdShieldViewModel @Inject constructor(
     private val deviceProfiler: DeviceProfiler,
     private val searchSuggestionClient: SearchSuggestionClient,
     private val systemPreferencesController: SystemPreferencesController,
-    private val snoozeController: ProtectionSnoozeController
+    private val snoozeController: ProtectionSnoozeController,
+    private val behavioralAnomalyEngine: BehavioralAnomalyEngine
 ) : ViewModel() {
 
     val vpnState: StateFlow<VpnRuntimeState> = repository.vpnRuntimeState
@@ -150,6 +154,14 @@ class AdShieldViewModel @Inject constructor(
 
     val recentLogs: StateFlow<List<DnsActivityRecord>> = repository.recentLogsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val anomalyRadarReport: StateFlow<BehavioralAnomalyEngine.BehavioralRadarReport> = recentLogs
+        .map { behavioralAnomalyEngine.snapshotReport() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            behavioralAnomalyEngine.snapshotReport()
+        )
 
     val liveTopApps: StateFlow<List<AppDnsActivity>> = repository.liveTopAppsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -1765,6 +1777,71 @@ class AdShieldViewModel @Inject constructor(
             is SystemPreferenceWriteResult.PermissionDenied ->
                 showFeedback("Grant WRITE_SECURE_SETTINGS via ADB once to let AdShield Pro toggle this preference.")
             is SystemPreferenceWriteResult.RejectedBySystem -> showFeedback(result.reason)
+        }
+    }
+
+    // --- v2.12 Power Expansion Controls ---
+
+    fun setHardcodedDnsTrapEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setHardcodedDnsTrapEnabled(enabled)
+            reloadTunnelIfConnected()
+            showFeedback(
+                if (enabled) "Anti-Bypass Hardcoded DNS Trap enabled (routes hardcoded public DNS port-53 into local filter)."
+                else "Hardcoded DNS Trap disabled."
+            )
+        }
+    }
+
+    fun setContextAutomationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setContextAutomationEnabled(enabled)
+            showFeedback(
+                if (enabled) "Context-Aware Protection Automation enabled."
+                else "Context-Aware Protection Automation disabled."
+            )
+        }
+    }
+
+    fun setBatteryAlertsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBatteryAlertsEnabled(enabled)
+            BatteryAlertWorker.applySchedule(appContext, enabled)
+            showFeedback(
+                if (enabled) "Background battery thermal (>=43°C) & full-charge alerts scheduled."
+                else "Background battery alerts cancelled."
+            )
+        }
+    }
+
+    fun setZeroKnowledgeCloudFilesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setZeroKnowledgeCloudFilesEnabled(enabled)
+            showFeedback(
+                if (enabled) "Zero-Knowledge AES-256-GCM file encryption enabled for new vault uploads."
+                else "Zero-Knowledge file encryption disabled."
+            )
+        }
+    }
+
+    fun setScheduledSafScanEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setScheduledSafScanEnabled(enabled)
+            SafFolderScanWorker.applySchedule(appContext, enabled)
+            showFeedback(
+                if (enabled) "Scheduled background SAF folder scan enabled (scans granted folders only)."
+                else "Scheduled SAF folder scan disabled."
+            )
+        }
+    }
+
+    fun setBrowserHttpsFirstEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBrowserHttpsFirstEnabled(enabled)
+            showFeedback(
+                if (enabled) "HTTPS-First auto-upgrade enabled in Privacy Browser."
+                else "HTTPS-First auto-upgrade disabled."
+            )
         }
     }
 }

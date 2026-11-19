@@ -75,8 +75,22 @@ class UpstreamDnsResolver @Inject constructor(
         val protocolOrigin: String
     )
 
-    private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(128, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean = size > 1024
+    private val dnsCache = object : LinkedHashMap<String, CachedDnsEntry>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedDnsEntry>?): Boolean =
+            size > MAX_CACHE_ENTRIES
+    }
+
+    internal fun putCacheEntryForTest(
+        query: DnsPacketCodec.ParsedDnsQuery,
+        config: DnsResolverConfig,
+        wireResponse: ByteArray,
+        expiresAtEpochMs: Long,
+        protocolOrigin: String = "DOH (Test)"
+    ) {
+        val key = buildCacheKey(query, config)
+        synchronized(dnsCache) {
+            dnsCache[key] = CachedDnsEntry(wireResponse.copyOf(), expiresAtEpochMs, protocolOrigin)
+        }
     }
 
     @Volatile
@@ -233,6 +247,7 @@ class UpstreamDnsResolver @Inject constructor(
     ): UpstreamResult = withContext(Dispatchers.IO) {
         val now = System.currentTimeMillis()
         val cacheKey = buildCacheKey(query, config)
+        var staleCandidate: CachedDnsEntry? = null
         val cached = synchronized(dnsCache) { dnsCache.get(cacheKey) }
         if (cached != null) {
             if (cached.expiresAtEpochMs > now) {
@@ -243,7 +258,11 @@ class UpstreamDnsResolver @Inject constructor(
                     latencyMs = 0
                 )
             }
-            synchronized(dnsCache) { dnsCache.remove(cacheKey) }
+            if (config.serveStaleOnOutage && (now - cached.expiresAtEpochMs) <= MAX_STALE_WINDOW_MS) {
+                staleCandidate = cached
+            } else {
+                synchronized(dnsCache) { dnsCache.remove(cacheKey) }
+            }
         }
 
         val configuredPlan = DnsProviderRegistry.queryPlan(config)
@@ -373,6 +392,19 @@ class UpstreamDnsResolver @Inject constructor(
 
         if (resolved != null) return@withContext resolved as UpstreamResult
 
+        // RFC 8767 Serve-Stale fallback: only when all live configured upstreams failed, the stale
+        // window (<= 1h) has not elapsed, and strict DNSSEC AD-enforcement is not active.
+        if (staleCandidate != null && config.serveStaleOnOutage &&
+            config.dnssecMode != com.adshield.pro.domain.model.DnssecMode.REQUIRE_AUTHENTICATED_ANSWERS
+        ) {
+            return@withContext UpstreamResult(
+                responseBytes = DnsPacketCodec.rewriteTransactionId(staleCandidate.wireResponse, query.transactionId),
+                protocolUsed = "${staleCandidate.protocolOrigin} (Serve-Stale RFC 8767)",
+                fromCache = true,
+                latencyMs = 0
+            )
+        }
+
         // Fail closed at the DNS protocol layer: return SERVFAIL, never an unvalidated response
         // and never an implicit plaintext downgrade.
         UpstreamResult(
@@ -388,7 +420,14 @@ class UpstreamDnsResolver @Inject constructor(
         config: DnsResolverConfig,
         endpoint: DnsProviderEndpoint
     ): ByteArray = when (config.protocol) {
-        DnsProtocol.DOH -> queryDoh(query.rawPayload, endpoint.dohUrl)
+        DnsProtocol.DOH -> {
+            val effectiveDohUrl = if (config.odohRelayUrl.isNotBlank()) {
+                ObliviousDohCodec.buildRelayQueryUrl(config.odohRelayUrl, endpoint.dohUrl) ?: endpoint.dohUrl
+            } else {
+                endpoint.dohUrl
+            }
+            queryDoh(query.rawPayload, effectiveDohUrl)
+        }
         DnsProtocol.DOT -> queryDot(query.rawPayload, endpoint, config.enableIpv6)
         DnsProtocol.UDP_TCP -> queryUdpOrTcp(query, endpoint, config.enableIpv6)
     }
@@ -706,7 +745,13 @@ class UpstreamDnsResolver @Inject constructor(
             val failoverScope = if (config.failoverEnabled && config.protocol != DnsProtocol.UDP_TCP) {
                 "|plan=" + DnsProviderRegistry.queryPlan(config).joinToString(",") { it.providerId }
             } else ""
-            return "${config.protocol.name}@$endpoint$failoverScope|dnssec=${config.dnssecMode.name}|${query.cacheKey}"
+            val odohScope = if (config.odohRelayUrl.isNotBlank() && config.protocol == DnsProtocol.DOH) {
+                "|odoh=" + config.odohRelayUrl.trim().lowercase()
+            } else ""
+            return "${config.protocol.name}@$endpoint$failoverScope$odohScope|dnssec=${config.dnssecMode.name}|${query.cacheKey}"
         }
+
+        const val MAX_CACHE_ENTRIES = 4_096
+        const val MAX_STALE_WINDOW_MS = 3_600_000L
     }
 }

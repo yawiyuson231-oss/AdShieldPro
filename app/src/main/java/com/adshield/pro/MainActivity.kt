@@ -131,6 +131,49 @@ enum class MainNavDestination(val label: String, val icon: ImageVector) {
     STATUS("Status", Icons.Default.VerifiedUser)
 }
 
+enum class NavPillar(
+    val label: String,
+    val icon: ImageVector,
+    val primaryDestination: MainNavDestination,
+    val destinations: List<MainNavDestination>
+) {
+    SHIELD(
+        "Shield",
+        Icons.Default.Shield,
+        MainNavDestination.HOME,
+        listOf(MainNavDestination.HOME, MainNavDestination.AD_BLOCKER, MainNavDestination.LIVE, MainNavDestination.STATISTICS)
+    ),
+    SECURITY(
+        "Security",
+        Icons.Default.Security,
+        MainNavDestination.SECURITY,
+        listOf(MainNavDestination.SECURITY)
+    ),
+    INTEL(
+        "Intel",
+        Icons.Default.Hub,
+        MainNavDestination.INTELLIGENCE,
+        listOf(MainNavDestination.INTELLIGENCE, MainNavDestination.WORLD_MONITOR)
+    ),
+    VAULT(
+        "Vault",
+        Icons.Default.Folder,
+        MainNavDestination.FILES,
+        listOf(MainNavDestination.FILES, MainNavDestination.CLOUD, MainNavDestination.DOWNLOADS)
+    ),
+    SYSTEM(
+        "System",
+        Icons.Default.Settings,
+        MainNavDestination.SETTINGS,
+        listOf(MainNavDestination.SETTINGS, MainNavDestination.OPTIMIZER, MainNavDestination.BATTERY, MainNavDestination.STATUS)
+    );
+
+    companion object {
+        fun forDestination(dest: MainNavDestination): NavPillar =
+            entries.firstOrNull { dest in it.destinations } ?: SHIELD
+    }
+}
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -230,6 +273,7 @@ fun AdShieldMainApp(
     var connectorsOpen by rememberSaveable { mutableStateOf(false) }
     var worldMonitorOpen by rememberSaveable { mutableStateOf(false) }
     var showVpnConsentHelp by remember { mutableStateOf(false) }
+    var showQuickSearchDialog by rememberSaveable { mutableStateOf(false) }
     val connectorViewModel: ConnectorViewModel = hiltViewModel()
     val connectorState by connectorViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -380,12 +424,31 @@ fun AdShieldMainApp(
         }
     }
 
+    if (showQuickSearchDialog) {
+        GlobalQuickSearchDialog(
+            onDismiss = { showQuickSearchDialog = false },
+            onSelectDestination = { dest ->
+                showQuickSearchDialog = false
+                connectorsOpen = false
+                worldMonitorOpen = false
+                showQuickTilesScreen = false
+                showAppFirewallScreen = false
+                showAboutScreen = false
+                currentTab = dest
+            }
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             if (!showAboutScreen && !showQuickTilesScreen && !showAppFirewallScreen && !connectorsOpen && !worldMonitorOpen && currentTab != MainNavDestination.WORLD_MONITOR) {
-                CyberBottomNav(currentTab = currentTab, onSelect = { currentTab = it })
+                CyberBottomNav(
+                    currentTab = currentTab,
+                    onSelect = { currentTab = it },
+                    onOpenQuickSearch = { showQuickSearchDialog = true }
+                )
             }
         }
     ) { innerPadding ->
@@ -503,41 +566,117 @@ private fun WorldMonitorDestination(
 }
 
 @Composable
-private fun CyberBottomNav(currentTab: MainNavDestination, onSelect: (MainNavDestination) -> Unit) {
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val visibleTarget = if (screenWidth >= 600) 7 else 5
-    val itemWidth = ((screenWidth - 16) / visibleTarget).coerceIn(64, 96).dp
-    val listState = rememberLazyListState()
-    LaunchedEffect(currentTab, visibleTarget) {
-        listState.animateScrollToItem(DashboardPresentation.navScrollTarget(currentTab.ordinal, visibleTarget))
-    }
-    NavigationBar(containerColor = Color(0xFF040D1A), tonalElevation = 0.dp) {
-        LazyRow(
-            state = listState,
-            modifier = Modifier.fillMaxWidth().height(80.dp),
-            horizontalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            itemsIndexed(MainNavDestination.entries, key = { _, destination -> destination.name }) { _, destination ->
-                Row(modifier = Modifier.width(itemWidth).fillMaxHeight()) {
-                    NavigationBarItem(
-                        modifier = Modifier.fillMaxWidth(),
-                        selected = currentTab == destination,
-                        onClick = { onSelect(destination) },
-                        icon = { Icon(destination.icon, contentDescription = destination.label, modifier = Modifier.size(20.dp)) },
-                        label = { Text(destination.label, fontSize = 10.sp, maxLines = 1) },
-                        alwaysShowLabel = true,
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SkyBlueGlow,
-                            selectedTextColor = SkyBlueGlow,
-                            indicatorColor = ElectricBlue.copy(alpha = 0.18f),
-                            unselectedIconColor = Color(0xFF7C93AF),
-                            unselectedTextColor = Color(0xFF7C93AF)
-                        )
+private fun CyberBottomNav(
+    currentTab: MainNavDestination,
+    onSelect: (MainNavDestination) -> Unit,
+    onOpenQuickSearch: () -> Unit = {}
+) {
+    val activePillar = remember(currentTab) { NavPillar.forDestination(currentTab) }
+    val pillarDestinations = activePillar.destinations
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (pillarDestinations.size > 1) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF061326))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                itemsIndexed(pillarDestinations, key = { _, dest -> dest.name }) { _, dest ->
+                    FilterChip(
+                        selected = currentTab == dest,
+                        onClick = { onSelect(dest) },
+                        label = { Text(dest.label, fontSize = 11.sp, maxLines = 1) },
+                        leadingIcon = { Icon(dest.icon, contentDescription = null, modifier = Modifier.size(15.dp)) }
+                    )
+                }
+                item(key = "quick_search_chip") {
+                    FilterChip(
+                        selected = false,
+                        onClick = onOpenQuickSearch,
+                        label = { Text("Jump…", fontSize = 11.sp, maxLines = 1) },
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Quick Search", modifier = Modifier.size(15.dp)) }
                     )
                 }
             }
         }
+        NavigationBar(containerColor = Color(0xFF040D1A), tonalElevation = 0.dp) {
+            NavPillar.entries.forEach { pillar ->
+                val selected = pillar == activePillar
+                NavigationBarItem(
+                    selected = selected,
+                    onClick = {
+                        if (selected && pillar.destinations.size == 1) {
+                            onOpenQuickSearch()
+                        } else {
+                            onSelect(pillar.primaryDestination)
+                        }
+                    },
+                    icon = { Icon(pillar.icon, contentDescription = pillar.label, modifier = Modifier.size(20.dp)) },
+                    label = { Text(pillar.label, fontSize = 10.sp, maxLines = 1) },
+                    alwaysShowLabel = true,
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = SkyBlueGlow,
+                        selectedTextColor = SkyBlueGlow,
+                        indicatorColor = ElectricBlue.copy(alpha = 0.18f),
+                        unselectedIconColor = Color(0xFF7C93AF),
+                        unselectedTextColor = Color(0xFF7C93AF)
+                    )
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun GlobalQuickSearchDialog(
+    onDismiss: () -> Unit,
+    onSelectDestination: (MainNavDestination) -> Unit
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val filtered = remember(query) {
+        val q = query.trim().lowercase()
+        if (q.isEmpty()) MainNavDestination.entries
+        else MainNavDestination.entries.filter {
+            it.label.lowercase().contains(q) || it.name.lowercase().contains(q)
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Quick Jump & Command Search") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Search workspaces, firewall, DNS, vault…") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 280.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    itemsIndexed(filtered, key = { _, d -> d.name }) { _, dest ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectDestination(dest) }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(dest.icon, contentDescription = null, tint = SkyBlueGlow, modifier = Modifier.size(20.dp))
+                            Text(dest.label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
 
 @Composable

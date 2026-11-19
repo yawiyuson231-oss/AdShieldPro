@@ -80,3 +80,53 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     .catch((err) => sendResponse({ enabled: [], error: err?.message || 'ruleset query failed' }));
   return true;
 });
+
+const DYNAMIC_RULE_ID_BASE = 900000;
+const MAX_DYNAMIC_CUSTOM_RULES = 500;
+
+async function syncDynamicCustomRules(customRules = { allow: [], block: [] }) {
+  if (!chrome.declarativeNetRequest?.updateDynamicRules) return { ok: false, count: 0 };
+  const allow = Array.isArray(customRules.allow) ? customRules.allow : [];
+  const block = Array.isArray(customRules.block) ? customRules.block : [];
+
+  const existing = await chrome.declarativeNetRequest.getDynamicRules();
+  const removeRuleIds = existing
+    .map((r) => r.id)
+    .filter((id) => id >= DYNAMIC_RULE_ID_BASE && id < DYNAMIC_RULE_ID_BASE + MAX_DYNAMIC_CUSTOM_RULES);
+
+  const addRules = [];
+  let nextId = DYNAMIC_RULE_ID_BASE;
+  for (const domain of allow) {
+    if (addRules.length >= MAX_DYNAMIC_CUSTOM_RULES) break;
+    const clean = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+    if (!clean) continue;
+    addRules.push({
+      id: nextId++,
+      priority: 100,
+      action: { type: 'allow' },
+      condition: { urlFilter: `||${clean}^`, resourceTypes: ['main_frame', 'sub_frame', 'script', 'image', 'xmlhttprequest', 'other'] }
+    });
+  }
+  for (const domain of block) {
+    if (addRules.length >= MAX_DYNAMIC_CUSTOM_RULES) break;
+    const clean = String(domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+    if (!clean) continue;
+    addRules.push({
+      id: nextId++,
+      priority: 90,
+      action: { type: 'block' },
+      condition: { urlFilter: `||${clean}^`, resourceTypes: ['sub_frame', 'script', 'image', 'xmlhttprequest', 'ping', 'other'] }
+    });
+  }
+
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+  return { ok: true, count: addRules.length };
+}
+
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type !== 'syncDynamicRules') return undefined;
+  syncDynamicCustomRules(msg.rules)
+    .then((res) => sendResponse(res))
+    .catch((err) => sendResponse({ ok: false, count: 0, error: err?.message || 'dynamic rule sync failed' }));
+  return true;
+});

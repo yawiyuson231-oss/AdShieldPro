@@ -30,6 +30,8 @@ import com.adshield.pro.domain.model.TimeBucketStat
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
 import com.adshield.pro.domain.model.VpnRuntimeState
 import com.adshield.pro.domain.model.VpnStatus
+import com.adshield.pro.engine.aether.BehavioralAnomalyEngine
+import com.adshield.pro.engine.filter.BinaryFilterSnapshotCodec
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -67,7 +69,8 @@ class AdShieldRepository @Inject constructor(
     private val dao: AdShieldDao,
     private val prefs: UserPreferencesRepository,
     private val filterEngine: FilterRuleEngine,
-    private val intelligenceRecorder: IntelligenceRecorder
+    private val intelligenceRecorder: IntelligenceRecorder,
+    private val behavioralAnomalyEngine: BehavioralAnomalyEngine
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val filterMutex = Mutex()
@@ -278,8 +281,18 @@ class AdShieldRepository @Inject constructor(
         protocolUsed: String,
         fromCache: Boolean,
         appPackageName: String? = null,
-        appName: String? = null
+        appName: String? = null,
+        isScreenInteractive: Boolean = true
     ) {
+        behavioralAnomalyEngine.recordObservation(
+            domain = domain,
+            queryType = queryType,
+            timestampEpochMs = System.currentTimeMillis(),
+            isBlocked = isBlocked,
+            isScreenInteractive = isScreenInteractive,
+            appPackageName = appPackageName,
+            appName = appName
+        )
         // Live per-app counters are intentionally memory-only; detailed DNS logging remains optional.
         val appKey = appPackageName?.takeIf { it.isNotBlank() } ?: "unattributed"
         _liveTopApps.update { current ->
@@ -704,12 +717,27 @@ class AdShieldRepository @Inject constructor(
                     if (!source.url.startsWith("https://", ignoreCase = true)) {
                         throw SecurityException("Insecure non-HTTPS URL rejected")
                     }
-                    val req = Request.Builder()
+                    val reqBuilder = Request.Builder()
                         .url(source.url)
                         .header("User-Agent", "AdShieldPro/2.0 (Android; DNS-Filter-Updater)")
-                        .build()
+                    if (cacheFile.exists() && source.etagOrHash.startsWith("etag:")) {
+                        val storedEtag = source.etagOrHash.removePrefix("etag:").trim()
+                        if (storedEtag.isNotEmpty()) {
+                            reqBuilder.header("If-None-Match", storedEtag)
+                        }
+                    }
+                    val req = reqBuilder.build()
 
                     filterDownloadClient.newCall(req).execute().use { resp ->
+                        if (resp.code == 304 && cacheFile.exists()) {
+                            dao.upsertFilterSource(
+                                source.copy(
+                                    lastUpdatedEpochMs = now,
+                                    lastStatusMessage = "Up to date (HTTP 304 Not Modified)"
+                                )
+                            )
+                            return@use
+                        }
                         if (!resp.isSuccessful) {
                             throw IllegalStateException("HTTP ${resp.code}")
                         }
@@ -734,14 +762,19 @@ class AdShieldRepository @Inject constructor(
                         tempFile.copyTo(cacheFile, overwrite = true)
                         tempFile.delete()
 
-                        val hash = sha256Hex(bodyStr).take(16)
+                        val serverEtag = resp.header("ETag")?.trim()?.takeIf { it.isNotEmpty() && it.length <= 128 }
+                        val hashOrEtag = if (serverEtag != null) {
+                            "etag:$serverEtag"
+                        } else {
+                            sha256Hex(bodyStr).take(16)
+                        }
                         dao.upsertFilterSource(
                             source.copy(
                                 ruleCount = parsed.totalValidRules,
                                 duplicateCount = parsed.duplicateCount,
                                 lastUpdatedEpochMs = now,
                                 lastStatusMessage = "Updated (${parsed.totalValidRules} rules)",
-                                etagOrHash = hash
+                                etagOrHash = hashOrEtag
                             )
                         )
                         updatedSourcesCount++
@@ -787,6 +820,37 @@ class AdShieldRepository @Inject constructor(
     }
 
     private suspend fun rebuildActiveFilterListsLocked(sources: List<FilterSourceEntity>) {
+        val enabledSources = sources.filter { it.isEnabled }
+        val compiledSnapshotFile = File(filterCacheDir, "compiled_filter_snapshot.bin")
+        val descriptors = enabledSources.map { src ->
+            val diskStamp = if (src.url.startsWith("asset://")) {
+                "asset:${bundledAssetFor(src)}"
+            } else {
+                val f = File(filterCacheDir, "${src.id}.txt")
+                "cache:${f.length()}:${f.lastModified()}:${src.etagOrHash}"
+            }
+            "${src.id}|${src.category}|${src.name}|$diskStamp"
+        }
+        val manifestFingerprint = BinaryFilterSnapshotCodec.computeManifestFingerprint(descriptors)
+
+        // Fast path: load pre-compiled prefix-compressed ADBF binary snapshot when all enabled
+        // sources already have recorded rule counts and match the exact manifest fingerprint.
+        if (enabledSources.isNotEmpty() && enabledSources.all { it.ruleCount > 0 } && compiledSnapshotFile.exists()) {
+            val fastLoaded = BinaryFilterSnapshotCodec.readFromFile(
+                file = compiledSnapshotFile,
+                expectedFingerprint = manifestFingerprint
+            ).getOrNull()
+            if (fastLoaded != null) {
+                filterEngine.updateFilterListRules(
+                    subdomainRules = fastLoaded.subdomainRules,
+                    exactRules = fastLoaded.exactRules,
+                    wildcardRules = fastLoaded.wildcardRules,
+                    allowSubdomains = fastLoaded.allowSubdomains
+                )
+                return
+            }
+        }
+
         val mergedSubdomains = HashMap<String, FilterRuleEngine.FilterListEntry>(4096)
         val mergedExact = HashMap<String, FilterRuleEngine.FilterListEntry>()
         val mergedWildcards = ArrayList<FilterRuleEngine.WildcardEntry>()
@@ -840,6 +904,19 @@ class AdShieldRepository @Inject constructor(
             wildcardRules = mergedWildcards,
             allowSubdomains = mergedAllow
         )
+
+        if (mergedSubdomains.isNotEmpty() || mergedExact.isNotEmpty() || mergedWildcards.isNotEmpty()) {
+            BinaryFilterSnapshotCodec.writeToFileAtomically(
+                file = compiledSnapshotFile,
+                data = BinaryFilterSnapshotCodec.CompiledFilterData(
+                    manifestFingerprint = manifestFingerprint,
+                    subdomainRules = mergedSubdomains,
+                    exactRules = mergedExact,
+                    wildcardRules = mergedWildcards,
+                    allowSubdomains = mergedAllow
+                )
+            )
+        }
     }
 
     private fun readBundledDefaultBlocklist(): String = readBundledBlocklistAsset("default_blocklist.txt")

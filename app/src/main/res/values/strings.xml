@@ -15,4 +15,24 @@
     <string name="widget_default_rate">Local non-root DNS firewall</string>
     <string name="widget_action_protect">Protect</string>
     <string name="widget_action_open">Open</string>
+
+    <!-- 5-Pillar Navigation & Quick Search -->
+    <string name="pillar_shield">Shield</string>
+    <string name="pillar_security">Security</string>
+    <string name="pillar_intel">Intel</string>
+    <string name="pillar_vault">Vault</string>
+    <string name="pillar_system">System</string>
+    <string name="quick_search_title">Quick Jump &amp; Command Search</string>
+    <string name="quick_search_placeholder">Search workspaces, firewall, QR scanner, DNS, vault…</string>
+
+    <!-- Power Expansion Features -->
+    <string name="hardcoded_dns_trap_title">Anti-Bypass Hardcoded DNS Trap</string>
+    <string name="hardcoded_dns_trap_subtitle">Routes hardcoded 8.8.8.8 / 1.1.1.1 / 9.9.9.9 port-53 lookups into the local filter</string>
+    <string name="context_automation_title">Context-Aware Protection Automation</string>
+    <string name="context_automation_subtitle">Auto-hardens DNS on Open Wi-Fi and pauses heavy syncs during gaming or low battery</string>
+    <string name="battery_alerts_title">Background Thermal &amp; Full-Charge Alerts</string>
+    <string name="qr_scan_camera_button">Scan QR with Camera</string>
+    <string name="qr_pick_image_button">Scan QR Image</string>
+    <string name="zk_encryption_title">Zero-Knowledge AES-256-GCM File Vault</string>
+    <string name="anomaly_radar_title">AETHER Behavioral &amp; Screen-Off Tracker Radar</string>
 </resources>
