@@ -262,8 +262,11 @@ test or stable, can upgrade to it in place.
 
 - **Use the on-device AI Agent:** Open **Security → AI Agent** and ask for one check, or choose one
   directly. The bundled model suggests a task without an account, key, cloud inference or prompt
-  upload. Approve the check before it runs. The optional DNS benchmark sends real DNS probes only
-  after approval. See [supported checks](docs/PHONE_AGENT.md).
+  upload. **Security review** combines three read-only specialists for phone protection, saved DNS
+  policy and visible app metadata. It flags overlaps between app risk indicators and saved DNS
+  exceptions without sending data or changing settings. The separate DNS benchmark sends real probes
+  only after its own approval. See [supported checks](docs/PHONE_AGENT.md) and the
+  [Android Agent roadmap](docs/AETHER_AGENT_ROADMAP.md).
 - **Check your DNS resolver:** Run a live, uncached probe in Settings to see which provider replied,
   its DNSSEC and EDNS evidence, and why selected backups were needed. DoH and DoT remain encrypted
   during opt-in failover. [DNS architecture and limits](docs/DNS_SECURITY_ARCHITECTURE.md).

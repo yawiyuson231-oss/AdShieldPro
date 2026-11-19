@@ -160,7 +160,7 @@ class AetherPhoneAgentViewModel @Inject constructor(
             try {
                 ensureActive()
                 val timeout = when (task) {
-                    AetherSecurityTask.SECURITY_REVIEW -> null // Each read has its own deadline.
+                    AetherSecurityTask.SECURITY_REVIEW -> null // Each specialist has its own deadline.
                     AetherSecurityTask.AUDIT_APPS -> AetherSecurityReview.APPS_TIMEOUT_MS
                     AetherSecurityTask.BENCHMARK_DNS -> 15_000L
                     AetherSecurityTask.SCAN_FILE -> 35_000L

@@ -77,6 +77,22 @@ class AetherSecurityAgentTest {
     }
 
     @Test
+    fun securityReviewDoesNotOverrideNarrowerScopeOrAuthorizeAFollowUp() {
+        listOf("Security review without DNS", "Security review but only check my protection",
+            "Security review, then test DNS speed").forEach { request ->
+            assertTrue(model.suggest(request) != Task.SECURITY_REVIEW)
+        }
+        val approval = AetherTaskApproval()
+        val review = approval.propose(Task.SECURITY_REVIEW, suggested = true)
+        val approved = requireNotNull(approval.approve(review.id, "https://example.invalid"))
+        assertEquals(Task.SECURITY_REVIEW, approved.task)
+        assertNull(approved.link)
+        val benchmark = approval.propose(Task.BENCHMARK_DNS)
+        assertNull(approval.approve(review.id))
+        assertEquals(Task.BENCHMARK_DNS, approval.approve(benchmark.id)?.task)
+    }
+
+    @Test
     fun gatedTaskCanOnlyBeApprovedOnceAndNotAfterDismissalOrReplacement() {
         val approval = AetherTaskApproval()
         val task = requireNotNull(model.suggest("Turn on DNS Alias Shield"))

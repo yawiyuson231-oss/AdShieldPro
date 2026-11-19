@@ -112,11 +112,16 @@ internal fun AetherPhoneAgentScreen(
                     viewModel.findTask(request)
                     request = ""
                 }, enabled = request.isNotBlank() && state.canStart) { Text("Suggest a check") }
+                OutlinedButton(
+                    onClick = { viewModel.proposeTool(Task.SECURITY_REVIEW) },
+                    enabled = state.canStart,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Review phone, DNS and apps") }
                 TextButton(onClick = { showChecks = !showChecks }, enabled = state.canStart) {
                     Text(if (showChecks) "Hide available checks" else "Choose a check instead")
                 }
                 if (showChecks) {
-                    Task.entries.forEach { task ->
+                    Task.entries.filter { it != Task.SECURITY_REVIEW }.forEach { task ->
                         TextButton(onClick = { viewModel.proposeTool(task) }, enabled = state.canStart) { Text(task.title) }
                     }
                 }
@@ -124,12 +129,13 @@ internal fun AetherPhoneAgentScreen(
                 if (state.fileChoiceId != null) Text("Waiting for Android’s file picker…")
                 state.running?.let { task ->
                     val status = if (state.stopping) "Stopping when the current operation returns…" else when (val progress = state.progress) {
-                        AetherTaskProgress.ReadingPhone -> "Checking protection, connection and device readings…"
+                        AetherTaskProgress.ReviewingSecurity -> "Reviewing phone protection, DNS settings and visible apps…"
                         AetherTaskProgress.ReadingFile -> "Reading the file you chose…"
                         AetherTaskProgress.InspectingFile -> "Inspecting the local copy…"
                         is AetherTaskProgress.ReadingApps -> {
-                            if (progress.visible > 0) "App audit · ${progress.processed}/${progress.visible} processed"
-                            else "App audit · reading Android app list…"
+                            val label = if (task == Task.SECURITY_REVIEW) "Security review · apps" else "App audit"
+                            if (progress.visible > 0) "$label · ${progress.processed}/${progress.visible} processed"
+                            else "$label · reading Android app list…"
                         }
                         null -> "Running: ${task.title}…"
                     }
@@ -149,8 +155,10 @@ internal fun AetherPhoneAgentScreen(
 
         // Results begin immediately after the single controls item.
         val result = state.result
-        if (result != null && result !is AetherTaskResult.Phone) {
-            item(key = "task-result") { AgentTaskResult(result, onTool) }
+        when (result) {
+            is AetherTaskResult.Review -> agentSecurityReviewItems(result.report, ::select, actionsEnabled = state.canStart)
+            null, is AetherTaskResult.Phone -> Unit
+            else -> item(key = "task-result") { AgentTaskResult(result, ::select, actionsEnabled = state.canStart) }
         }
         val phone = when (result) {
             is AetherTaskResult.Phone -> result.report
@@ -211,7 +219,7 @@ private fun AgentTaskDialog(proposal: AetherTaskApproval.Proposal, onApprove: (S
     val details = when (proposal.task) {
         Task.CHECK_PHONE -> "Read current protection, Wi-Fi, DNS activity and device-health readings. Nothing will change."
         Task.AUDIT_APPS -> "Check permissions and install sources of apps Android lets AdShield see. This won't read private app files or remove anything."
-        Task.SECURITY_REVIEW -> "Run two read-only checks: phone protection, connection and device readings; then permissions and install sources of visible apps. No settings will change and no network test will run."
+        Task.SECURITY_REVIEW -> "Three on-device specialists check phone protection, saved DNS policy and visible app metadata. The report compares app indicators with saved DNS exceptions. This review won't send data, read private app files or change settings."
         Task.SCAN_FILE -> "Choose one file up to ${AetherFileInput.MAX_MIB} MiB with Android’s file picker. AdShield inspects it locally and won’t launch, install, upload, or change the original."
         Task.SCAN_LINK -> "Analyze one web link on this phone without opening it. Paste only the link you want to check."
         Task.BENCHMARK_DNS -> "Send a lookup for example.com to the built-in resolvers and your custom resolver if selected, using your configured DNS protocol. Your task text is not sent and no resolver setting will change."

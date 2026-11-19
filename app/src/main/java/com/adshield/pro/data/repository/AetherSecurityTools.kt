@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.engine.aether.AetherAppReview
+import com.adshield.pro.engine.aether.AetherDnsPolicyReview
 import com.adshield.pro.engine.aether.AetherFileInput
 import com.adshield.pro.engine.aether.AetherSecurityReview
 import com.adshield.pro.engine.aether.AetherSecurityTask
@@ -50,10 +51,14 @@ class AetherSecurityTools @Inject constructor(
     ): AetherTaskResult = withContext(Dispatchers.IO) {
         when (approved.task) {
             AetherSecurityTask.CHECK_PHONE -> AetherTaskResult.Phone(phoneReader.check())
-            AetherSecurityTask.AUDIT_APPS -> AetherTaskResult.Apps(auditApps(onProgress))
+            AetherSecurityTask.AUDIT_APPS -> {
+                onProgress(AetherTaskProgress.ReadingApps(0, 0))
+                AetherTaskResult.Apps(AetherAppReview.from(readAppMetadata(onProgress)))
+            }
             AetherSecurityTask.SECURITY_REVIEW -> AetherTaskResult.Review(AetherSecurityReview.run(
                 readPhone = phoneReader::check,
-                readApps = { auditApps(onProgress, announceStart = false) },
+                readDns = ::readDnsPolicy,
+                readApps = { readAppMetadata(onProgress) },
                 publish = onProgress
             ))
             AetherSecurityTask.SCAN_FILE -> scanSelectedFile(chosenFile, onProgress)
@@ -118,14 +123,21 @@ class AetherSecurityTools @Inject constructor(
         }
     }
 
-    private suspend fun auditApps(onProgress: (AetherTaskProgress) -> Unit, announceStart: Boolean = true): AetherAppReview {
-        if (announceStart) onProgress(AetherTaskProgress.ReadingApps(0, 0))
-        val audit = security.auditVisibleApps { processed, total, _ ->
+    private suspend fun readDnsPolicy(): AetherDnsPolicyReview.Snapshot {
+        val settings = repository.settingsFlow.first()
+        return AetherDnsPolicyReview.inspect(
+            config = settings.resolverConfig,
+            policy = settings.dnsFirewallPolicy,
+            excluded = settings.excludedAppPackages,
+            aliasShieldOn = settings.cnameUncloakingEnabled
+        )
+    }
+
+    private suspend fun readAppMetadata(onProgress: (AetherTaskProgress) -> Unit) =
+        security.auditVisibleApps { processed, total, _ ->
             // Publish real counts without app names. Limit recompositions on large installations.
             if (processed == 1 || processed == total || processed % 8 == 0) {
                 onProgress(AetherTaskProgress.ReadingApps(processed, total))
             }
         }
-        return AetherAppReview.from(audit)
-    }
 }

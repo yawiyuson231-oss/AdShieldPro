@@ -72,6 +72,7 @@ When a DNS query is allowed by your local filtering rules, it is resolved by you
 ### 4E. On-device AI Agent
 
 - The Agent's task text and findings stay on the phone. The bundled model needs no account, AI API key or provider connection. The app removes any retired Agent connection from its on-device credential store without removing other providers’ settings. This does not delete old provider-side data or revoke previously issued keys.
+- Security review reads local phone/protection reports, saved DNS policy, and metadata for apps Android lets AdShield see. It does not send those readings, open links, run DNS probes, save a scan history entry, or change settings.
 - The Agent's DNS benchmark sends fixed `example.com` queries only if approved. Settings diagnostics and benchmarks send the name you enter to the configured or tested DNS providers. When failover is enabled, selected backups may also see a DNS lookup. A custom DoH URL may need a separate system lookup for the endpoint hostname; the requested name does not fall back to plaintext.
 
 ---
