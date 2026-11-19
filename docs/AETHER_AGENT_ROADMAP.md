@@ -26,7 +26,7 @@ settings action is a separate decision. See the [usage and device checklist](PHO
 
 The Android CI suite exercises the real Agent UI on an API 29 emulator, including dismissed and
 backgrounded approvals, an offline report, leaving the Agent, and the real VPN's receipt across setup,
-changed settings, rebuild, pause/resume and stop. A separate test uses a controlled reader to verify
+changed settings, rebuild (including while paused), pause/resume and stop. A separate test uses a controlled reader to verify
 in-flight cancellation. This does not validate physical handsets, all network transitions or packet
 coverage. See [the test scope](TESTING.md#android-agent-device-tests).
 

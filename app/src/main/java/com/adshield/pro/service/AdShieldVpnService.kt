@@ -122,10 +122,14 @@ class AdShieldVpnService : VpnService() {
             }
             ACTION_PAUSE_VPN -> {
                 synchronized(tunnelLock) {
-                    if (vpnInterface != null) {
+                    // A setup in progress can take a pause request, but don't claim a paused
+                    // tunnel before Android has returned a descriptor and a fresh setup receipt.
+                    if (tunnelGeneration != null) {
                         isPaused = true
-                        repository.updateVpnStatus(VpnStatus.PAUSED)
-                        updateForegroundNotification()
+                        if (vpnInterface != null) {
+                            repository.updateVpnStatus(VpnStatus.PAUSED)
+                            updateForegroundNotification()
+                        }
                     }
                 }
                 return START_STICKY
@@ -149,7 +153,7 @@ class AdShieldVpnService : VpnService() {
                 synchronized(tunnelLock) {
                     if (tunnelGeneration != null) {
                         startForegroundWithNotification()
-                        startVpnTunnel()
+                        startVpnTunnel(keepPause = true)
                     }
                 }
                 return START_STICKY
@@ -163,10 +167,11 @@ class AdShieldVpnService : VpnService() {
         }
     }
 
-    private fun startVpnTunnel() = synchronized(tunnelLock) {
-        // Invalidate the old receipt before tearing down its descriptor.
+    private fun startVpnTunnel(keepPause: Boolean = false) = synchronized(tunnelLock) {
+        // Invalidate the old receipt before tearing down its descriptor. A settings rebuild
+        // changes the exclusion list, not the user's decision to pause filtering.
         repository.updateVpnStatus(VpnStatus.STARTING)
-        discardTunnelLocked()
+        discardTunnelLocked(clearPause = !keepPause)
         val generation = nextTunnelGeneration.incrementAndGet()
         tunnelGeneration = generation
 
@@ -217,7 +222,7 @@ class AdShieldVpnService : VpnService() {
                             filterRuleEngine.updateProtectionMode(settings.protectionMode)
                             repository.syncRuntimeModeAndResolver(settings.protectionMode, settings)
                             repository.updateVpnStatus(
-                                status = VpnStatus.CONNECTED,
+                                status = if (isPaused) VpnStatus.PAUSED else VpnStatus.CONNECTED,
                                 networkLabel = networkLabel,
                                 establishedTunnel = VpnTunnelReceipt(generation, System.currentTimeMillis(), ipv6,
                                     exclusions.accepted, exclusions.rejected)
@@ -733,13 +738,13 @@ class AdShieldVpnService : VpnService() {
         discardTunnelLocked()
     }
 
-    private fun discardTunnelLocked() {
+    private fun discardTunnelLocked(clearPause: Boolean = true) {
         tunnelGeneration = null
         tunnelJob?.cancel()
         tunnelJob = null
         val oldInterface = vpnInterface
         vpnInterface = null
-        isPaused = false
+        if (clearPause) isPaused = false
         runCatching { oldInterface?.close() }
     }
 

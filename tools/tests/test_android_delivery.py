@@ -1,5 +1,6 @@
 """Exercise installer and publication gates without Android or release writes."""
 
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -92,7 +93,9 @@ esac
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('requires an explicit manual workflow request', result.stderr)
 
-    def test_preview_publishes_exact_tested_apk_as_non_latest_with_checksum(self):
+    def mock_preview_release(self):
+        digest = hashlib.sha256((self.root / self.apk_rel).read_bytes()).hexdigest()
+        self.file('adshield-verified-debug.sha256', f'{digest}  {self.apk_rel}\n')
         self.file('bin/git', '#!/bin/bash\nprintf "%s\\n" "$GITHUB_SHA"\n', executable=True)
         self.file('bin/python3', '#!/bin/bash\n[[ "$2" == --variant && "$3" == debug && -s "$4" ]]\n', executable=True)
         self.file('sdk/build-tools/36.0.0/apksigner', '#!/bin/bash\n[[ "$1" == verify && -s "$2" ]]\n', executable=True)
@@ -103,22 +106,49 @@ case "$*" in
 'release create preview-v2.11.1-run.123.2 '*)
     cmp "$4" app/build/outputs/apk/debug/app-debug.apk
     [[ "$5" == "$4.sha256" && "$(cat "$5")" == "$(sha256sum "$4" | cut -d ' ' -f 1)" ]]
-    [[ " $* " == *' --prerelease --latest=false '* && " $* " == *" --target $GITHUB_SHA "* ]]
+    [[ " $* " == *' --verify-tag --prerelease --latest=false '* && -f reserved-ref ]]
     touch published
     ;;
+'api --method POST repos/example/repo/git/refs -f ref=refs/tags/preview-v2.11.1-run.123.2 '*)
+    [[ "${TAG_ALREADY_EXISTS:-false}" == false && " $* " == *" -f sha=$GITHUB_SHA --silent "* ]]
+    printf '%s\n' "$GITHUB_SHA" > reserved-ref
+    ;;
+'api repos/example/repo/git/ref/tags/preview-v2.11.1-run.123.2 --jq .object.sha') cat reserved-ref ;;
 'release view preview-v2.11.1-run.123.2 '*) test -f published; echo true ;;
 *) exit 66 ;;
 esac
 ''', executable=True)
-        result = self.run_script('publish_android_preview.sh', GITHUB_EVENT_NAME='workflow_dispatch',
-                                 GITHUB_REF_TYPE='branch', PUBLIC_PREVIEW='true', GITHUB_REPOSITORY='example/repo',
-                                 GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', GITHUB_SHA='a' * 40)
+
+    def run_publication(self, **extra_env):
+        return self.run_script('publish_android_preview.sh', GITHUB_EVENT_NAME='workflow_dispatch',
+                               GITHUB_REF_TYPE='branch', PUBLIC_PREVIEW='true', GITHUB_REPOSITORY='example/repo',
+                               GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='2', GITHUB_SHA='a' * 40, **extra_env)
+
+    def test_preview_publishes_exact_tested_apk_as_non_latest_with_checksum(self):
+        self.mock_preview_release()
+        result = self.run_publication()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue((self.root / 'published').exists())
         self.assertEqual(list(self.root.glob('adshield-preview.*')), [])
         summary = (self.root / 'summary').read_text(encoding='utf-8')
         self.assertIn('AdShieldPro-2.11.1-preview-123.2.apk', summary)
         self.assertIn('Production Latest: `v2.11.0`', summary)
+
+    def test_preview_refuses_changed_apk_before_any_publication(self):
+        self.mock_preview_release()
+        self.file(self.apk_rel, 'different bytes after device test')
+        result = self.run_publication()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('The APK changed after verification', result.stderr)
+        self.assertFalse((self.root / 'reserved-ref').exists())
+        self.assertFalse((self.root / 'published').exists())
+
+    def test_preview_refuses_a_tag_collision(self):
+        self.mock_preview_release()
+        result = self.run_publication(TAG_ALREADY_EXISTS='true')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Could not reserve a new preview tag', result.stderr)
+        self.assertFalse((self.root / 'published').exists())
 
 
 if __name__ == '__main__':

@@ -126,8 +126,9 @@ disables Wi-Fi and mobile data on the emulator, and fails unless all four instru
   and scan history, then verify leaving the tab clears the result.
 - **Real VPN service and UI:** use Android's VPN consent dialog and one installed and one missing
   package. Check saved vs. unknown before setup, accepted vs. rejected after setup, changed settings
-  before rebuild, a new generation after rebuild, the same generation on pause/resume, and no receipt
-  after stop. Preview an accepted exclusion from the review and check that the receipt and saved
+  before rebuild, a new generation after rebuild, the same generation on pause/resume, a new receipt
+  when rebuilding without ending a pause, and no receipt after stop. Preview an accepted exclusion
+  from the review and check that the receipt and saved
   policy stay unchanged.
 - **Filtered preview:** on the offline debug app, open the chooser with no exclusions, then
   preview a selected app's saved exclusion and DNS override. Verify unknown setup without a tunnel,

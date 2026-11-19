@@ -110,6 +110,7 @@ jobs:
           python3 -m unittest discover -s tools/tests 2>&1 | tee .ci/universal-debug.log
           python3 tools/check_universal_release.py --variant debug "$APK" 2>&1 | tee -a .ci/universal-debug.log
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK" 2>&1 | tee -a .ci/universal-debug.log
+          sha256sum "$APK" > "$RUNNER_TEMP/adshield-verified-debug.sha256"
 
       - name: Release build with R8 + resource shrinking (throwaway keystore)
         run: |
@@ -215,7 +216,8 @@ jobs:
           disable-linux-hw-accel: false
           disable-animations: true
           script: >-
-            bash -o pipefail -c 'bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log &&
+            bash -o pipefail -c 'sha256sum --check "$RUNNER_TEMP/adshield-verified-debug.sha256" &&
+            bash tools/smoke_android_install.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee .ci/android-install.log &&
             bash tools/smoke_android_agent.sh app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk 2>&1 | tee .ci/android-agent.log &&
             bash tools/smoke_android_install.sh app/build/outputs/apk/release/app-release.apk emulator-5554 com.adshield.pro.secure 2>&1 | tee -a .ci/android-install.log'
 
@@ -267,9 +269,9 @@ jobs:
           if-no-files-found: ignore
 
       # The Actions log endpoint is not reachable from every environment, so the
-      # raw logs are mirrored into this branch under .ci/ as well.
-      - name: Mirror logs into the branch (only when something failed)
-        if: failure() && github.ref_type == 'branch' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      # raw logs are mirrored into working branches under .ci/ as well. Never add a CI commit to main.
+      - name: Mirror logs into the working branch (only when something failed)
+        if: failure() && startsWith(github.ref, 'refs/heads/arena/') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

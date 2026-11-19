@@ -221,9 +221,10 @@ class AdShieldRepository @Inject constructor(
         establishedTunnel: VpnTunnelReceipt? = null
     ) {
         val previousStatus = _vpnRuntimeState.value.status
+        val tunnelInstalled = status == VpnStatus.CONNECTED || status == VpnStatus.PAUSED
         _vpnRuntimeState.update { current ->
             val nowConnectedSince = when {
-                status == VpnStatus.CONNECTED && current.connectedSinceEpochMs == null -> System.currentTimeMillis()
+                tunnelInstalled && current.connectedSinceEpochMs == null -> System.currentTimeMillis()
                 status == VpnStatus.DISCONNECTED || status == VpnStatus.ERROR -> null
                 else -> current.connectedSinceEpochMs
             }
@@ -233,11 +234,7 @@ class AdShieldRepository @Inject constructor(
                 activeNetworkLabel = networkLabel ?: current.activeNetworkLabel,
                 loadedRuleCount = filterEngine.getCurrentSnapshot().totalLoadedRules,
                 lastError = error,
-                tunnelReceipt = when (status) {
-                    VpnStatus.CONNECTED -> establishedTunnel ?: current.activeTunnelReceipt
-                    VpnStatus.PAUSED -> current.activeTunnelReceipt
-                    else -> null
-                }
+                tunnelReceipt = if (tunnelInstalled) establishedTunnel ?: current.activeTunnelReceipt else null
             )
         }
         if (status != previousStatus) {

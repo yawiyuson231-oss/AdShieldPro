@@ -14,6 +14,8 @@ sha=${GITHUB_SHA:?}
 [[ "$(git rev-parse HEAD)" == "$sha" ]] || fail 'The checkout does not match the tested commit.'
 
 apk=app/build/outputs/apk/debug/app-debug.apk
+sha256sum --check "${RUNNER_TEMP:?}/adshield-verified-debug.sha256" ||
+    fail 'The APK changed after verification; the emulator-tested build is required.'
 python3 tools/check_universal_release.py --variant debug "$apk"
 "${ANDROID_HOME:?}/build-tools/36.0.0/apksigner" verify "$apk"
 version=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*$/\1/p' app/build.gradle.kts)
@@ -39,21 +41,25 @@ cat > "$work/notes.md" <<EOF
 
 If Android reports a signing conflict with an older **debug** build, uninstall only the old debug build first; this erases that debug build's local data. Do not uninstall production to install this preview.
 
-This build uses a CI debug signer. It passed the checks in the [Android workflow]($provenance), including a fresh install and launcher smoke test on the Android 10 x86_64 emulator. It is not a production-signed release or a full device test.
+This build uses a CI debug signer. It passed the checks in the [Android workflow]($provenance), including fresh install, launch, and Agent instrumentation on the Android 10 x86_64 emulator. It is not a production-signed release or a full device test.
 
 - Source commit: \`$sha\`
 - APK SHA-256: \`$digest\`
 EOF
 
-# A unique per-attempt tag avoids replacing a previously published preview.
+# --target is ignored if a tag already exists. Reserve a new ref atomically so even a
+# colliding tag cannot attach these tested bytes to the wrong source commit.
+gh api --method POST "repos/$repo/git/refs" -f ref="refs/tags/$tag" -f sha="$sha" --silent ||
+    fail 'Could not reserve a new preview tag for the verified commit.'
 gh release create "$tag" "$work/$name" "$work/$name.sha256" \
-    --repo "$repo" --target "$sha" --prerelease --latest=false \
+    --repo "$repo" --verify-tag --prerelease --latest=false \
     --title "AdShield Pro $version — public debug preview ($run_ident)" --notes-file "$work/notes.md"
 
 is_preview=$(gh release view "$tag" --repo "$repo" --json isPrerelease --jq .isPrerelease)
+tagged_sha=$(gh api "repos/$repo/git/ref/tags/$tag" --jq .object.sha)
 latest_after=$(gh api "repos/$repo/releases/latest" --jq .tag_name)
-[[ "$is_preview" == true && -n "$latest_after" && "$latest_after" != "$tag" ]] ||
-    fail 'The preview is not isolated from the production Latest release.'
+[[ "$is_preview" == true && "$tagged_sha" == "$sha" && "$latest_after" == "$latest" ]] ||
+    fail 'Could not verify preview provenance or that production Latest stayed unchanged.'
 if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf '## Public debug preview\n\n[Download the signed debug APK](%s/%s) · [SHA-256](%s/%s.sha256)\n\nProduction Latest: `%s`\n' \
         "$base" "$name" "$base" "$name" "$latest_after" >> "$GITHUB_STEP_SUMMARY"

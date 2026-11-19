@@ -222,6 +222,20 @@ class AetherAgentDeviceTest {
             awaitVpn(state) { it.status == VpnStatus.CONNECTED }
             assertEquals(rebuilt.generation, state.vpnState.value.activeTunnelReceipt?.generation)
 
+            // A configuration rebuild must also work without silently unpausing protection.
+            sendVpnAction(AdShieldVpnService.ACTION_PAUSE_VPN)
+            awaitVpn(state) { it.status == VpnStatus.PAUSED }
+            sendVpnAction(AdShieldVpnService.ACTION_RELOAD_TUNNEL_CONFIG)
+            awaitVpn(state) { it.activeTunnelReceipt?.generation?.let { generation -> generation > rebuilt.generation } == true }
+            val pausedRebuild = requireNotNull(state.vpnState.value.activeTunnelReceipt)
+            assertEquals(VpnStatus.PAUSED, state.vpnState.value.status)
+            assertEquals(rebuilt.acceptedExclusions, pausedRebuild.acceptedExclusions)
+            assertEquals(rebuilt.rejectedExclusions, pausedRebuild.rejectedExclusions)
+            requestReview()
+            approveAndWaitForReview()
+            scrollReview("review-tunnel")
+            compose.onNodeWithText("DNS filtering was paused; the Android tunnel was still installed.").assertExists()
+
             sendVpnAction(AdShieldVpnService.ACTION_STOP_VPN)
             awaitVpn(state) { it.status == VpnStatus.DISCONNECTED }
             assertNull(state.vpnState.value.activeTunnelReceipt)
