@@ -15,18 +15,7 @@ TDLib native runtime: 12 libraries verified and installed
 > Task :app:generateDebugRFile
 > Task :app:kspDebugKotlin
 > Task :app:compileDebugKotlin
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/HardcodedDnsTrap.kt:167:17 No parameter with name 'payload' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/HardcodedDnsTrap.kt:175:17 No parameter with name 'payload' found.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/UpstreamDnsResolver.kt:425:35 Unresolved reference 'buildRelayQueryUrl'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/ApkAnalyzer.kt:168:25 Unresolved reference 'ApkSignatureVerifier'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/ApkSignatureVerifier.kt:343:1 Syntax error: Unclosed comment.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:157:41 Unresolved reference 'scanUrl' on receiver of type 'UrlThreatScanner'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:159:25 Unresolved reference 'unwrappedFromHost' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:160:79 Unresolved reference 'unwrappedFromHost' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:162:25 Unresolved reference 'removedParameters' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:163:49 Unresolved reference 'removedParameters' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:163:106 Unresolved reference 'removedParameters' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
-e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:169:29 Unresolved reference 'unwrappedFromHost' on receiver of type 'LinkSanitizer.SanitizedLinkResult'.
+e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt:165:40 Unresolved reference 'reasons' on receiver of type 'UrlThreatScanner.UrlVerdict'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/SecurityEngine.kt:85:78 Argument type mismatch: actual type is '() -> Unit', but 'String?' was expected.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/AdShieldViewModel.kt:158:63 Unresolved reference 'BehavioralRadarReport'.
 e: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/ui/viewmodel/AdShieldViewModel.kt:159:10 Cannot infer type for type parameter 'R'. Specify it explicitly.
@@ -44,10 +33,10 @@ FAILURE: Build failed with an exception.
 * What went wrong:
 Execution failed for task ':app:compileDebugKotlin' (registered by plugin 'com.android.internal.application').
 > A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Kotlin compiler: NAMED_PARAMETER_NOT_FOUND
+   > Kotlin compiler: UNRESOLVED_REFERENCE
        Kotlin compiler error
-         No parameter with name 'payload' found.
-         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/dns/HardcodedDnsTrap.kt line 167
+         Unresolved reference 'reasons' on receiver of type 'UrlThreatScanner.UrlVerdict'.
+         Location: /home/runner/work/AdShieldPro/AdShieldPro/app/src/main/java/com/adshield/pro/engine/security/QrPayloadInspector.kt line 165
 
 * Try:
 > Run with --info or --debug option to get more log output.
@@ -208,7 +197,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
 	... 30 more
-Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No parameter with name 'payload' found.
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Unresolved reference 'reasons' on receiver of type 'UrlThreatScanner.UrlVerdict'.
 	at org.jetbrains.kotlin.gradle.plugin.diagnostics.DefaultCompilerDiagnosticsProblemsReporter.reportCompilerMessage(CompilerDiagnosticsProblemsReporter.kt:63)
 	at org.jetbrains.kotlin.compilerRunner.btapi.ProblemsApiCompilerMessageRenderer.replayTo(ProblemsApiCompilerMessageRenderer.kt:88)
 	at org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork.execute(BuildToolsApiCompilationWork.kt:251)
@@ -245,5 +234,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: No param
 	... 2 more
 
 
-BUILD FAILED in 1m 12s
+BUILD FAILED in 1m 33s
 9 actionable tasks: 8 executed, 1 from cache
