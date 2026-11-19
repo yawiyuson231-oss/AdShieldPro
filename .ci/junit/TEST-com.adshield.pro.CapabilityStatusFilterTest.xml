@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.CapabilityStatusFilterTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:23.514Z" hostname="runnervmccnms" time="0.01">
+<testsuite name="com.adshield.pro.CapabilityStatusFilterTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:08.089Z" hostname="ip-10-0-140-34" time="0.005">
   <properties/>
   <testcase name="eachStatusFilterMatchesTheRegistry" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.001"/>
-  <testcase name="searchMatchesAreaAndLimitations" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.006"/>
-  <testcase name="searchIsCaseInsensitiveAndCombinesWithStatus" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.003"/>
+  <testcase name="searchMatchesAreaAndLimitations" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.002"/>
+  <testcase name="searchIsCaseInsensitiveAndCombinesWithStatus" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.002"/>
   <testcase name="emptySearchShowsEveryFeature" classname="com.adshield.pro.CapabilityStatusFilterTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

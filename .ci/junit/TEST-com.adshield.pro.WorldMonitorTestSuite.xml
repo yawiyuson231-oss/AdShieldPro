@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.WorldMonitorTestSuite" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:28.906Z" hostname="runnervmccnms" time="0.226">
+<testsuite name="com.adshield.pro.WorldMonitorTestSuite" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:13.009Z" hostname="ip-10-0-140-34" time="0.159">
   <properties/>
-  <testcase name="testProviderRegistryAndEpistemicContracts" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.004"/>
-  <testcase name="testNewsFeedParserDecodesEntitiesAndRejectsInventedDates" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.011"/>
-  <testcase name="testExpandedFreeKeylessProvidersAndNewNormalizers" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.033"/>
-  <testcase name="testStreetLevelSlippyTileMathAndGeodesicRuler" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.007"/>
-  <testcase name="testEventCorrelationEngineNeverInventsSelfLinks" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.008"/>
-  <testcase name="testAnOutletThatAnswersWithAPageIsReportedNotShownAsActive" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
+  <testcase name="testProviderRegistryAndEpistemicContracts" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.003"/>
+  <testcase name="testNewsFeedParserDecodesEntitiesAndRejectsInventedDates" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.007"/>
+  <testcase name="testExpandedFreeKeylessProvidersAndNewNormalizers" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.023"/>
+  <testcase name="testStreetLevelSlippyTileMathAndGeodesicRuler" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.005"/>
+  <testcase name="testEventCorrelationEngineNeverInventsSelfLinks" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.005"/>
+  <testcase name="testAnOutletThatAnswersWithAPageIsReportedNotShownAsActive" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.003"/>
   <testcase name="testEveryNewsProviderDeclaresAReachableKeylessEndpoint" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.0"/>
-  <testcase name="testNewsFeedParserReadsRssRdfAndAtom" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.005"/>
-  <testcase name="testJsBridgeAndTileServerSecurityValidation" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.004"/>
-  <testcase name="testWatchtowerGeofenceMatchingAndDeduplication" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.004"/>
-  <testcase name="testNewsParsingFailsHonestlyWhenTheFeedIsNotANewsDocument" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.001"/>
-  <testcase name="testDigitalTwinAndAiAnalystEpistemicSeparation" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.017"/>
+  <testcase name="testNewsFeedParserReadsRssRdfAndAtom" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
+  <testcase name="testJsBridgeAndTileServerSecurityValidation" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
+  <testcase name="testWatchtowerGeofenceMatchingAndDeduplication" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
+  <testcase name="testNewsParsingFailsHonestlyWhenTheFeedIsNotANewsDocument" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.0"/>
+  <testcase name="testDigitalTwinAndAiAnalystEpistemicSeparation" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.011"/>
   <testcase name="testNativeGlobe3DProjectionAndInverseRayCast" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
-  <testcase name="testGlobal234CountriesAndLiveFeedsEndToEnd" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.019"/>
-  <testcase name="testPureKotlinTlePropagationAndTopoJsonDecoding" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.049"/>
-  <testcase name="testNormalizersAcrossAllEightIntelligenceDomains" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.036"/>
+  <testcase name="testGlobal234CountriesAndLiveFeedsEndToEnd" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.013"/>
+  <testcase name="testPureKotlinTlePropagationAndTopoJsonDecoding" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.026"/>
+  <testcase name="testNormalizersAcrossAllEightIntelligenceDomains" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.031"/>
   <testcase name="testGeoSpatialIndexCzmlAndGeoJsonExport" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.004"/>
-  <testcase name="testSimulationLabStampsExperimentalMetadata" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.01"/>
-  <testcase name="testNewsParserKeepsTimezonesStrictInsteadOfGuessing" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.005"/>
+  <testcase name="testSimulationLabStampsExperimentalMetadata" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.013"/>
+  <testcase name="testNewsParserKeepsTimezonesStrictInsteadOfGuessing" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
   <testcase name="testDynamicFreshnessDecayOnCachedEntities" classname="com.adshield.pro.WorldMonitorTestSuite" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

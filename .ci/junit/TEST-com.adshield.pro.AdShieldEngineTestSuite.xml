@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.AdShieldEngineTestSuite" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:22.585Z" hostname="runnervmccnms" time="0.158">
+<testsuite name="com.adshield.pro.AdShieldEngineTestSuite" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:07.559Z" hostname="ip-10-0-140-34" time="0.14">
   <properties/>
-  <testcase name="testCacheKeysAreScopedToTheActiveResolver" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.062"/>
-  <testcase name="testFilterRuleEngine_precedenceModesWildcardsAndConflictDetection" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.028"/>
-  <testcase name="testBrowserContentBlocker_sanitizesTrackingParamsAndEvaluatesRequests" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.009"/>
-  <testcase name="testJunkCleaner_sha256DuplicateDetection" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.015"/>
-  <testcase name="testDatabaseMigrationVersion" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.003"/>
+  <testcase name="testCacheKeysAreScopedToTheActiveResolver" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.058"/>
+  <testcase name="testFilterRuleEngine_precedenceModesWildcardsAndConflictDetection" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.022"/>
+  <testcase name="testBrowserContentBlocker_sanitizesTrackingParamsAndEvaluatesRequests" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.008"/>
+  <testcase name="testJunkCleaner_sha256DuplicateDetection" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.01"/>
+  <testcase name="testDatabaseMigrationVersion" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.002"/>
   <testcase name="testUdpResponseIsTruncatedWithTcBitWhenItExceedsTheTunnelMtu" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
-  <testcase name="videoSafetyProtectsPlaybackAndKeepsThirdPartyAdSlotsBlocked" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.006"/>
+  <testcase name="videoSafetyProtectsPlaybackAndKeepsThirdPartyAdSlotsBlocked" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.004"/>
   <testcase name="filterEngineDropsUnsafeFeedRulesAndKeepsMediaResolvable" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
-  <testcase name="testLargeTcpDnsAnswersAreSegmentedToFitTheTunnelMtu" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.002"/>
-  <testcase name="testUpstreamResponsesMustEchoTheTransactionIdAndBeResponses" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
-  <testcase name="testOnlyNoerrorAndNxdomainAnswersAreCacheable" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="testLargeTcpDnsAnswersAreSegmentedToFitTheTunnelMtu" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="testUpstreamResponsesMustEchoTheTransactionIdAndBeResponses" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="testOnlyNoerrorAndNxdomainAnswersAreCacheable" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.002"/>
   <testcase name="mediaAwareOrderPrefersSubnetForwardingProviderOnlyForMedia" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.004"/>
-  <testcase name="testUpstreamServerListIncludesIpv6FallbackOnlyWhenEnabled" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.002"/>
-  <testcase name="testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkholeResponses" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
-  <testcase name="testFilterValidation_rejectsMalformedDomainsHtmlAndBroadWildcards" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="testUpstreamServerListIncludesIpv6FallbackOnlyWhenEnabled" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
+  <testcase name="testDnsPacketCodec_synthesizesNxdomainAndZeroIpSinkholeResponses" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="testFilterValidation_rejectsMalformedDomainsHtmlAndBroadWildcards" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
   <testcase name="testRegression_malformedDnsPacketsAndCompressionLoopsRejectedSafely" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
   <testcase name="testUdpPayloadCapacityMatchesIpVersionHeaders" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
-  <testcase name="videoSafetyExemptionAppliesOnlyToTheMediaDomainRuleNotToAdHosts" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="videoSafetyExemptionAppliesOnlyToTheMediaDomainRuleNotToAdHosts" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.002"/>
   <testcase name="testIpv4AndIpv6_udpAndTcpFramingAndChecksums" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
   <testcase name="testDnsPacketParser_parsesStandardIpv4AAndIpv6AaaaQueries" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
-  <testcase name="videoSafetyRefusesRulesThatWouldBreakPlayback" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
-  <testcase name="everyProviderDeclaresItsClientSubnetPolicy" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.001"/>
+  <testcase name="videoSafetyRefusesRulesThatWouldBreakPlayback" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
+  <testcase name="everyProviderDeclaresItsClientSubnetPolicy" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
   <testcase name="testThirdPartyDetectionRespectsLabelBoundaries" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.0"/>
-  <testcase name="testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.006"/>
-  <testcase name="testAiSmartBoostPredictor_detectsBottlenecksAndReadinessScoreAccurately" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.005"/>
+  <testcase name="testUpdateAssetSelection_prefersReleaseApkAndSkipsDebugAndSplitApks" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.01"/>
+  <testcase name="testAiSmartBoostPredictor_detectsBottlenecksAndReadinessScoreAccurately" classname="com.adshield.pro.AdShieldEngineTestSuite" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

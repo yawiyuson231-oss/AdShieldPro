@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsCacheLifetimeTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:27.652Z" hostname="runnervmccnms" time="0.006">
+<testsuite name="com.adshield.pro.DnsCacheLifetimeTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:11.934Z" hostname="ip-10-0-140-34" time="0.01">
   <properties/>
   <testcase name="replayAgesRealTtlFieldsWithoutTouchingOptOrOriginalWire" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.0"/>
-  <testcase name="resolverDoesNotReplayAcrossCheckingDisabledOrEdnsDoFlags" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.003"/>
+  <testcase name="resolverDoesNotReplayAcrossCheckingDisabledOrEdnsDoFlags" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.007"/>
   <testcase name="customDohPathsAndQueriesWithDifferentCaseDoNotShareCacheKeys" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.001"/>
   <testcase name="shortTtlIsNotExtendedAndNoLifetimeMeansNoCache" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.0"/>
   <testcase name="negativeLifetimeComesFromSoaAndIsAgedBeforeReplay" classname="com.adshield.pro.DnsCacheLifetimeTest" time="0.0"/>

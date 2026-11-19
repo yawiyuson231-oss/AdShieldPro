@@ -32,10 +32,10 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:transformDebugClassesWithAsm UP-TO-DATE
 > Task :app:preDebugUnitTestBuild
 > Task :app:processDebugJavaRes UP-TO-DATE
-> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
-> Task :app:bundleDebugClassesToRuntimeJar
-> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
 > Task :app:kspDebugUnitTestKotlin
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
 
 > Task :app:compileDebugUnitTestKotlin
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/ScanJournalTest.kt:156:23 Redundant creation of Json format. Creating instances for each use can be slow.
@@ -128,55 +128,13 @@ AetherCoreTest > testSuspectedBlocking_requiresExplicitOptInAndHigherScore PASSE
 
 AetherCoreTest > testHostExtraction_handlesPortsUsersAndTrailingDots PASSED
 
-AetherGuidedPlanTest > rejectsTheWholePlanIfAnyStepIsUnclearRestrictedOrChangesSettings PASSED
+AetherDnsPolicyReviewTest > usesEligibleProvidersFromTheActualSavedPlanNotAnInventedFallback PASSED
 
-AetherGuidedPlanTest > aPastedUrlIsNotASeparatorOrATargetAndStillNeedsAnExplicitLink PASSED
+AetherDnsPolicyReviewTest > separatesRejectedNewAndRemovedExclusionsAndDoesNotInferPerQueryPolicy PASSED
 
-AetherGuidedPlanTest > shippedModelBuildsOrderedEnglishAndTaglishPlansWithoutChangingSingleTaskBehavior PASSED
+AetherDnsPolicyReviewTest > reportsOnlyTheSavedScopeAndDoesNotExposeCustomResolverEndpoints PASSED
 
-AetherGuidedPlanTest > receiptsDistinguishMissingEvidenceFromCompletedChecksWithLimits PASSED
-
-AetherGuidedPlanTest > failedOrCanceledChecksStayOnTheSameStepAndRequireFreshApproval PASSED
-
-AetherGuidedPlanTest > onlyTheMatchingStepApprovalCanStartOrFinishAnAttempt PASSED
-
-AetherOnlineHttpTest > mapsTransportAndHttpFailuresAndBoundsReplyReads PASSED
-
-AetherOnlineHttpTest > sendsOneHttpsPostWithBearerAuthenticationAndReturnsOnlyTheTaskId PASSED
-
-AetherOnlineHttpTest > stoppingTheWaitCancelsTheHttpCallWithoutReturningATask PASSED
-
-AetherOnlineHttpTest > sendsGeminiKeyOnlyToPinnedNativeEndpointAndParsesTheReply PASSED
-
-AetherOnlineHttpTest > turnsGeminiBadRequestForAnInvalidKeyIntoAnAuthError PASSED
-
-AetherOnlineHttpTest > rejectsOversizedRepliesWithNoContentLength PASSED
-
-AetherOnlinePlannerTest > acceptsOnlyWholeLabelsFromTextOrHarmlessWrappers PASSED
-
-AetherOnlinePlannerTest > approvalToSendDoesNotApproveAnOnlineSuggestedTask PASSED
-
-AetherOnlinePlannerTest > restoresOldConnectionsWithoutResavingKeysAndBindsApprovalToARevision PASSED
-
-AetherOnlinePlannerTest > outboundReviewContainsOnlyTypedTaskTextAndNeverIncludesScannedLinks PASSED
-
-AetherOnlinePlannerTest > geminiUsesOnlyFinalTextAndRejectsIncompleteRepliesAndToolCalls PASSED
-
-AetherOnlinePlannerTest > recognizesProviderErrorCodesWithoutLeakingPrivateErrorText PASSED
-
-AetherOnlinePlannerTest > pinsGeminiAndOpenAiAndNormalizesCompatibleBaseUrls PASSED
-
-AetherOnlinePlannerTest > supportsReviewAndFileToolsWithoutAllowingExpandedOrDestructiveRequests PASSED
-
-AetherOnlinePlannerTest > onlineProviderCannotConvertStatusQuestionsOrNegationIntoASettingChange PASSED
-
-AetherOnlinePlannerTest > savesTokenAndDestinationTogetherAndRejectsUnsafeEndpoints PASSED
-
-AetherOnlinePlannerTest > nativeGeminiSendsOnlyOneTextTurnAndOpenAiUsesModernOutputLimit PASSED
-
-AetherOnlinePlannerTest > acceptsOnlyOneLabelAndRejectsToolCallsAndMalformedReplies PASSED
-
-AetherOnlinePlannerTest > httpFailuresAreDistinguishedWithoutDisplayingProviderBodies PASSED
+AetherDnsPolicyReviewTest > savedExclusionsStayUnknownUntilTheCurrentTunnelHasAReceipt PASSED
 
 AetherPhoneAgentTest > benchmarksOnlyCredibleLatencyOrRecordedResolverFailures PASSED
 
@@ -198,6 +156,8 @@ AetherSecurityAgentTest > shippedModelMakesUsefulSuggestionsForEverySupportedTas
 
 AetherSecurityAgentTest > shippedModelMatchesHoldoutWithoutWrongTaskSuggestions PASSED
 
+AetherSecurityAgentTest > multiStepRequestsDoNotProposePartialChecks PASSED
+
 AetherSecurityAgentTest > invalidWeightsFailClosedInsteadOfPretendingTheModelRan PASSED
 
 AetherSecurityAgentTest > gatedTaskCanOnlyBeApprovedOnceAndNotAfterDismissalOrReplacement PASSED
@@ -206,23 +166,31 @@ AetherSecurityAgentTest > declinesNegatedRequestsAndDoesNotConvertStatusQuestion
 
 AetherSecurityAgentTest > realLocalScannerReceivesOnlyAnExplicitlyApprovedLink PASSED
 
+AetherSecurityAgentTest > securityReviewDoesNotOverrideNarrowerScopeOrAuthorizeAFollowUp PASSED
+
 AetherSecurityReviewTest > boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy PASSED
 
 AetherSecurityReviewTest > staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan PASSED
 
-AetherSecurityReviewTest > runsOnlyTheTwoReviewStepsAndReportsSkippedApps PASSED
+AetherSecurityReviewTest > deadlineOrFailureLeavesOtherSpecialistsEvidenceIntact PASSED
 
-AetherSecurityReviewTest > cancelingTheReviewDoesNotStartTheNextStep PASSED
+AetherSecurityReviewTest > keepsAppAndPolicyOverlapAdvisoryWhenOtherRulesCanTakePrecedence PASSED
+
+AetherSecurityReviewTest > runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps PASSED
+
+AetherSecurityReviewTest > joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits PASSED
+
+AetherSecurityReviewTest > readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration PASSED
+
+AetherSecurityReviewTest > runsIndependentSpecialistsAndCancelsAllWithoutAReport PASSED
+
+AetherSecurityReviewTest > externalDeadlineCancelsTheReviewRatherThanReportingAMissingReading PASSED
 
 AetherSecurityReviewTest > declaredServiceBindingIsEvidenceButSpoofedPermissionSuffixesAreNot PASSED
 
-AetherSecurityReviewTest > deadlineOrFailureLeavesTheOtherStepsEvidenceIntact PASSED
-
-AetherSecurityReviewTest > externalDeadlineCancelsTheReviewRatherThanProducingAMissingStep PASSED
-
 AetherSecurityReviewTest > cancelDuringFileReadPreventsWritingTheNextChunk PASSED
 
-AetherSecurityReviewTest > emptyMetadataIsAGapAndNotSuccessfulCoverage PASSED
+AetherSecurityReviewTest > noInspectedAppsIsUnknownNotZeroMatches PASSED
 
 BatteryIntelligenceTestSuite > testCapacityHealth_isNullUnlessBothCountersExist PASSED
 
@@ -462,6 +430,24 @@ DnsCacheLifetimeTest > negativeLifetimeComesFromSoaAndIsAgedBeforeReplay PASSED
 
 DnsCacheLifetimeTest > resolverReusesOnlyRemainingLifetimeAndPreservesDnssecEvidence PASSED
 
+DnsResolverHardeningTest > strictDnssecRejectionDoesNotBlockLaterAuthenticatedNames PASSED
+
+DnsResolverHardeningTest > liveDiagnosticsDoNotReadOrChangeTheNormalReplyCache PASSED
+
+DnsResolverHardeningTest > refusalFallsBackToSelectedEncryptedResolverWithDetails PASSED
+
+DnsResolverHardeningTest > matchesCompleteQuestionAndOnlyThenAllowsTruncationRetry PASSED
+
+DnsResolverHardeningTest > usesExtendedRcodeAndReportsOnlyNumericExtendedErrorEvidence PASSED
+
+DnsResolverHardeningTest > closingABlockedExchangeReleasesItsIoOnCancellation PASSED
+
+DnsResolverHardeningTest > rejectsMalformedRecordDataAndInvalidEdnsPlacementOrLength PASSED
+
+DnsResolverHardeningTest > dohRequiresHttpsAndAcceptsOnlyBoundedDnsMessageBodies PASSED
+
+DnsResolverHardeningTest > cancelsSlowHedgeWithoutRecordingItsCancellationAsAnOutage PASSED
+
 FeatureExpansion211TestSuite > testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes PASSED
 
 FeatureExpansion211TestSuite > testHomeWidgetPresentationAcrossStates PASSED
@@ -478,13 +464,13 @@ FeatureExpansion211TestSuite > testAppFirewallSummaryAndFilteringModes PASSED
 
 FeatureExpansion211TestSuite > testDnsResolverBenchmarkRanksLiveProbesAndHandlesFailures PASSED
 
-GitHubReleaseMetadataTest > requiresWellFormedSha256AndSkipsAnUnverifiedCandidate PASSED
-
-GitHubReleaseMetadataTest > refusesPartialOrOverflowingVersionTags PASSED
+GitHubReleaseMetadataTest > refusesLegacyPreviewCandidateAndInvalidSecureTags PASSED
 
 GitHubReleaseMetadataTest > refusesAssetFromDifferentRepositoryTagOrFilename PASSED
 
-GitHubReleaseMetadataTest > refusesDraftAndPrereleaseEvenWithValidAssets PASSED
+GitHubReleaseMetadataTest > refusesDraftAndNonIsolatedSecureReleaseEvenWithValidAssets PASSED
+
+GitHubReleaseMetadataTest > requiresWellFormedSha256AndRejectsAmbiguousAssets PASSED
 
 InfinityCoreTestSuite > testWebDavPaths_rejectTraversalAndBuildSafeChildren PASSED
 
@@ -798,6 +784,8 @@ TelegramCloudTestSuite > testEncryptedSessionThatCannotBeUnlockedIsWipedNotInven
 
 TelegramCloudTestSuite > testPrivateChannelConnectionCreatesChannelAndOnlyDesignatedChatIsQueried PASSED
 
+VpnExclusionSetupTest > recordsOnlyActualUserExclusionAttemptsWithoutCountingTheAppItself PASSED
+
 WorldMonitorTestSuite > testProviderRegistryAndEpistemicContracts PASSED
 
 WorldMonitorTestSuite > testNewsFeedParserDecodesEntitiesAndRejectsInventedDates PASSED
@@ -840,6 +828,6 @@ WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 50s
-34 actionable tasks: 8 executed, 2 from cache, 24 up-to-date
+BUILD SUCCESSFUL in 34s
+34 actionable tasks: 7 executed, 2 from cache, 25 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

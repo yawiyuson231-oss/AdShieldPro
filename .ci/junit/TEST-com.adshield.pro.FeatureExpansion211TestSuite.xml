@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.FeatureExpansion211TestSuite" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:27.659Z" hostname="runnervmccnms" time="0.085">
+<testsuite name="com.adshield.pro.FeatureExpansion211TestSuite" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:12.224Z" hostname="ip-10-0-140-34" time="0.09">
   <properties/>
-  <testcase name="testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.002"/>
-  <testcase name="testHomeWidgetPresentationAcrossStates" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.005"/>
-  <testcase name="testCnameCloakingBlocksTrackerAliasesWhileRespectingAllowlistAndMediaSafety" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testHomeWidgetPresentationAcrossStates" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.003"/>
+  <testcase name="testCnameCloakingBlocksTrackerAliasesWhileRespectingAllowlistAndMediaSafety" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.0"/>
   <testcase name="testLinkSanitizerStripsTrackersUnwrapsRedirectsAndPreservesFunctionalParams" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
   <testcase name="testProtectionSnoozeLifecycleAndTilePresentation" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
   <testcase name="testCnameExtractionHandlesCompressedChainsAndRejectsMalformedWire" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.0"/>
-  <testcase name="testAppFirewallSummaryAndFilteringModes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.003"/>
-  <testcase name="testDnsResolverBenchmarkRanksLiveProbesAndHandlesFailures" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.071"/>
+  <testcase name="testAppFirewallSummaryAndFilteringModes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testDnsResolverBenchmarkRanksLiveProbesAndHandlesFailures" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.082"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.GitHubReleaseMetadataTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-19T08:22:27.746Z" hostname="runnervmccnms" time="0.002">
+<testsuite name="com.adshield.pro.GitHubReleaseMetadataTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-19T11:29:12.316Z" hostname="ip-10-0-140-34" time="0.002">
   <properties/>
-  <testcase name="requiresWellFormedSha256AndSkipsAnUnverifiedCandidate" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.001"/>
-  <testcase name="refusesPartialOrOverflowingVersionTags" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.001"/>
-  <testcase name="refusesAssetFromDifferentRepositoryTagOrFilename" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.0"/>
-  <testcase name="refusesDraftAndPrereleaseEvenWithValidAssets" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.0"/>
+  <testcase name="refusesLegacyPreviewCandidateAndInvalidSecureTags" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.001"/>
+  <testcase name="refusesAssetFromDifferentRepositoryTagOrFilename" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.001"/>
+  <testcase name="refusesDraftAndNonIsolatedSecureReleaseEvenWithValidAssets" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.0"/>
+  <testcase name="requiresWellFormedSha256AndRejectsAmbiguousAssets" classname="com.adshield.pro.GitHubReleaseMetadataTest" time="0.0"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
