@@ -218,6 +218,7 @@ class AetherAgentDeviceTest {
     }
 
     /** Approve only the system VPN dialogue returned by prepare(); do not pre-grant app ops. */
+    @Suppress("DEPRECATION") // The Android 10 consent activity requires getCallingPackage().
     private fun allowVpnThroughAndroidConsent() {
         val consent = VpnService.prepare(app) ?: return
         val packageName = requireNotNull(consent.component?.packageName)
@@ -225,7 +226,7 @@ class AetherAgentDeviceTest {
         val serviceInfo = automation.serviceInfo
         serviceInfo.flags = serviceInfo.flags or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         automation.serviceInfo = serviceInfo
-        compose.activityRule.scenario.onActivity { it.startActivity(consent) }
+        compose.activityRule.scenario.onActivity { it.startActivityForResult(consent, 7840) }
         compose.waitUntil(timeoutMillis = 15_000) {
             val root = automation.rootInActiveWindow ?: return@waitUntil false
             root.packageName?.toString() == packageName &&
