@@ -49,6 +49,8 @@ class AdShieldApplication : Application(), Configuration.Provider {
         WorldMonitorWatchWorker.schedule(this)
         GitHubUpdateWorker.schedule(this)
         appScope.launch {
+            // Optional signed-data staging is disabled unless explicitly consented and configured.
+            com.adshield.pro.engine.evolution.EvolutionUpdateWorker.reconcile(this@AdShieldApplication)
             credentialStore.removeRetiredAgentCredential()
             val settings = preferencesRepository.getSettingsSnapshot()
             // Reconcile opted-in security scans even when a worker/receiver starts the process

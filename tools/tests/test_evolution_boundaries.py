@@ -4,7 +4,7 @@ import shutil
 import tempfile
 import unittest
 
-from tools.evolution.boundaries import ROOT, MANIFEST, check
+from tools.evolution.boundaries import ROOT, MANIFEST, SETTINGS_PATH, SETTINGS_EXTENSION, check
 
 
 class FrozenBoundaryTest(unittest.TestCase):
@@ -21,6 +21,16 @@ class FrozenBoundaryTest(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, path)
             self.assertTrue(check(root)['unchanged'])
+            settings = root / SETTINGS_PATH
+            original_settings = settings.read_bytes()
+            self.assertIn(SETTINGS_EXTENSION, original_settings)
+            settings.write_bytes(original_settings.replace(b'EvolutionSettingsCard()', b'UnreviewedSettingsCard()'))
+            with self.assertRaisesRegex(ValueError, 'boundary changed'):
+                check(root)
+            settings.write_bytes(original_settings + SETTINGS_EXTENSION)
+            with self.assertRaisesRegex(ValueError, 'boundary changed'):
+                check(root)
+            settings.write_bytes(original_settings)
             target = root / 'app/src/main/AndroidManifest.xml'
             original = target.read_bytes()
             target.write_bytes(original + b'<!-- unexpected permission/service change -->')

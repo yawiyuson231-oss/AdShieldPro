@@ -152,6 +152,10 @@ fun SettingsScreen(
             )
         }
 
+        // BEGIN reviewed evolution settings extension
+        item { com.adshield.pro.ui.evolution.EvolutionSettingsCard() }
+        // END reviewed evolution settings extension
+
         // Encrypted DNS Protocol & Resolver Card
         item {
             Card(

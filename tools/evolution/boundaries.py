@@ -22,6 +22,16 @@ FILES = ('app/src/main/AndroidManifest.xml', 'app/src/main/java/com/adshield/pro
          'app.js', 'engine.js', 'index.html')
 
 
+# User-authorized additive consent control. Original SettingsScreen bytes stay pinned;
+# this exact insertion is the only exception, never a blanket UI rebaseline.
+SETTINGS_PATH = 'app/src/main/java/com/adshield/pro/ui/screens/SettingsScreen.kt'
+SETTINGS_EXTENSION = b'''        // BEGIN reviewed evolution settings extension
+        item { com.adshield.pro.ui.evolution.EvolutionSettingsCard() }
+        // END reviewed evolution settings extension
+
+'''
+
+
 def check(root=ROOT):
     root = Path(root)
     manifest = load_json(root / MANIFEST)
@@ -34,11 +44,17 @@ def check(root=ROOT):
     expected = manifest['files']
     if set(expected) != paths:
         raise ValueError('protected file inventory changed')
+    extensions = []
     for path in sorted(paths):
-        if hashlib.sha256((root / path).read_bytes()).hexdigest() != expected[path]:
+        content = (root / path).read_bytes()
+        if path == SETTINGS_PATH and content.count(SETTINGS_EXTENSION) == 1:
+            content = content.replace(SETTINGS_EXTENSION, b'', 1)
+            extensions.append('explicit-consent-settings-card')
+        if hashlib.sha256(content).hexdigest() != expected[path]:
             raise ValueError(f'DNS/VPN/UI boundary changed: {path}')
     return dict(unchanged=True, files_checked=len(paths), base_commit=BASE,
-                limitations='Static byte equality in declared boundaries, not end-to-end DNS proof.')
+                reviewed_additive_extensions=extensions,
+                limitations='Original boundary bytes pinned; exact disclosed consent insertion allowed. Not end-to-end DNS proof.')
 
 
 if __name__ == '__main__':

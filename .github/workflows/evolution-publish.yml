@@ -1,0 +1,93 @@
+name: Publish reviewed evolution data
+
+on:
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: 'First publication only (fails if the dedicated release already exists)'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evolution-data-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Reviewed main-branch code only. Working branches cannot use the signing job.
+    if: github.ref == 'refs/heads/main'
+    environment: evolution-publisher
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require reviewed inputs and independently configured keys
+        env:
+          PRIVATE_KEY: ${{ secrets.EVOLUTION_PUBLISHER_PRIVATE_KEY_PEM }}
+          PUBLIC_KEY: ${{ vars.EVOLUTION_PUBLISHER_PUBLIC_KEY_PEM }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$PRIVATE_KEY"
+          test -n "$PUBLIC_KEY"
+          test -f evolution/publisher/reviewed-reputation.json
+          mkdir -p "$RUNNER_TEMP/evolution-publisher"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/evolution-publisher/private.pem"
+          printf '%s\n' "$PUBLIC_KEY" > "$RUNNER_TEMP/evolution-publisher/public.pem"
+      - name: Fetch current signed channel (never silently reset its sequence)
+        if: ${{ !inputs.bootstrap }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/evolution-previous"
+          gh release download evolution-data --repo "$GITHUB_REPOSITORY" --pattern reputation.evo --dir "$RUNNER_TEMP/evolution-previous"
+      - name: Sign and independently verify reviewed data
+        env:
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=()
+          if [ "$BOOTSTRAP" != true ]; then
+            previous=(--previous "$RUNNER_TEMP/evolution-previous/reputation.evo")
+          fi
+          python3 -m tools.evolution.publisher \
+            --manifest evolution/publisher/reviewed-reputation.json \
+            --private-key "$RUNNER_TEMP/evolution-publisher/private.pem" \
+            --public-key "$RUNNER_TEMP/evolution-publisher/public.pem" \
+            --output "$RUNNER_TEMP/evolution-publisher/reputation.evo" \
+            --public-config-output "$RUNNER_TEMP/evolution-publisher/evolution-publisher.properties" \
+            "${previous[@]}"
+      - name: Create dedicated prerelease channel (first publication only)
+        if: ${{ inputs.bootstrap }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create evolution-data --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false --title 'Signed evolution data channel' --notes 'Data-only packages; verify publisher signature and expiry before use. Not an APK release.'
+      - name: Publish signed data to dedicated channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload evolution-data "$RUNNER_TEMP/evolution-publisher/reputation.evo" --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Retain public configuration for reviewed app integration
+        uses: actions/upload-artifact@v7
+        with:
+          name: evolution-publisher-public-configuration
+          path: ${{ runner.temp }}/evolution-publisher/evolution-publisher.properties
+      - name: Remove private signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/evolution-publisher/private.pem"

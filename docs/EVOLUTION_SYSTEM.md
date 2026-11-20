@@ -15,6 +15,10 @@ Delivery date: 2026-11-20. This is an additive evolution of the existing applica
 
 **Engineering workstation / CI:** `tools/evolution` evaluates candidates, stores public research/verified feedback, records cycles, validates data-module contracts and checks release evidence. It does not run downloaded code, silently replace Android executables, change filters/models, publish releases, or install packages.
 
+## Authenticated update staging addition
+
+The internal Android-side signed-data verifier and HTTPS stager are described in [EVOLUTION_UPDATER.md](EVOLUTION_UPDATER.md). Startup now reconciles a default-off WorkManager staging job, gated on explicit consent and packaged publisher configuration. An additive default-off Settings control and exact-hash APK advisory consumer are now connected, with separate atomic activation and rollback. Advisory findings never change local risk scores, threat levels or DNS decisions. No production configuration/feed is bundled; protected publisher-environment creation was denied by GitHub with HTTP 403. See the updater and publisher guides for deployment blockers and current validation.
+
 ## Phases and implementation map
 
 | Phase | Implemented | Safety boundary |
@@ -68,7 +72,7 @@ python3 -m tools.evolution.pipeline
 python3 -m tools.evolution.pipeline --plan --android
 python3 -m tools.evolution.pipeline --android
 
-# Byte-for-byte DNS/VPN/manifest/UI boundary protection (109 files).
+# Original DNS/VPN/manifest/UI boundary hashes (109 files); only the exact disclosed consent-card insertion is allowed.
 python3 -m tools.evolution.boundaries
 
 # Safe fixture reproducibility and all evolution/delivery Python tests.

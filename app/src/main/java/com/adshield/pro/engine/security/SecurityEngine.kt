@@ -90,7 +90,15 @@ class SecurityEngine @Inject constructor(
         val fileVerdict = fileScanner.scanFile(file, checkpoint)
         val extension = file.extension.lowercase()
         val apkReport = if (extension == "apk") apkAnalyzer.analyzeApk(file, checkpoint) else null
+        val publisherAdvisory = com.adshield.pro.engine.evolution.EvolutionAdvisoryText.evaluate(
+            enabled = extension == "apk" && com.adshield.pro.engine.evolution.EvolutionPublisherConfiguration.enabled(context),
+            sha256 = fileVerdict.sha256
+        ) { hash ->
+            val stager = requireNotNull(com.adshield.pro.engine.evolution.EvolutionPublisherConfiguration.createStager(context))
+            stager.lookupSha256(hash)
+        }
         val limitations = buildList {
+            publisherAdvisory.limitation?.let { add(it) }
             addAll(fileVerdict.limitations)
             if (apkReport != null) {
                 addAll(apkReport.limitations)
@@ -101,7 +109,8 @@ class SecurityEngine @Inject constructor(
         }
 
         val combinedScore = maxOf(fileVerdict.riskScore, apkReport?.riskScore ?: 0)
-        val combinedFindings = fileVerdict.findings + (apkReport?.riskReasons ?: emptyList())
+        val combinedFindings = fileVerdict.findings + (apkReport?.riskReasons ?: emptyList()) +
+            listOfNotNull(publisherAdvisory.finding)
         val threatName = apkReport?.let { r ->
             if (r.threatLevel == ApkAnalyzer.ThreatLevel.DANGEROUS || r.threatLevel == ApkAnalyzer.ThreatLevel.SUSPICIOUS) {
                 "APK risk indicators (score ${r.riskScore})"
