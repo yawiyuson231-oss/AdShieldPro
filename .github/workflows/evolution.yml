@@ -1,0 +1,26 @@
+name: Offline evolution governance
+
+on:
+  push:
+    branches: [main, 'arena/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify safe synthetic corpus is reproducible
+        run: python3 -m tools.evolution.fixtures --check
+      - name: Test evolution gates and existing delivery tooling
+        run: python3 -m unittest discover -s tools/tests -v

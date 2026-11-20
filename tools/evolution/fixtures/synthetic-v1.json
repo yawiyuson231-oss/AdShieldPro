@@ -1,0 +1,410 @@
+[
+  {
+    "id": "domain:lookalike",
+    "category": "domain",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Brand imitation with billing lure",
+    "input": {
+      "target": "paypal-billing.attacker.test"
+    }
+  },
+  {
+    "id": "domain:deep-lookalike",
+    "category": "domain",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Brand imitation in deep subdomains",
+    "input": {
+      "target": "a.b.c.google.attacker.test"
+    }
+  },
+  {
+    "id": "domain:punycode",
+    "category": "domain",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Synthetic IDN risk signal; not verified malware",
+    "input": {
+      "target": "xn--fixture.test"
+    }
+  },
+  {
+    "id": "domain:ordinary",
+    "category": "domain",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Ordinary reserved documentation host",
+    "input": {
+      "target": "docs.publisher.test"
+    }
+  },
+  {
+    "id": "domain:hyphen-negative",
+    "category": "domain",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "A hyphen alone is not abuse",
+    "input": {
+      "target": "team-notes.publisher.test"
+    }
+  },
+  {
+    "id": "phishing:brand-credentials",
+    "category": "phishing",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Brand impersonation and credential lure",
+    "input": {
+      "target": "https://paypal.attacker.test/login"
+    }
+  },
+  {
+    "id": "phishing:plain-credentials",
+    "category": "phishing",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Brand impersonation on cleartext transport",
+    "input": {
+      "target": "http://gcash.attacker.test/verify"
+    }
+  },
+  {
+    "id": "phishing:generic-lure",
+    "category": "phishing",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Generic synthetic credential lure without brand; blind-spot probe",
+    "input": {
+      "target": "https://portal.attacker.test/signin"
+    }
+  },
+  {
+    "id": "phishing:article",
+    "category": "phishing",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Ordinary documentation",
+    "input": {
+      "target": "https://docs.publisher.test/article"
+    }
+  },
+  {
+    "id": "phishing:legitimate-login",
+    "category": "phishing",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "A login path alone is not phishing",
+    "input": {
+      "target": "https://portal.publisher.test/login"
+    }
+  },
+  {
+    "id": "apk_metadata:accessibility-sms",
+    "category": "apk_metadata",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Declared accessibility plus SMS and unknown origin; not observed interception",
+    "input": {
+      "permissions": [
+        "RECEIVE_SMS"
+      ],
+      "bindings": [
+        "BIND_ACCESSIBILITY_SERVICE"
+      ],
+      "installer": null,
+      "target_sdk": 36
+    }
+  },
+  {
+    "id": "apk_metadata:surveillance",
+    "category": "apk_metadata",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Stacked requested permissions and unknown origin",
+    "input": {
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
+      "bindings": [],
+      "installer": null,
+      "target_sdk": 36
+    }
+  },
+  {
+    "id": "apk_metadata:old-dropper",
+    "category": "apk_metadata",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Installation request without Internet, old SDK and unknown origin",
+    "input": {
+      "permissions": [
+        "REQUEST_INSTALL_PACKAGES"
+      ],
+      "bindings": [],
+      "installer": null,
+      "target_sdk": 28
+    }
+  },
+  {
+    "id": "apk_metadata:store-basic",
+    "category": "apk_metadata",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Minimal store-installed metadata",
+    "input": {
+      "permissions": [
+        "INTERNET"
+      ],
+      "bindings": [],
+      "installer": "com.android.vending",
+      "target_sdk": 36
+    }
+  },
+  {
+    "id": "apk_metadata:unknown-source-only",
+    "category": "apk_metadata",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Unknown origin alone must not imply elevated metadata risk",
+    "input": {
+      "permissions": [
+        "INTERNET"
+      ],
+      "bindings": [],
+      "installer": null,
+      "target_sdk": 36
+    }
+  },
+  {
+    "id": "apk_metadata:binding-in-request-list",
+    "category": "apk_metadata",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Requested binding string is not a declared component binding",
+    "input": {
+      "permissions": [
+        "BIND_ACCESSIBILITY_SERVICE"
+      ],
+      "bindings": [],
+      "installer": "com.android.vending",
+      "target_sdk": 36
+    }
+  },
+  {
+    "id": "dns_filter:blocked",
+    "category": "dns_filter",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Exact synthetic feed block",
+    "input": {
+      "target": "blocked.fixture.test",
+      "allow": false
+    }
+  },
+  {
+    "id": "dns_filter:subdomain",
+    "category": "dns_filter",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Subdomain synthetic feed block",
+    "input": {
+      "target": "cdn.blocked.fixture.test",
+      "allow": false
+    }
+  },
+  {
+    "id": "dns_filter:allow-override",
+    "category": "dns_filter",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Explicit user allow overrides feed",
+    "input": {
+      "target": "blocked.fixture.test",
+      "allow": true
+    }
+  },
+  {
+    "id": "dns_filter:suffix-boundary",
+    "category": "dns_filter",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Non-child suffix must not match",
+    "input": {
+      "target": "notblocked.fixture.test",
+      "allow": false
+    }
+  },
+  {
+    "id": "dns_filter:ordinary",
+    "category": "dns_filter",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "No matching rule",
+    "input": {
+      "target": "docs.fixture.test",
+      "allow": false
+    }
+  },
+  {
+    "id": "dns_filter:case-dot",
+    "category": "dns_filter",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Normalization retains block semantics",
+    "input": {
+      "target": "BLOCKED.FIXTURE.TEST.",
+      "allow": false
+    }
+  },
+  {
+    "id": "configuration:alias-off",
+    "category": "configuration",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Saved alias inspection disabled",
+    "input": {
+      "alias_shield": false,
+      "wifi_only": false
+    }
+  },
+  {
+    "id": "configuration:network-gap",
+    "category": "configuration",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Saved cellular/ethernet/other filtering gap",
+    "input": {
+      "alias_shield": true,
+      "wifi_only": true
+    }
+  },
+  {
+    "id": "configuration:combined",
+    "category": "configuration",
+    "malicious": true,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "Both saved coverage gaps",
+    "input": {
+      "alias_shield": false,
+      "wifi_only": true
+    }
+  },
+  {
+    "id": "configuration:covered",
+    "category": "configuration",
+    "malicious": false,
+    "source": "repository-authored synthetic regression specification v1",
+    "verification": "verified",
+    "observed_at": "2026-11-20T00:00:00Z",
+    "license": "CC0-1.0",
+    "label_scope": "synthetic-risk-or-policy-only",
+    "rationale": "All fixture transports covered with alias inspection enabled",
+    "input": {
+      "alias_shield": true,
+      "wifi_only": false
+    }
+  }
+]

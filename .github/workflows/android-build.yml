@@ -147,6 +147,11 @@ jobs:
           ls -a app/src/main/java/com/adshield/pro | head -5
           tools/gradle-ci.sh .ci/test.log :app:testDebugUnitTest
 
+      - name: Validate detector evaluation evidence against tested sources
+        run: |
+          python3 -m tools.evolution.fixtures --check
+          python3 -m tools.evolution.artifacts validate .ci/evolution/current.json
+
       - name: Android lint
         run: |
           set -o pipefail
@@ -264,6 +269,7 @@ jobs:
           path: |
             .ci/*.log
             .ci/junit/*.xml
+            .ci/evolution/*.json
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.*
             app/build/test-results/**
