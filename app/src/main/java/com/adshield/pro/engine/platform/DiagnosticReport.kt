@@ -267,6 +267,9 @@ object DiagnosticScrubber {
     private val PRIVATE_IPV4 = Regex(
         "\\b(?:10\\.\\d{1,3}|192\\.168|172\\.(?:1[6-9]|2\\d|3[01]))\\.\\d{1,3}\\.\\d{1,3}\\b"
     )
+    // Unique-local (fc00::/7) and link-local (fe80::/10) IPv6 addresses are local-network detail,
+    // unlike a public recursive resolver address, so they are removed like RFC 1918 IPv4 space.
+    private val PRIVATE_IPV6 = Regex("(?i)\\b(?:f[cd][0-9a-f]{2}:|fe80:)[0-9a-f:]*[0-9a-f]\\b")
     // 24+ chars covers hex digests, base64 blobs, JWT fragments and device ids while leaving
     // normal words alone; "+/=" are included because base64 secrets are the likeliest shape.
     private val LONG_TOKEN = Regex("[A-Za-z0-9_\\-+/=]{24,}")
@@ -283,7 +286,10 @@ object DiagnosticScrubber {
         val withoutUnixPaths = UNIX_PATH.replace(withoutWindowsPaths) { match ->
             match.groupValues[1] + PLACEHOLDER_PATH
         }
-        val withoutPrivateIps = PRIVATE_IPV4.replace(withoutUnixPaths, PLACEHOLDER_PRIVATE_IP)
+        val withoutPrivateIps = PRIVATE_IPV6.replace(
+            PRIVATE_IPV4.replace(withoutUnixPaths, PLACEHOLDER_PRIVATE_IP),
+            PLACEHOLDER_PRIVATE_IP
+        )
         val withoutTokens = LONG_TOKEN.replace(withoutPrivateIps, PLACEHOLDER_TOKEN)
         return HOSTNAME.replace(withoutTokens, PLACEHOLDER_HOST)
     }

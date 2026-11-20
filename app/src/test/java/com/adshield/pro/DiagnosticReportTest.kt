@@ -136,6 +136,13 @@ class DiagnosticReportTest {
             assertFalse("scrubber must remove '$leaked'", credentialed.contains(leaked))
         }
 
+        // Unique-local and link-local IPv6 addresses are local-network detail and must go too.
+        listOf("fd12:3456:789a::1", "fe80::1c2b:3d4e:5f60:7081").forEach { local ->
+            val scrubbed = DiagnosticScrubber.redact("Family $local")
+            assertFalse("scrubber must remove '$local'", scrubbed.contains(local.substringBefore(":")))
+            assertTrue(scrubbed.contains(DiagnosticScrubber.PLACEHOLDER_PRIVATE_IP))
+        }
+
         // Base64-shaped secrets carry + / = and must not slip past the token rule.
         val base64 = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345+/="
         assertFalse(DiagnosticScrubber.redact("token $base64").contains(base64))
