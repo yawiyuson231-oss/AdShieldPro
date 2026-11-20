@@ -11,6 +11,15 @@ AdShield Pro is a non-root Android app that filters DNS requests on-device and i
   to click it once; the deploy workflow reports it if it is still off).
 - **Direct APK download:** [latest AdShield Pro release](https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest)
 - [Browse all GitHub releases](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
+- **Community Discord:** <https://discord.gg/TZh3kwDU9M> — build announcements, filter-list triage,
+  and capability-review discussion. The website links out to it as a plain anchor: no Discord widget,
+  iframe, or tracking script is embedded, so the zero-third-party-SDK guarantee still holds.
+
+The landing page (`docs/index.html`) is at website **v2.0** and ships, without any framework or remote
+asset, a `Ctrl / ⌘ + K` quick-jump command palette, an interactive encrypted-transport and capability
+matrix (DoQ RFC 9250 / DoH & DoT / DNS Alias Shield / 129-point audit), a five-screen app demo
+including per-app DNS policies, and an on-device Privacy Lab that sanitizes redirect links and scores
+lookalike hostnames entirely in the browser.
 
 ### Publishing a release
 
@@ -330,6 +339,7 @@ smoke test checklist.
 - [Latest releases and APK downloads](https://github.com/yawiyuson231-oss/AdShieldPro/releases)
 - [Privacy policy](https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/PRIVACY_POLICY.md)
 - [Report a problem](https://github.com/yawiyuson231-oss/AdShieldPro/issues)
+- [Community Discord server](https://discord.gg/TZh3kwDU9M)
 
 AdShield Pro is built with **Kotlin, Jetpack Compose (Material 3), Clean Architecture + MVVM, Room SQLite, DataStore, WorkManager, Hilt, and Android `VpnService`**. DNS filtering can reduce requests to known ad, tracking, and malicious domains, but it cannot guarantee protection from every threat.
 

@@ -62,6 +62,10 @@
   --neon: #8dffdc;
   --threat: #ff4f74;
   --amber: #ffb547;
+  --discord: #5865f2;
+  --discord-soft: rgba(88, 101, 242, .16);
+  --discord-line: rgba(133, 144, 255, .42);
+  --discord-glow: #9ba5ff;
   --grad: linear-gradient(120deg, var(--emerald), var(--cyan));
   --radius: 22px;
   --container: 1320px;
@@ -816,12 +820,355 @@ p { overflow-wrap: break-word; }
 @keyframes done-blink { 0%, 68% { opacity: 0; } 75%, 95% { opacity: 1; } 100% { opacity: 0; } }
 
 /* =========================================================
-   Responsive Breakpoints (1220px -> 1060px -> 640px -> 390px)
+   Website v2.0 — Command Bar, Protocol Matrix, Privacy Lab & Discord Hub
    ========================================================= */
-@media (max-width: 1220px) {
-  .nav { gap: 2px; font-size: .85rem; }
-  .nav a:not(.btn) { padding: 8px 10px; }
-  .nav a:not(.btn)::after { left: 10px; right: 10px; }
+.eyebrow-v2 {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 99px;
+  border: 1px solid var(--line-strong);
+  background: rgba(20, 232, 162, .12); color: #fff;
+  font: 700 .64rem/1.3 var(--font-mono); letter-spacing: .12em;
+}
+.btn-discord {
+  color: #eef0ff;
+  background: linear-gradient(135deg, rgba(88, 101, 242, .24), rgba(34, 228, 255, .1));
+  border-color: var(--discord-line);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.btn-discord:hover {
+  border-color: var(--discord-glow);
+  background: linear-gradient(135deg, rgba(88, 101, 242, .38), rgba(34, 228, 255, .18));
+  box-shadow: 0 0 34px -6px rgba(88, 101, 242, .65);
+}
+.btn-discord-solid {
+  color: #fff;
+  background: linear-gradient(125deg, #5865f2, #4752c4 60%, #1d9bf0);
+  box-shadow: 0 0 0 1px rgba(165, 176, 255, .45), 0 14px 40px -12px rgba(88, 101, 242, .85), inset 0 1px rgba(255, 255, 255, .35);
+}
+.btn-discord-solid:hover {
+  box-shadow: 0 0 0 1px rgba(185, 194, 255, .75), 0 18px 54px -10px rgba(88, 101, 242, .95), inset 0 1px rgba(255, 255, 255, .45);
+}
+.nav a.nav-discord {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #cdd3ff;
+}
+.nav a.nav-discord svg { width: 15px; height: 15px; flex: none; color: var(--discord-glow); }
+.nav a.nav-discord:hover { color: #fff; }
+
+.cmd-trigger {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 40px; padding: 6px 11px; border-radius: 11px;
+  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, .035);
+  color: var(--muted); font: 600 .76rem var(--font-mono); cursor: pointer;
+  flex-shrink: 0; transition: border-color .25s, background .25s, color .25s;
+}
+.cmd-trigger:hover { border-color: var(--cyan); background: rgba(34, 228, 255, .08); color: var(--text); }
+.cmd-trigger svg { width: 15px; height: 15px; flex: none; color: var(--neon); }
+.cmd-trigger kbd {
+  padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line);
+  background: rgba(2, 8, 14, .75); color: var(--neon); font: 600 .66rem var(--font-mono);
+}
+
+.hero-specs {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;
+  margin-top: 22px; max-width: 620px;
+}
+.hero-spec {
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px;
+  background: rgba(7, 20, 34, .58); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  min-width: 0; text-align: left;
+}
+.hero-spec b { display: block; font: 700 .84rem/1.25 var(--font-display); color: var(--neon); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hero-spec span { display: block; margin-top: 2px; font: 500 .66rem/1.3 var(--font-mono); color: var(--dim); }
+
+/* Phone Showcase 5th screen: Per-App Firewall */
+.f-apps { margin: 4px 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.f-apps li {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(255, 255, 255, .025); font-size: .74rem;
+}
+.f-app-meta { min-width: 0; }
+.f-app-meta b { display: block; font: 600 .74rem var(--font-display); color: var(--text); }
+.f-app-meta small { display: block; font: 500 .58rem var(--font-mono); color: var(--dim); }
+.f-mode-btn {
+  flex: none; padding: 4px 8px; border-radius: 7px; border: 1px solid var(--line-strong);
+  font: 700 .56rem var(--font-mono); letter-spacing: .05em; cursor: pointer;
+  background: rgba(20, 232, 162, .14); color: var(--neon);
+  transition: background .25s, color .25s, border-color .25s;
+}
+.f-mode-btn[data-mode="allow"] { background: rgba(34, 228, 255, .14); border-color: rgba(34, 228, 255, .45); color: var(--cyan); }
+.f-mode-btn[data-mode="bypass"] { background: rgba(255, 181, 71, .14); border-color: rgba(255, 181, 71, .45); color: var(--amber); }
+.f-mode-btn[data-mode="block"] { background: rgba(255, 79, 116, .15); border-color: rgba(255, 79, 116, .45); color: #ff9cb0; }
+
+/* Protocol & Architecture Matrix inside #features */
+.arch-panel {
+  margin-top: 32px; border: 1px solid var(--line-strong); border-radius: 24px;
+  background: linear-gradient(160deg, rgba(10, 26, 44, .75), rgba(4, 12, 22, .85));
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  overflow: hidden;
+}
+.arch-head {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 18px 22px; border-bottom: 1px solid var(--line);
+}
+.arch-head-title { font: 700 1.05rem var(--font-display); color: var(--text); }
+.arch-head-sub { display: block; font: 500 .74rem var(--font-mono); color: var(--dim); margin-top: 2px; }
+.arch-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.arch-tab {
+  min-height: 38px; padding: 7px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+  color: var(--muted); font: 600 .78rem var(--font-mono); cursor: pointer;
+  transition: border-color .25s, background .25s, color .25s;
+}
+.arch-tab:hover { color: var(--text); border-color: var(--line-strong); }
+.arch-tab[aria-selected="true"] {
+  background: var(--grad); color: #01170f; border-color: transparent; font-weight: 700;
+}
+.arch-body { padding: 22px; }
+.arch-pane[hidden] { display: none; }
+.arch-grid {
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 22px; align-items: start;
+}
+.arch-copy h3 { font-size: 1.24rem; margin-bottom: 8px; color: var(--neon); }
+.arch-copy p { margin: 0 0 14px; color: var(--muted); font-size: .95rem; }
+.arch-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+.arch-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+  border-radius: 99px; border: 1px solid var(--line-strong);
+  background: rgba(20, 232, 162, .07); color: var(--neon);
+  font: 600 .7rem var(--font-mono);
+}
+.arch-specs {
+  display: grid; gap: 10px; margin: 0; padding: 16px; border-radius: 16px;
+  border: 1px solid var(--line); background: rgba(2, 8, 15, .65);
+}
+.arch-spec-row { display: flex; justify-content: space-between; gap: 12px; font-size: .82rem; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.arch-spec-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.arch-spec-row span { color: var(--dim); font-family: var(--font-mono); font-size: .74rem; }
+.arch-spec-row strong { color: var(--text); font-family: var(--font-mono); font-size: .76rem; text-align: right; }
+
+/* Interactive Privacy Lab (#lab) */
+.lab-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: stretch;
+}
+.lab-card {
+  display: flex; flex-direction: column; gap: 16px;
+  padding: clamp(20px, 3vw, 28px); border: 1px solid var(--line-strong); border-radius: 24px;
+  background: linear-gradient(165deg, rgba(10, 26, 44, .78), rgba(3, 10, 18, .9));
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 30px 80px -40px rgba(0, 0, 0, .85);
+  min-width: 0;
+}
+.lab-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.lab-card-top h3 { font-size: 1.24rem; margin-top: 4px; }
+.lab-kicker { font: 700 .68rem var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); }
+.lab-chip {
+  flex: none; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line-strong);
+  background: rgba(20, 232, 162, .09); color: var(--neon); font: 600 .66rem var(--font-mono);
+}
+.lab-desc { margin: 0; color: var(--muted); font-size: .92rem; }
+.lab-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lab-presets-label { font: 600 .68rem var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .08em; margin-right: 4px; }
+.preset-btn {
+  padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .035); color: var(--muted);
+  font: 600 .72rem var(--font-mono); cursor: pointer; transition: border-color .2s, color .2s, background .2s;
+}
+.preset-btn:hover { border-color: var(--cyan); color: #fff; background: rgba(34, 228, 255, .09); }
+.lab-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.lab-input {
+  flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 10px 13px;
+  border-radius: 11px; border: 1px solid var(--line-strong);
+  background: rgba(2, 8, 15, .82); color: var(--text);
+  font: 500 .8rem var(--font-mono);
+}
+.lab-input:focus { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.lab-result {
+  flex: 1; display: flex; flex-direction: column; gap: 12px;
+  padding: 15px 16px; border-radius: 16px; border: 1px solid var(--line);
+  background: rgba(2, 8, 15, .7); min-width: 0;
+}
+.lab-out-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lab-out-code {
+  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: thin;
+  padding: 8px 11px; border-radius: 9px; border: 1px solid var(--line);
+  background: rgba(6, 18, 30, .85); color: var(--neon); font: 500 .76rem var(--font-mono);
+}
+.lab-out-code.is-warn { color: #ff9cb0; border-color: rgba(255, 79, 116, .45); }
+.lab-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-stat {
+  padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .025); font: 600 .68rem var(--font-mono); color: var(--muted);
+}
+.lab-stat.ok { color: var(--neon); border-color: rgba(20, 232, 162, .35); background: rgba(20, 232, 162, .08); }
+.lab-stat.warn { color: var(--amber); border-color: rgba(255, 181, 71, .4); background: rgba(255, 181, 71, .09); }
+.lab-stat.bad { color: #ff9cb0; border-color: rgba(255, 79, 116, .45); background: rgba(255, 79, 116, .1); }
+.lab-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lab-tags li {
+  padding: 3px 8px; border-radius: 6px; font: 600 .66rem var(--font-mono);
+  background: rgba(255, 79, 116, .12); border: 1px solid rgba(255, 79, 116, .32); color: #ff9cb0;
+}
+.lab-tags li.kept {
+  background: rgba(20, 232, 162, .1); border-color: rgba(20, 232, 162, .3); color: var(--neon);
+}
+.domain-score-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.domain-score-num { font: 700 1.55rem/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--neon); }
+.domain-score-num.warn { color: var(--amber); }
+.domain-score-num.bad { color: #ff8aa3; }
+.domain-signals { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.domain-signals li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: .8rem; color: var(--muted);
+}
+.domain-signals li b { color: var(--text); font: 600 .78rem var(--font-display); }
+.domain-signals li code { font: 500 .7rem var(--font-mono); color: var(--cyan); text-align: right; }
+.lab-foot-link {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
+  color: var(--neon); font: 600 .78rem var(--font-mono); text-decoration: none;
+}
+.lab-foot-link:hover { color: #fff; text-decoration: underline; }
+
+/* Community, Discord Hub & FAQ (#community) */
+.community-grid {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start;
+}
+.discord-hub {
+  position: relative; overflow: hidden;
+  padding: clamp(22px, 3.5vw, 34px); border-radius: 26px;
+  border: 1px solid var(--discord-line);
+  background:
+    radial-gradient(420px circle at 15% 0%, rgba(88, 101, 242, .26), transparent 65%),
+    radial-gradient(360px circle at 95% 100%, rgba(20, 232, 162, .14), transparent 65%),
+    linear-gradient(165deg, rgba(12, 22, 44, .88), rgba(4, 10, 20, .94));
+  box-shadow: 0 34px 90px -36px rgba(0, 0, 0, .9), 0 0 50px -22px rgba(88, 101, 242, .5);
+}
+.discord-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.discord-emblem {
+  width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; flex: none;
+  background: linear-gradient(135deg, #5865f2, #3b46c4);
+  box-shadow: 0 12px 30px -8px rgba(88, 101, 242, .85), inset 0 1px rgba(255, 255, 255, .4);
+  color: #fff;
+}
+.discord-emblem svg { width: 32px; height: 32px; }
+.discord-badge {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px;
+  border-radius: 99px; border: 1px solid var(--discord-line);
+  background: rgba(88, 101, 242, .18); color: #dce0ff;
+  font: 700 .66rem var(--font-mono); letter-spacing: .12em; text-transform: uppercase;
+}
+.discord-hub h3 { font-size: clamp(1.35rem, 2.5vw, 1.75rem); margin: 6px 0 0; }
+.discord-lead { margin: 0 0 18px; color: #c4d2dc; font-size: .96rem; }
+.discord-invite-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(133, 144, 255, .3);
+  background: rgba(3, 8, 18, .72); margin-bottom: 18px;
+}
+.discord-invite-bar code {
+  flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 .82rem var(--font-mono); color: #dce0ff; padding: 4px 6px;
+}
+.discord-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+.channel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.channel-card {
+  padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(133, 144, 255, .2);
+  background: rgba(8, 18, 34, .65); min-width: 0;
+}
+.channel-card code { display: block; font: 700 .74rem var(--font-mono); color: var(--neon); margin-bottom: 4px; }
+.channel-card p { margin: 0; font-size: .8rem; color: var(--muted); line-height: 1.45; }
+.discord-privacy-note {
+  margin: 0; padding: 10px 12px; border-radius: 11px;
+  border: 1px solid var(--line); background: rgba(20, 232, 162, .05);
+  color: var(--dim); font: 500 .75rem/1.45 var(--font-mono);
+}
+
+.faq-stack { display: grid; gap: 12px; }
+.faq-item {
+  border: 1px solid var(--line); border-radius: 18px;
+  background: rgba(8, 20, 34, .58); overflow: hidden;
+  transition: border-color .25s, background .25s;
+}
+.faq-item[open] { border-color: var(--line-strong); background: rgba(10, 26, 44, .78); }
+.faq-item summary {
+  list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 16px 20px; cursor: pointer; font: 600 .98rem/1.35 var(--font-display); color: var(--text);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-plus {
+  width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--line-strong);
+  display: grid; place-items: center; flex: none; color: var(--neon); font: 700 .95rem/1 var(--font-mono);
+  transition: transform .25s var(--ease-out), background .25s;
+}
+.faq-item[open] .faq-plus { transform: rotate(45deg); background: rgba(20, 232, 162, .14); }
+.faq-body { padding: 0 20px 18px; color: var(--muted); font-size: .9rem; line-height: 1.6; }
+.faq-body p { margin: 0; }
+.faq-body code { font: 500 .82em var(--font-mono); color: var(--neon); }
+
+/* Command Palette Modal */
+.cmd-backdrop {
+  position: fixed; inset: 0; z-index: 400; display: grid; place-items: start center;
+  padding: clamp(56px, 11vh, 110px) 16px 24px;
+  background: rgba(1, 5, 10, .78);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+}
+.cmd-backdrop[hidden] { display: none; }
+.cmd-dialog {
+  width: min(580px, 100%); border-radius: 20px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(170deg, #0b1c30, #040c16);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, .85), 0 0 40px -12px rgba(34, 228, 255, .35);
+  overflow: hidden;
+}
+.cmd-search-bar {
+  display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cmd-search-bar svg { width: 18px; height: 18px; flex: none; color: var(--cyan); }
+.cmd-input {
+  flex: 1; min-width: 0; border: 0; background: none; color: var(--text);
+  font: 500 .96rem var(--font-body); outline: none;
+}
+.cmd-close {
+  padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .04); color: var(--dim);
+  font: 600 .68rem var(--font-mono); cursor: pointer;
+}
+.cmd-close:hover { color: var(--text); border-color: var(--line-strong); }
+.cmd-list {
+  max-height: min(360px, 56vh); overflow-y: auto; margin: 0; padding: 8px; list-style: none;
+  display: grid; gap: 4px;
+}
+.cmd-item {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 13px; border: 1px solid transparent; border-radius: 12px;
+  background: none; color: var(--text); text-align: left; cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.cmd-item:hover, .cmd-item.is-selected {
+  background: rgba(20, 232, 162, .11); border-color: rgba(34, 228, 255, .35);
+}
+.cmd-item-main b { display: block; font: 600 .9rem var(--font-display); }
+.cmd-item-main small { display: block; color: var(--dim); font: 500 .74rem var(--font-mono); }
+.cmd-item-tag {
+  flex: none; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .03); color: var(--neon); font: 600 .66rem var(--font-mono);
+}
+.cmd-foot {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+  padding: 10px 16px; border-top: 1px solid var(--line);
+  color: var(--dim); font: 500 .68rem var(--font-mono);
+}
+
+/* =========================================================
+   Responsive Breakpoints (1320px -> 1160px -> 980px -> 640px -> 390px)
+   ========================================================= */
+@media (max-width: 1400px) {
+  .nav { gap: 1px; font-size: .83rem; }
+  .nav a:not(.btn) { padding: 8px 9px; }
+  .nav a:not(.btn)::after { left: 9px; right: 9px; }
 }
 
 @media (max-width: 1180px) {
@@ -831,11 +1178,12 @@ p { overflow-wrap: break-word; }
   .demo-log { min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 1060px) {
+@media (max-width: 1300px) {
   :root { --header-h: 66px; }
   .header-cta { display: none; }
+  .cmd-trigger { margin-left: auto; }
   .nav-toggle {
-    display: grid; align-content: center; gap: 5px; width: 44px; height: 44px; margin-left: auto; padding: 0 11px;
+    display: grid; align-content: center; gap: 5px; width: 44px; height: 44px; margin-left: 0; padding: 0 11px;
     border: 1px solid var(--line-strong); border-radius: 12px; background: rgba(255, 255, 255, .04); cursor: pointer;
     flex-shrink: 0;
   }
@@ -865,6 +1213,10 @@ p { overflow-wrap: break-word; }
   .site-header.menu-open { background: rgba(3, 9, 16, .97); }
 }
 
+@media (max-width: 1040px) {
+  .arch-grid, .lab-grid, .community-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 980px) {
 
   .hero { padding-top: calc(var(--header-h) + 32px); min-height: auto; }
@@ -873,6 +1225,7 @@ p { overflow-wrap: break-word; }
   .hero-logo { font-size: clamp(2.1rem, 10.5vw, 5.2rem); }
   .hero-intro, .hero-tagline { margin-inline: auto; }
   .actions, .hero-meta { justify-content: center; }
+  .hero-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; margin-inline: auto; }
   .hero-stage { max-width: min(460px, 92vw); }
 
   .showcase-inner { grid-template-columns: minmax(0, 1fr); gap: 40px; }
@@ -887,6 +1240,8 @@ p { overflow-wrap: break-word; }
 }
 
 @media (max-width: 640px) {
+  .cmd-trigger kbd, .cmd-trigger-label { display: none; }
+  .cmd-trigger { padding: 8px 11px; min-height: 44px; }
   .hero { padding-bottom: 64px; }
   .hero-logo {
     font-size: clamp(1.85rem, 10.8vw, 3.6rem);
@@ -896,6 +1251,7 @@ p { overflow-wrap: break-word; }
   .actions { flex-direction: column; align-items: stretch; width: 100%; max-width: 420px; margin-inline: auto; }
   .actions .btn { width: 100%; }
   .hero-meta { gap: 8px 14px; font-size: .72rem; }
+  .hero-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .hero-stage { max-width: min(380px, 100%); }
   .stage-chip {
     white-space: normal;
@@ -912,6 +1268,10 @@ p { overflow-wrap: break-word; }
   .feature-grid { grid-template-columns: minmax(0, 1fr); }
   .card { min-height: 0; padding: 22px 20px; }
   .card h3, .card p, .card-icon { transform: none; }
+  .arch-head, .arch-body { padding: 16px; }
+  .channel-grid { grid-template-columns: minmax(0, 1fr); }
+  .discord-actions { flex-direction: column; }
+  .discord-actions .btn { width: 100%; }
 
   .demo-panel { border-radius: 20px; }
   .demo-toolbar { flex-direction: column; align-items: stretch; padding: 12px; }
@@ -996,6 +1356,8 @@ p { overflow-wrap: break-word; }
       <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></symbol>
+      <symbol id="i-discord" viewBox="0 0 24 24"><path fill="currentColor" d="M20.32 4.37a19.8 19.8 0 0 0-4.89-1.52.07.07 0 0 0-.08.04c-.21.37-.44.86-.61 1.25a18.27 18.27 0 0 0-5.48 0 12.64 12.64 0 0 0-.62-1.25.08.08 0 0 0-.08-.04c-1.7.29-3.34.8-4.89 1.52a.07.07 0 0 0-.03.03C.53 9.05-.32 13.58.1 18.06a.08.08 0 0 0 .03.05 19.9 19.9 0 0 0 5.99 3.03.08.08 0 0 0 .08-.03c.46-.63.87-1.3 1.22-2a.08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.9.08.08 0 0 1-.01-.12c.13-.1.25-.2.37-.3a.07.07 0 0 1 .08-.01c3.93 1.8 8.18 1.8 12.07 0a.07.07 0 0 1 .08.01c.12.1.24.2.37.3a.08.08 0 0 1-.01.12c-.6.35-1.22.65-1.87.9a.08.08 0 0 0-.04.11c.36.7.77 1.37 1.22 2a.08.08 0 0 0 .08.03 19.84 19.84 0 0 0 6-3.03.08.08 0 0 0 .03-.05c.5-5.18-.84-9.68-3.55-13.66a.06.06 0 0 0-.03-.03ZM8.02 15.33c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.96 2.42-2.16 2.42Zm7.97 0c-1.18 0-2.16-1.08-2.16-2.42 0-1.33.96-2.42 2.16-2.42 1.21 0 2.18 1.1 2.16 2.42 0 1.34-.95 2.42-2.16 2.42Z"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m16.5 16.5 4.2 4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
       <symbol id="i-android" viewBox="0 0 24 24"><path fill="currentColor" d="M17.6 9.48 19.44 6.3a.38.38 0 1 0-.66-.38l-1.87 3.23a11.4 11.4 0 0 0-9.82 0L5.22 5.92a.38.38 0 1 0-.66.38L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52ZM7 15.25A1.25 1.25 0 1 1 8.25 14 1.25 1.25 0 0 1 7 15.25Zm10 0A1.25 1.25 0 1 1 18.25 14 1.25 1.25 0 0 1 17 15.25Z"/></symbol>
     </defs>
   </svg>
@@ -1028,16 +1390,25 @@ p { overflow-wrap: break-word; }
       </a>
       <nav class="nav" id="site-nav" aria-label="Main navigation">
         <a href="#showcase" data-nav>Showcase</a>
-        <a href="#features" data-nav>Protection</a>
-        <a href="#demo" data-nav>How it works</a>
+        <a href="#features" data-nav>Features</a>
+        <a href="#lab" data-nav>Privacy Lab</a>
+        <a href="#demo" data-nav>Demo</a>
+        <a href="#community" data-nav>Community</a>
         <a href="#download" data-nav>Download</a>
         <a href="app/" data-nav>Web platform</a>
-        <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Releases</a>
+        <a class="nav-discord" href="https://discord.gg/TZh3kwDU9M" target="_blank" rel="noopener noreferrer">
+          <svg aria-hidden="true"><use href="#i-discord"/></svg><span>Discord</span>
+        </a>
         <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">GitHub</a>
         <a class="btn btn-primary btn-sm nav-mobile-cta" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
           <svg aria-hidden="true"><use href="#i-download"/></svg><span>Get APK</span>
         </a>
       </nav>
+      <button class="cmd-trigger" type="button" data-cmd-open aria-label="Open quick navigation and actions (Ctrl+K)">
+        <svg aria-hidden="true"><use href="#i-search"/></svg>
+        <span class="cmd-trigger-label">Quick jump</span>
+        <kbd aria-hidden="true">⌘K</kbd>
+      </button>
       <a class="btn btn-primary btn-sm header-cta magnetic" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
         <svg aria-hidden="true"><use href="#i-download"/></svg><span>Get APK</span>
       </a>
@@ -1052,17 +1423,20 @@ p { overflow-wrap: break-word; }
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="container hero-inner">
         <div class="hero-copy">
-          <div class="eyebrow hero-fade" style="--d:0ms">Private DNS protection for Android</div>
+          <div class="eyebrow hero-fade" style="--d:0ms"><span>Private DNS protection for Android</span><span class="eyebrow-v2">WEB V2.0</span></div>
           <h1 id="hero-title" class="hero-title">
             <span class="hero-logo" data-split-chars>ADSHIELD <span class="hero-logo-accent">PRO</span></span>
             <span class="hero-tagline" data-split-words>Block the noise. <em>Protect your digital world.</em></span>
           </h1>
-          <p class="hero-intro hero-fade" style="--d:900ms">On-device encrypted DNS protection for Android — with DNS-over-HTTPS, DNS-over-TLS and DNS-over-QUIC, custom allow and block rules, scheduled Quiet Hours profiles, Quick Settings control, and a local-first companion web platform.</p>
+          <p class="hero-intro hero-fade" style="--d:900ms">On-device encrypted DNS protection for Android — with DNS-over-HTTPS, DNS-over-TLS and DNS-over-QUIC, per-app split-tunnel policies, offline link sanitization, and a local-first companion web platform.</p>
           <div class="actions hero-fade" style="--d:1050ms">
             <a class="btn btn-primary magnetic" data-apk-link href="https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/v2.11.0/AdShieldPro-2.11.0-release.apk" rel="noopener">
               <svg aria-hidden="true"><use href="#i-download"/></svg><span data-apk-cta>Download APK · v2.11.0</span>
             </a>
             <a class="btn btn-ghost glow-border magnetic" href="app/"><span>Web platform</span><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+            <a class="btn btn-discord glow-border magnetic" href="https://discord.gg/TZh3kwDU9M" target="_blank" rel="noopener noreferrer">
+              <svg aria-hidden="true"><use href="#i-discord"/></svg><span>Join Discord</span>
+            </a>
             <a class="btn btn-ghost glow-border magnetic" href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">
               <svg aria-hidden="true"><use href="#i-github"/></svg><span>View on GitHub</span>
             </a>
@@ -1070,6 +1444,12 @@ p { overflow-wrap: break-word; }
           <ul class="hero-meta hero-fade" style="--d:1200ms" aria-label="Highlights">
             <li>Open source (GPL-3.0)</li><li>Android 10+ · No root</li><li>DNS activity stays on your device</li>
           </ul>
+          <div class="hero-specs hero-fade" style="--d:1320ms" aria-label="Platform architecture highlights">
+            <div class="hero-spec"><b>DoH · DoT · DoQ</b><span>RFC 8484 / 7858 / 9250</span></div>
+            <div class="hero-spec"><b>129 Capabilities</b><span>95 shipped · public audit</span></div>
+            <div class="hero-spec"><b>DNS-Only TUN</b><span>No remote VPN routing</span></div>
+            <div class="hero-spec"><b>Zero SDK Trackers</b><span>Verifiable local builds</span></div>
+          </div>
         </div>
 
         <div class="hero-stage" id="hero-stage" role="img" aria-label="Illustration: ad and tracker icons approach the AdShield Pro shield and dissolve into particles at its protective barrier">
@@ -1147,6 +1527,9 @@ p { overflow-wrap: break-word; }
             <button class="phone-tab" role="tab" id="tab-boost" aria-selected="false" aria-controls="screen-boost" data-phone-tab="boost" tabindex="-1">
               <span class="phone-tab-num">04</span><span><b>Smart Boost</b><small>Rule-based maintenance tips</small></span>
             </button>
+            <button class="phone-tab" role="tab" id="tab-firewall" aria-selected="false" aria-controls="screen-firewall" data-phone-tab="firewall" tabindex="-1">
+              <span class="phone-tab-num">05</span><span><b>Per-App DNS</b><small>Split-tunnel &amp; per-app policies</small></span>
+            </button>
           </div>
           <p class="disclaimer" data-reveal><span class="disclaimer-icon" aria-hidden="true">i</span><span>Illustrative demo. All numbers and domains shown are simulated — not live device data.</span></p>
         </div>
@@ -1219,6 +1602,29 @@ p { overflow-wrap: break-word; }
                   </ul>
                   <p class="b-note">Example suggestions</p>
                 </section>
+
+                <section class="screen" id="screen-firewall" role="tabpanel" aria-labelledby="tab-firewall" data-screen="firewall" hidden>
+                  <h3 class="s-title">Per-App DNS <small>Tap to cycle</small></h3>
+                  <ul class="f-apps" aria-label="Simulated per-app DNS policies">
+                    <li>
+                      <div class="f-app-meta"><b>Web Browser</b><small>48 DNS queries</small></div>
+                      <button class="f-mode-btn" type="button" data-app-policy="filtered" aria-label="Web Browser DNS mode: Filtered">FILTERED</button>
+                    </li>
+                    <li>
+                      <div class="f-app-meta"><b>Social Feed</b><small>31 DNS queries</small></div>
+                      <button class="f-mode-btn" type="button" data-app-policy="filtered" aria-label="Social Feed DNS mode: Filtered">FILTERED</button>
+                    </li>
+                    <li>
+                      <div class="f-app-meta"><b>Transit Maps</b><small>12 DNS queries</small></div>
+                      <button class="f-mode-btn" type="button" data-app-policy="allow" data-mode="allow" aria-label="Transit Maps DNS mode: Allow DNS">ALLOW DNS</button>
+                    </li>
+                    <li>
+                      <div class="f-app-meta"><b>Mobile Banking</b><small>Excluded from TUN</small></div>
+                      <button class="f-mode-btn" type="button" data-app-policy="bypass" data-mode="bypass" aria-label="Mobile Banking DNS mode: Split-tunnel">SPLIT-TUNNEL</button>
+                    </li>
+                  </ul>
+                  <p class="b-note" data-fw-summary>2 filtered · 1 allow · 0 block DNS · 1 split-tunnel</p>
+                </section>
               </div>
 
               <div class="phone-nav" aria-hidden="true">
@@ -1226,6 +1632,7 @@ p { overflow-wrap: break-word; }
                 <button type="button" tabindex="-1" data-phone-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/></svg></button>
                 <button type="button" tabindex="-1" data-phone-tab="rules"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
                 <button type="button" tabindex="-1" data-phone-tab="boost"><svg viewBox="0 0 24 24"><path d="M13 2 5 14h6l-1 8 8-12h-6l1-8Z"/></svg></button>
+                <button type="button" tabindex="-1" data-phone-tab="firewall"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M17 14v6M14 17h6"/></svg></button>
               </div>
             </div>
           </div>
@@ -1303,7 +1710,195 @@ p { overflow-wrap: break-word; }
           </article>
         </div>
 
+        <!-- Interactive Transport & Security Architecture Explorer -->
+        <div class="arch-panel" data-reveal aria-label="Protocol and capability explorer">
+          <div class="arch-head">
+            <div>
+              <span class="arch-head-title">Encrypted Transport &amp; Defense Stack</span>
+              <span class="arch-head-sub">Inspect how AdShield Pro v2.11 handles queries on-device</span>
+            </div>
+            <div class="arch-tabs" role="tablist" aria-label="Architecture layers">
+              <button class="arch-tab" role="tab" type="button" id="arch-tab-doq" aria-selected="true" aria-controls="arch-pane-doq" data-arch-tab="doq">DoQ · RFC 9250</button>
+              <button class="arch-tab" role="tab" type="button" id="arch-tab-doh" aria-selected="false" aria-controls="arch-pane-doh" data-arch-tab="doh" tabindex="-1">DoH &amp; DoT</button>
+              <button class="arch-tab" role="tab" type="button" id="arch-tab-alias" aria-selected="false" aria-controls="arch-pane-alias" data-arch-tab="alias" tabindex="-1">DNS Alias Shield</button>
+              <button class="arch-tab" role="tab" type="button" id="arch-tab-audit" aria-selected="false" aria-controls="arch-pane-audit" data-arch-tab="audit" tabindex="-1">129-Point Audit</button>
+            </div>
+          </div>
+          <div class="arch-body">
+            <div class="arch-pane" id="arch-pane-doq" role="tabpanel" aria-labelledby="arch-tab-doq" data-arch-pane="doq">
+              <div class="arch-grid">
+                <div class="arch-copy">
+                  <h3>DNS-over-QUIC (RFC 9250) with Fail-Closed Safety</h3>
+                  <p>Allowed DNS queries are multiplexed over QUIC streams on UDP port 853, avoiding TCP head-of-line blocking during Wi-Fi to mobile handoffs. If an encrypted upstream cannot be reached, AdShield returns DNS <code>SERVFAIL</code> rather than silently downgrading to plaintext UDP 53.</p>
+                  <div class="arch-badges">
+                    <span class="arch-pill">QUIC / UDP 853</span>
+                    <span class="arch-pill">No plaintext fallback</span>
+                    <span class="arch-pill">Circuit-breaker health checks</span>
+                  </div>
+                </div>
+                <div class="arch-specs">
+                  <div class="arch-spec-row"><span>Local TUN IPv4</span><strong>10.215.173.2/32</strong></div>
+                  <div class="arch-spec-row"><span>Local TUN IPv6</span><strong>fd00:ad5:1e1d::2/128</strong></div>
+                  <div class="arch-spec-row"><span>Non-DNS app sockets</span><strong>Bypassed (direct OS route)</strong></div>
+                  <div class="arch-spec-row"><span>Downgrade policy</span><strong>Refused (SERVFAIL)</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-pane" id="arch-pane-doh" role="tabpanel" aria-labelledby="arch-tab-doh" data-arch-pane="doh" hidden>
+              <div class="arch-grid">
+                <div class="arch-copy">
+                  <h3>RFC 8484 DoH &amp; RFC 7858 DoT Wire Validation</h3>
+                  <p>Every upstream wire response is structurally walked before reaching your apps or cache: transaction ID, question match, opcode, truncation flags, and trailing bytes are verified, and cache keys remain isolated to the active resolver.</p>
+                  <div class="arch-badges">
+                    <span class="arch-pill">HTTPS 443 / TLS 853</span>
+                    <span class="arch-pill">Resolver-scoped LRU cache</span>
+                    <span class="arch-pill">Upstream DNSSEC AD evidence</span>
+                  </div>
+                </div>
+                <div class="arch-specs">
+                  <div class="arch-spec-row"><span>Wire validation</span><strong>DnsResponseValidator</strong></div>
+                  <div class="arch-spec-row"><span>Cache capacity</span><strong>1,024 TTL-bounded entries</strong></div>
+                  <div class="arch-spec-row"><span>Preset resolvers</span><strong>Cloudflare · Quad9 · AdGuard · Google</strong></div>
+                  <div class="arch-spec-row"><span>Latency benchmark</span><strong>Concurrent EDNS0+DO probes</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-pane" id="arch-pane-alias" role="tabpanel" aria-labelledby="arch-tab-alias" data-arch-pane="alias" hidden>
+              <div class="arch-grid">
+                <div class="arch-copy">
+                  <h3>DNS Alias Shield (CNAME, HTTPS &amp; SVCB Cloaking)</h3>
+                  <p>Trackers often hide behind first-party subdomains that alias to third-party ad servers. AdShield inspects reachable <code>CNAME</code> chains and <code>HTTPS</code>/<code>SVCB</code> target names inside validated DNS answers while honouring user allowlists and video playback safeguards.</p>
+                  <div class="arch-badges">
+                    <span class="arch-pill">CNAME chain walk</span>
+                    <span class="arch-pill">HTTPS / SVCB AliasMode</span>
+                    <span class="arch-pill">Video Playback Guard</span>
+                  </div>
+                </div>
+                <div class="arch-specs">
+                  <div class="arch-spec-row"><span>Inspected records</span><strong>CNAME · HTTPS · SVCB</strong></div>
+                  <div class="arch-spec-row"><span>Extra network lookups</span><strong>0 (inspects returned packet)</strong></div>
+                  <div class="arch-spec-row"><span>User allowlist priority</span><strong>Always outranks blocklists</strong></div>
+                  <div class="arch-spec-row"><span>Shared media CDNs</span><strong>Protected from false blocks</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arch-pane" id="arch-pane-audit" role="tabpanel" aria-labelledby="arch-tab-audit" data-arch-pane="audit" hidden>
+              <div class="arch-grid">
+                <div class="arch-copy">
+                  <h3>129 Publicly Audited Capabilities — Zero Vaporware</h3>
+                  <p>Every feature across the Android app and companion web platform is tracked in a machine-checked capability registry generated directly from source code and verified by automated CI tests. Platform limits are documented openly rather than hidden behind marketing claims.</p>
+                  <div class="arch-badges">
+                    <span class="arch-pill">95 Implemented</span>
+                    <span class="arch-pill">22 Partial (documented)</span>
+                    <span class="arch-pill">AdShield Pro is not an antivirus</span>
+                  </div>
+                </div>
+                <div class="arch-specs">
+                  <div class="arch-spec-row"><span>Implemented &amp; tested</span><strong>95 capabilities</strong></div>
+                  <div class="arch-spec-row"><span>Partial / scoped</span><strong>22 capabilities</strong></div>
+                  <div class="arch-spec-row"><span>Planned / unavailable</span><strong>12 capabilities (explicit)</strong></div>
+                  <div class="arch-spec-row"><span>Companion web suite</span><strong><a href="app/">Inspect live in /app/ →</a></strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <p class="note" data-reveal><strong>What DNS filtering can do:</strong> it can block connections to known domains. It cannot guarantee every ad is removed, inspect encrypted page content, or separate ads served from the same domain as an app or website.</p>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true" data-reveal="line"><span></span></div>
+
+    <!-- ============ INTERACTIVE PRIVACY LAB (V2) ============ -->
+    <section class="section lab" id="lab" aria-labelledby="lab-title">
+      <div class="container">
+        <div class="section-head section-head--center">
+          <div class="eyebrow" data-reveal>Interactive Privacy Lab</div>
+          <h2 id="lab-title" class="section-title" data-split-words>Test our local engines <em>right here.</em></h2>
+          <p class="section-lead" data-reveal>Try two client-side tools modeled after AdShield Pro’s Link Cleaner and AETHER lexical inspector. Everything you paste or type stays in your browser memory — zero network calls.</p>
+        </div>
+
+        <noscript>
+          <p class="discord-privacy-note" style="margin-bottom:22px">These two tools run entirely in your browser with JavaScript. Without it you can still use the download section below — no privacy tool on this page sends your input anywhere.</p>
+        </noscript>
+
+        <div class="lab-grid">
+          <!-- Tool 1: Link Sanitizer -->
+          <article class="lab-card" id="lab-sanitizer" data-reveal>
+            <div class="lab-card-top">
+              <div>
+                <span class="lab-kicker">Tool 01 · Offline Link Cleaner</span>
+                <h3>Redirect Peeler &amp; Tracker Stripper</h3>
+              </div>
+              <span class="lab-chip">0 network calls</span>
+            </div>
+            <p class="lab-desc">Unwraps embedded redirect wrappers and removes tracking query parameters (<code>utm_*</code>, <code>fbclid</code>, <code>gclid</code>, <code>si</code>, <code>mc_eid</code>) while keeping functional parameters intact.</p>
+
+            <div class="lab-presets" role="group" aria-label="Sample URLs to clean">
+              <span class="lab-presets-label">Presets:</span>
+              <button type="button" class="preset-btn" data-url-preset="social">Wrapped social link</button>
+              <button type="button" class="preset-btn" data-url-preset="search">Search ad redirect</button>
+              <button type="button" class="preset-btn" data-url-preset="video">Video share URL</button>
+            </div>
+
+            <div class="lab-form">
+              <input type="text" class="lab-input" id="lab-url-input" aria-label="URL to sanitize locally" autocomplete="off" spellcheck="false" value="https://l.facebook.com/l.php?u=https%3A%2F%2Fshop.example.org%2Fdeals%3Fitem%3Dheadphones%26fbclid%3DIwAR9x82Kq_demo%26utm_source%3Dsocial%26utm_medium%3Dcpc&amp;h=AT2xyz">
+              <button type="button" class="btn btn-primary btn-sm" id="lab-url-run">Sanitize</button>
+            </div>
+
+            <div class="lab-result" aria-live="polite">
+              <div class="lab-out-row">
+                <code class="lab-out-code" id="lab-url-clean">https://shop.example.org/deals?item=headphones</code>
+                <button type="button" class="copy-btn" id="lab-url-copy" aria-label="Copy sanitized URL">Copy</button>
+              </div>
+              <div class="lab-stats" id="lab-url-stats"></div>
+              <ul class="lab-tags" id="lab-url-tags" aria-label="Parameter actions"></ul>
+            </div>
+          </article>
+
+          <!-- Tool 2: Domain Signal Inspector -->
+          <article class="lab-card" id="lab-inspector" data-reveal>
+            <div class="lab-card-top">
+              <div>
+                <span class="lab-kicker">Tool 02 · Lexical &amp; Lookalike Preview</span>
+                <h3>Instant Domain Signal Inspector</h3>
+              </div>
+              <span class="lab-chip">Advisory only</span>
+            </div>
+            <p class="lab-desc">Evaluates hostname structure, tracker naming tokens, TLD risk profile, and homoglyph/typosquat brand impersonation (including fake Discord or payment lookalikes).</p>
+
+            <div class="lab-presets" role="group" aria-label="Sample domains to inspect">
+              <span class="lab-presets-label">Presets:</span>
+              <button type="button" class="preset-btn" data-domain-preset="discord-scam">Discord scam lookalike</button>
+              <button type="button" class="preset-btn" data-domain-preset="tracker">Ad tracker host</button>
+              <button type="button" class="preset-btn" data-domain-preset="clean">Clean media CDN</button>
+            </div>
+
+            <div class="lab-form">
+              <input type="text" class="lab-input" id="lab-domain-input" aria-label="Hostname to inspect locally" autocomplete="off" spellcheck="false" value="disc0rd-nitro-gift.claim-drop.top">
+              <button type="button" class="btn btn-primary btn-sm" id="lab-domain-run">Inspect</button>
+            </div>
+
+            <div class="lab-result" aria-live="polite">
+              <div class="domain-score-bar">
+                <div>
+                  <span class="lab-kicker" id="lab-domain-verdict">High lookalike / phishing risk</span>
+                  <div style="font-size:.76rem;color:var(--dim)" id="lab-domain-host">disc0rd-nitro-gift.claim-drop.top</div>
+                </div>
+                <span class="domain-score-num bad" id="lab-domain-score">100 / 100</span>
+              </div>
+              <ul class="domain-signals" id="lab-domain-signals" aria-label="Domain signal breakdown"></ul>
+              <a class="lab-foot-link" href="app/">
+                <span>Deep-inspect against 79k+ bundled rules in OmniShield X</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-arrow"/></svg>
+              </a>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -1363,6 +1958,78 @@ p { overflow-wrap: break-word; }
       </div>
     </section>
 
+    <div class="divider" aria-hidden="true" data-reveal="line"><span></span></div>
+
+    <!-- ============ COMMUNITY HUB (V2) ============ -->
+    <section class="section community" id="community" aria-labelledby="community-title">
+      <div class="container">
+        <div class="section-head">
+          <div class="eyebrow" data-reveal>Community &amp; open source</div>
+          <h2 id="community-title" class="section-title" data-split-words>Build it with us <em>on Discord.</em></h2>
+          <p class="section-lead" data-reveal>AdShield Pro is developed in the open. Join the community server to test pre-releases, request capabilities, and review the audit matrix alongside the maintainers.</p>
+        </div>
+
+        <div class="community-grid">
+          <article class="discord-hub" data-reveal>
+            <div class="discord-head">
+              <span class="discord-emblem" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-discord"/></svg></span>
+              <div>
+                <span class="discord-badge">Official community server</span>
+                <h3>AdShield Pro Discord</h3>
+              </div>
+            </div>
+            <p class="discord-lead">The fastest place for build announcements, filter-list triage, and capability audits. No account is created on this website and no third-party widget is embedded — the invite is a plain outbound link.</p>
+
+            <div class="discord-invite-bar">
+              <code id="discord-invite">discord.gg/TZh3kwDU9M</code>
+              <button type="button" class="copy-btn" data-copy-discord aria-label="Copy Discord invite link">Copy invite</button>
+            </div>
+
+            <div class="discord-actions">
+              <a class="btn btn-discord-solid" href="https://discord.gg/TZh3kwDU9M" rel="noopener">
+                <svg aria-hidden="true"><use href="#i-discord"/></svg><span>Join the server</span>
+              </a>
+              <a class="btn btn-ghost" href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">
+                <svg aria-hidden="true"><use href="#i-github"/></svg><span>Browse the source</span>
+              </a>
+            </div>
+
+            <div class="channel-grid">
+              <div class="channel-card"><code>#announcements</code><p>Signed APK releases, SHA-256 hashes, and audit-matrix updates.</p></div>
+              <div class="channel-card"><code>#support</code><p>Setup questions, split-tunnel troubleshooting, and log triage.</p></div>
+              <div class="channel-card"><code>#filter-lab</code><p>Report false positives, share allow rules, propose list sources.</p></div>
+              <div class="channel-card"><code>#contributors</code><p>Kotlin, web platform, and documentation work in progress.</p></div>
+            </div>
+
+            <p class="discord-privacy-note">Privacy note: Discord is a third-party service with its own terms and privacy policy. This page embeds no Discord script, pixel, or iframe — the link only opens when you click it.</p>
+          </article>
+
+          <div class="faq-stack" data-reveal>
+            <details class="faq-item" open>
+              <summary><span>Does DNS filtering stop every ad or tracker?</span><span class="faq-plus" aria-hidden="true">+</span></summary>
+              <div class="faq-body"><p>No. AdShield Pro blocks lookups to domains that appear on your enabled lists. Ads served from the same hostname as the page or app itself, and anything inside an already-encrypted connection, cannot be separated by DNS alone.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary><span>Is AdShield Pro a full VPN or a security suite?</span><span class="faq-plus" aria-hidden="true">+</span></summary>
+              <div class="faq-body"><p>No. AdShield Pro is not a full VPN: it uses Android’s local VpnService TUN interface to intercept DNS packets only, with no remote exit node and no traffic relaying. It is not an antivirus either, and it does not inspect encrypted page content.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary><span>Which encrypted transports are supported?</span><span class="faq-plus" aria-hidden="true">+</span></summary>
+              <div class="faq-body"><p>DNS-over-HTTPS (RFC 8484), DNS-over-TLS (RFC 7858), and DNS-over-QUIC (RFC 9250). If every encrypted upstream fails, queries return <code>SERVFAIL</code> instead of silently falling back to plaintext port 53.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary><span>Where does my DNS history go?</span><span class="faq-plus" aria-hidden="true">+</span></summary>
+              <div class="faq-body"><p>Query matching and the activity log are processed on-device. The activity log can be cleared at any time, and the app ships no third-party analytics SDK. See the <a href="privacy.html">privacy policy</a> for the full data map.</p></div>
+            </details>
+            <details class="faq-item">
+              <summary><span>How do I report a bug or request a capability?</span><span class="faq-plus" aria-hidden="true">+</span></summary>
+              <div class="faq-body"><p>Use the <code>#support</code> or <code>#filter-lab</code> channel on the <a href="https://discord.gg/TZh3kwDU9M" rel="noopener">Discord server</a>, or open an issue on <a href="https://github.com/yawiyuson231-oss/AdShieldPro/issues" rel="noopener">GitHub</a>. Requests are tracked against the public <a href="https://github.com/yawiyuson231-oss/AdShieldPro/blob/main/docs/CAPABILITY_MATRIX.md" rel="noopener">capability matrix</a>.</p></div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ DOWNLOAD ============ -->
     <section class="section download" id="download" aria-labelledby="download-title">
       <div class="download-bg" aria-hidden="true"><span></span></div>
@@ -1401,6 +2068,8 @@ p { overflow-wrap: break-word; }
             <span aria-hidden="true">·</span>
             <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Release notes</a>
             <span aria-hidden="true">·</span>
+            <a href="https://discord.gg/TZh3kwDU9M" rel="noopener">Discord community</a>
+            <span aria-hidden="true">·</span>
             <a href="privacy.html">Privacy policy</a>
           </p>
         </div>
@@ -1435,9 +2104,25 @@ p { overflow-wrap: break-word; }
         <a href="privacy.html">Privacy policy</a>
         <a href="https://github.com/yawiyuson231-oss/AdShieldPro/releases" rel="noopener">Release notes</a>
         <a href="https://github.com/yawiyuson231-oss/AdShieldPro" rel="noopener">Source code</a>
+        <a href="https://discord.gg/TZh3kwDU9M" rel="noopener">Discord</a>
       </nav>
     </div>
   </footer>
+
+  <div class="cmd-backdrop" id="cmd-modal" role="dialog" aria-modal="true" aria-label="Quick navigation and actions" hidden>
+    <div class="cmd-dialog">
+      <div class="cmd-search-bar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"/></svg>
+        <input class="cmd-input" id="cmd-input" type="text" role="combobox" aria-expanded="true" aria-controls="cmd-list" aria-autocomplete="list" placeholder="Jump to a section, action, or resource…" autocomplete="off" spellcheck="false">
+        <button type="button" class="cmd-close" id="cmd-close" aria-label="Close quick jump">ESC</button>
+      </div>
+      <ul class="cmd-list" id="cmd-list" role="listbox" aria-label="Quick jump results"></ul>
+      <div class="cmd-foot">
+        <span>↑ ↓ to move · Enter to run · Esc to close</span>
+        <span>Ctrl / ⌘ + K</span>
+      </div>
+    </div>
+  </div>
 
   <script>
 /* AdShield Pro — shared core utilities (namespace: window.AS) */
@@ -1650,7 +2335,7 @@ p { overflow-wrap: break-word; }
       }
     });
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 1060 && nav.classList.contains('is-open')) closeMenu();
+      if (window.innerWidth > 1300 && nav.classList.contains('is-open')) closeMenu();
     }, { passive: true });
   }
 
@@ -1734,7 +2419,7 @@ p { overflow-wrap: break-word; }
       }
     }
   }, { rootMargin: '-40% 0px -50% 0px' });
-  ['top', 'showcase', 'features', 'demo', 'download'].forEach((id) => {
+  ['top', 'showcase', 'features', 'lab', 'demo', 'community', 'download'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) secObserver.observe(el);
   });
@@ -2416,6 +3101,554 @@ p { overflow-wrap: break-word; }
     pauseBtn.setAttribute('aria-pressed', paused);
     pauseBtn.setAttribute('aria-label', paused ? 'Resume simulation' : 'Pause simulation');
     loop.setPaused(paused, true);
+  });
+})();
+
+/* AdShield Pro — v2: per-app DNS policy cycling (demo screen 05) */
+(() => {
+  'use strict';
+  const screen = document.getElementById('screen-firewall');
+  if (!screen) return;
+  const summary = screen.querySelector('[data-fw-summary]');
+  const ORDER = ['filtered', 'allow', 'block', 'bypass'];
+  const LABEL = { filtered: 'FILTERED', allow: 'ALLOW DNS', block: 'BLOCK DNS', bypass: 'SPLIT-TUNNEL' };
+
+  function refresh() {
+    const counts = { filtered: 0, allow: 0, block: 0, bypass: 0 };
+    screen.querySelectorAll('[data-app-policy]').forEach((b) => {
+      const mode = b.dataset.appPolicy;
+      counts[mode] = (counts[mode] || 0) + 1;
+    });
+    if (!summary) return;
+    summary.textContent = [
+      `${counts.filtered} filtered`,
+      `${counts.allow} allow`,
+      `${counts.block} block DNS`,
+      `${counts.bypass} split-tunnel`
+    ].join(' · ');
+  }
+
+  screen.querySelectorAll('[data-app-policy]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = ORDER[(ORDER.indexOf(btn.dataset.appPolicy) + 1) % ORDER.length];
+      btn.dataset.appPolicy = next;
+      btn.dataset.mode = next;
+      btn.textContent = LABEL[next];
+      const app = btn.closest('li')?.querySelector('.f-app-meta b');
+      if (app) btn.setAttribute('aria-label', `${app.textContent} DNS mode: ${LABEL[next]}`);
+      refresh();
+    });
+  });
+  refresh();
+})();
+
+/* AdShield Pro — v2: protocol & capability matrix tabs */
+(() => {
+  'use strict';
+  const tabs = [...document.querySelectorAll('.arch-tab[data-arch-tab]')];
+  if (!tabs.length) return;
+  const panes = [...document.querySelectorAll('.arch-pane[data-arch-pane]')];
+
+  function select(index, focus) {
+    const tab = tabs[index];
+    if (!tab) return;
+    tabs.forEach((t, i) => {
+      const on = i === index;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+    });
+    panes.forEach((p) => { p.hidden = p.dataset.archPane !== tab.dataset.archTab; });
+    if (focus) tab.focus();
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(i, false));
+    tab.addEventListener('keydown', (e) => {
+      const last = tabs.length - 1;
+      let next = null;
+      if (e.key === 'ArrowRight') next = i === last ? 0 : i + 1;
+      else if (e.key === 'ArrowLeft') next = i === 0 ? last : i - 1;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = last;
+      if (next === null) return;
+      e.preventDefault();
+      select(next, true);
+    });
+  });
+})();
+
+/* AdShield Pro — v2: Privacy Lab #1 — offline link sanitizer */
+(() => {
+  'use strict';
+  const input = document.getElementById('lab-url-input');
+  if (!input) return;
+  const runBtn = document.getElementById('lab-url-run');
+  const copyBtn = document.getElementById('lab-url-copy');
+  const out = document.getElementById('lab-url-clean');
+  const statsEl = document.getElementById('lab-url-stats');
+  const tagsEl = document.getElementById('lab-url-tags');
+
+  const WRAP_HOSTS = new Set([
+    'l.facebook.com', 'lm.facebook.com', 'l.instagram.com', 'l.messenger.com',
+    'out.reddit.com', 'href.li', 'link.medium.com', 'away.vk.com', 't.umblr.com'
+  ]);
+  const TRACK_EXACT = new Set([
+    'fbclid', 'gclid', 'dclid', 'msclkid', 'yclid', 'twclid', 'ttclid', 'wbraid', 'gbraid',
+    'igshid', 'igsh', 'si', 'mc_cid', 'mc_eid', 'mkt_tok', '_hsenc', '_hsmi', '_ga', '_gl',
+    'oly_enc_id', 'oly_anon_id', 'vero_id', 'vero_conv', 'rb_clickid', 'wickedid', 's_cid',
+    'sc_cid', 'cmpid', 'ncid', 'icid', 'spm', 'scm', 'ns_campaign', 'ns_mchannel', 'ns_source',
+    'ref_src', 'ref_url', 'fb_action_ids', 'fb_action_types', 'fb_source', 'fb_ref', 'hsa_cam'
+  ]);
+  const TRACK_PREFIX = ['utm_', 'mtm_', 'pk_', 'hsa_', 'trk_', 'at_'];
+
+  const PRESETS = {
+    social: 'https://l.facebook.com/l.php?u=https%3A%2F%2Fshop.example.org%2Fdeals%3Fitem%3Dheadphones%26fbclid%3DIwAR9x82Kq_demo%26utm_source%3Dsocial%26utm_medium%3Dcpc&h=AT2xyz',
+    search: 'https://www.google.com/url?q=https%3A%2F%2Fnews.example.net%2Farticle%2F42%3Fpage%3D2&sa=D&source=web&ust=1712345678901234&usg=AOvVaw0demo',
+    video: 'https://video.example.com/watch?v=demo42&si=EnSIkaIECMiOdemo&feature=share&utm_campaign=sharing'
+  };
+
+  function isTracking(key) {
+    const k = key.toLowerCase();
+    return TRACK_EXACT.has(k) || TRACK_PREFIX.some((p) => k.startsWith(p));
+  }
+
+  function toUrl(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return null;
+    const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
+    let u;
+    try { u = new URL(withScheme); } catch { return null; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (!u.hostname.includes('.')) return null;
+    return u;
+  }
+
+  function sanitize(raw) {
+    let u = toUrl(raw);
+    if (!u) return null;
+    const removed = [];
+    let unwrapped = 0;
+
+    for (let pass = 0; pass < 3; pass++) {
+      const host = u.hostname.toLowerCase();
+      const wrapped = WRAP_HOSTS.has(host) || (host.endsWith('google.com') && u.pathname.startsWith('/url'));
+      if (!wrapped) break;
+      const target = u.searchParams.get('u') || u.searchParams.get('url')
+        || (u.pathname.startsWith('/url') ? u.searchParams.get('q') : null);
+      const next = target ? toUrl(target) : null;
+      if (!next) break;
+      u = next;
+      unwrapped += 1;
+    }
+
+    for (const key of [...u.searchParams.keys()]) {
+      if (isTracking(key)) {
+        u.searchParams.delete(key);
+        if (!removed.includes(key)) removed.push(key);
+      }
+    }
+
+    let clean = u.toString();
+    if (u.search === '?' || clean.endsWith('?')) clean = clean.replace(/\?$/, '');
+    return { clean, removed, unwrapped, host: u.hostname, kept: [...u.searchParams.keys()] };
+  }
+
+  function chip(text, tone) {
+    const el = document.createElement('span');
+    el.className = `lab-stat ${tone}`;
+    el.textContent = text;
+    return el;
+  }
+
+  function render() {
+    const result = sanitize(input.value);
+    if (!result) {
+      out.textContent = 'Not a valid http(s) URL';
+      out.classList.add('is-warn');
+      statsEl.replaceChildren(chip('Rejected input', 'bad'));
+      tagsEl.replaceChildren();
+      return;
+    }
+    out.textContent = result.clean;
+    out.classList.remove('is-warn');
+    const chips = [];
+    if (result.unwrapped) chips.push(chip(`Unwrapped ${result.unwrapped} redirect${result.unwrapped > 1 ? 's' : ''}`, 'warn'));
+    chips.push(chip(result.removed.length
+      ? `Removed ${result.removed.length} tracking param${result.removed.length > 1 ? 's' : ''}`
+      : 'No tracking params found', result.removed.length ? 'bad' : 'ok'));
+    chips.push(chip(`Kept ${result.kept.length} functional param${result.kept.length === 1 ? '' : 's'}`, 'ok'));
+    statsEl.replaceChildren(...chips);
+
+    const tags = [];
+    result.removed.forEach((key) => {
+      const li = document.createElement('li');
+      li.textContent = `− ${key}`;
+      tags.push(li);
+    });
+    if (!tags.length) {
+      const li = document.createElement('li');
+      li.className = 'kept';
+      li.textContent = 'Already clean';
+      tags.push(li);
+    }
+    tagsEl.replaceChildren(...tags);
+  }
+
+  runBtn?.addEventListener('click', render);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); render(); }
+  });
+  document.querySelectorAll('[data-url-preset]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      input.value = PRESETS[btn.dataset.urlPreset] || PRESETS.social;
+      render();
+    });
+  });
+
+  if (copyBtn) {
+    let timer = 0;
+    copyBtn.addEventListener('click', async () => {
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(out.textContent);
+        copied = true;
+      } catch { /* clipboard unavailable — leave the value selectable */ }
+      copyBtn.textContent = copied ? 'Copied' : 'Copy manually';
+      clearTimeout(timer);
+      timer = setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1800);
+    });
+  }
+
+  render();
+})();
+
+/* AdShield Pro — v2: Privacy Lab #2 — client-side domain signal inspector */
+(() => {
+  'use strict';
+  const input = document.getElementById('lab-domain-input');
+  if (!input) return;
+  const runBtn = document.getElementById('lab-domain-run');
+  const verdictEl = document.getElementById('lab-domain-verdict');
+  const hostEl = document.getElementById('lab-domain-host');
+  const scoreEl = document.getElementById('lab-domain-score');
+  const signalsEl = document.getElementById('lab-domain-signals');
+
+  const BRANDS = [
+    'discord', 'paypal', 'apple', 'icloud', 'google', 'gmail', 'microsoft', 'outlook',
+    'netflix', 'amazon', 'facebook', 'instagram', 'whatsapp', 'telegram', 'steam',
+    'binance', 'metamask', 'coinbase', 'tiktok', 'youtube', 'github', 'spotify'
+  ];
+  const RISK_TOKENS = [
+    'nitro', 'gift', 'claim', 'free', 'login', 'verify', 'wallet', 'seed', 'airdrop',
+    'bonus', 'prize', 'reward', 'signin', 'account', 'refund', 'invoice', 'support'
+  ];
+  const TRACK_TOKENS = ['track', 'click', 'pixel', 'analytics', 'telemetry', 'adservice', 'doubleclick', 'beacon', 'adsrv'];
+  const RISK_TLDS = new Set([
+    'top', 'xyz', 'click', 'zip', 'mov', 'tk', 'gq', 'cf', 'ml', 'ga', 'work',
+    'loan', 'quest', 'rest', 'cam', 'buzz', 'monster', 'cyou', 'sbs'
+  ]);
+  const SAFE_TLDS = new Set(['com', 'org', 'net', 'edu', 'gov', 'io', 'dev', 'app', 'co']);
+
+  const PRESETS = {
+    'discord-scam': 'disc0rd-nitro-gift.claim-drop.top',
+    tracker: 'pixel.adservice-metrics.click',
+    clean: 'cdn.media.example.org'
+  };
+
+  function skeleton(label) {
+    return label
+      .toLowerCase()
+      .replace(/0/g, 'o').replace(/1/g, 'l').replace(/3/g, 'e').replace(/4/g, 'a')
+      .replace(/5/g, 's').replace(/7/g, 't').replace(/@/g, 'a').replace(/\$/g, 's')
+      .replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/-/g, '');
+  }
+
+  function normalize(raw) {
+    return String(raw || '').trim().toLowerCase()
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .split(/[/?#]/)[0]
+      .replace(/\.$/, '');
+  }
+
+  function inspect(raw) {
+    const host = normalize(raw);
+    if (!host || !host.includes('.')) return null;
+    const labels = host.split('.');
+    const tld = labels[labels.length - 1];
+    const main = labels.length > 1 ? labels[labels.length - 2] : labels[0];
+    const signals = [];
+    let score = 0;
+
+    const bare = skeleton(host);
+    const fake = BRANDS.find((b) => bare.includes(b) && !main.includes(b));
+    if (fake) {
+      score += 55;
+      signals.push({ label: 'Brand impersonation', detail: `${fake} → ${main}`, tone: 'bad' });
+    }
+    const puny = host.includes('xn--');
+    if (puny) {
+      score += 30;
+      signals.push({ label: 'Punycode label', detail: 'xn-- present', tone: 'bad' });
+    }
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      score += 20;
+      signals.push({ label: 'Raw IP host', detail: 'no domain name', tone: 'warn' });
+    }
+    const riskWords = RISK_TOKENS.filter((t) => host.includes(t));
+    if (riskWords.length) {
+      score += Math.min(riskWords.length * 18, 36);
+      signals.push({ label: 'Urgency / credential bait', detail: riskWords.join(', '), tone: 'bad' });
+    }
+    const trackWords = TRACK_TOKENS.filter((t) => host.includes(t));
+    if (trackWords.length) {
+      score += Math.min(trackWords.length * 14, 28);
+      signals.push({ label: 'Tracker naming pattern', detail: trackWords.join(', '), tone: 'warn' });
+    }
+    if (RISK_TLDS.has(tld)) {
+      score += 25;
+      signals.push({ label: 'High-abuse TLD', detail: `.${tld}`, tone: 'bad' });
+    } else {
+      signals.push({ label: 'TLD profile', detail: `.${tld}`, tone: SAFE_TLDS.has(tld) ? 'ok' : 'warn' });
+    }
+    const hyphens = (main.match(/-/g) || []).length;
+    const digits = (main.match(/\d/g) || []).length;
+    if (hyphens >= 2) {
+      score += 12;
+      signals.push({ label: 'Hyphen stacking', detail: `${hyphens} in "${main}"`, tone: 'warn' });
+    }
+    if (digits >= 3) {
+      score += 10;
+      signals.push({ label: 'Digit stuffing', detail: `${digits} digits`, tone: 'warn' });
+    }
+    if (!fake && !riskWords.length && !trackWords.length && !RISK_TLDS.has(tld)) {
+      signals.push({ label: 'Lexical structure', detail: `${labels.length} labels`, tone: 'ok' });
+    }
+    signals.push({ label: 'Depth', detail: `${labels.length} labels · ${host.length} chars`, tone: labels.length > 4 ? 'warn' : 'ok' });
+
+    const capped = Math.min(Math.round(score), 100);
+    let verdict = 'No structural signals';
+    let tone = 'ok';
+    if (capped >= 70) { verdict = 'High lookalike / phishing risk'; tone = 'bad'; }
+    else if (capped >= 40) { verdict = 'Suspicious naming signals'; tone = 'warn'; }
+    else if (capped >= 15) { verdict = 'Minor signals — verify before use'; tone = 'warn'; }
+    return { host, capped, verdict, tone, signals };
+  }
+
+  function render() {
+    const result = inspect(input.value);
+    if (!result) {
+      verdictEl.textContent = 'Enter a valid hostname';
+      hostEl.textContent = 'Example: cdn.media.example.org';
+      scoreEl.textContent = '—';
+      scoreEl.className = 'domain-score-num';
+      signalsEl.replaceChildren();
+      return;
+    }
+    verdictEl.textContent = result.verdict;
+    hostEl.textContent = result.host;
+    scoreEl.textContent = `${result.capped} / 100`;
+    scoreEl.className = `domain-score-num ${result.tone === 'ok' ? '' : result.tone}`.trim();
+    const rows = result.signals.map((s) => {
+      const li = document.createElement('li');
+      const b = document.createElement('b');
+      b.textContent = s.label;
+      const code = document.createElement('code');
+      code.textContent = s.detail;
+      li.append(b, code);
+      return li;
+    });
+    signalsEl.replaceChildren(...rows);
+  }
+
+  runBtn?.addEventListener('click', render);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); render(); }
+  });
+  document.querySelectorAll('[data-domain-preset]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      input.value = PRESETS[btn.dataset.domainPreset] || PRESETS.clean;
+      render();
+    });
+  });
+  render();
+})();
+
+/* AdShield Pro — v2: copy the Discord invite (no clipboard credentials, no network) */
+(() => {
+  'use strict';
+  const INVITE = 'https://discord.gg/TZh3kwDU9M';
+  document.querySelectorAll('[data-copy-discord]').forEach((btn) => {
+    let timer = 0;
+    btn.addEventListener('click', async () => {
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(INVITE);
+        copied = true;
+      } catch { /* clipboard blocked by permissions policy */ }
+      btn.textContent = copied ? 'Copied' : 'Copy manually';
+      clearTimeout(timer);
+      timer = setTimeout(() => { btn.textContent = 'Copy invite'; }, 1800);
+    });
+  });
+})();
+
+/* AdShield Pro — v2: Quick-Jump command palette (Ctrl/⌘ + K) */
+(() => {
+  'use strict';
+  const modal = document.getElementById('cmd-modal');
+  const input = document.getElementById('cmd-input');
+  const list = document.getElementById('cmd-list');
+  const closeBtn = document.getElementById('cmd-close');
+  if (!modal || !input || !list) return;
+
+  const ITEMS = [
+    { title: 'Overview', detail: 'Hero, telemetry strip and install CTA', tag: 'Section', href: '#top', keys: 'home top hero start' },
+    { title: 'Inside the app', detail: 'Five interactive demo screens', tag: 'Section', href: '#showcase', keys: 'showcase phone screens' },
+    { title: 'Capabilities', detail: 'Feature grid and protocol matrix', tag: 'Section', href: '#features', keys: 'features doq doh matrix' },
+    { title: 'Privacy Lab', detail: 'Link sanitizer and domain inspector', tag: 'Section', href: '#lab', keys: 'lab tools sanitizer inspector' },
+    { title: 'Live demo', detail: 'DNS filtering simulation', tag: 'Section', href: '#demo', keys: 'demo simulation canvas' },
+    { title: 'Community', detail: 'Discord hub, channel guide and FAQ', tag: 'Section', href: '#community', keys: 'community discord faq' },
+    { title: 'Download', detail: 'Signed APK, checksum and release notes', tag: 'Section', href: '#download', keys: 'download apk release sha256' },
+    { title: 'Web platform', detail: 'OmniShield X companion suite', tag: 'App', href: 'app/', keys: 'app web omnishield aether' },
+    { title: 'Privacy policy', detail: 'Data map and Play Data Safety', tag: 'Page', href: 'privacy.html', keys: 'privacy policy data safety gdpr' },
+    { title: 'Source code', detail: 'Read or build the Android app', tag: 'GitHub', href: 'https://github.com/yawiyuson231-oss/AdShieldPro', keys: 'github source code repo' },
+    { title: 'Latest release', detail: 'Signed APK + .sha256 checksum', tag: 'GitHub', href: 'https://github.com/yawiyuson231-oss/AdShieldPro/releases/latest', keys: 'release latest apk sha' },
+    { title: 'Discord server', detail: 'discord.gg/TZh3kwDU9M', tag: 'Discord', href: 'https://discord.gg/TZh3kwDU9M', keys: 'discord chat community support invite' }
+  ];
+
+  let selected = 0;
+  let visible = ITEMS;
+  let restoreFocus = null;
+
+  function matches(item, query) {
+    if (!query) return true;
+    const hay = `${item.title} ${item.detail} ${item.tag} ${item.keys}`.toLowerCase();
+    return query.toLowerCase().split(/\s+/).filter(Boolean).every((part) => hay.includes(part));
+  }
+
+  function render() {
+    const rows = visible.map((item, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `cmd-item${index === selected ? ' is-selected' : ''}`;
+      btn.setAttribute('role', 'option');
+      btn.setAttribute('aria-selected', index === selected ? 'true' : 'false');
+      btn.id = `cmd-opt-${index}`;
+      btn.dataset.cmdIndex = String(index);
+      const main = document.createElement('span');
+      main.className = 'cmd-item-main';
+      const b = document.createElement('b');
+      b.textContent = item.title;
+      const small = document.createElement('small');
+      small.textContent = item.detail;
+      main.append(b, small);
+      const tag = document.createElement('span');
+      tag.className = 'cmd-item-tag';
+      tag.textContent = item.tag;
+      btn.append(main, tag);
+      btn.addEventListener('click', () => run(index));
+      btn.addEventListener('pointerenter', () => {
+        if (selected === index) return;
+        selected = index;
+        highlight();
+      });
+      return btn;
+    });
+    if (!rows.length) {
+      const empty = document.createElement('li');
+      empty.className = 'cmd-item';
+      empty.textContent = 'No matches — try “download”, “discord”, or “privacy”.';
+      list.replaceChildren(empty);
+      input.removeAttribute('aria-activedescendant');
+      return;
+    }
+    list.replaceChildren(...rows);
+    syncActiveDescendant();
+  }
+
+  function syncActiveDescendant() {
+    if (!visible.length) { input.removeAttribute('aria-activedescendant'); return; }
+    input.setAttribute('aria-activedescendant', `cmd-opt-${selected}`);
+  }
+
+  function run(index) {
+    const item = visible[index];
+    if (!item) return;
+    close();
+    if (item.href.startsWith('#')) {
+      const target = document.querySelector(item.href);
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: window.AS && !window.AS.state.reduced ? 'smooth' : 'auto', block: 'start' });
+      }
+      if (history.replaceState) history.replaceState(null, '', item.href);
+    } else {
+      window.location.assign(item.href);
+    }
+  }
+
+  function highlight() {
+    [...list.querySelectorAll('.cmd-item')].forEach((el, i) => {
+      el.classList.toggle('is-selected', i === selected);
+      el.setAttribute('aria-selected', i === selected ? 'true' : 'false');
+    });
+    syncActiveDescendant();
+  }
+
+  function open() {
+    restoreFocus = document.activeElement;
+    modal.hidden = false;
+    input.value = '';
+    visible = ITEMS;
+    selected = 0;
+    render();
+    input.focus();
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    if (modal.hidden) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    if (restoreFocus && typeof restoreFocus.focus === 'function') restoreFocus.focus();
+  }
+
+  document.querySelectorAll('[data-cmd-open]').forEach((btn) => btn.addEventListener('click', open));
+  closeBtn?.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+  input.addEventListener('input', () => {
+    visible = ITEMS.filter((item) => matches(item, input.value));
+    selected = 0;
+    render();
+  });
+
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (visible.length) { selected = (selected + 1) % visible.length; highlight(); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (visible.length) { selected = (selected - 1 + visible.length) % visible.length; highlight(); }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      run(selected);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+    if ((e.metaKey || e.ctrlKey) && key === 'k') {
+      e.preventDefault();
+      if (modal.hidden) open(); else close();
+    } else if (!modal.hidden && key === 'escape') {
+      close();
+    }
   });
 })();
   </script>
