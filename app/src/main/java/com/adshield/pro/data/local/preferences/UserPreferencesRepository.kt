@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -26,9 +27,11 @@ import com.adshield.pro.domain.model.SearchProvider
 import com.adshield.pro.domain.model.UsbDebuggingTileConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
+import java.io.IOException
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -186,11 +189,19 @@ class UserPreferencesRepository @Inject constructor(
         val VPN_SNOOZE_UNTIL_MS = longPreferencesKey("vpn_snooze_until_epoch_ms")
     }
 
-    val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data.map { prefs ->
-        val mapped = buildSettings(prefs)
-        cachedSettings.set(mapped)
-        mapped
-    }
+    val settingsFlow: Flow<AppSettingsState> = context.adShieldDataStore.data
+        .catch { failure ->
+            // A truncated preferences file must not make every Hilt consumer (including the
+            // launch activity, VPN service, tiles and boot receiver) crash forever. DataStore's
+            // documented recovery path is to emit defaults for I/O corruption; programming and
+            // cancellation failures are still rethrown so they remain visible.
+            if (failure is IOException) emit(emptyPreferences()) else throw failure
+        }
+        .map { prefs ->
+            val mapped = buildSettings(prefs)
+            cachedSettings.set(mapped)
+            mapped
+        }
 
     private fun buildSettings(prefs: Preferences): AppSettingsState {
         val preset = runCatching {
