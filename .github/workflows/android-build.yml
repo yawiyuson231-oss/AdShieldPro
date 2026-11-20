@@ -86,6 +86,9 @@ jobs:
           chmod +x tools/audit_capability_tests.py
           python3 tools/audit_capability_tests.py --strict
 
+      - name: Preserve audited DNS, existing VPN, permissions and UI boundaries
+        run: python3 -m tools.evolution.boundaries
+
       - name: Verify bundled AETHER task model
         run: python3 tools/train_aether_tasks.py --check
 

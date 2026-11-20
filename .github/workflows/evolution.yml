@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Preserve audited DNS, existing VPN, permissions and UI boundaries
+        run: python3 -m tools.evolution.boundaries
       - name: Verify safe synthetic corpus is reproducible
         run: python3 -m tools.evolution.fixtures --check
       - name: Test evolution gates and existing delivery tooling

@@ -7,6 +7,7 @@ import com.adshield.pro.engine.intelligence.SecurityConfigurationChanges
 import com.adshield.pro.engine.security.AppRiskAuditor
 import com.adshield.pro.engine.security.BoundedAuditCache
 import com.adshield.pro.engine.security.EvolutionWorkPolicy
+import com.adshield.pro.engine.security.PermissionObservationHistory
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -110,6 +111,31 @@ class EvolutionSafetyTest {
         assertTrue(SecurityConfigurationChanges.changedControls(before, before).isEmpty())
         assertTrue(SecurityConfigurationChanges.changedControls(before,
             before.copy(dnsFirewallPolicy = before.dnsFirewallPolicy.copy(emergencyAllowlistOnly = true))).isEmpty())
+    }
+
+    @Test
+    fun permissionHistoryUsesObservedSetsAndDoesNotInventGrantsOrMissingAppChanges() {
+        val history = PermissionObservationHistory()
+        val initial = AppRiskAuditor.AppSecurityProfile("fixture.test", "Fixture", "1", 36,
+            listOf("android.permission.INTERNET", "android.permission.CAMERA"), null, false,
+            firstInstallTimeEpochMs = 123L)
+        assertEquals(0, history.observe(listOf(initial)))
+        assertEquals(0, history.observe(listOf(initial.copy(requestedPermissions = initial.requestedPermissions.reversed()))))
+        assertEquals(0, history.observe(emptyList()))
+        val changed = initial.copy(requestedPermissions = initial.requestedPermissions + "android.permission.RECEIVE_SMS")
+        assertEquals(1, history.observe(listOf(changed)))
+        assertEquals(0, history.observe(listOf(changed)))
+        assertEquals(1, history.observe(listOf(changed.copy(declaredComponentPermissions = setOf("android.permission.BIND_ACCESSIBILITY_SERVICE")))))
+        assertEquals(0, history.observe(listOf(initial.copy(firstInstallTimeEpochMs = 456L))))
+    }
+
+    @Test
+    fun evictedPermissionBaselinesRemainUnknownRatherThanReportedAsChanges() {
+        val history = PermissionObservationHistory(1)
+        val a = AppRiskAuditor.AppSecurityProfile("a.test", "A", "1", 36, emptyList(), null, false)
+        assertEquals(0, history.observe(listOf(a)))
+        assertEquals(0, history.observe(listOf(a.copy(packageName = "b.test"))))
+        assertEquals(0, history.observe(listOf(a.copy(requestedPermissions = listOf("android.permission.CAMERA")))))
     }
 
     @Test

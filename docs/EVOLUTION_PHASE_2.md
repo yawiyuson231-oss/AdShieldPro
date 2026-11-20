@@ -1,6 +1,6 @@
 # Phase 2 — isolated detector evaluation harness
 
-Status: implementation and Python contract tests complete; **Android/JVM compilation and execution pending CI**. This phase does not claim improved shipping detection accuracy. No production Kotlin, UI, DNS routing or resolver code is modified.
+Status: the adapter has now compiled and executed in Android CI; source-bound evidence validation passed. See the current [validation record](EVOLUTION_VALIDATION.md) and [system guide](EVOLUTION_SYSTEM.md). This phase does not claim improved shipping detection accuracy. Phase 2 itself did not modify production Kotlin, UI, DNS routing or resolver code; later bounded runtime changes are documented separately.
 
 ## What was added
 

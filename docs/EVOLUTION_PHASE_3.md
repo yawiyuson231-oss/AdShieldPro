@@ -1,6 +1,6 @@
 # Phase 3 — provenance graph and reviewed research intake
 
-Status: **offline engineering foundation implemented and tested**. Not connected to Android Room, live feeds, or protection decisions. Phase 2 Android execution remains pending; this independent phase does not bypass that gate.
+Status: **offline engineering foundation implemented and tested**. Not connected to Android Room or protection decisions. Later phases added bounded public Maven-advisory collection, and Phase 2 Android execution has passed; see [the current system guide](EVOLUTION_SYSTEM.md) and [validation record](EVOLUTION_VALIDATION.md). The sections below describe the Phase 3 checkpoint.
 
 ## Existing architecture and reuse boundary
 

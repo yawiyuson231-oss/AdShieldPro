@@ -211,6 +211,20 @@ class KnowledgeGraphTest(unittest.TestCase):
                 self.graph.propose('edge-v1', 'Review')
         self.assertEqual(self.count('reviews'), 2)
 
+    def test_process_crash_rolls_back_uncommitted_research_without_rebuilding_database(self):
+        self.graph.import_bundle(self.bundle)
+        script = (
+            "import os,sqlite3,sys; db=sqlite3.connect(sys.argv[1]); "
+            "db.execute('BEGIN IMMEDIATE'); "
+            "db.execute(\"INSERT INTO nodes VALUES ('interrupted','{}')\"); os._exit(9)"
+        )
+        result = subprocess.run([sys.executable, '-c', script, str(self.path)], timeout=10)
+        self.assertEqual(result.returncode, 9)
+        self.graph.verify()
+        self.assertEqual(self.count('nodes'), 8)
+        self.assertIsNone(self.graph.db.execute("SELECT 1 FROM nodes WHERE id='interrupted'").fetchone())
+        self.assertEqual(self.graph.relationship('edge-v1')['verification'], 'unverified')
+
     def test_persistence_and_integrity(self):
         self.import_and_review()
         another = KnowledgeGraph(self.path, clock=lambda: self.now)

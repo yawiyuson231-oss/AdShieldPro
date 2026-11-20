@@ -2,6 +2,8 @@
 
 Audit date: 2026-11-20. Base: `4fbc131ca4f4d0bd4e93eca2f73013e9cd867452`.
 
+This document preserves the initial audit findings. For current implemented scope and subsequent real Android CI/research results, see [the system guide](EVOLUTION_SYSTEM.md) and [validation record](EVOLUTION_VALIDATION.md).
+
 ## Scope and assurance
 
 Repository-wide architecture/build/test inventory and targeted security-boundary source review, not a line-by-line review of all code or a penetration-test certification. The Android application has 215 Kotlin production files, plus generated TDLib Java bindings; the repository also contains a static web app, browser extension, and Cloudflare API. No Android runtime, JDK, emulator, APK-signing tool or Google Maven access was available in this environment. Checked-in `.ci` logs are historical evidence, not results of this audit. No new advisory feed was fetched and no claim of current global threat coverage is made.
@@ -58,15 +60,15 @@ Journal databases must stay outside version control, hold no user telemetry, and
 
 | Phase | Scope | Required evidence before integration |
 |---|---|---|
-| 2 | Isolated JVM adapters and 26 safe domain/URL/APK-metadata/config fixtures implemented; see [Phase 2 status](EVOLUTION_PHASE_2.md). Android execution and independent holdouts pending. | Real detector predictions, hashes of model/build and dataset; negative controls; DNS golden regressions; demonstrated category improvement. No fabricated performance gains. |
-| 3 | Offline provenance graph and reviewed research proposal intake implemented; see [Phase 3 status](EVOLUTION_PHASE_3.md). Live collection and Android integration pending. | Source/timestamp/confidence/status on every edge; license/source reliability review; TTL/capacity limits; Room migration and device retention tests remain required; no unverified indicators promoted to protection. |
-| 4 | Verified feedback, drift reporting, versioned detection registry and rollback | Label approval, deduplication/train-holdout separation, drift baselines, paired old/new runs, safe rollback fault tests. |
-| 5 | Resilience, trust snapshots and telemetry-based incremental scheduling | Device tests for corruption, process death, boot, permission/DNS changes, low RAM/battery/storage/network; preserve essential DNS protection. |
-| 6 | CI evidence binding and secure module contracts | Isolated data-only interfaces, declared permissions, compatibility/performance/privacy checks, removal tests; build/signature provenance; protected human release approval. No downloaded executable plugins. |
+| 2 | Isolated JVM adapters and 26 safe domain/URL/APK-metadata/config fixtures implemented; see [Phase 2 status](EVOLUTION_PHASE_2.md). Android execution passed; independent holdouts pending. | Real detector predictions, hashes of model/build and dataset; negative controls; DNS golden regressions; demonstrated category improvement. No fabricated performance gains. |
+| 3 | Offline provenance graph and reviewed research proposal intake implemented; see [Phase 3 status](EVOLUTION_PHASE_3.md). Bounded public Maven advisory collection added later; Android graph integration remains pending. | Source/timestamp/confidence/status on every edge; license/source reliability review; TTL/capacity limits; Room migration and device retention tests remain required; no unverified indicators promoted to protection. |
+| 4 | Reviewed feedback, exact train/holdout separation, advisory distribution-shift checks, versioned model metadata and rollback history implemented | Private independent holdouts, authenticated reviewers and source/model authenticity still require external evidence; no shipping model switch. |
+| 5 | Bounded Android audit pacing/cache, startup recovery fix, saved-control and declared-permission change observations implemented; SQLite crash rollback tested | Wider-device corruption/reboot/Doze/thermal/performance testing remains required. Essential DNS protection and all frozen boundaries remain unchanged. |
+| 6 | Fixed check/build pipeline, read-only pinned-signer verifier, JSON-only data-module contract, source-bound production approval and frozen-boundary gates implemented | No dynamic code loading. Production remains blocked pending real independent evidence, protected-environment approval and signer custody. |
 
 ## Measured validation in this workspace
 
 - `npm run ci`: passed; 262 JS unit/integration tests, 102 static verification checks, existing house lint passed.
 - `python3 -m unittest discover -s tools/tests -v`: passed, 57 tests through the Phase 3 checkpoint (11 Phase 1 evolution tests, 10 fixture/artifact tests, 17 knowledge/research tests, and 19 existing delivery-tool tests).
 - Evolution tests demonstrate synthetic confusion-matrix improvement (one missed positive → zero) and rejection of unchanged models, hidden category regressions, false positives, incomplete/unverified evidence, invalid stage transitions, altered deployment evidence, journal edits and truncation with a pinned head. **This is gate validation, not a measured improvement in the shipping detectors.**
-- Android compilation, lint, JVM/instrumentation tests, APK signing and device performance: not run; Java/Android tooling unavailable. Existing Android CI remains the runtime validation path.
+- At the initial local audit checkpoint, Android compilation/lint/JVM/instrumentation/signing tests were unavailable. Subsequent branch Android CI has executed them; see [current validation](EVOLUTION_VALIDATION.md). Production signing and wider-device performance remain unverified.

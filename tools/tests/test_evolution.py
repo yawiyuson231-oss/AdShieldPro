@@ -72,6 +72,7 @@ class EvolutionTest(unittest.TestCase):
         for value in (False, None, 'true', 1):
             self.assertFalse(gate(self.report(), dict(self.checks, privacy_review=value))['eligible'])
         self.assertFalse(gate(self.report(), {})['eligible'])
+        self.assertFalse(gate(dict(self.report(), eligible=False), self.checks)['eligible'])
 
     def test_priorities_record_failure(self):
         report = evaluate(self.samples, self.good, self.good)
@@ -116,6 +117,10 @@ class EvolutionTest(unittest.TestCase):
                 journal.append('c1', 'EXPERIMENT', evidence)
                 with self.assertRaises(ValueError):
                     journal.append('c1', 'VERIFY', dict(evidence, checks={}))
+                altered = copy.deepcopy(evidence)
+                altered['report']['candidate']['fn'] = 999
+                with self.assertRaises(ValueError):
+                    journal.append('c1', 'VERIFY', altered)
                 journal.append('c1', 'VERIFY', evidence)
                 with self.assertRaises(ValueError):
                     journal.append('c1', 'DEPLOY', evidence)

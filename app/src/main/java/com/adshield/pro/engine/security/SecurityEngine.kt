@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import com.adshield.pro.domain.model.RuleCategory
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +40,8 @@ import javax.inject.Singleton
 @Singleton
 class SecurityEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val filterRuleEngine: FilterRuleEngine
+    private val filterRuleEngine: FilterRuleEngine,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) {
 
     val urlScanner: UrlThreatScanner = UrlThreatScanner(
@@ -51,6 +54,7 @@ class SecurityEngine @Inject constructor(
     private val apkAnalyzer = ApkAnalyzer()
     private val appAuditor = AppRiskAuditor()
     private val metadataAuditCache = BoundedAuditCache<AppRiskAuditor.AppSecurityProfile, AppRiskAuditor.AppRiskAudit>()
+    private val permissionHistory = PermissionObservationHistory()
 
     // --- Web / link protection -------------------------------------------------
 
@@ -222,6 +226,15 @@ class SecurityEngine @Inject constructor(
                 if (pacing.yieldMillis > 0L) delay(pacing.yieldMillis)
                 pacing = EvolutionWorkPolicy.plan(resources.sample())
             }
+        }
+        ensureActive()
+        val permissionChanges = permissionHistory.observe(inspected.map { it.profile })
+        if (permissionChanges > 0) {
+            intelligenceRecorder.record(IntelligenceEventFactory.privacySettingChanged(
+                title = "Declared app permissions changed",
+                detail = "$permissionChanges inspected app(s) changed requested permissions or component bindings since an earlier completed audit in this process. Actual permission grants and behavior were not checked.",
+                timestampEpochMs = System.currentTimeMillis()
+            ))
         }
         val ordered = inspected.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }
             .thenBy { it.profile.appName.lowercase() })

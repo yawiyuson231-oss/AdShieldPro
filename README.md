@@ -3,6 +3,21 @@
 [![Android build & test](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml/badge.svg)](https://github.com/yawiyuson231-oss/AdShieldPro/actions/workflows/android-build.yml)
 
 AdShield Pro is a non-root Android app that filters DNS requests on-device and includes a built-in privacy browser and device-maintenance tools. It is built with Kotlin, Jetpack Compose (Material 3), Room, DataStore, WorkManager, Hilt, and Android `VpnService`.
+## Governed security evolution
+
+The additive [evolution system](docs/EVOLUTION_SYSTEM.md) provides offline candidate comparisons,
+provenance-tracked research, verified-feedback/model-selection metadata, rollback records and
+controlled engineering checks. Android audits gain bounded resource-aware pacing and private
+change-history observations; DNS behavior and UI layouts remain unchanged. Improvements must be
+measured—an unchanged or regressing candidate is rejected, and nothing silently replaces code or
+installs an APK. See the [audit](docs/EVOLUTION_AUDIT.md) and [validation record](docs/EVOLUTION_VALIDATION.md)
+for implemented scope, measured results and remaining deployment gates.
+
+```sh
+python3 -m tools.evolution.pipeline       # available local checks, never publishes/installs
+python3 -m tools.evolution.pipeline --plan --android
+```
+
 ## Website and downloads
 
 - **Project website:** <https://yawiyuson231-oss.github.io/AdShieldPro/> — source in
