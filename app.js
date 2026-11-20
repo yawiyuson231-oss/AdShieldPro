@@ -100,7 +100,6 @@ async function boot() {
     await loadBundledRules();
     await loadInstalledFeeds(state.engine);
     applyUserRules();
-    applyImportedExceptions(state.engine);
     state.aether.reputation.cache.clear();
     await loadCachedModel();
 
@@ -224,18 +223,14 @@ async function rebuildEngine() {
       if (text) await engine.loadFilterListAsync(text, { category: feed.category, source: feed.id });
     } catch { /* bundled rules remain */ }
   }
-  state.customRules.forEach((rule) => {
-    rule.applied = rule.enabled !== false
-      ? engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType)
-      : false;
-  });
   state.engine = engine;
+  // Rule objects live inside an engine, so a *new* one starts with no user rules:
+  // re-apply the whole set (custom rules + imported exceptions) or every user
+  // allow/block would be silently lost on the next rebuild.
+  applyUserRules(engine);
   state.aether.attachEngine(engine);
   state.aether.reputation.cache.clear();
   state.client.setEngine(engine);
-  // Rule objects live inside the engine, so a *new* engine would otherwise drop
-  // every user allow/block silently. Re-apply the imported vault explicitly.
-  applyImportedExceptions(engine);
 }
 
 /**
@@ -335,11 +330,19 @@ function buildState({ includeModel = false } = {}) {
   };
 }
 
-function applyUserRules() {
+function applyUserRules(engine = state.engine) {
+  // Clears only *user* rules; bundled and installed feed rules stay loaded. Every
+  // caller owns `state.customRules` as the single source of truth, so a rule that
+  // left that list disappears from the engine here — that is what makes "Remove"
+  // in the rules table correct even when two imported rules overlapped.
+  engine.clearUserRules();
   for (const rule of state.customRules) {
     if (rule.enabled === false) { rule.applied = false; continue; }
-    rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
+    rule.applied = engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
   }
+  // Imported site exceptions ("never filter this site") are user intent too, and
+  // they live outside `customRules`; without this they were dropped by the clear.
+  applyImportedExceptions(engine);
 }
 
 /**
@@ -1433,8 +1436,7 @@ async function renderFeeds() {
           if (target && !confirm('The aggressive tier blocks tag managers and social SDKs. Some sites may break. You can undo this instantly, and every block stays labelled. Continue?')) return;
           // Only claim success when the tier actually changed: the old code toasted
           // "enabled" even after the load failed and returned false.
-          const changed = await enableAggressiveTier(target);
-          if (!changed) return;
+          if (!await enableAggressiveTier(target)) return;
           toast(target ? 'Aggressive tier enabled — reversible at any time.' : 'Aggressive tier disabled.', target ? 'warn' : 'ok');
         }
       }),
@@ -1596,7 +1598,8 @@ function renderSync() {
             class: 'sm ghost', text: 'Remove',
             onclick: () => {
               state.customRules = state.customRules.filter((r) => r !== rule);
-              state.engine.removeUserRule(rule.pattern, rule.isAllow);
+              // Different imported rules can share the same exact/suffix entries.
+              applyUserRules();
               state.aether?.reputation.cache.clear();
               scheduleSnapshot('rule-removed');
               renderSync();

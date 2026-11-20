@@ -4,10 +4,11 @@
     "app/src/main/java/com/adshield/pro/service/AdShieldVpnService.kt",
     "dns/cache.js",
     "dns/client.js",
+    "engine.js",
     "ui/dom.js"
   ],
   "files": {
-    "app.js": "1382f1a711a3104898f4a4f2575a599e4f841b05309cf7f4184bde564474721c",
+    "app.js": "857b604155bb1c7ad2951ed0f67e31e192db5b2c1d422f920cebbb20e2925887",
     "app/src/main/AndroidManifest.xml": "5b8c9ab9a8e2e9cceaca2a777d80aa75664b4e357ecf29d78a2204d1f2f3ab4b",
     "app/src/main/java/com/adshield/pro/MainActivity.kt": "8a21662ca1d15ab0dd16d5f6ee675db31aa87bfbbe5e486224bc4afb3b2476a3",
     "app/src/main/java/com/adshield/pro/engine/dns/CnameCloakingInspector.kt": "6e8fe2aa8b36653b5da009e45dade7432216e35152721fef4d1f337c313e21b2",
@@ -113,11 +114,11 @@
     "dns/codec.js": "02b4ae479dddd9d4468ae85fc21f82aae50a2191b89c72c648731f3041deef4c",
     "dns/dnssec.js": "f932aecc92e1d7e10c7995da33327d372876b12986448289cb9d15d1f433a21c",
     "dns/resolvers.js": "240295257a41a291e487934f1b14d851646b9c99bb2459a3b2588d0b035d4120",
-    "engine.js": "bd5cafdea6ab6fa4eeab72fcb60beb6f0fcc0415a5d130486bab567f9f4fc1fd",
+    "engine.js": "cfbd790633341c8c4a8b77d0a1baeeef9681180e151cd056efa0cc0d9116d16e",
     "index.html": "a9f145e55db7156ed8f11d64a965dfa145333a1e1513f4d8e1c94038aebf461a",
     "ui/dom.js": "2c98fd3abab45f3dc24e35f5f19c2e4888cfda36cb85fe418c3593195254ea60"
   },
   "note": "Supersedes the byte hashes of tools/evolution/boundaries.json for the files in `changed`, each with a named defect and a regression test (docs/AUDIT_2026-11.md). The original baseline stays pinned and is still reproduced from base commit 4fbc131.",
-  "reviewed_pass": "2026-11 audit-and-fix pass",
+  "reviewed_pass": "2026-11 audit-and-fix pass (incl. merge of PR #34)",
   "schema": 1
 }

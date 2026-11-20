@@ -173,10 +173,18 @@ test('new snapshots are labelled with the shipped app version', async () => {
 test('app.js applies imported browser site exceptions to the engine', () => {
   const source = read('app.js');
   assert.match(source, /function applyImportedExceptions/, 'the helper must exist');
-  assert.equal((source.match(/applyImportedExceptions\(/g) || []).length >= 3, true,
-    'it must run at boot and after every engine rebuild, not just be defined');
   assert.match(source, /importedBackup\?\.browserSiteExceptions/,
     'the imported exception list is the source of truth');
+  // applyUserRules() owns the whole user-rule layer: it clears the engine's user
+  // rules and then re-installs custom rules *and* imported exceptions. That is what
+  // makes boot, engine rebuild and the single-rule "Remove" path all consistent.
+  const body = source.slice(source.indexOf('function applyUserRules'), source.indexOf('function applyImportedExceptions'));
+  assert.match(body, /clearUserRules\(\)/, 'the user-rule layer must be replaced, not patched');
+  assert.match(body, /applyImportedExceptions\(engine\)/,
+    'a clear that forgets imported exceptions silently un-allows every imported site');
+  const rebuild = source.slice(source.indexOf('async function rebuildEngine'), source.indexOf('function refreshRuleSummary'));
+  assert.match(rebuild, /applyUserRules\(engine\)/,
+    'a rebuilt engine must receive the user rules again');
 });
 
 test('the aggressive tier toggle and the custom-rule view stay consistent', () => {
@@ -185,8 +193,11 @@ test('the aggressive tier toggle and the custom-rule view stay consistent', () =
     source.indexOf('async function rebuildEngine'));
   assert.match(toggle, /await rebuildEngine\(\)/,
     'both directions must rebuild, otherwise the off switch cannot remove the rules');
-  assert.equal(/toast\(target \?/.test(source) && !/if \(!changed\) return;/.test(source), false,
+  const button = source.slice(source.indexOf("text: state.settings.aggressiveTier ? 'Disable aggressive tier'"),
+    source.indexOf("pill(state.settings.aggressiveTier ? 'enabled'"));
+  assert.match(button, /if \(!await enableAggressiveTier\(/,
     'the UI must not claim the tier changed when the load failed');
+  assert.match(toggle, /return false/, 'a failed load must be reported to the caller');
   // Wildcards must be persisted with their match type so re-applying keeps them.
   assert.equal(/state\.customRules\.push\(\{ pattern: domain, isAllow: true, enabled: true/.test(source), false,
     'new rules must record matchType, not rely on pattern sniffing');
