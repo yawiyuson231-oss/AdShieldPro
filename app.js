@@ -56,7 +56,12 @@ const state = {
   snapshotTimer: null,
   analyticsTimer: null,
   lastSnapshotId: null,
-  currentPage: 'dashboard'
+  currentPage: 'dashboard',
+  /**
+   * Set only while a Chromium browser is offering an installation, cleared as soon as the
+   * offer is used or withdrawn. Firefox and Safari never populate this.
+   */
+  installPrompt: null
 };
 
 /* ------------------------------------------------------------------ */
@@ -111,6 +116,7 @@ async function boot() {
     // Train the lexical model after first paint so the UI never blocks.
     setTimeout(() => { ensureModel().catch((err) => { state.trainingError = err.message; }); }, 300);
     registerServiceWorker();
+    offerInstallation();
     // The governor starts the monitor loop itself, with the interval it derives
     // from device power state — calling startMonitorLoop() separately here would
     // briefly install an untrottled timer and then replace it.
@@ -552,8 +558,14 @@ function renderDashboard() {
       ['Rule set memory', breakdown.total > 0
         ? `${bytes(estimateRuleMemory(breakdown.total))} (estimate: ${Math.round(estimateRuleMemory(breakdown.total) / breakdown.total)} bytes per rule)`
         : '0 B (no rules loaded)'],
-      ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background']
+      ['Analysis cost', clf.isTrained ? 'model trained once per visit; no retraining loop' : 'training once, in the background'],
+      ['Offline install', state.installPrompt
+        ? 'this browser is offering installation right now'
+        : 'not offered by this browser — use its menu → “Install app”, or keep the tab open']
     ]),
+    state.installPrompt
+      ? h('button', { class: 'sm', text: 'Install for offline use', onclick: installOffline })
+      : null,
     h('div', { class: 'row', style: { marginTop: '10px' } },
       h('button', {
         class: 'sm',
@@ -1747,6 +1759,50 @@ function registerServiceWorker() {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('service worker registration failed', err));
 }
 
+/**
+ * Offline installation, offered only when the browser actually offers it.
+ *
+ * The manifest makes the app installable, but without listening for
+ * `beforeinstallprompt` the browser's own prompt is the only route and Chrome suppresses it
+ * until its engagement heuristic fires. Capturing the event lets the dashboard show a working
+ * "Install for offline use" button. Browsers without the event (Firefox, Safari) and contexts
+ * where installation is impossible (already installed, insecure origin) keep the button out of
+ * the UI entirely rather than showing a dead control.
+ */
+function offerInstallation() {
+  window.addEventListener('beforeinstallprompt', (event) => {
+    // Keep the event so the click below can call prompt() from a real user gesture.
+    event.preventDefault();
+    state.installPrompt = event;
+    if (state.currentPage === 'dashboard') renderDashboard();
+  });
+  window.addEventListener('appinstalled', () => {
+    state.installPrompt = null;
+    if (state.currentPage === 'dashboard') renderDashboard();
+    toast('Installed. OmniShield X now opens offline from your launcher.', 'ok');
+  });
+}
+
+async function installOffline() {
+  const prompt = state.installPrompt;
+  if (!prompt) {
+    // No captured event: say what is actually true instead of pretending to install.
+    toast('This browser has not offered installation. Use your browser menu → “Install app” / “Add to Home Screen”.', 'info');
+    return;
+  }
+  try {
+    await prompt.prompt();
+    const choice = await prompt.userChoice;
+    if (choice?.outcome !== 'accepted') toast('Installation dismissed. Nothing was changed.', 'info');
+  } catch (err) {
+    toast(`Installation could not start: ${err.message}`, 'warn');
+  } finally {
+    // A captured prompt is single-use; it must not be offered twice.
+    state.installPrompt = null;
+    if (state.currentPage === 'dashboard') renderDashboard();
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Event wiring                                                        */
 /* ------------------------------------------------------------------ */
@@ -1883,6 +1939,7 @@ globalThis.__omnishield = {
   saveSnapshot,
   buildState,
   startMonitorLoop,
+  installOffline,
   stop() {
     clearInterval(state.monitorTimer);
     clearTimeout(state.snapshotTimer);

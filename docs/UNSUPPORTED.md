@@ -90,9 +90,12 @@ remain explicitly unsupported:
 
 - **Static rules are capped at 30,000.** Chrome only guarantees that many
   `declarativeNetRequest` static rules per extension; the rest is shared with every other
-  installed blocker. The bundled feeds contain 79,739 rules, so the extension ships the
-  first 30,000 by feed order. Popularity ordering is not available offline, so this is a
-  breadth trade-off, not a claim that the shipped 30,000 are the "best" ones.
+  installed blocker. The bundled feeds contain 79,807 rule lines (79,806 unique domains
+  after duplicates), so the extension ships the first 30,000 by feed order — the curated
+  supplement first, then the large list. Popularity ordering is not available offline, so
+  this is a breadth trade-off, not a claim that the shipped 30,000 are the "best" ones.
+  `assets/extension-facts.json` records the exact counts measured from the ZIP that ships,
+  including how many lines were left over the cap.
 - **Third-party requests only.** Rules use `domainType: "thirdParty"`, so ads served from
   a site's own domain are not blocked by DNR.
 - **Per-tab counts need a dev install.** `onRuleMatchedDebug` requires the

@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -551,12 +549,21 @@ private fun DiagnosticCard(diagnostic: BatteryDiagnostic) {
             Spacer(Modifier.height(6.dp))
             Text("→ ${diagnostic.recommendation}", fontSize = 12.sp, color = color)
             Spacer(Modifier.height(6.dp))
-            AssistChip(
-                onClick = {},
-                label = { Text("${diagnostic.confidenceLabel} · ${diagnostic.confidencePercent}%", fontSize = 10.sp) },
-                colors = AssistChipDefaults.assistChipColors(labelColor = MutedText),
+            // Informational badge, not a control: an AssistChip with an empty onClick
+            // looked tappable and did nothing. A Surface states the same confidence without
+            // promising an action, and stays non-interactive for TalkBack as well.
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = color.copy(alpha = 0.12f),
                 modifier = Modifier.height(26.dp)
-            )
+            ) {
+                Text(
+                    text = "${diagnostic.confidenceLabel} · ${diagnostic.confidencePercent}% confidence",
+                    fontSize = 10.sp,
+                    color = MutedText,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
             if (diagnostic.evidence.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
                 diagnostic.evidence.forEach {

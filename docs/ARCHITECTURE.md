@@ -196,7 +196,7 @@ builds `_site/` deterministically:
 
 The same script runs locally (`npm run stage`), and `tests/unit/stage.test.mjs` asserts that
 the real repository stages and that a missing precache target is caught. The staged app was
-also booted under a `/app/` base URL in a DOM harness: 79,739 rules load and the extension
+also booted under a `/app/` base URL in a DOM harness: 79,743 rules load and the extension
 facts fetch resolves.
 
 ## 10. Security posture of the app itself

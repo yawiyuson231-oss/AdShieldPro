@@ -11,7 +11,7 @@
  *
  * Bump VERSION to invalidate this registration's caches on release.
  */
-const VERSION = 'omnishield-x-v5.0.3-dns.2';
+const VERSION = 'omnishield-x-v5.0.3-dns.3';
 const SCOPE = self.registration.scope;
 // Cache Storage is origin-wide, even when this worker only controls one subdirectory.
 const CACHE_PREFIX = `omnishield-x:${SCOPE}:`;
@@ -25,6 +25,8 @@ const SHELL_ASSETS = [
   './engine.js',
   './manifest.webmanifest',
   './assets/icon.svg',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
   './assets/extension-facts.json',
   './assets/core_supplement_ads.txt',
   './assets/core_supplement_aggressive.txt',

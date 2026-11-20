@@ -499,3 +499,43 @@ test('removing a user rule from the UI stops it blocking immediately', async () 
   assert.equal(app.state.engine.evaluate('ui-removal.example').blocked, false,
     'a removed rule must not keep blocking the domain');
 });
+
+test('installation is offered only when the browser offers it, and never faked', async () => {
+  app.navigate('dashboard');
+
+  // Before any event: no captured prompt, no button. Firefox/Safari never fire this event.
+  assert.equal(app.state.installPrompt, null, 'no prompt must exist before the browser offers one');
+  const findInstall = () => [...win.document.querySelectorAll('#dash-resources button')]
+    .find((b) => /Install for offline use/.test(b.textContent));
+  assert.equal(findInstall(), undefined, 'a dead install button must not be rendered');
+  assert.match(text('#dash-resources'), /Offline install/,
+    'the dashboard must state that installation is not currently offered');
+
+  // The browser now offers installation, exactly as Chrome does.
+  let preventDefaulted = false;
+  let prompted = 0;
+  const event = new win.Event('beforeinstallprompt', { cancelable: true });
+  event.preventDefault = () => { preventDefaulted = true; win.Event.prototype.preventDefault.call(event); };
+  event.prompt = async () => { prompted++; };
+  event.userChoice = Promise.resolve({ outcome: 'accepted' });
+  win.dispatchEvent(event);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.ok(preventDefaulted, 'the default banner must be intercepted so the app controls the moment');
+  assert.ok(app.state.installPrompt, 'the offer must be captured');
+  const button = findInstall();
+  assert.ok(button, 'the install control must appear once the browser offers installation');
+
+  // A user gesture uses the captured prompt exactly once and then removes it.
+  button.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(prompted, 1, 'the captured prompt must be used exactly once');
+  assert.equal(app.state.installPrompt, null, 'a captured prompt is single-use and must be cleared');
+  assert.equal(findInstall(), undefined, 'the control disappears once the offer is consumed');
+
+  // With nothing captured, the action must say what is true instead of pretending.
+  await app.installOffline();
+  assert.equal(prompted, 1, 'no prompt may be raised when the browser has not offered one');
+  assert.match(text('#toasts'), /has not offered installation/i,
+    'the fallback must explain the real browser route, not claim to install');
+});

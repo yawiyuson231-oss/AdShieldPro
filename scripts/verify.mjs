@@ -165,11 +165,12 @@ export function verify() {
   const aggressive = read('assets/core_supplement_aggressive.txt');
   add('aggressive tier warns about breakage and is opt-in', /SHIPS DISABLED BY DEFAULT/i.test(aggressive));
 
-  /* 9. Manifest validity. */
+  /* 9. Manifest validity, including the icons Chrome actually requires to install. */
   let manifestOk = false;
   let manifestDetail = '';
+  let manifest = null;
   try {
-    const manifest = JSON.parse(read('manifest.webmanifest'));
+    manifest = JSON.parse(read('manifest.webmanifest'));
     const icons = manifest.icons || [];
     manifestOk = !!manifest.name && !!manifest.start_url && icons.length > 0
       && icons.every((i) => exists(i.src));
@@ -178,6 +179,38 @@ export function verify() {
     manifestDetail = err.message;
   }
   add('web manifest is valid', manifestOk, manifestDetail);
+
+  // Chrome refuses beforeinstallprompt unless the icon list holds a real 192x192 and a
+  // 512x512 PNG. An SVG-only list parses happily and still blocks installation, so the
+  // required sizes are checked for real pixels, not just for a file existing.
+  const pngSize = (file) => {
+    try {
+      const buffer = readFileSync(abs(file));
+      const isPng = buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+      return isPng ? { w: buffer.readUInt32BE(16), h: buffer.readUInt32BE(20) } : null;
+    } catch { return null; }
+  };
+  const manifestIcons = manifest?.icons || [];
+  const sizedIcon = (size) => manifestIcons.find((icon) => {
+    if (!/image\/png/.test(icon.type || '')) return false;
+    const actual = pngSize(icon.src);
+    return Boolean(actual && actual.w === size && actual.h === size
+      && (icon.sizes || '').split(/\s+/).includes(`${size}x${size}`));
+  });
+  const icon192 = sizedIcon(192);
+  const icon512 = sizedIcon(512);
+  add('manifest ships a real 192x192 PNG icon', Boolean(icon192), icon192 ? icon192.src : 'missing — Chrome will not offer installation');
+  add('manifest ships a real 512x512 PNG icon', Boolean(icon512), icon512 ? icon512.src : 'missing — Chrome will not offer installation');
+  add('a manifest icon is usable as a maskable icon',
+    manifestIcons.some((icon) => /maskable/.test(icon.purpose || '') && pngSize(icon.src)),
+    `${manifestIcons.filter((i) => /maskable/.test(i.purpose || '')).length} maskable entr(ies)`);
+
+  // The icons the manifest promises must also survive the service worker's precache,
+  // otherwise a first offline launch renders the install with broken artwork.
+  const swSource = read('sw.js');
+  for (const icon of [icon192, icon512].filter(Boolean)) {
+    add(`service worker precaches ${icon.src}`, swSource.includes(`'./${icon.src}'`));
+  }
 
   /* 9b. Accessibility basics that must not regress. */
   const htmlA11y = read('index.html');
