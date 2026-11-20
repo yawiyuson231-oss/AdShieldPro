@@ -490,12 +490,53 @@ test('analytics are persisted to storage after real DNS activity (debounced flus
   assert.equal(stored.includes('example.com'), false, 'raw hostnames must never be persisted');
 });
 
-test('removing a user rule from the UI stops it blocking immediately', async () => {
-  app.navigate('dns');
-  app.state.engine.addUserRule('ui-removal.example', false, 'SUFFIX');
-  assert.equal(app.state.engine.evaluate('ui-removal.example').blocked, true, 'rule must start blocking');
-  const removed = app.state.engine.removeUserRule('ui-removal.example', false);
-  assert.equal(removed, true, 'removeUserRule must report the removal');
-  assert.equal(app.state.engine.evaluate('ui-removal.example').blocked, false,
-    'a removed rule must not keep blocking the domain');
+async function waitFor(predicate, message) {
+  const deadline = Date.now() + 3000;
+  while (!predicate() && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(predicate(), message);
+}
+
+test('removing one imported rule preserves the other match modes for its domain', async () => {
+  app.navigate('sync');
+  const pattern = 'overlapping-rule.example';
+  const file = new win.File([JSON.stringify({ customRules: [
+    { rawPattern: pattern, ruleType: 'BLOCK', matchType: 'EXACT' },
+    { rawPattern: pattern, ruleType: 'BLOCK', matchType: 'SUFFIX' }
+  ] })], 'overlapping-rules.json', { type: 'application/json' });
+  const input = $('#import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new win.Event('change', { bubbles: true }));
+  const ruleRows = () => [...win.document.querySelectorAll('#rules-body tr')]
+    .filter((row) => row.cells[0]?.textContent === pattern);
+  await waitFor(() => ruleRows().length === 2, 'both imported rules should appear');
+  const engine = app.state.engine;
+  assert.equal(engine.evaluate(`child.${pattern}`).blocked, true);
+
+  ruleRows().find((row) => row.cells[2].textContent === 'suffix').querySelector('button').click();
+  assert.equal(ruleRows().length, 1);
+  assert.equal(engine.evaluate(pattern).blocked, true, 'the remaining EXACT rule should still block');
+  assert.equal(engine.evaluate(`child.${pattern}`).blocked, false, 'the deleted SUFFIX rule should stop blocking');
+  ruleRows()[0].querySelector('button').click();
+  assert.equal(engine.evaluate(pattern).blocked, false);
+});
+
+test('failure to load the aggressive tier never shows an enabled notification', async () => {
+  const fetch = globalThis.fetch;
+  globalThis.fetch = (input, init) => String(input).endsWith('assets/core_supplement_aggressive.txt')
+    ? Promise.resolve(new Response(null, { status: 503 }))
+    : fetch(input, init);
+  try {
+    app.navigate('feeds');
+    const enableButton = () => [...win.document.querySelectorAll('#feeds-list button')]
+      .find((button) => button.textContent === 'Enable aggressive tier');
+    await waitFor(enableButton, 'the enable button should render');
+    enableButton().click();
+    await waitFor(() => text('#toasts').includes('Could not load the aggressive tier'), 'the load failure should be reported');
+    assert.equal(app.state.settings.aggressiveTier, false);
+    assert.doesNotMatch(text('#toasts'), /Aggressive tier enabled/);
+  } finally {
+    globalThis.fetch = fetch;
+  }
 });

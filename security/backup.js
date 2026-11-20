@@ -2,7 +2,7 @@
  * OmniShield X — configuration backup, migration and crash recovery.
  *
  * Every save is hashed (SHA-256) and written as an immutable snapshot; the newest
- * N snapshots are kept. On startup the platform calls `recover()`, which walks
+ * N verified snapshots are kept. On startup the platform calls `recover()`, which walks
  * snapshots newest-first and returns the first one that both passes schema
  * migration and matches its stored hash. Corrupt data therefore degrades to the
  * previous good configuration instead of wiping the user's settings.
@@ -51,6 +51,45 @@ export function migrate(state) {
   return { state: current, applied, version };
 }
 
+const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+function inspectSnapshot(id, raw) {
+  const metadata = { id };
+  const fail = (reason, extra = {}) => ({ metadata, result: { ok: false, reason, ...extra } });
+  if (raw === null) return fail('not-found');
+  let record;
+  try { record = JSON.parse(raw); } catch { /* checked below */ }
+  if (!isObject(record)) {
+    metadata.corrupt = true;
+    return fail('corrupt-record');
+  }
+  metadata.hash = record.hash;
+  metadata.bytes = record.bytes;
+  if (typeof record.payload !== 'string') return fail('corrupt-payload');
+
+  let parsed;
+  try { parsed = JSON.parse(record.payload); } catch { /* checked below */ }
+  const timestamp = typeof parsed?.createdAt === 'string' ? Date.parse(parsed.createdAt) : NaN;
+  metadata.createdAt = Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+  metadata.reason = typeof parsed?.reason === 'string' ? parsed.reason : 'unknown';
+  metadata.schemaVersion = Number.isInteger(parsed?.schemaVersion) ? parsed.schemaVersion : null;
+  if (typeof record.hash !== 'string' || !record.hash) return fail('missing-hash');
+  const actual = sha256Hex(record.payload);
+  if (actual !== record.hash) return fail('hash-mismatch', { expected: record.hash, actual });
+  if (!isObject(parsed)) return fail('corrupt-json');
+  if (!isObject(parsed.state)) return fail('corrupt-state');
+
+  try {
+    const migrated = migrate(parsed.state);
+    return {
+      metadata,
+      result: { ok: true, state: migrated.state, migrations: migrated.applied, createdAt: metadata.createdAt }
+    };
+  } catch (err) {
+    return fail('migration-failed', { detail: err.message });
+  }
+}
+
 export class BackupManager {
   /**
    * @param {{storage:object, clock?:()=>number, maxSnapshots?:number,
@@ -61,7 +100,7 @@ export class BackupManager {
     if (!this.storage) throw new Error('BackupManager requires a storage adapter');
     this.clock = options.clock ?? (() => Date.now());
     this.maxSnapshots = options.maxSnapshots ?? 5;
-    this.appVersion = options.appVersion ?? '5.0.2';
+    this.appVersion = options.appVersion ?? '5.0.3';
     this.prefix = options.prefix ?? 'backup:';
   }
 
@@ -91,33 +130,24 @@ export class BackupManager {
     return { id, hash, bytes, schemaVersion: SCHEMA_VERSION, appliedMigrations: migrated.applied };
   }
 
-  async list() {
-    const keys = (await this.storage.keys()).filter((k) => k.startsWith(this.prefix));
-    const out = [];
+  async _entries() {
+    const keys = (await this.storage.keys()).filter((key) => key.startsWith(this.prefix));
+    const entries = [];
     for (const key of keys) {
       const raw = await this.storage.getItem(key);
-      if (!raw) continue;
-      try {
-        const record = JSON.parse(raw);
-        let meta = null;
-        try { meta = JSON.parse(record.payload); } catch { meta = null; }
-        const hasHash = typeof record.hash === 'string' && record.hash.length > 0;
-        out.push({
-          id: record.id ?? key.slice(this.prefix.length), hash: record.hash, bytes: record.bytes,
-          createdAt: meta?.createdAt ?? null, reason: meta?.reason ?? 'unknown',
-          schemaVersion: meta?.schemaVersion ?? null,
-          valid: !!meta && hasHash && sha256Hex(record.payload) === record.hash
-        });
-      } catch {
-        out.push({ id: key.slice(this.prefix.length), createdAt: null, corrupt: true, valid: false });
-      }
+      if (raw === null) continue;
+      // The storage key is authoritative; the redundant ID in the record is not hashed.
+      entries.push(inspectSnapshot(key.slice(this.prefix.length), raw));
     }
-    return out.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+    return entries.sort((a, b) => (b.metadata.createdAt ?? '').localeCompare(a.metadata.createdAt ?? ''));
+  }
+
+  async list() {
+    return (await this._entries()).map(({ metadata, result }) => ({ ...metadata, valid: result.ok }));
   }
 
   async _prune() {
-    const snapshots = (await this.list()).filter((s) => !s.corrupt);
-    if (snapshots.length <= this.maxSnapshots) return 0;
+    const snapshots = (await this.list()).filter((s) => s.valid);
     const doomed = snapshots.slice(this.maxSnapshots);
     for (const s of doomed) await this.storage.removeItem(this._key(s.id));
     return doomed.length;
@@ -128,45 +158,24 @@ export class BackupManager {
    * @returns {{ok:boolean, state?:object, reason?:string, migrations?:number[]}}
    */
   async restore(id) {
-    const raw = await this.storage.getItem(this._key(id));
-    if (!raw) return { ok: false, reason: 'not-found' };
-    let record;
-    try { record = JSON.parse(raw); } catch { return { ok: false, reason: 'corrupt-record' }; }
-    if (typeof record.payload !== 'string') return { ok: false, reason: 'corrupt-payload' };
-
-    if (typeof record.hash !== 'string' || !record.hash) {
-      return { ok: false, reason: 'missing-hash' };
-    }
-    const actual = sha256Hex(record.payload);
-    if (actual !== record.hash) {
-      return { ok: false, reason: 'hash-mismatch', expected: record.hash, actual };
-    }
-    let parsed;
-    try { parsed = JSON.parse(record.payload); } catch { return { ok: false, reason: 'corrupt-json' }; }
-    try {
-      const migrated = migrate(parsed.state || {});
-      return { ok: true, state: migrated.state, migrations: migrated.applied, createdAt: parsed.createdAt };
-    } catch (err) {
-      return { ok: false, reason: 'migration-failed', detail: err.message };
-    }
+    return inspectSnapshot(id, await this.storage.getItem(this._key(id))).result;
   }
 
   /**
    * Automatic recovery: newest valid snapshot wins; corrupt ones are skipped.
    */
   async recover() {
-    const snapshots = (await this.list()).filter((s) => !s.corrupt);
+    const snapshots = await this._entries();
     const skipped = [];
-    for (const snapshot of snapshots) {
-      const result = await this.restore(snapshot.id);
+    for (const { metadata, result } of snapshots) {
       if (result.ok) {
         return {
-          ok: true, id: snapshot.id, state: result.state,
+          ok: true, id: metadata.id, state: result.state,
           migrations: result.migrations, createdAt: result.createdAt,
           skipped, attempts: skipped.length + 1
         };
       }
-      skipped.push({ id: snapshot.id, reason: result.reason });
+      skipped.push({ id: metadata.id, reason: result.reason });
     }
     return {
       ok: false,
