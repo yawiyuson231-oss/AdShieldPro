@@ -21,7 +21,11 @@ Updated 2026-11-20. Results are tied to source revisions; historical `.ci` mirro
    - Includes declared-permission history, source-bound production approval workflow and bounded research/module/check tooling.
    - Web CI, offline evolution governance and website assembly checks also passed on this source. Website assembly on the working branch does not deploy a production website.
 
-Final engineering review additionally hardened explicit confidence assessment (without rewriting imported evidence), streaming file hashes, and APK snapshot/certificate binding against a concurrently replaced build output. These engineering-only changes preserve Android runtime input bytes and are covered by 89 local Python tests; their final CI checkpoint is recorded below when available.
+4. [Final engineering checkpoint 44689879657](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44689879657), source `c5a41f7e7c52b02ed7fa7e00f930f07c044ad6ab`:
+   - **Whole Android workflow passed**, including 409 JVM tests, all 4 Android 10 Agent instrumentation tests, Kotlin compilation, debug/instrumentation and throwaway-key R8 release builds, package/signature checks, lint, detector evidence, emulator installation and the 109-file frozen-boundary gate.
+   - Evolution governance (44689879680), web CI (44689879704) and website assembly (44689879687) also passed on this exact source.
+   - Final engineering review hardened explicit confidence assessment (without rewriting imported evidence), streaming file hashes, and APK snapshot/certificate binding against a concurrently replaced build output. These changes preserve Android runtime/build input bytes relative to the prior passing checkpoint and are covered by 89 local Python tests.
+   - Subsequent validation/audit documentation updates do not change tested executable inputs. No production release, public APK preview or main-branch merge was performed.
 
 ## Actual detection evidence
 

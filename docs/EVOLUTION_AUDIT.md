@@ -33,7 +33,9 @@ Repository-wide architecture/build/test inventory and targeted security-boundary
 6. **Medium — audit-chain trust limits.** Hash chains detect edits, not an attacker replacing the entire database and its head. Export heads to separately controlled CI artifacts; stronger signing/key custody is a later requirement.
 7. **Medium — release evidence trust.** Phase 1 accepts reviewer attestations. They are not cryptographic proofs of testing/signing and must not be wired to unattended release publication.
 
-These are architecture gaps/review findings, not verified exploitable vulnerabilities. No runtime security fixes are claimed.
+8. **Medium — negative-control coverage needs expansion before detection changes.** Source review of `DomainRiskAnalyzer` finds substring brand matching that includes the one-character brand `x`; this can overstate lexical suspicion for ordinary hostnames. This is a code-review risk, not a measured shipping false-positive rate. The detector participates in DNS assessment, so its behavior was deliberately not patched under the DNS-freeze requirement. Add independently labeled benign short-brand/IDN cases before any future detection promotion.
+
+These are architecture gaps/review findings, not verified exploitable vulnerabilities. The initial audit did not claim runtime fixes; the later emulator-discovered initialization race and its verified repair are recorded separately in the validation guide.
 
 ## Phase 1 — implemented: offline evolution governance
 
