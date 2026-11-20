@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import androidx.core.app.NotificationCompat
 import com.adshield.pro.MainActivity
+import com.adshield.pro.ProcessScopeOwner
 import com.adshield.pro.R
 import com.adshield.pro.data.local.preferences.UserPreferencesRepository
 import com.adshield.pro.data.repository.AdShieldRepository
@@ -35,6 +36,7 @@ import com.adshield.pro.engine.platform.ProtectionSnoozeEngine
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -47,6 +49,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
@@ -105,17 +108,9 @@ class AdShieldVpnService : VpnService() {
             ACTION_STOP_VPN -> {
                 stopVpnTunnel()
                 // The user explicitly turned protection off: this must be durable before
-                // stopSelf() tears down the service scope, otherwise the pending DataStore
+                // stopSelf() tears down the component scope, otherwise the pending DataStore
                 // write is cancelled and protection would silently come back after a reboot.
-                runCatching {
-                    runBlocking {
-                        withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
-                            snoozeController.cancelResumeAlarm()
-                            preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
-                            preferencesRepository.setVpnShouldRemainActive(false)
-                        }
-                    }
-                }
+                persistShutdownState()
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -721,18 +716,36 @@ class AdShieldVpnService : VpnService() {
     override fun onRevoke() {
         stopVpnTunnel(reason = "VPN permission was revoked or superseded by another VPN app.")
         // Triggered when the user or another VPN application revokes our VPN permission;
-        // persist durably before stopSelf() cancels serviceScope.
-        runCatching {
-            runBlocking {
-                withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) {
-                    snoozeController.cancelResumeAlarm()
-                    preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
-                    preferencesRepository.setVpnShouldRemainActive(false)
-                }
-            }
-        }
+        // persist durably before stopSelf() cancels the component scope.
+        persistShutdownState()
         stopSelf()
         super.onRevoke()
+    }
+
+    /**
+     * Writes the "protection is off" state on the *application* scope, then waits for it
+     * within a fixed budget.
+     *
+     * The writes used to run on `serviceScope` (and on the callers' scopes), which
+     * `stopSelf()` cancels a few statements later — so the preferences could be dropped
+     * and the boot receiver would bring protection back on after a reboot, silently
+     * overriding the user's decision to turn it off. The write now belongs to a scope
+     * that outlives this service; only the (bounded) wait happens here.
+     */
+    private fun persistShutdownState() {
+        val block: suspend () -> Unit = {
+            snoozeController.cancelResumeAlarm()
+            preferencesRepository.setVpnSnoozeUntilEpochMs(0L)
+            preferencesRepository.setVpnShouldRemainActive(false)
+        }
+        val processScope = (application as? ProcessScopeOwner)?.appScope
+        if (processScope == null) {
+            // Fail closed: an unexpected Application type still persists, exactly as before.
+            runCatching { runBlocking { withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) { block() } } }
+            return
+        }
+        val job = processScope.async { withTimeoutOrNull(SHUTDOWN_PERSIST_TIMEOUT_MS) { block() } }
+        runCatching { runBlocking { job.await() } }
     }
 
     private fun stopVpnTunnel(reason: String? = null) = synchronized(tunnelLock) {
@@ -758,9 +771,14 @@ class AdShieldVpnService : VpnService() {
         synchronized(tunnelLock) {
             if (tunnelGeneration != null) stopVpnTunnel()
         }
-        // The daily counter is batched in memory; write the tail before the scope
-        // dies so the last second of activity is never lost.
-        runCatching { runBlocking { withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) { repository.flushDailyStats() } } }
+        // The daily counter is batched in memory; write the tail on the process scope so a
+        // cancellation racing this teardown cannot drop the last seconds of activity.
+        val flushScope = (application as? ProcessScopeOwner)?.appScope
+        if (flushScope != null) {
+            runCatching { runBlocking { withTimeoutOrNull(SHUTDOWN_PERSIST_TIMEOUT_MS) { flushScope.async { repository.flushDailyStats() }.await() } } }
+        } else {
+            runCatching { runBlocking { withTimeout(SHUTDOWN_PERSIST_TIMEOUT_MS) { repository.flushDailyStats() } } }
+        }
         serviceScope.cancel()
         super.onDestroy()
     }

@@ -40,6 +40,7 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:compileDebugUnitTestKotlin
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/EvolutionDetectorEvidenceTest.kt:34:39 Java type mismatch: inferred type is 'String?', but 'String' was expected.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/EvolutionDetectorEvidenceTest.kt:127:9 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'File?'.
+w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/EvolutionSafetyTest.kt:143:42 Java type mismatch: inferred type is 'String?', but 'String' was expected.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/ScanJournalTest.kt:156:23 Redundant creation of Json format. Creating instances for each use can be slow.
 w: file:///home/runner/work/AdShieldPro/AdShieldPro/app/src/test/java/com/adshield/pro/TelegramCloudTestSuite.kt:601:91 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
 
@@ -470,6 +471,62 @@ DnsResolverHardeningTest > cancelsSlowHedgeWithoutRecordingItsCancellationAsAnOu
 
 EvolutionDetectorEvidenceTest > exportsActualDetectorPredictionsWithoutUsingLabelsForInference PASSED
 
+EvolutionSafetyTest > evictedPermissionBaselinesRemainUnknownRatherThanReportedAsChanges PASSED
+
+EvolutionSafetyTest > lowMemoryAndStorageAvoidCachingAndMeteredNetworksAvoidOptionalSync PASSED
+
+EvolutionSafetyTest > missingAndAdverseReadingsNeverDisableEssentialProtection PASSED
+
+EvolutionSafetyTest > permissionHistoryUsesObservedSetsAndDoesNotInventGrantsOrMissingAppChanges PASSED
+
+EvolutionSafetyTest > savedConfigurationHistoryDoesNotExposeEndpointsPackagesOrInventNetworkTrust PASSED
+
+EvolutionSafetyTest > cacheEvictsAndDoesNotRememberFailuresOrZeroCapacityEntries PASSED
+
+EvolutionSafetyTest > incrementalMetadataCacheUsesFullPermissionInputNotFileTimestamps PASSED
+
+EvolutionSafetyTest > scanScheduleRestorationNoLongerRequiresDashboardCreation PASSED
+
+EvolutionSafetyTest > pacingAlwaysCompletesEveryItemUnderAllResourcePlans PASSED
+
+EvolutionSafetyTest > healthyReadingsAllowBoundedWorkNotUnlimitedResourceUse PASSED
+
+EvolutionUpdateTest > advisoryReadRechecksExpiryAndExactDigest PASSED
+
+EvolutionUpdateTest > persistsReplayWatermarkAcrossInstancesAndExpiry PASSED
+
+EvolutionUpdateTest > invalidStagedBytesCannotReplaceActiveRecord PASSED
+
+EvolutionUpdateTest > advisoryReadRejectsTamperedStoredData PASSED
+
+EvolutionUpdateTest > rejectsReplayFutureExpiryAndIncompatibleApp PASSED
+
+EvolutionUpdateTest > rejectsTruncatedAndOversizeInputs PASSED
+
+EvolutionUpdateTest > requiresHttpsAndExplicitTrustConfiguration PASSED
+
+EvolutionUpdateTest > expiredFallbackCannotReplaceValidActiveData PASSED
+
+EvolutionUpdateTest > identicalCurrentPackageIsDistinctFromConflictingReplay PASSED
+
+EvolutionUpdateTest > rejectsExecutablesInvalidHashesAndDuplicateEntries PASSED
+
+EvolutionUpdateTest > acceptsPublisherBoundCompatibleData PASSED
+
+EvolutionUpdateTest > advisoryTextNeverTreatsMissingInvalidOrDisabledDataAsSafety PASSED
+
+EvolutionUpdateTest > stagingIsNotActivation PASSED
+
+EvolutionUpdateTest > corruptedStoredStateDoesNotResetWatermark PASSED
+
+EvolutionUpdateTest > githubUsesDedicatedChannelAndRestrictedHttpsRedirects PASSED
+
+EvolutionUpdateTest > rejectsTamperingUnknownPublisherAndTrailingBytes PASSED
+
+EvolutionUpdateTest > concurrentStagerCannotBypassSequenceCheck PASSED
+
+EvolutionUpdateTest > rollbackKeepsDownloadWatermarkAndQuarantinesRejectedSequence PASSED
+
 FeatureExpansion211TestSuite > testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes PASSED
 
 FeatureExpansion211TestSuite > testHomeWidgetPresentationAcrossStates PASSED
@@ -852,6 +909,6 @@ WorldMonitorTestSuite > testDynamicFreshnessDecayOnCachedEntities PASSED
 
 [Incubating] Problems report is available at: file:///home/runner/work/AdShieldPro/AdShieldPro/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 34s
+BUILD SUCCESSFUL in 46s
 34 actionable tasks: 7 executed, 2 from cache, 25 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

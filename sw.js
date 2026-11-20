@@ -105,6 +105,9 @@ self.addEventListener('fetch', (event) => {
         return fresh;
       } catch {
         const cache = await openCache(SHELL_CACHE);
+        // `catch` (no request argument) means all she can say is "this failed";
+        // a plain network error is what a navigation expects when there is no
+        // offline shell, and it is what the browser renders as its offline page.
         return (await readCache(cache, INDEX)) || (await readCache(cache, SCOPE)) || Response.error();
       }
     })());

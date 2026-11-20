@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.DnsAddressFallbackTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-20T06:03:13.062Z" hostname="ip-10-0-138-219" time="0.051">
+<testsuite name="com.adshield.pro.DnsAddressFallbackTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:46:00.053Z" hostname="runnervmccnms" time="0.066">
   <properties/>
-  <testcase name="lateMatchingUdpTruncationDoesNotSpendTheTcpRetryBudget" classname="com.adshield.pro.DnsAddressFallbackTest" time="0.032"/>
-  <testcase name="usesOnlyTheFastFirstAddressAndNeverRetriesCompleteUdpOverTcp" classname="com.adshield.pro.DnsAddressFallbackTest" time="0.011"/>
+  <testcase name="lateMatchingUdpTruncationDoesNotSpendTheTcpRetryBudget" classname="com.adshield.pro.DnsAddressFallbackTest" time="0.041"/>
+  <testcase name="usesOnlyTheFastFirstAddressAndNeverRetriesCompleteUdpOverTcp" classname="com.adshield.pro.DnsAddressFallbackTest" time="0.017"/>
   <testcase name="laterAddressesStartWithinTheProviderBudgetAndLosingSocketsAreCancelled" classname="com.adshield.pro.DnsAddressFallbackTest" time="0.008"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

@@ -36,8 +36,8 @@ TDLib native runtime: 12 checksum-verified libraries present
 > Task :app:generateDebugLintReportModel
 > Task :app:preDebugUnitTestBuild
 > Task :app:generateDebugUnitTestLintModel
-> Task :app:lintAnalyzeDebug FROM-CACHE
-> Task :app:lintAnalyzeDebugAndroidTest FROM-CACHE
+> Task :app:lintAnalyzeDebugAndroidTest
+> Task :app:lintAnalyzeDebug
 > Task :app:lintAnalyzeDebugUnitTest
 
 > Task :app:lintReportDebug
@@ -46,6 +46,6 @@ Wrote SARIF report to file:///home/runner/work/AdShieldPro/AdShieldPro/app/build
 
 > Task :app:lintDebug
 
-BUILD SUCCESSFUL in 40s
-33 actionable tasks: 7 executed, 2 from cache, 24 up-to-date
+BUILD SUCCESSFUL in 3m 32s
+33 actionable tasks: 9 executed, 24 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

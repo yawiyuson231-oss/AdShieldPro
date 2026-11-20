@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.SystemTilesTestSuite" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-20T06:03:14.106Z" hostname="ip-10-0-138-219" time="0.004">
+<testsuite name="com.adshield.pro.SystemTilesTestSuite" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:46:02.013Z" hostname="runnervmccnms" time="0.008">
   <properties/>
-  <testcase name="testPrivateDnsAddMoveAndRemoveCustomHostnames" classname="com.adshield.pro.SystemTilesTestSuite" time="0.001"/>
+  <testcase name="testPrivateDnsAddMoveAndRemoveCustomHostnames" classname="com.adshield.pro.SystemTilesTestSuite" time="0.002"/>
   <testcase name="testDelayMinutesAreClampedBetweenOneMinuteAndTwentyFourHours" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
   <testcase name="testQuickSetupCommandFormattingAndChecklistEvaluation" classname="com.adshield.pro.SystemTilesTestSuite" time="0.001"/>
   <testcase name="testPrivateDnsCycleRespectsIncludedModesAndHostnames" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
@@ -12,7 +12,7 @@
   <testcase name="testPrivateDnsCycleFallsBackSafelyWhenAllStepsDisabled" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
   <testcase name="testPrivateDnsCycleAdvancesAndWrapsCorrectly" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
   <testcase name="testPrivateDnsAutoRevertPreservesOriginalTargetAcrossMultipleTapsAndCancelsOnReturn" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
-  <testcase name="testPrivateDnsHostnameValidationAcceptsDoTHostsAndRejectsInvalidInputs" classname="com.adshield.pro.SystemTilesTestSuite" time="0.0"/>
+  <testcase name="testPrivateDnsHostnameValidationAcceptsDoTHostsAndRejectsInvalidInputs" classname="com.adshield.pro.SystemTilesTestSuite" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

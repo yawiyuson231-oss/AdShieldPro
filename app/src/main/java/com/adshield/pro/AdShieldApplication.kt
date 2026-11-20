@@ -21,15 +21,29 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Marks coroutine scopes that live exactly as long as the process, so shutdown-critical
+ * writes can be awaited without risking a dependency cycle (the VPN service needs the
+ * context to reach the repository, and the repository cannot see the service).
+ *
+ * Without this marker, `stopSelf()` cancels the service's own scope underneath three
+ * DataStore writes that are the only thing preventing protection from silently coming
+ * back after the next reboot.
+ */
+interface ProcessScopeOwner {
+    /** A scope tied to the application, not to any component's lifetime. */
+    val appScope: CoroutineScope
+}
+
 @HiltAndroidApp
-class AdShieldApplication : Application(), Configuration.Provider {
+class AdShieldApplication : Application(), Configuration.Provider, ProcessScopeOwner {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var preferencesRepository: UserPreferencesRepository
     @Inject lateinit var intelligenceMonitor: IntelligenceMonitor
     @Inject lateinit var credentialStore: ProviderCredentialStore
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    override val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()

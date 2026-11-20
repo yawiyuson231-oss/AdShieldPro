@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.EvolutionUpdateTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:46:00.545Z" hostname="runnervmccnms" time="0.54">
+  <properties/>
+  <testcase name="advisoryReadRechecksExpiryAndExactDigest" classname="com.adshield.pro.EvolutionUpdateTest" time="0.396"/>
+  <testcase name="persistsReplayWatermarkAcrossInstancesAndExpiry" classname="com.adshield.pro.EvolutionUpdateTest" time="0.02"/>
+  <testcase name="invalidStagedBytesCannotReplaceActiveRecord" classname="com.adshield.pro.EvolutionUpdateTest" time="0.006"/>
+  <testcase name="advisoryReadRejectsTamperedStoredData" classname="com.adshield.pro.EvolutionUpdateTest" time="0.006"/>
+  <testcase name="rejectsReplayFutureExpiryAndIncompatibleApp" classname="com.adshield.pro.EvolutionUpdateTest" time="0.014"/>
+  <testcase name="rejectsTruncatedAndOversizeInputs" classname="com.adshield.pro.EvolutionUpdateTest" time="0.013"/>
+  <testcase name="requiresHttpsAndExplicitTrustConfiguration" classname="com.adshield.pro.EvolutionUpdateTest" time="0.001"/>
+  <testcase name="expiredFallbackCannotReplaceValidActiveData" classname="com.adshield.pro.EvolutionUpdateTest" time="0.015"/>
+  <testcase name="identicalCurrentPackageIsDistinctFromConflictingReplay" classname="com.adshield.pro.EvolutionUpdateTest" time="0.008"/>
+  <testcase name="rejectsExecutablesInvalidHashesAndDuplicateEntries" classname="com.adshield.pro.EvolutionUpdateTest" time="0.008"/>
+  <testcase name="acceptsPublisherBoundCompatibleData" classname="com.adshield.pro.EvolutionUpdateTest" time="0.003"/>
+  <testcase name="advisoryTextNeverTreatsMissingInvalidOrDisabledDataAsSafety" classname="com.adshield.pro.EvolutionUpdateTest" time="0.001"/>
+  <testcase name="stagingIsNotActivation" classname="com.adshield.pro.EvolutionUpdateTest" time="0.005"/>
+  <testcase name="corruptedStoredStateDoesNotResetWatermark" classname="com.adshield.pro.EvolutionUpdateTest" time="0.004"/>
+  <testcase name="githubUsesDedicatedChannelAndRestrictedHttpsRedirects" classname="com.adshield.pro.EvolutionUpdateTest" time="0.002"/>
+  <testcase name="rejectsTamperingUnknownPublisherAndTrailingBytes" classname="com.adshield.pro.EvolutionUpdateTest" time="0.008"/>
+  <testcase name="concurrentStagerCannotBypassSequenceCheck" classname="com.adshield.pro.EvolutionUpdateTest" time="0.003"/>
+  <testcase name="rollbackKeepsDownloadWatermarkAndQuarantinesRejectedSequence" classname="com.adshield.pro.EvolutionUpdateTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.SecurityCenterTestSuite" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-11-20T06:03:14.013Z" hostname="ip-10-0-138-219" time="0.091">
+<testsuite name="com.adshield.pro.SecurityCenterTestSuite" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:46:01.858Z" hostname="runnervmccnms" time="0.153">
   <properties/>
-  <testcase name="testUrlScanner_flagsTyposquatting" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testUrlScanner_flagsPhishingPatterns" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
-  <testcase name="testApkAnalyzer_axmlParser_extractsPackageAndPermissions" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
-  <testcase name="testApkAnalyzer_flagsSmsInterceptionDropperProfile" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.005"/>
-  <testcase name="testFileScanner_checksSignaturesAcrossWindowsBeforeTheTail" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.006"/>
+  <testcase name="testUrlScanner_flagsTyposquatting" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
+  <testcase name="testUrlScanner_flagsPhishingPatterns" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
+  <testcase name="testApkAnalyzer_axmlParser_extractsPackageAndPermissions" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.003"/>
+  <testcase name="testApkAnalyzer_flagsSmsInterceptionDropperProfile" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.009"/>
+  <testcase name="testFileScanner_checksSignaturesAcrossWindowsBeforeTheTail" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.01"/>
   <testcase name="testFileScanner_cleanFilePasses" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
   <testcase name="testBrowserBlocker_blocksThirdPartyAdHostsButNotFirstPartyContent" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testFileScanner_reportsUnreadableArchiveMetadataAndPropagatesCancellation" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
+  <testcase name="testFileScanner_reportsUnreadableArchiveMetadataAndPropagatesCancellation" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
   <testcase name="testAppAuditor_flagsAccessibilitySmsTrojanProfile" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testFileScanner_detectsPolyglotExecutableInImage" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
+  <testcase name="testFileScanner_detectsPolyglotExecutableInImage" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.003"/>
   <testcase name="testUrlScanner_usesKnownThreatLookup" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
   <testcase name="testUrlScanner_cleanUrlPasses" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testFileScanner_detectsEicarTestSignature" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testApkAnalyzer_limitsDexReadsAcrossEntries" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.059"/>
-  <testcase name="testFilterEngine_blocksSubdomainsAndHonoursExceptions" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
-  <testcase name="testFileScanner_doesNotTreatIncidentalMzBytesAsAnExecutable" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.006"/>
-  <testcase name="testUrlScanner_flagsEmbeddedCredentialsAndRawIpLogins" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
+  <testcase name="testFileScanner_detectsEicarTestSignature" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
+  <testcase name="testApkAnalyzer_limitsDexReadsAcrossEntries" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.098"/>
+  <testcase name="testFilterEngine_blocksSubdomainsAndHonoursExceptions" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
+  <testcase name="testFileScanner_doesNotTreatIncidentalMzBytesAsAnExecutable" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.016"/>
+  <testcase name="testUrlScanner_flagsEmbeddedCredentialsAndRawIpLogins" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.0"/>
   <testcase name="testFileScanner_detectsZipSlipArchive" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.002"/>
   <testcase name="testFileScanner_flagsMacroOfficeDocuments" classname="com.adshield.pro.SecurityCenterTestSuite" time="0.001"/>
   <system-out><![CDATA[]]></system-out>

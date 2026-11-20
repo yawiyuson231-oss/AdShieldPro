@@ -180,21 +180,22 @@ async function loadInstalledFeeds(engine) {
 }
 
 async function enableAggressiveTier(enable) {
-  const descriptor = BUNDLED.aggressive;
   if (enable) {
     try {
-      const text = await fetchText(descriptor.file);
-      state.engine.loadFilterList(text, descriptor.category, descriptor.source);
-      state.settings.aggressiveTier = true;
+      await fetchText(BUNDLED.aggressive.file);
     } catch (err) {
       toast(`Could not load the aggressive tier: ${err.message}`, 'bad');
       return false;
     }
+    state.settings.aggressiveTier = true;
   } else {
-    // Rebuild the engine without the aggressive source.
     state.settings.aggressiveTier = false;
-    await rebuildEngine();
   }
+  // One code path for both directions: a fresh engine is the only way to *remove*
+  // a feed source, and using it for enabling too means the on/off toggle cannot
+  // drift between the two branches.
+  await rebuildEngine();
+  refreshRuleSummary();
   scheduleSnapshot('aggressive-tier');
   renderAll();
   return true;
@@ -214,16 +215,34 @@ async function rebuildEngine() {
   if (state.settings.aggressiveTier) {
     try { engine.loadFilterList(await fetchText(BUNDLED.aggressive.file), 'ADS', BUNDLED.aggressive.source); } catch { /* ignore */ }
   }
-  await loadInstalledFeeds(engine);
-  state.customRules.forEach((rule) => {
-    rule.applied = rule.enabled !== false
-      ? engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType)
-      : false;
-  });
+  for (const feed of FEED_REGISTRY) {
+    try {
+      const check = await state.feeds?.verify(feed.id);
+      if (!check?.ok) continue;
+      const text = await state.feeds.content(feed.id);
+      if (text) await engine.loadFilterListAsync(text, { category: feed.category, source: feed.id });
+    } catch { /* bundled rules remain */ }
+  }
   state.engine = engine;
+  // Rule objects live inside an engine, so a *new* one starts with no user rules:
+  // re-apply the whole set (custom rules + imported exceptions) or every user
+  // allow/block would be silently lost on the next rebuild.
+  applyUserRules(engine);
   state.aether.attachEngine(engine);
   state.aether.reputation.cache.clear();
   state.client.setEngine(engine);
+}
+
+/**
+ * Rule-set changes after boot (feed updates, imports, tier changes) used to leave
+ * the header pill and the tab title claiming the rule count measured at startup.
+ * Both are re-derived from the engine instead of being incremented.
+ */
+function refreshRuleSummary() {
+  if (!state.booted || !state.engine) return;
+  const total = state.engine.totalRules();
+  setBootStatus(`ready · ${number(total)} rules`, 'ok');
+  try { document.title = `OmniShield X — ${number(total)} rules active`; } catch { /* headless */ }
 }
 
 function flushAnalytics() {
@@ -311,12 +330,39 @@ function buildState({ includeModel = false } = {}) {
   };
 }
 
-function applyUserRules() {
-  state.engine.clearUserRules();
+function applyUserRules(engine = state.engine) {
+  // Clears only *user* rules; bundled and installed feed rules stay loaded. Every
+  // caller owns `state.customRules` as the single source of truth, so a rule that
+  // left that list disappears from the engine here — that is what makes "Remove"
+  // in the rules table correct even when two imported rules overlapped.
+  engine.clearUserRules();
   for (const rule of state.customRules) {
     if (rule.enabled === false) { rule.applied = false; continue; }
-    rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
+    rule.applied = engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
   }
+  // Imported site exceptions ("never filter this site") are user intent too, and
+  // they live outside `customRules`; without this they were dropped by the clear.
+  applyImportedExceptions(engine);
+}
+
+/**
+ * Site exceptions and app exclusions imported from an Android backup are real
+ * user intent, so they must reach the engine. `browserSiteExceptions` is the
+ * documented "never filter this site" list; it used to be stored, exported and
+ * displayed while doing nothing at all. Malformed entries are skipped and
+ * counted instead of being turned into a wildcard that matches everything.
+ */
+function applyImportedExceptions(engine = state.engine) {
+  const exceptions = state.importedBackup?.browserSiteExceptions;
+  if (!engine || !Array.isArray(exceptions)) return 0;
+  let applied = 0;
+  for (const entry of exceptions) {
+    const raw = typeof entry === 'string' ? entry : (entry?.pattern ?? entry?.domain ?? entry?.host);
+    const normalized = OmniShieldFilterEngine.normalizeDomain(raw);
+    if (!normalized) continue;
+    if (engine.addUserRule(normalized, true, 'SUFFIX')) applied++;
+  }
+  return applied;
 }
 
 function applySavedState(saved = {}) {
@@ -356,11 +402,17 @@ function applySavedState(saved = {}) {
     }
   }
   if (saved.protectionMode || Array.isArray(saved.browserSiteExceptions) || Array.isArray(saved.excludedAppPackages)) {
+    // Only overwrite the fields this snapshot actually carries. A backup saved by
+    // the Android app has no `excludedAppPackages`, and clobbering the remembered
+    // import with [] silently dropped the user's app exclusions from the next export.
     state.importedBackup = {
-      ...(state.importedBackup || {}),
-      protectionMode: saved.protectionMode ?? 'BALANCED',
-      browserSiteExceptions: Array.isArray(saved.browserSiteExceptions) ? saved.browserSiteExceptions : [],
-      excludedAppPackages: Array.isArray(saved.excludedAppPackages) ? saved.excludedAppPackages : []
+      protectionMode: saved.protectionMode ?? state.importedBackup?.protectionMode ?? 'BALANCED',
+      browserSiteExceptions: Array.isArray(saved.browserSiteExceptions)
+        ? saved.browserSiteExceptions
+        : (state.importedBackup?.browserSiteExceptions ?? []),
+      excludedAppPackages: Array.isArray(saved.excludedAppPackages)
+        ? saved.excludedAppPackages
+        : (state.importedBackup?.excludedAppPackages ?? [])
     };
   }
 }
@@ -500,9 +552,25 @@ function navigate(page) {
   if (location.hash !== `#${page}`) history.replaceState(null, '', `#${page}`);
 }
 
+/**
+ * Renders the pages currently visible to the user.
+ *
+ * Historically this ran every renderer, which meant a single Save after a feed
+ * update re-read and re-drew all ten pages (and re-fetched the extension facts
+ * file) — the app stuttered for a second on every change. Only the visible page
+ * and the dashboard (whose KPI cards summarise global state) are drawn now; the
+ * rest render when they are navigated to.
+ */
 function renderAll() {
-  for (const render of Object.values(PAGE_RENDERERS)) {
-    try { Promise.resolve(render()).catch((err) => console.error('render failed', err)); } catch (err) { console.error('render failed', err); }
+  const pages = new Set([state.currentPage || 'dashboard', 'dashboard']);
+  for (const page of pages) {
+    const render = PAGE_RENDERERS[page];
+    if (!render) continue;
+    try {
+      // Renderers may be async (they read shipped artifacts); a rejection must be
+      // reported, never left as an unhandled promise.
+      Promise.resolve(render()).catch((err) => console.error(`render failed (${page})`, err));
+    } catch (err) { console.error(`render failed (${page})`, err); }
   }
 }
 
@@ -521,8 +589,11 @@ function renderDashboard() {
   const clf = state.aether.classifier;
   const observations = state.aether.observations.size;
 
+  // `breakdown.total` also counts exceptions and wildcard *allow* rules, so calling
+  // it "block rules" overstated the blocklist by the number of allow entries. The
+  // KPI now names exactly what it counts.
   mount('#dash-kpis',
-    kpi(number(breakdown.total), 'block rules active in this browser'),
+    kpi(number(breakdown.total), 'rule entries loaded (blocks + exceptions)'),
     kpi(number(breakdown.blockDomains), 'filtered domains'),
     kpi(number(breakdown.safetyEntries), 'safety allowlist entries (never blocked)'),
     kpi(clf.isTrained ? clf.metrics.auc.toFixed(3) : '—', 'AETHER model AUC (held-out)', clf.isTrained ? 'ok' : 'warn')
@@ -732,14 +803,12 @@ function analyseDomain(input) {
 }
 
 function toggleDomainRule(domain, currentlyBlocked) {
-  if (currentlyBlocked) {
-    state.engine.removeUserRule(domain, false);
-    const added = state.engine.addUserRule(`||${domain}^`, true);
-    if (!added) { toast(`Could not add an allow rule for ${domain}.`, 'bad'); return; }
-    state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
-    state.customRules.push({ pattern: domain, isAllow: true, enabled: true, applied: true });
-    toast(`${domain} added to your allowlist.`, 'ok');
-  } else {
+  // Drop *both* directions first. Leaving the opposite rule in place made the
+  // engine hold an allow and a block for the same host, with the allow winning
+  // no matter what the UI then claimed.
+  state.engine.removeUserRule(domain, false);
+  state.engine.removeUserRule(domain, true);
+  if (!currentlyBlocked) {
     const prevRejected = state.engine.rejectedRules.length;
     const added = state.engine.addUserRule(`||${domain}^`, false);
     if (!added) {
@@ -749,11 +818,13 @@ function toggleDomainRule(domain, currentlyBlocked) {
       toast(why, 'warn');
       return;
     }
-    state.engine.removeUserRule(domain, true);
-    state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
-    state.customRules.push({ pattern: domain, isAllow: false, enabled: true, applied: true });
-    toast(`${domain} blocked by your rule.`, 'ok');
+  } else {
+    const added = state.engine.addUserRule(`||${domain}^`, true);
+    if (!added) { toast(`Could not add an allow rule for ${domain}.`, 'bad'); return; }
   }
+  state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
+  state.customRules.push({ pattern: domain, isAllow: currentlyBlocked, matchType: 'SUFFIX', enabled: true, applied: true });
+  toast(currentlyBlocked ? `${domain} added to your allowlist.` : `${domain} blocked by your rule.`, 'ok');
   state.aether.reputation.cache.clear();
   scheduleSnapshot('custom-rule');
   analyseDomain(domain);
@@ -765,8 +836,11 @@ function reportFalsePositive(domain) {
   const result = state.aether.reportFalsePositive(domain);
   if (!result.ok) { toast(result.error || 'Could not record the report.', 'bad'); return; }
   if (result.allowRuleAdded) {
+    // Aether adds the allow rule itself; the opposing block rule must go or the
+    // allow it just granted is fighting a stale block in the engine.
+    state.engine.removeUserRule(domain, false);
     state.customRules = state.customRules.filter((r) => OmniShieldFilterEngine.normalizeDomain(r.pattern) !== domain);
-    state.customRules.push({ pattern: domain, isAllow: true, enabled: true, applied: true });
+    state.customRules.push({ pattern: domain, isAllow: true, matchType: 'SUFFIX', enabled: true, applied: true });
   }
   toast(result.note, 'ok');
   scheduleSnapshot('false-positive');
@@ -1360,6 +1434,8 @@ async function renderFeeds() {
         onclick: async () => {
           const target = !state.settings.aggressiveTier;
           if (target && !confirm('The aggressive tier blocks tag managers and social SDKs. Some sites may break. You can undo this instantly, and every block stays labelled. Continue?')) return;
+          // Only claim success when the tier actually changed: the old code toasted
+          // "enabled" even after the load failed and returned false.
           if (!await enableAggressiveTier(target)) return;
           toast(target ? 'Aggressive tier enabled — reversible at any time.' : 'Aggressive tier disabled.', target ? 'warn' : 'ok');
         }
@@ -1397,6 +1473,7 @@ async function checkFeedUpdates() {
     }
     lines.push(note('Feed updates are validated before use: structure, SHA-256 integrity, and rollback protection against truncated lists.', 'ok'));
     mount(status, ...lines);
+    refreshRuleSummary();
     await saveSnapshot('feed-update');
     renderAll();
   } finally {
@@ -1734,6 +1811,7 @@ async function checkFeedUpdatesQuietly() {
           state.engine.loadFilterList(text, feed.category, feed.id);
           state.aether?.reputation.cache.clear();
           toast(`${feed.name} updated (${number(result.meta.rules)} rules).`, 'ok');
+          refreshRuleSummary();
           renderDashboard();
         }
       } catch { /* stay on bundled rules */ }

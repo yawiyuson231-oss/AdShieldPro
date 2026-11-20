@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.adshield.pro.AetherSecurityReviewTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-20T06:03:09.008Z" hostname="ip-10-0-138-219" time="0.174">
+<testsuite name="com.adshield.pro.AetherSecurityReviewTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:45:55.753Z" hostname="runnervmccnms" time="0.222">
   <properties/>
-  <testcase name="boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.026"/>
-  <testcase name="staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.001"/>
-  <testcase name="deadlineOrFailureLeavesOtherSpecialistsEvidenceIntact" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.077"/>
-  <testcase name="keepsAppAndPolicyOverlapAdvisoryWhenOtherRulesCanTakePrecedence" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
-  <testcase name="runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
+  <testcase name="boundedFileReadRejectsOversizeAndStaticScannerChecksTheSelectedCopy" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.041"/>
+  <testcase name="staleOrRepeatedFilePickerCallbacksCannotAuthorizeAScan" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.0"/>
+  <testcase name="deadlineOrFailureLeavesOtherSpecialistsEvidenceIntact" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.104"/>
+  <testcase name="keepsAppAndPolicyOverlapAdvisoryWhenOtherRulesCanTakePrecedence" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.003"/>
+  <testcase name="runsExactlyThreeReadOnlySpecialistsAndReportsSkippedApps" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.003"/>
   <testcase name="joinsExactPackageIdsAcrossFullAuditBeforeDisplayLimits" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
   <testcase name="readsCurrentTunnelOnceAfterSpecialistsToAvoidReportingAnOlderGeneration" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
-  <testcase name="runsIndependentSpecialistsAndCancelsAllWithoutAReport" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.005"/>
-  <testcase name="externalDeadlineCancelsTheReviewRatherThanReportingAMissingReading" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.052"/>
+  <testcase name="runsIndependentSpecialistsAndCancelsAllWithoutAReport" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.007"/>
+  <testcase name="externalDeadlineCancelsTheReviewRatherThanReportingAMissingReading" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.053"/>
   <testcase name="declaredServiceBindingIsEvidenceButSpoofedPermissionSuffixesAreNot" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.001"/>
   <testcase name="cancelDuringFileReadPreventsWritingTheNextChunk" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
-  <testcase name="noInspectedAppsIsUnknownNotZeroMatches" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.002"/>
+  <testcase name="noInspectedAppsIsUnknownNotZeroMatches" classname="com.adshield.pro.AetherSecurityReviewTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

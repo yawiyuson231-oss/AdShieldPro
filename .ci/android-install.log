@@ -1,13 +1,31 @@
-Performing Streamed Install
-Success
-package:/data/app/com.adshield.pro.debug-Hz9kCCTDuLwA9NdmDAONtg==/base.apk
-com.adshield.pro.debug/com.adshield.pro.MainActivity
-Starting: Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.adshield.pro.debug/com.adshield.pro.MainActivity }
-Status: ok
-LaunchState: COLD
-Activity: com.adshield.pro.debug/com.adshield.pro.MainActivity
-TotalTime: 3035
-WaitTime: 3115
-Complete
-    mResumedActivity: ActivityRecord{2adc138 u0 com.adshield.pro.debug/com.adshield.pro.MainActivity t6}
-PASSED: Installed and opened com.adshield.pro.debug on Android 10 (API 29, x86_64).
+::error::Android Package Manager rejected the debug APK: Performing Streamed Install
+adb: failed to install app/build/outputs/apk/debug/app-debug.apk: cmd: Failure calling service package: Broken pipe (32)
+11-20 09:50:57.126  1908  2711 E AndroidRuntime: *** FATAL EXCEPTION IN SYSTEM PROCESS: backup-0
+11-20 09:50:57.126  1908  2711 E AndroidRuntime: java.lang.OutOfMemoryError: Failed to allocate a 16 byte allocation with 5569216 free bytes and 5866KB until OOM, target footprint 16339312, growth limit 16777216
+11-20 09:50:57.126  1908  2711 E AndroidRuntime: 	at android.os.ThreadLocalWorkSource.setUid(ThreadLocalWorkSource.java:68)
+11-20 09:50:57.126  1908  2711 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:212)
+11-20 09:50:57.126  1908  2711 E AndroidRuntime: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+11-20 09:50:58.056  3149  3453 E AndroidRuntime: FATAL EXCEPTION: IntentService[MediaProvider]
+11-20 09:50:58.056  3149  3453 E AndroidRuntime: Process: android.process.media, PID: 3149
+11-20 09:50:58.056  3149  3453 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:58.067  2393  2393 E AndroidRuntime: FATAL EXCEPTION: main
+11-20 09:50:58.067  2393  2393 E AndroidRuntime: Process: com.android.phone, PID: 2393
+11-20 09:50:58.067  2393  2393 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:58.167  3686  3892 E AndroidRuntime: FATAL EXCEPTION: StartupThread#4
+11-20 09:50:58.167  3686  3892 E AndroidRuntime: Process: com.google.android.apps.messaging, PID: 3686
+11-20 09:50:58.167  3686  3892 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:58.170  3686  3686 E AndroidRuntime: FATAL EXCEPTION: main
+11-20 09:50:58.170  3686  3686 E AndroidRuntime: Process: com.google.android.apps.messaging, PID: 3686
+11-20 09:50:58.170  3686  3686 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:58.455  3455  4026 E AndroidRuntime: FATAL EXCEPTION: pool-1-thread-1
+11-20 09:50:58.455  3455  4026 E AndroidRuntime: Process: com.google.android.apps.photos, PID: 3455
+11-20 09:50:58.455  3455  4026 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:58.988  2312  2312 E AndroidRuntime: FATAL EXCEPTION: main
+11-20 09:50:58.988  2312  2312 E AndroidRuntime: Process: com.google.android.gms, PID: 2312
+11-20 09:50:58.988  2312  2312 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:59.014  2548  2742 E AndroidRuntime: FATAL EXCEPTION: launcher-loader
+11-20 09:50:59.014  2548  2742 E AndroidRuntime: Process: com.google.android.apps.nexuslauncher, PID: 2548
+11-20 09:50:59.014  2548  2742 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause
+11-20 09:50:59.024  2821  3085 E AndroidRuntime: FATAL EXCEPTION: EventBus0
+11-20 09:50:59.024  2821  3085 E AndroidRuntime: Process: com.google.android.googlequicksearchbox:search, PID: 2821
+11-20 09:50:59.024  2821  3085 E AndroidRuntime: DeadSystemException: The system died; earlier logs will point to the root cause

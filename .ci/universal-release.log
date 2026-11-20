@@ -2,7 +2,7 @@ Universal build gate
   variant        : release, com.adshield.pro.secure
   version        : 2.11.1 (versionCode 21101)
   sdk            : min 29 / target 36 / compile 37
-  apk            : app-release.apk, 56.44 MB, 1 dex file(s)
+  apk            : app-release.apk, 56.47 MB, 1 dex file(s)
   native libs    : arm64-v8a, armeabi-v7a, x86, x86_64 (all ABIs: libandroidx.graphics.path.so, libcryptox.so, libdatastore_shared_counter.so, libsslx.so, libtdjni.so)
 
 PASSED — single ABI-independent APK for Android 10+ (API 29-37) on any CPU architecture.

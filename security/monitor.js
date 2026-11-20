@@ -12,6 +12,20 @@
 const MAX_EVENTS = 800;
 const MAX_DOMAINS = 400;
 
+/**
+ * Nearest-rank percentile on an already-sorted array.
+ *
+ * The previous index was `floor(p * n)`, which at p=0.95 and n=100 returned the
+ * 95th element (index 95 of 100) — the 96th smallest — and at small samples
+ * pointed one element too high, so p95 was reported a notch worse than measured.
+ * Nearest-rank: ceil(p*n) - 1, clamped into range.
+ */
+function percentileOf(sorted, p) {
+  if (!sorted.length) return null;
+  const rank = Math.ceil(p * sorted.length) - 1;
+  return sorted[Math.min(sorted.length - 1, Math.max(0, rank))];
+}
+
 export class SecurityMonitor {
   /**
    * @param {{clock?:()=>number, bucketMs?:number, buckets?:number}} [options]
@@ -109,6 +123,21 @@ export class SecurityMonitor {
     for (const key of this.buckets.keys()) if (key < cutoff) this.buckets.delete(key);
   }
 
+  /**
+   * Drops series buckets older than the chart window.
+   *
+   * Pruning only happened when a *new* bucket was created — i.e. when real
+   * traffic arrived. A tab left open overnight recorded nothing, so 24 h of empty
+   * minute buckets piled up and the 30-point chart then drew a fog of zeroes with
+   * no indication that they were hours old. Reading the chart prunes first, so the
+   * window always means what it says.
+   */
+  _pruneForRead() {
+    const nowStart = Math.floor(this.clock() / this.bucketMs) * this.bucketMs;
+    this._pruneBuckets(nowStart);
+    return nowStart;
+  }
+
   subscribe(fn) {
     this.subscribers.add(fn);
     return () => this.subscribers.delete(fn);
@@ -116,7 +145,7 @@ export class SecurityMonitor {
 
   /** Rolling series for the dashboard chart (oldest first). */
   series(field = 'lookups', points = 30) {
-    const now = Math.floor(this.clock() / this.bucketMs) * this.bucketMs;
+    const now = this._pruneForRead();
     const out = [];
     for (let i = points - 1; i >= 0; i--) {
       const start = now - i * this.bucketMs;
@@ -129,11 +158,10 @@ export class SecurityMonitor {
   latencyPercentiles() {
     if (!this.latencies.length) return { count: 0, p50: null, p95: null, max: null };
     const sorted = [...this.latencies].sort((a, b) => a - b);
-    const at = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
     return {
       count: sorted.length,
-      p50: Math.round(at(0.5) * 10) / 10,
-      p95: Math.round(at(0.95) * 10) / 10,
+      p50: Math.round(percentileOf(sorted, 0.5) * 10) / 10,
+      p95: Math.round(percentileOf(sorted, 0.95) * 10) / 10,
       max: Math.round(sorted[sorted.length - 1] * 10) / 10
     };
   }
@@ -153,6 +181,7 @@ export class SecurityMonitor {
   }
 
   metrics() {
+    this._pruneForRead();
     const averageLatency = this.totals.latencyCount
       ? Math.round((this.totals.latencySum / this.totals.latencyCount) * 10) / 10
       : null;
