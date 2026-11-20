@@ -6,14 +6,14 @@ GitHub Releases is the selected host. The repository is public, so app downloads
 
 `https://github.com/yawiyuson231-oss/AdShieldPro/releases/download/evolution-data/reputation.evo`
 
-This URL is configured in code as the dedicated channel contract, **not evidence that an asset is already published**. No release, production signing key, secret, environment or app configuration was created by this change. A subsequent protected-environment provisioning attempt on 2026-11-20 was denied with HTTP 403 `Resource not accessible by integration`; admin environment/secret permissions need to be granted or an administrator must provision the environment through GitHub. No weaker repository-secret fallback was used. The updater remains default-off. These changes have not yet passed Android CI or runtime transport tests.
+This URL is configured in code as the dedicated channel contract, **not evidence that an asset is already published**. No release, production signing key, secret, environment or app configuration was created by this change. A subsequent protected-environment provisioning attempt on 2026-11-20 was denied with HTTP 403 `Resource not accessible by integration`; admin environment/secret permissions need to be granted or an administrator must provision the environment through GitHub. No weaker repository-secret fallback was used. The updater remains default-off. The integrated app passed Android CI [44700560932](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44700560932), including 427 JVM and six Android 10 instrumentation tests, and a separate public debug APK was published. Live publisher/CDN transport and production signing were not exercised.
 
 ## Validation of this addition
 
 - 18 isolated Kotlin/JVM updater test methods passed using the documented local JUnit-compatible assertion shim, including redirect allowlist, HTTPS/port/credential restrictions and redirect limits. This is not Android instrumentation or an HTTP transport integration test.
 - 77 Python evolution tests passed, including seven new publisher tests using ephemeral test-only RSA keys.
 - A separately executed interoperability check signed a harmless package with the Python publisher and verified its signature, sequence and indicator schema with the Kotlin verifier. The temporary private test key was removed; only ignored test output remains under `.cache/`.
-- The 109 original boundary hashes remain pinned; only the exact disclosed additive consent-card insertion is normalized out, with all other bytes unchanged. No publisher workflow has been executed and no live CDN transfer, production signing or Android runtime claim follows from these checks.
+- The 109 original boundary hashes remain pinned; only the exact disclosed additive consent-card insertion is normalized out, with all other bytes unchanged. No data-publisher workflow has been executed and no live feed/CDN or production-signing claim follows from these checks. Separate full Android CI now verifies compilation, packaging, lint, all JVM tests and the six-case emulator gate; see the validation record.
 
 ## Channel isolation
 
@@ -52,6 +52,6 @@ Omit `--previous` only for an independently approved first publication. This too
 
 ## Shipping app integration
 
-Review the public configuration artifact against the independently trusted publisher key, then package it at `app/src/main/assets/evolution-publisher.properties` in an authorized app build. Never download and trust this configuration at runtime. The explicit consent UI, advisory-only scanner integration and atomic activation/rollback are now implemented. Complete Android build/instrumentation and real transport tests before enabling live use. Neither a published feed nor a staged download updates an already-installed app's executable code.
+Review the public configuration artifact against the independently trusted publisher key, then package it at `app/src/main/assets/evolution-publisher.properties` in an authorized app build. Never download and trust this configuration at runtime. The explicit consent UI, advisory-only scanner integration and atomic activation/rollback are now implemented. Android build/instrumentation now pass on the recorded source. Real publisher/CDN transport testing and secure provisioning still precede live use. Neither a published feed nor a staged download updates an already-installed app's executable code.
 
 The signed validity window is at most seven days. Publish renewed, reviewed data with a higher sequence before expiry; an expired feed is not used as current evidence. Service outages and unmatched hashes are not evidence that files are safe. Data freshness, trusted time, key compromise, rollback after reinstall and holdout quality still require operational planning.

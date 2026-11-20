@@ -27,6 +27,15 @@ Updated 2026-11-20. Results are tied to source revisions; historical `.ci` mirro
    - Final engineering review hardened explicit confidence assessment (without rewriting imported evidence), streaming file hashes, and APK snapshot/certificate binding against a concurrently replaced build output. These changes preserve Android runtime/build input bytes relative to the prior passing checkpoint and are covered by 89 local Python tests.
    - Subsequent validation/audit documentation updates do not change tested executable inputs. No production release, public APK preview or main-branch merge was performed.
 
+5. [Opt-in updater and public test APK run 44700560932](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44700560932), source `6df673e0c4057bbb8a71ff40939854b08594799e`:
+   - **Whole Android workflow passed**, including **427 JVM tests** (source declaration count and CI exact-count/no-skip assertion), lint, debug/instrumentation and throwaway-key R8 release builds, signatures/packages and detector evidence.
+   - **All six Android 10 instrumentation cases passed**: four existing Agent cases plus consent/default-off and private-filesystem activation/rollback checks. This is not a live publisher/CDN, broad device-matrix or production-signing certification.
+   - Push-triggered Android run 44700552068 also passed; evolution governance 44700552024, web CI 44700552026 and website assembly 44700552133 passed on the same source.
+   - The original 109 boundary hashes stay pinned. Only the exact disclosed additive consent-card insertion is normalized out of SettingsScreen; tests reject modified/duplicated insertions. DNS/filter/service/manifest bytes are unchanged.
+   - Explicitly requested [public debug test APK](https://github.com/yawiyuson231-oss/AdShieldPro/releases/tag/preview-v2.11.1-run.44700560932.1) was published, separate from production and not Latest. APK SHA-256: `761ab06466f21cfcbe6e043552f995f63329c7077579d92eaa5b49aadb7e75ff`.
+   - Protected publisher-environment provisioning was attempted but denied by GitHub HTTP 403 `Resource not accessible by integration`. No production key, secret, publisher environment, real indicator feed, main merge or production APK release was created. Advisory updates remain unavailable until secure publisher configuration and reviewed data are provided.
+   - Downloading full Actions logs locally returned EOF; workflow step conclusions, source test-count gate and published release provenance were available. Historical `.ci` files are not substituted as logs for this run.
+
 ## Actual detection evidence
 
 The first Android run exported real predictions for the 26 synthetic fixtures. Artifact arithmetic: **TP=14, FN=1, FP=0, TN=11**. The missed case was `phishing:generic-lure`. This remains a visible blind spot; its label was not changed and no heuristic/blocking threshold was adjusted merely to improve the score.
@@ -35,7 +44,7 @@ These public fixtures are development regressions, not a private holdout or evid
 
 ## Local checks
 
-Local checks passed: 89 Python evolution/delivery tests, fixture reproducibility, the 109-file frozen DNS/VPN/manifest/UI gate, bundled AETHER model reproducibility, UI-performance source gates, `npm run ci` (262 web JS tests and 102 static verification checks), and 22 cloud API tests. The aggregate fixed-command runner covers these checks; no tool/dependency installation, publication or APK installation is performed by that runner.
+Latest local checks passed: 96 Python evolution/delivery tests, fixture reproducibility, the 109-file original-boundary gate with the exact disclosed consent insertion exception, bundled AETHER model reproducibility, UI-performance source gates, `npm run ci` (262 web JS tests and 102 static verification checks), and 22 cloud API tests. The aggregate fixed-command runner covers these checks; no tool/dependency installation, publication or APK installation is performed by that runner.
 
 The Phase 3 process-crash test deliberately exits a subprocess during an uncommitted SQLite transaction, then verifies original graph rows and integrity. This is a real SQLite transaction-recovery check, not an Android crash/reboot certification.
 
