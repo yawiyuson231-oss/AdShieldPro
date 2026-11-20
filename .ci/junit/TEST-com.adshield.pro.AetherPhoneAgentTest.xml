@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.AetherPhoneAgentTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:45:55.550Z" hostname="runnervmccnms" time="0.028">
+  <properties/>
+  <testcase name="benchmarksOnlyCredibleLatencyOrRecordedResolverFailures" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.013"/>
+  <testcase name="doesNotInventWifiStatusWhenVpnMasksTheUnderlyingConnection" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.001"/>
+  <testcase name="recommendsOnlyBoundedToolsForProtectionSettings" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.0"/>
+  <testcase name="honoursLoggingOptOutAndDoesNotEchoRawActivity" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.008"/>
+  <testcase name="boundsSavedDnsWorkAndDoesNotTreatUnloggedLookupsAsZeroTraffic" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.002"/>
+  <testcase name="usesDevicePressureAndPastScansWithoutClaimingToFixOrDetectInfection" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.003"/>
+  <testcase name="identifiesReportedOpenWifiWeakSignalAndSignInAsSeparateIssues" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.0"/>
+  <testcase name="unavailableReadingsAreNotReportedAsHealthy" classname="com.adshield.pro.AetherPhoneAgentTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

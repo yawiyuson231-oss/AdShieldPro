@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.adshield.pro.FeatureExpansion211TestSuite" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-20T09:46:01.087Z" hostname="runnervmccnms" time="0.088">
+  <properties/>
+  <testcase name="testSharedTextExtractionHandlesBalancedParensAndRejectsUnsafeRedirectSchemes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.003"/>
+  <testcase name="testHomeWidgetPresentationAcrossStates" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.004"/>
+  <testcase name="testCnameCloakingBlocksTrackerAliasesWhileRespectingAllowlistAndMediaSafety" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testLinkSanitizerStripsTrackersUnwrapsRedirectsAndPreservesFunctionalParams" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testProtectionSnoozeLifecycleAndTilePresentation" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testCnameExtractionHandlesCompressedChainsAndRejectsMalformedWire" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.0"/>
+  <testcase name="testAppFirewallSummaryAndFilteringModes" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.001"/>
+  <testcase name="testDnsResolverBenchmarkRanksLiveProbesAndHandlesFailures" classname="com.adshield.pro.FeatureExpansion211TestSuite" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
