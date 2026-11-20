@@ -12,6 +12,7 @@ import com.adshield.pro.worker.IntelligenceRetentionWorker
 import com.adshield.pro.worker.ConnectorRetentionWorker
 import com.adshield.pro.worker.ConnectorSyncWorker
 import com.adshield.pro.worker.SmartOptimizationWorker
+import com.adshield.pro.worker.ScheduledScanWorker
 import com.adshield.pro.worker.WorldMonitorWatchWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -48,8 +49,15 @@ class AdShieldApplication : Application(), Configuration.Provider {
         WorldMonitorWatchWorker.schedule(this)
         GitHubUpdateWorker.schedule(this)
         appScope.launch {
+            // Optional signed-data staging is disabled unless explicitly consented and configured.
+            com.adshield.pro.engine.evolution.EvolutionUpdateWorker.reconcile(this@AdShieldApplication)
             credentialStore.removeRetiredAgentCredential()
             val settings = preferencesRepository.getSettingsSnapshot()
+            // Reconcile opted-in security scans even when a worker/receiver starts the process
+            // without creating the dashboard ViewModel. WorkManager owns persistent execution.
+            ScheduledScanWorker.scheduleOrCancel(
+                this@AdShieldApplication, settings.scheduledScanEnabled, settings.scheduledScanIntervalHours
+            )
             FilterUpdateWorker.scheduleOrCancelPeriodicUpdates(
                 context = this@AdShieldApplication,
                 enabled = settings.autoUpdateFiltersEnabled,

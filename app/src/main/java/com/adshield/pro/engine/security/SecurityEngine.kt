@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import com.adshield.pro.domain.model.RuleCategory
+import com.adshield.pro.data.repository.IntelligenceRecorder
+import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -36,7 +40,8 @@ import javax.inject.Singleton
 @Singleton
 class SecurityEngine @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val filterRuleEngine: FilterRuleEngine
+    private val filterRuleEngine: FilterRuleEngine,
+    private val intelligenceRecorder: IntelligenceRecorder
 ) {
 
     val urlScanner: UrlThreatScanner = UrlThreatScanner(
@@ -48,6 +53,8 @@ class SecurityEngine @Inject constructor(
     private val fileScanner = FileThreatScanner()
     private val apkAnalyzer = ApkAnalyzer()
     private val appAuditor = AppRiskAuditor()
+    private val metadataAuditCache = BoundedAuditCache<AppRiskAuditor.AppSecurityProfile, AppRiskAuditor.AppRiskAudit>()
+    private val permissionHistory = PermissionObservationHistory()
 
     // --- Web / link protection -------------------------------------------------
 
@@ -83,7 +90,15 @@ class SecurityEngine @Inject constructor(
         val fileVerdict = fileScanner.scanFile(file, checkpoint)
         val extension = file.extension.lowercase()
         val apkReport = if (extension == "apk") apkAnalyzer.analyzeApk(file, checkpoint) else null
+        val publisherAdvisory = com.adshield.pro.engine.evolution.EvolutionAdvisoryText.evaluate(
+            enabled = extension == "apk" && com.adshield.pro.engine.evolution.EvolutionPublisherConfiguration.enabled(context),
+            sha256 = fileVerdict.sha256
+        ) { hash ->
+            val stager = requireNotNull(com.adshield.pro.engine.evolution.EvolutionPublisherConfiguration.createStager(context))
+            stager.lookupSha256(hash)
+        }
         val limitations = buildList {
+            publisherAdvisory.limitation?.let { add(it) }
             addAll(fileVerdict.limitations)
             if (apkReport != null) {
                 addAll(apkReport.limitations)
@@ -94,7 +109,8 @@ class SecurityEngine @Inject constructor(
         }
 
         val combinedScore = maxOf(fileVerdict.riskScore, apkReport?.riskScore ?: 0)
-        val combinedFindings = fileVerdict.findings + (apkReport?.riskReasons ?: emptyList())
+        val combinedFindings = fileVerdict.findings + (apkReport?.riskReasons ?: emptyList()) +
+            listOfNotNull(publisherAdvisory.finding)
         val threatName = apkReport?.let { r ->
             if (r.threatLevel == ApkAnalyzer.ThreatLevel.DANGEROUS || r.threatLevel == ApkAnalyzer.ThreatLevel.SUSPICIOUS) {
                 "APK risk indicators (score ${r.riskScore})"
@@ -169,6 +185,8 @@ class SecurityEngine @Inject constructor(
             return@withContext AppRiskAuditor.VisibleAudit(0, emptyList())
         }
         val inspected = ArrayList<AppRiskAuditor.AppRiskAudit>(apps.size)
+        val resources = AuditResourceSampler(context)
+        var pacing = EvolutionWorkPolicy.plan(resources.sample())
         val flags = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or
             PackageManager.MATCH_DISABLED_COMPONENTS
         apps.forEachIndexed { index, appInfo ->
@@ -194,7 +212,7 @@ class SecurityEngine @Inject constructor(
                         receiver.permission?.takeIf { it == "android.permission.BIND_DEVICE_ADMIN" }
                     }
                 }
-                inspected += appAuditor.audit(AppRiskAuditor.AppSecurityProfile(
+                val profile = AppRiskAuditor.AppSecurityProfile(
                     packageName = packageName,
                     appName = label,
                     versionName = info.versionName,
@@ -205,10 +223,27 @@ class SecurityEngine @Inject constructor(
                     isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0,
                     firstInstallTimeEpochMs = info.firstInstallTime,
                     declaredComponentPermissions = bindings
-                ))
+                )
+                // Re-read every permission/binding/source before using the complete profile as
+                // an in-memory key. No timestamp-only shortcut can hide permission changes.
+                inspected += metadataAuditCache.getOrCompute(profile, pacing.cacheEntries) { appAuditor.audit(profile) }
             }
             ensureActive()
             onProgress(index + 1, apps.size, label)
+            if ((index + 1) % pacing.batchSize == 0) {
+                yield()
+                if (pacing.yieldMillis > 0L) delay(pacing.yieldMillis)
+                pacing = EvolutionWorkPolicy.plan(resources.sample())
+            }
+        }
+        ensureActive()
+        val permissionChanges = permissionHistory.observe(inspected.map { it.profile })
+        if (permissionChanges > 0) {
+            intelligenceRecorder.record(IntelligenceEventFactory.privacySettingChanged(
+                title = "Declared app permissions changed",
+                detail = "$permissionChanges inspected app(s) changed requested permissions or component bindings since an earlier completed audit in this process. Actual permission grants and behavior were not checked.",
+                timestampEpochMs = System.currentTimeMillis()
+            ))
         }
         val ordered = inspected.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }
             .thenBy { it.profile.appName.lowercase() })

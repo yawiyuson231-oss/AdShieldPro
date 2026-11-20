@@ -42,6 +42,11 @@ jobs:
             exit 1
           fi
 
+      - name: Require source-bound verified evolution approval
+        env:
+          ADSHIELD_EVOLUTION_APPROVAL_JSON: ${{ vars.ADSHIELD_EVOLUTION_APPROVAL_JSON }}
+        run: python3 -m tools.evolution.release_gate
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -87,6 +92,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tools/tests
+          python3 -m tools.evolution.boundaries
+          python3 -m tools.evolution.fixtures --check
           python3 tools/check_ui_performance.py
           ./gradlew :app:testDebugUnitTest :app:lintDebug --no-daemon --console=plain
 

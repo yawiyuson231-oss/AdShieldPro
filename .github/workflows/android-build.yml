@@ -86,6 +86,9 @@ jobs:
           chmod +x tools/audit_capability_tests.py
           python3 tools/audit_capability_tests.py --strict
 
+      - name: Preserve audited DNS, existing VPN, permissions and UI boundaries
+        run: python3 -m tools.evolution.boundaries
+
       - name: Verify bundled AETHER task model
         run: python3 tools/train_aether_tasks.py --check
 
@@ -146,6 +149,11 @@ jobs:
           ls -a
           ls -a app/src/main/java/com/adshield/pro | head -5
           tools/gradle-ci.sh .ci/test.log :app:testDebugUnitTest
+
+      - name: Validate detector evaluation evidence against tested sources
+        run: |
+          python3 -m tools.evolution.fixtures --check
+          python3 -m tools.evolution.artifacts validate .ci/evolution/current.json
 
       - name: Android lint
         run: |
@@ -264,6 +272,7 @@ jobs:
           path: |
             .ci/*.log
             .ci/junit/*.xml
+            .ci/evolution/*.json
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.*
             app/build/test-results/**

@@ -1,0 +1,13 @@
+.........................................................
+----------------------------------------------------------------------
+Ran 57 tests in 1.015s
+
+OK
+Universal build gate
+  variant        : debug, com.adshield.pro.debug
+  version        : 2.11.1-debug (versionCode 21101)
+  sdk            : min 29 / target 36 / compile 37
+  apk            : app-debug.apk, 132.28 MB, 20 dex file(s)
+  native libs    : arm64-v8a, armeabi-v7a, x86, x86_64 (all ABIs: libandroidx.graphics.path.so, libcryptox.so, libdatastore_shared_counter.so, libsslx.so, libtdjni.so)
+
+PASSED — single ABI-independent APK for Android 10+ (API 29-37) on any CPU architecture.
