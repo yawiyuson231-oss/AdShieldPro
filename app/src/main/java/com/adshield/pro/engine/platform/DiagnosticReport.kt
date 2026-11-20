@@ -260,21 +260,29 @@ object DiagnosticScrubber {
     private val EMAIL = Regex("(?i)\\b[\\w.+-]+@[a-z0-9-]+(?:\\.[a-z0-9-]+)+\\b")
     private val URL = Regex("(?i)\\b(?:https?|ftp)://\\S+")
     private val WINDOWS_PATH = Regex("(?i)\\b[a-z]:\\\\[^\\s\"']*")
-    private val UNIX_PATH = Regex("(?:^|\\s)(/(?:[\\w.@+-]+/)+[\\w.@+-]+)")
+    // The delimiter in front of a path is kept in group 1: a path often arrives wrapped in
+    // punctuation or quotes ("list (/storage/emulated/0/x)"), and dropping the delimiter would
+    // either fuse words or, worse, miss the path entirely because it is not preceded by a space.
+    private val UNIX_PATH = Regex("(^|[\\s(\"'\\[=,;:])(/(?:[\\w.@+-]+/)+[\\w.@+-]+)")
     private val PRIVATE_IPV4 = Regex(
         "\\b(?:10\\.\\d{1,3}|192\\.168|172\\.(?:1[6-9]|2\\d|3[01]))\\.\\d{1,3}\\.\\d{1,3}\\b"
     )
-    // 24+ chars covers hex digests, JWTs fragments and device ids while leaving normal words alone.
-    private val LONG_TOKEN = Regex("[A-Za-z0-9_\\-]{24,}")
+    // 24+ chars covers hex digests, base64 blobs, JWT fragments and device ids while leaving
+    // normal words alone; "+/=" are included because base64 secrets are the likeliest shape.
+    private val LONG_TOKEN = Regex("[A-Za-z0-9_\\-+/=]{24,}")
     private val HOSTNAME = Regex("(?i)\\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,24}\\b")
 
     fun redact(text: String): String {
-        val withoutEmail = EMAIL.replace(text, PLACEHOLDER_EMAIL)
-        val withoutUrls = URL.replace(withoutEmail, PLACEHOLDER_URL)
-        val withoutWindowsPaths = WINDOWS_PATH.replace(withoutUrls, PLACEHOLDER_PATH)
-        // The regex consumes the whitespace that precedes a path; put a single space back so two
-        // words never fuse into a synthetic token that a later rule could mangle differently.
-        val withoutUnixPaths = UNIX_PATH.replace(withoutWindowsPaths) { _ -> " $PLACEHOLDER_PATH" }
+        // Whole URLs go first: an e-mail inside a query string would otherwise be replaced by a
+        // placeholder containing a space, which truncates the URL match and leaves the rest of the
+        // query (often a token) behind.
+        val withoutUrls = URL.replace(text, PLACEHOLDER_URL)
+        val withoutEmail = EMAIL.replace(withoutUrls, PLACEHOLDER_EMAIL)
+        val withoutWindowsPaths = WINDOWS_PATH.replace(withoutEmail, PLACEHOLDER_PATH)
+        // Group 1 is the delimiter that preceded the path, so it is written back untouched.
+        val withoutUnixPaths = UNIX_PATH.replace(withoutWindowsPaths) { match ->
+            match.groupValues[1] + PLACEHOLDER_PATH
+        }
         val withoutPrivateIps = PRIVATE_IPV4.replace(withoutUnixPaths, PLACEHOLDER_PRIVATE_IP)
         val withoutTokens = LONG_TOKEN.replace(withoutPrivateIps, PLACEHOLDER_TOKEN)
         return HOSTNAME.replace(withoutTokens, PLACEHOLDER_HOST)

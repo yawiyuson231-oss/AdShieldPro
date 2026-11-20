@@ -51,6 +51,20 @@ interface AdShieldDao {
     @Query("SELECT COUNT(*) FROM dns_logs WHERE is_blocked = 1 AND category = 'MALWARE'")
     fun observeMalwareBlockCount(): Flow<Long>
 
+    /**
+     * Total, blocked and malware-blocked counts in one statement, for reports that must be
+     * internally consistent rather than three racing snapshots.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) AS total,
+               COALESCE(SUM(CASE WHEN is_blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
+               COALESCE(SUM(CASE WHEN is_blocked = 1 AND category = 'MALWARE' THEN 1 ELSE 0 END), 0) AS malware
+        FROM dns_logs
+        """
+    )
+    suspend fun countDnsLogStats(): DnsLogCounts
+
     @Query("DELETE FROM dns_logs WHERE timestamp_epoch_ms < :cutoffEpochMs")
     suspend fun pruneLogsOlderThan(cutoffEpochMs: Long): Int
 

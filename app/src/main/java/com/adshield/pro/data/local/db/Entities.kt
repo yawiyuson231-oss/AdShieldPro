@@ -167,3 +167,15 @@ data class DirectDownloadEntity(
     val error: String?,
     @ColumnInfo(name = "integrity_status") val integrityStatus: String?
 )
+
+/**
+ * One consistent, single-statement snapshot of the DNS log counters.
+ *
+ * The diagnostic report must not mix three separate COUNT queries: a query arriving between them
+ * would produce a report where "blocked" exceeds "total".
+ */
+data class DnsLogCounts(
+    @ColumnInfo(name = "total") val total: Long,
+    @ColumnInfo(name = "blocked") val blocked: Long,
+    @ColumnInfo(name = "malware") val malware: Long
+)

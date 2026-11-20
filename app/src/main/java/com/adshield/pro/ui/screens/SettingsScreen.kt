@@ -49,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,8 +134,10 @@ fun SettingsScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    var pendingDiagnosticReport by remember { mutableStateOf<String?>(null) }
-    var diagnosticStatus by remember { mutableStateOf<String?>(null) }
+    // Saveable: an activity recreation (rotation, theme change) while the system picker is open
+    // would otherwise drop the report and silently write nothing when the user comes back.
+    var pendingDiagnosticReport by rememberSaveable { mutableStateOf<String?>(null) }
+    var diagnosticStatus by rememberSaveable { mutableStateOf<String?>(null) }
 
     // The report text is prepared before the picker opens so the user's chosen file is written in
     // one step and a cancelled picker never leaves a half-written document behind.

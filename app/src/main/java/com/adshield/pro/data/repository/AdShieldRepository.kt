@@ -923,6 +923,8 @@ class AdShieldRepository @Inject constructor(
         val settings = prefs.getSettingsSnapshot()
         val runtime = _vpnRuntimeState.value
         val sources = dao.getAllFilterSourcesNow()
+        // One statement, so a query arriving mid-report cannot make "blocked" exceed "total".
+        val counts = dao.countDnsLogStats()
         DiagnosticReport.build(
             DiagnosticReportInput(
                 generatedAtEpochMs = nowEpochMs,
@@ -935,9 +937,9 @@ class AdShieldRepository @Inject constructor(
                 dnssecMode = settings.resolverConfig.dnssecMode.label,
                 failoverEnabled = settings.resolverConfig.failoverEnabled,
                 loadedRuleCount = runtime.loadedRuleCount,
-                totalQueries = dao.observeTotalLoggedCount().first(),
-                blockedQueries = dao.observeBlockedLoggedCount().first(),
-                malwareBlocks = dao.observeMalwareBlockCount().first(),
+                totalQueries = counts.total,
+                blockedQueries = counts.blocked,
+                malwareBlocks = counts.malware,
                 detailedLoggingEnabled = settings.detailedDnsLoggingEnabled,
                 logRetentionDays = settings.logRetentionDays,
                 filterSources = sources.map { source ->

@@ -121,6 +121,45 @@ class DiagnosticReportTest {
     }
 
     @Test
+    fun testPunctuationWrappedPathsAndUrlCredentialsAreRemoved() {
+        // A path in parentheses is not preceded by whitespace, so it must still be recognised.
+        val parenthesised = DiagnosticScrubber.redact("Family (/storage/emulated/0/Download/tax_2026)")
+        assertFalse(parenthesised.contains("storage"))
+        assertFalse(parenthesised.contains("tax_2026"))
+        assertTrue(parenthesised.contains(DiagnosticScrubber.PLACEHOLDER_PATH))
+
+        // An e-mail inside a query string must not truncate the URL match and leak the rest.
+        val credentialed = DiagnosticScrubber.redact(
+            "List https://lists.example.org/download?owner=alice@example.com&key=shortSecret"
+        )
+        listOf("lists.example.org", "alice", "shortSecret", "owner=").forEach { leaked ->
+            assertFalse("scrubber must remove '$leaked'", credentialed.contains(leaked))
+        }
+
+        // Base64-shaped secrets carry + / = and must not slip past the token rule.
+        val base64 = "aBcDeFgHiJkLmNoPqRsTuVwXyZ012345+/="
+        assertFalse(DiagnosticScrubber.redact("token $base64").contains(base64))
+
+        val report = DiagnosticReport.build(
+            input(
+                sources = listOf(
+                    DiagnosticFilterSource(
+                        name = "Family (/storage/emulated/0/Download/tax_2026)",
+                        enabled = true,
+                        ruleCount = 5
+                    )
+                )
+            )
+        )
+        // "storage" alone is too broad a probe: the quarantine line legitimately says
+        // "app-private storage". These fragments can only come from the leaked path.
+        listOf("tax_2026", "/storage/emulated", "Download").forEach { leaked ->
+            assertFalse("report must not contain '$leaked'", report.contains(leaked))
+        }
+        assertTrue(report.contains("Family ([path removed])"))
+    }
+
+    @Test
     fun testPublicResolverAddressesSurviveSoTheReportStaysUseful() {
         val scrubbed = DiagnosticScrubber.redact("resolver 1.1.1.1 and 2606:4700:4700::1111 answered")
         assertTrue(scrubbed.contains("1.1.1.1"))
