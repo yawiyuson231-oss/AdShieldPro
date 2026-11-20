@@ -38,106 +38,6 @@ e: [ksp] Client.java:239: Unresolved reference 'TdApi'
 e: [ksp] Client.java:244: Unresolved reference 'TdApi'
 e: [ksp] Client.java:246: Unresolved reference 'TdApi'
 e: [ksp] Client.java:248: Unresolved reference 'TdApi'
-e: [ksp] TelegramTdlibPort.kt:85: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:86: Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: [ksp] TelegramTdlibPort.kt:86: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:86: Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: [ksp] TelegramTdlibPort.kt:87: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:88: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:89: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:90: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:91: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:92: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:93: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:94: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:95: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:96: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:97: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:98: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:99: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:100: 'val' cannot be reassigned.
-e: [ksp] TelegramTdlibPort.kt:67: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:68: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:69: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:70: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:71: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:72: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:73: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:74: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:75: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:76: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:77: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:78: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:79: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:80: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:27: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:25: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:25: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:23: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:21: Unresolved reference 'TdApi'.
-e: [ksp] TelegramTdlibPort.kt:7: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:181: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
-e: [ksp] AndroidTdlibPort.kt:181: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:187: Cannot infer type for type parameter 'K'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:187: Cannot infer type for type parameter 'V'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:162: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:128: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:130: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:131: Unresolved reference 'authorizationState' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:135: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:136: Cannot infer type for type parameter 'A'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:136: Cannot infer type for type parameter 'B'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:136: Unresolved reference 'file' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:136: Unresolved reference 'file' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:139: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:140: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:141: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:143: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:143: Unresolved reference 'state' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:144: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:145: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:146: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:147: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'R'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:111: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
-e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'T'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:111: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:116: 'onResult' overrides nothing. Potential signatures for overriding:
-fun onResult(object: Object!): Unit
-e: [ksp] AndroidTdlibPort.kt:115: Class '<anonymous>' is not abstract and does not implement abstract member:
-fun onResult(object: Object!): Unit
-e: [ksp] AndroidTdlibPort.kt:116: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:103: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:104: Cannot infer type for type parameter 'A'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:104: Cannot infer type for type parameter 'B'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:104: Unresolved reference 'id'.
-e: [ksp] AndroidTdlibPort.kt:80: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:87: 'onResult' overrides nothing. Potential signatures for overriding:
-fun onResult(object: Object!): Unit
-e: [ksp] AndroidTdlibPort.kt:86: Class '<anonymous>' is not abstract and does not implement abstract member:
-fun onResult(object: Object!): Unit
-e: [ksp] AndroidTdlibPort.kt:87: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:88: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:89: Unresolved reference 'code' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:89: Unresolved reference 'message' on receiver of type 'Any'.
-e: [ksp] AndroidTdlibPort.kt:97: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
-e: [ksp] AndroidTdlibPort.kt:80: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:72: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:71: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:71: Inapplicable candidate(s): fun <T> MutableSharedFlow(replay: Int = ..., extraBufferCapacity: Int = ..., onBufferOverflow: BufferOverflow = ...): MutableSharedFlow<T>
-e: [ksp] AndroidTdlibPort.kt:70: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:69: Unresolved reference 'TdApi'.
-e: [ksp] AndroidTdlibPort.kt:69: Cannot infer type for type parameter 'K'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:69: Cannot infer type for type parameter 'V'. Specify it explicitly.
-e: [ksp] AndroidTdlibPort.kt:69: Argument type mismatch: actual type is 'Map<uninferred K (of fun <K, V> emptyMap), uninferred V (of fun <K, V> emptyMap)>', but 'Map<Int, ??? (Unresolved qualified name: TdApi.File)>' was expected.
-e: [ksp] AndroidTdlibPort.kt:70: Type of 'val fileStates: StateFlow<Map<Int, ??? (Unresolved qualified name: TdApi.File)>>' is not a subtype of overridden property 'val fileStates: StateFlow<Map<Int, ??? (Unresolved qualified name: TdApi.File)>>' defined in 'com.adshield.pro.data.telegram.TelegramTdlibPort'.
-e: [ksp] AndroidTdlibPort.kt:72: Type of 'val updates: SharedFlow<??? (Unresolved qualified name: TdApi.Object)>' is not a subtype of overridden property 'val updates: SharedFlow<??? (Unresolved qualified name: TdApi.Object)>' defined in 'com.adshield.pro.data.telegram.TelegramTdlibPort'.
-e: [ksp] AndroidTdlibPort.kt:80: 'send' overrides nothing. Potential signatures for overriding:
-suspend fun <T : ??? (Unresolved qualified name: TdApi)> send(query: ??? (Unresolved qualified name: TdApi)): T
-e: [ksp] AndroidTdlibPort.kt:61: Class 'AndroidTdlibPort' is not abstract and does not implement abstract member:
-suspend fun <T : ??? (Unresolved qualified name: TdApi)> send(query: ??? (Unresolved qualified name: TdApi)): T
-e: [ksp] AndroidTdlibPort.kt:15: Unresolved reference 'TdApi'.
 e: [ksp] TelegramStorageRepository.kt:862: Cannot infer type for type parameter 'R'. Specify it explicitly.
 e: [ksp] TelegramStorageRepository.kt:862: Cannot infer type for type parameter 'T'. Specify it explicitly.
 e: [ksp] TelegramStorageRepository.kt:862: Inapplicable candidate(s): suspend fun <T : ??? (Unresolved qualified name: TdApi)> send(query: ??? (Unresolved qualified name: TdApi)): T
@@ -433,6 +333,106 @@ e: [ksp] TelegramStorageRepository.kt:222: Unresolved reference 'phoneNumber'.
 e: [ksp] TelegramStorageRepository.kt:223: Unresolved reference 'settings'.
 e: [ksp] TelegramStorageRepository.kt:223: Unresolved reference 'TdApi'.
 e: [ksp] TelegramStorageRepository.kt:10: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:181: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
+e: [ksp] AndroidTdlibPort.kt:181: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:187: Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:187: Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:162: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:128: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:130: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:131: Unresolved reference 'authorizationState' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:135: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:136: Cannot infer type for type parameter 'A'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:136: Cannot infer type for type parameter 'B'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:136: Unresolved reference 'file' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:136: Unresolved reference 'file' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:139: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:140: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:141: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:143: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:143: Unresolved reference 'state' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:144: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:145: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:146: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:147: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:111: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
+e: [ksp] AndroidTdlibPort.kt:111: Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:111: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:116: 'onResult' overrides nothing. Potential signatures for overriding:
+fun onResult(object: Object!): Unit
+e: [ksp] AndroidTdlibPort.kt:115: Class '<anonymous>' is not abstract and does not implement abstract member:
+fun onResult(object: Object!): Unit
+e: [ksp] AndroidTdlibPort.kt:116: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:103: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:104: Cannot infer type for type parameter 'A'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:104: Cannot infer type for type parameter 'B'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:104: Unresolved reference 'id'.
+e: [ksp] AndroidTdlibPort.kt:80: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:87: 'onResult' overrides nothing. Potential signatures for overriding:
+fun onResult(object: Object!): Unit
+e: [ksp] AndroidTdlibPort.kt:86: Class '<anonymous>' is not abstract and does not implement abstract member:
+fun onResult(object: Object!): Unit
+e: [ksp] AndroidTdlibPort.kt:87: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:88: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:89: Unresolved reference 'code' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:89: Unresolved reference 'message' on receiver of type 'Any'.
+e: [ksp] AndroidTdlibPort.kt:97: Cannot access class 'TdApi.Function'. Check your module classpath for missing or conflicting dependencies.
+e: [ksp] AndroidTdlibPort.kt:80: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:72: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:71: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:71: Inapplicable candidate(s): fun <T> MutableSharedFlow(replay: Int = ..., extraBufferCapacity: Int = ..., onBufferOverflow: BufferOverflow = ...): MutableSharedFlow<T>
+e: [ksp] AndroidTdlibPort.kt:70: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:69: Unresolved reference 'TdApi'.
+e: [ksp] AndroidTdlibPort.kt:69: Cannot infer type for type parameter 'K'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:69: Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: [ksp] AndroidTdlibPort.kt:69: Argument type mismatch: actual type is 'Map<uninferred K (of fun <K, V> emptyMap), uninferred V (of fun <K, V> emptyMap)>', but 'Map<Int, ??? (Unresolved qualified name: TdApi.File)>' was expected.
+e: [ksp] AndroidTdlibPort.kt:70: Type of 'val fileStates: StateFlow<Map<Int, ??? (Unresolved qualified name: TdApi.File)>>' is not a subtype of overridden property 'val fileStates: StateFlow<Map<Int, ??? (Unresolved qualified name: TdApi.File)>>' defined in 'com.adshield.pro.data.telegram.TelegramTdlibPort'.
+e: [ksp] AndroidTdlibPort.kt:72: Type of 'val updates: SharedFlow<??? (Unresolved qualified name: TdApi.Object)>' is not a subtype of overridden property 'val updates: SharedFlow<??? (Unresolved qualified name: TdApi.Object)>' defined in 'com.adshield.pro.data.telegram.TelegramTdlibPort'.
+e: [ksp] AndroidTdlibPort.kt:80: 'send' overrides nothing. Potential signatures for overriding:
+suspend fun <T : ??? (Unresolved qualified name: TdApi)> send(query: ??? (Unresolved qualified name: TdApi)): T
+e: [ksp] AndroidTdlibPort.kt:61: Class 'AndroidTdlibPort' is not abstract and does not implement abstract member:
+suspend fun <T : ??? (Unresolved qualified name: TdApi)> send(query: ??? (Unresolved qualified name: TdApi)): T
+e: [ksp] AndroidTdlibPort.kt:15: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:85: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:86: Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: [ksp] TelegramTdlibPort.kt:86: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:86: Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: [ksp] TelegramTdlibPort.kt:87: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:88: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:89: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:90: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:91: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:92: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:93: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:94: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:95: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:96: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:97: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:98: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:99: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:100: 'val' cannot be reassigned.
+e: [ksp] TelegramTdlibPort.kt:67: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:68: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:69: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:70: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:71: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:72: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:73: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:74: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:75: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:76: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:77: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:78: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:79: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:80: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:27: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:25: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:25: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:23: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:21: Unresolved reference 'TdApi'.
+e: [ksp] TelegramTdlibPort.kt:7: Unresolved reference 'TdApi'.
 e: [ksp] IntelligenceMapPreferences.kt:80: Cannot infer type for type parameter 'V'. Specify it explicitly.
 e: [ksp] IntelligenceMapPreferences.kt:80: None of the following candidates is applicable:
 
@@ -576,37 +576,6 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:ksp
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$0(DefaultBuildLifecycleController.java:323)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:324)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$0(StateTransitionController.java:235)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:235)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:302)
-	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:300)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:296)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:288)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:65)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing com.google.devtools.ksp.gradle.KspAAWorkerAction
@@ -727,7 +696,7 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 61 more
+	... 30 more
 Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
 	at com.google.devtools.ksp.gradle.KspAAWorkerAction.execute(KspAATask.kt:903)
 	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:68)
@@ -763,5 +732,5 @@ Caused by: java.lang.Exception: KSP failed with exit code: PROCESSING_ERROR
 	... 2 more
 
 
-BUILD FAILED in 1m 8s
+BUILD FAILED in 1m 5s
 8 actionable tasks: 2 executed, 6 from cache
