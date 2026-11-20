@@ -882,10 +882,23 @@ object CapabilityRegistry {
         ),
         cap(
             "diagnostic-report", "Exportable diagnostic report", CapabilityArea.PLATFORM,
-            CapabilityStatus.PLANNED, "",
-            emptyList(), listOf("Would summarise telemetry, rule counts, last errors"),
-            listOf("Not implemented yet; must scrub identifiers before shipping"),
-            "n/a — planned"
+            CapabilityStatus.IMPLEMENTED, "engine/platform/DiagnosticReport.kt",
+            emptyList(),
+            listOf(
+                "Settings snapshot, Room DNS counters, filter-source metadata, scan-journal totals",
+                "Quarantine index counts, last battery telemetry snapshot and tunnel runtime status"
+            ),
+            listOf(
+                "Aggregates only: no domains, matched rules, app packages, file names, paths, " +
+                    "account or device identifiers and no raw log lines are written",
+                "Free-text values (runtime errors, custom list names) are redacted and length-bounded " +
+                    "before they reach the file",
+                "The user starts the export and picks the destination; nothing is uploaded and a " +
+                    "cancelled picker writes nothing",
+                "It is not a security audit and cannot show what a third-party app did"
+            ),
+            "DiagnosticReportTest.testReportCarriesNoIdentifiers guards identifier scrubbing, " +
+                "empty-state honesty and determinism; manual device check covers the export itself"
         ),
         cap(
             "intel-event-system", "Unified intelligence event store with bounded retention",

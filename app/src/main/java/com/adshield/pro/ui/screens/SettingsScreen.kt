@@ -1,5 +1,7 @@
 package com.adshield.pro.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,6 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.adshield.pro.data.local.preferences.AppSettingsState
@@ -71,7 +74,9 @@ import com.adshield.pro.engine.platform.SystemTileEngine
 import com.adshield.pro.ui.theme.CyberCyan
 import com.adshield.pro.ui.theme.EmeraldPrimary
 import com.adshield.pro.ui.theme.WarningAmber
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(
@@ -101,7 +106,8 @@ fun SettingsScreen(
     onToggleAutoStartBoot: (Boolean) -> Unit,
     onChangeThemePreference: (DarkThemePreference) -> Unit,
     onExportBackupJson: suspend () -> String,
-    onRestoreBackupJson: (String) -> Unit
+    onRestoreBackupJson: (String) -> Unit,
+    onBuildDiagnosticReport: suspend () -> String = { "" }
 ) {
     if (showAboutScreen) {
         AboutScreen(onBack = onCloseAbout)
@@ -126,6 +132,33 @@ fun SettingsScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var pendingDiagnosticReport by remember { mutableStateOf<String?>(null) }
+    var diagnosticStatus by remember { mutableStateOf<String?>(null) }
+
+    // The report text is prepared before the picker opens so the user's chosen file is written in
+    // one step and a cancelled picker never leaves a half-written document behind.
+    val diagnosticReportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        val report = pendingDiagnosticReport
+        pendingDiagnosticReport = null
+        if (uri == null || report == null) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            val written = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openOutputStream(uri, "wt")?.use { stream ->
+                        stream.write(report.toByteArray(Charsets.UTF_8))
+                    } != null
+                }.getOrDefault(false)
+            }
+            diagnosticStatus = if (written) {
+                "Diagnostic report exported."
+            } else {
+                "Could not write the report to that location."
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -775,6 +808,41 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Privacy Policy")
                         }
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                val report = runCatching { onBuildDiagnosticReport() }.getOrNull()
+                                if (report == null) {
+                                    diagnosticStatus = "Could not build the diagnostic report."
+                                } else {
+                                    pendingDiagnosticReport = report
+                                    diagnosticReportLauncher.launch("adshield-diagnostic-report.txt")
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Export diagnostic report")
+                    }
+
+                    Text(
+                        text = "The diagnostic report is a text file of counts, settings and timestamps " +
+                            "only. It contains no domains, app package names, file paths or identifiers, " +
+                            "and it is never uploaded automatically.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    diagnosticStatus?.let { status ->
+                        Text(
+                            text = status,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = CyberCyan
+                        )
                     }
                 }
             }
