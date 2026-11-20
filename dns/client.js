@@ -127,8 +127,13 @@ export class DnsClient {
       if (hit && hit.stale && this.staleWhileRevalidate && options.allowStale !== false) {
         const result = this._fromCache(hit, { name, type, started, verdict, stale: true });
         this._record({ kind: 'lookup', at: this.clock(), ...result, context: options.context });
-        // Refresh in the background; errors are swallowed (stale data is still served).
-        this._network(name, type, options).catch(() => {});
+        // Refresh in the background. `_network` bypasses the filter ladder (it is
+        // step 4-6 of it), so a rule installed since the entry was cached would
+        // otherwise be ignored and the stale answer re-cached — a blocked host kept
+        // resolving from cache. Re-check the verdict before touching the network.
+        const nowBlocked = this.engine?.evaluate(name)?.blocked;
+        if (nowBlocked) this.cache.remove(name, type);
+        else this._network(name, type, options).catch(() => {});
         return result;
       }
     }
@@ -201,22 +206,41 @@ export class DnsClient {
     };
   }
 
-  /** Resolves A and AAAA in parallel — real dual-stack behaviour. */
+  /**
+   * Resolves A and AAAA in parallel — real dual-stack behaviour.
+   *
+   * The report keeps `results: { a, aaaa }` (what the UI renders) and also lifts
+   * the common fields to the top level. `ttl`, `latencyMs` and the statuses of
+   * both families used to be `undefined`/`NaN` here because the object only ever
+   * defined `ipv4`/`ipv6`/`dnssec` as an array, so the UI printed "TTL —" and two
+   * empty rows for the per-family table.
+   */
   async lookupDualStack(input, options = {}) {
     const [a, aaaa] = await Promise.all([
       this.lookup(input, { ...options, type: 'A' }),
       this.lookup(input, { ...options, type: 'AAAA' })
     ]);
     const ttls = [a.ttl, aaaa.ttl].filter((v) => typeof v === 'number' && Number.isFinite(v));
+    const latencies = [a.latencyMs, aaaa.latencyMs].filter((v) => Number.isFinite(v));
+    const hasAddress = Boolean(a.addresses?.length || aaaa.addresses?.length);
     return {
       name: a.name || aaaa.name,
       blocked: a.blocked || aaaa.blocked,
       blockedBy: a.blockedBy || aaaa.blockedBy,
-      ipv4: a.addresses, ipv6: aaaa.addresses,
+      ok: !a.blocked && !aaaa.blocked && hasAddress,
+      status: a.blocked || aaaa.blocked
+        ? 'blocked'
+        : hasAddress
+          ? 'ok'
+          : (a.status === 'nxdomain' && aaaa.status === 'nxdomain' ? 'nxdomain' : 'nodata'),
+      ipv4: a.addresses,
+      ipv6: aaaa.addresses,
       ttl: ttls.length ? Math.min(...ttls) : null,
+      latencyMs: latencies.length ? Math.max(...latencies) : 0,
+      cached: Boolean(a.cached || aaaa.cached),
       dnssec: [a.dnssec, aaaa.dnssec].filter(Boolean),
-      results: { a, aaaa },
-      latencyMs: Math.max(a.latencyMs, aaaa.latencyMs)
+      reasons: [...(a.reasons || []), ...(aaaa.reasons || [])].slice(0, 6),
+      results: { a, aaaa }
     };
   }
 

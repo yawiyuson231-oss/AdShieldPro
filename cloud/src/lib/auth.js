@@ -12,13 +12,36 @@ const encoder = new TextEncoder()
 
 const jwksCache = new Map()
 
+/**
+ * Raised when the JWKS endpoint cannot be reached or answers something unusable.
+ *
+ * This must be distinguishable from "the token is invalid": an expired or forged
+ * token is a 401, whereas a provider outage means the request could not be judged
+ * at all. Collapsing both into 401 made a Supabase incident look like every user
+ * being logged out, and gave the API no way to say so.
+ */
+export class AuthProviderUnavailableError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'AuthProviderUnavailableError'
+    this.status = 503
+  }
+}
+
 export async function getJwks(supabaseUrl, { force = false } = {}) {
   const url = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`
   const cached = jwksCache.get(url)
   if (!force && cached && Date.now() < cached.expiresAt) return cached.keys
-  const response = await fetch(url)
-  if (!response.ok) throw new Error(`could not fetch Supabase JWKS (${response.status})`)
-  const body = await response.json()
+  let response
+  try {
+    response = await fetch(url)
+  } catch (error) {
+    throw new AuthProviderUnavailableError(`could not fetch Supabase JWKS: ${error?.message || error}`)
+  }
+  if (!response.ok) throw new AuthProviderUnavailableError(`could not fetch Supabase JWKS (${response.status})`)
+  const body = await response.json().catch(() => {
+    throw new AuthProviderUnavailableError('Supabase JWKS was not valid JSON')
+  })
   const keys = Array.isArray(body.keys) ? body.keys : []
   jwksCache.set(url, { keys, expiresAt: Date.now() + 3_600_000 })
   return keys
@@ -158,7 +181,11 @@ export async function requireUser(request, env) {
   const header = request.headers.get('Authorization') || ''
   const match = /^Bearer (.+)$/.exec(header.trim())
   if (!match) return null
-  const claims = await verifyToken(match[1], env).catch(() => null)
+  const claims = await verifyToken(match[1], env).catch((error) => {
+    // A provider outage is not a bad token: let the caller answer 503 and say why.
+    if (error instanceof AuthProviderUnavailableError) throw error
+    return null
+  })
   if (!claims) return null
   return claims
 }

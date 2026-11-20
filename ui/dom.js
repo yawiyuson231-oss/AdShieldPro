@@ -31,6 +31,9 @@ export function h(tag, props = {}, ...children) {
 function append(parent, children) {
   for (const child of children.flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
+    // Arrays that survive a nested spread must still render as text, not as the
+    // JavaScript source `a,b` — Array.prototype.toString would silently do that.
+    if (Array.isArray(child)) { append(parent, child); continue; }
     parent.appendChild(child instanceof Node ? child : document.createTextNode(String(child)));
   }
 }
@@ -238,8 +241,6 @@ export function setBusy(button, busy, busyLabel = 'Working…') {
   }
 }
 
-export default { h, clear, mount, pill, note, empty, kpi, table, kv, buttons, number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy };
-
 /**
  * Counted nouns, so the UI never prints "1 points".
  * @param {number} count
@@ -251,3 +252,14 @@ export function plural(count, singular, pluralForm) {
   const word = value === 1 ? singular : (pluralForm || `${singular}s`);
   return `${count} ${word}`;
 }
+
+/**
+ * Default export, listed after every binding it references exists.
+ * The object literal used to be evaluated above `plural`, so the default export
+ * carried `undefined` for it and any consumer calling `ui.plural()` from a default
+ * import hit a TypeError.
+ */
+export default {
+  h, clear, mount, pill, note, empty, kpi, table, kv, buttons,
+  number, plural, bytes, relativeTime, drawSeries, toast, download, setBusy
+};

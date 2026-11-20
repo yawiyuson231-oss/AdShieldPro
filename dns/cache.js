@@ -59,6 +59,15 @@ export class DnsCache {
   }
 
   /**
+   * Forgets one entry (used when a rule change invalidates an answer that was
+   * cached while the name was still allowed).
+   * @returns {boolean} whether anything was removed
+   */
+  remove(name, type = 'A') {
+    return this.entries.delete(DnsCache.key(name, type));
+  }
+
+  /**
    * Stores a result.
    * @param {{ttl?:number, negative?:boolean, negativeTtl?:number, staleGrace?:number}} meta
    */

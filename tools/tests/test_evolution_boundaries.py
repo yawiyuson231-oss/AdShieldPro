@@ -4,7 +4,9 @@ import shutil
 import tempfile
 import unittest
 
-from tools.evolution.boundaries import ROOT, MANIFEST, SETTINGS_PATH, SETTINGS_EXTENSION, check
+from tools.evolution.boundaries import (
+    ROOT, MANIFEST, AUDIT_MANIFEST, SETTINGS_PATH, SETTINGS_EXTENSION, check
+)
 
 
 class FrozenBoundaryTest(unittest.TestCase):
@@ -16,7 +18,7 @@ class FrozenBoundaryTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest = json.loads((ROOT / MANIFEST).read_text())
-            for name in [MANIFEST, *manifest['files']]:
+            for name in [MANIFEST, AUDIT_MANIFEST, *manifest['files']]:
                 path = root / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / name, path)
@@ -49,6 +51,36 @@ class FrozenBoundaryTest(unittest.TestCase):
             manifest['base_commit'] = '0' * 40
             (root / MANIFEST).write_text(json.dumps(manifest))
             with self.assertRaisesRegex(ValueError, 'baseline'):
+                check(root)
+
+    def test_a_change_outside_both_reviewed_baselines_is_rejected(self):
+        # A file may match the original audit baseline or the reviewed 2026-11 fix
+        # baseline, and nothing else: an unreviewed edit to a frozen file still fails.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = json.loads((ROOT / MANIFEST).read_text())
+            for name in [MANIFEST, AUDIT_MANIFEST, *manifest['files']]:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, path)
+            self.assertTrue(check(root)['unchanged'])
+            target = root / 'app.js'
+            target.write_bytes(target.read_bytes() + b'\n// unreviewed change\n')
+            with self.assertRaisesRegex(ValueError, 'boundary changed: app.js'):
+                check(root)
+
+    def test_the_audit_baseline_must_track_the_same_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = json.loads((ROOT / MANIFEST).read_text())
+            audited = json.loads((ROOT / AUDIT_MANIFEST).read_text())
+            for name in [MANIFEST, AUDIT_MANIFEST, *manifest['files']]:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / name, path)
+            audited['files'].pop(next(iter(audited['files'])))
+            (root / AUDIT_MANIFEST).write_text(json.dumps(audited))
+            with self.assertRaisesRegex(ValueError, 'same protected inventory'):
                 check(root)
 
 

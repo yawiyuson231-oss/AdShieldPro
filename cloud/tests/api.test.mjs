@@ -402,6 +402,58 @@ describe('AdShield Cloud API', () => {
     assert.equal(found.nodes[0].name, 'holiday-photo.jpg')
   })
 
+  test('replacing a file records a version_create audit entry', async () => {
+    const { call } = await setup()
+    await upload({ call, name: 'evolve.bin', data: randomData(1024) })
+    await upload({ call, name: 'evolve.bin', data: randomData(2048) })
+    const audit = await json(await call('/v1/audit'))
+    assert.ok(
+      audit.entries.some((entry) => entry.action === 'version_create'),
+      'a file gaining a new version was invisible in the audit log'
+    )
+  })
+
+  test('an unverifiable token is answered with 503, not an opaque 500', async () => {
+    const { env } = await setup()
+    const prodEnv = {
+      ...env,
+      AUTH_MODE: 'production',
+      SUPABASE_URL: 'https://unreachable.supabase.test',
+      TEST_JWT_SECRET: undefined
+    }
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async () => { throw new TypeError('simulated JWKS outage') }
+    try {
+      // A structurally valid but unverifiable RS256 token triggers the JWKS fetch.
+      const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: 'k' })).toString('base64url')
+      const payload = Buffer.from(JSON.stringify({ sub: 'u-1', exp: Math.floor(Date.now() / 1000) + 60 })).toString('base64url')
+      const token = `${header}.${payload}.c2ln`
+      const app = buildApp(prodEnv)
+      const response = await app.fetch(new Request('http://api/v1/account', {
+        headers: { Authorization: `Bearer ${token}` }
+      }), prodEnv)
+      assert.equal(response.status, 503)
+      const body = await json(response)
+      assert.equal(body.error, 'unable to verify token')
+      assert.match(body.detail, /JWKS|outage/i)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  test('copying into a folder that is gone is refused instead of orphaning a row', async () => {
+    const { call } = await setup()
+    const folder = await json(await call('/v1/folders', {
+      method: 'POST', body: JSON.stringify({ name: 'Doomed' })
+    }))
+    const { completed } = await upload({ call, name: 'inside.bin', data: randomData(512), parentId: folder.node.id })
+    // Trash the containing folder, then try to copy its file.
+    await call(`/v1/nodes/${folder.node.id}/delete`, { method: 'POST' })
+    const copy = await call(`/v1/nodes/${completed.node.id}/copy`, { method: 'POST' })
+    assert.equal(copy.status, 409)
+    assert.equal((await json(copy)).error, 'the containing folder is no longer available')
+  })
+
   test('every mutating action is written to the per-user audit log', async () => {
     const { call } = await setup()
     await upload({ call, name: 'audited.bin', data: randomData(2048) })

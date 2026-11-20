@@ -33,10 +33,24 @@ if (countsSupported && chrome.storage?.session?.get) {
   });
 }
 
+/**
+ * Debounced writer.
+ *
+ * A single heavy page can match hundreds of rules a second, and the previous code
+ * wrote the whole map to storage.session on *every* match — a write storm that
+ * storage.session rate-limits, silently losing counts. Coalescing to one write per
+ * 250 ms keeps the numbers accurate without the churn; the last write always lands
+ * because the timer is trailing-edge.
+ */
+let persistTimer = null;
 function persistCounts() {
-  try {
-    chrome.storage?.session?.set({ [STORAGE_KEY]: { ...sessionCounts }, total: sessionCounts.total });
-  } catch { /* ignore */ }
+  if (persistTimer !== null) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      chrome.storage?.session?.set({ [STORAGE_KEY]: { ...sessionCounts }, total: sessionCounts.total });
+    } catch { /* ignore */ }
+  }, 250);
 }
 
 if (countsSupported) {
@@ -47,10 +61,23 @@ if (countsSupported) {
     // storage.session is best-effort: counts are diagnostics, not billing data.
     persistCounts();
   });
-  chrome.tabs?.onRemoved?.addListener((tabId) => {
-    delete sessionCounts[tabId];
-    persistCounts();
-  });
+  // MV3 service workers are terminated after ~30 s idle, so tab ids are recycled:
+  // without this, a closed tab's count could reappear under a brand-new tab. Polling
+  // (never tabs events) keeps the extension free of the "tabs" permission.
+  const dropClosedTabs = () => {
+    chrome.tabs?.query?.({}, (tabs) => {
+      if (chrome.runtime?.lastError || !Array.isArray(tabs)) return;
+      const live = new Set(tabs.map((tab) => tab.id));
+      let changed = false;
+      for (const key of Object.keys(sessionCounts)) {
+        if (key === 'total') continue;
+        if (!live.has(Number(key))) { delete sessionCounts[key]; changed = true; }
+      }
+      if (changed) persistCounts();
+    });
+  };
+  setInterval(dropClosedTabs, 60_000);
+  if (chrome.runtime?.onStartup) chrome.runtime.onStartup.addListener(dropClosedTabs);
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {

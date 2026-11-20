@@ -35,7 +35,16 @@ export function buildApp(env) {
   /** Every /v1 route except health and public share access requires a verified Supabase JWT. */
   app.use('/v1/*', async (c, next) => {
     if (c.req.path === '/v1/health' || c.req.path.startsWith('/v1/share/')) return next()
-    const claims = await requireUser(c.req.raw, env)
+    // `requireUser` can throw while fetching the Supabase JWKS (provider outage,
+    // DNS failure, corrupt key). That used to surface as an opaque 500 stacked on
+    // top of a provider error; an unverifiable token is a 401, and the reason is
+    // returned so the client can tell "bad token" from "auth provider down".
+    let claims = null
+    try {
+      claims = await requireUser(c.req.raw, env)
+    } catch (error) {
+      return c.json({ error: 'unable to verify token', detail: String(error?.message || error) }, 503)
+    }
     if (!claims) return c.json({ error: 'unauthorized' }, 401)
     // Registration is the one authenticated route that runs before an account row exists.
     if (c.req.path === '/v1/account/register') {
@@ -65,8 +74,11 @@ export function buildApp(env) {
   app.post('/v1/account/register', async (c) => {
     const body = await c.req.json().catch(() => ({}))
     const ip = c.req.header('CF-Connecting-IP') || ''
-    const claims = await requireUser(c.req.raw, env)
-    if (!claims) return c.json({ error: 'unauthorized' }, 401)
+    // The middleware above already verified this token; re-verification here hit
+    // the JWKS endpoint (and its cache) a second time for every signup, and a
+    // provider hiccup between the two calls turned a valid token into a 401.
+    const claims = userOf(c)
+    if (!claims?.sub) return c.json({ error: 'unauthorized' }, 401)
     const verified = await turnstileVerify(body.turnstileToken, env, ip)
     if (!verified) return c.json({ error: 'bot protection failed' }, 403)
     const account = await createAccount(c.env.DB, { userId: claims.sub, email: claims.email })
@@ -201,6 +213,11 @@ export function buildApp(env) {
 
   app.post('/v1/nodes/:id/copy', async (c) => nodeAction(c, 'copy', async (node) => {
     if (node.deleted_at) return { status: 400, error: 'cannot copy a trashed item' }
+    // Copying into a trashed/deleted folder used to succeed and leave an orphan the
+    // listing query could never reach. The target must be a live folder the caller owns.
+    if (node.parent_id && !(await ownsFolder(c, node.parent_id))) {
+      return { status: 409, error: 'the containing folder is no longer available' }
+    }
     const id = newId('nd')
     await run(
       c.env.DB,
@@ -501,6 +518,9 @@ export function buildApp(env) {
         newId('ver'), existing.id, user.id, nextVersion, existing.size_bytes, existing.sha1 || '',
         existing.b2_file_id, existing.b2_key, now()
       )
+      // 'version_create' is a declared audit action that nothing ever wrote, so a
+      // file silently gaining a new version left no trace in /v1/audit.
+      await audit(c.env.DB, { userId: user.id, action: 'version_create', detail: `${existing.name} v${nextVersion}` })
       const prunedBytes = await pruneVersions(c, existing.id, user.id)
       await run(
         c.env.DB,
