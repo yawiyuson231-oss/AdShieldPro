@@ -444,8 +444,8 @@ export class OmniShieldFilterEngine {
     return changed;
   }
 
-  /** Replaces user rules wholesale (used by config import / recovery). */
-  setUserRules(rules = []) {
+  /** Clears only custom rules, leaving bundled and installed feeds intact. */
+  clearUserRules() {
     this.customBlockExact.clear(); this.customBlockSuffix.clear();
     this.customAllowExact.clear(); this.customAllowSuffix.clear();
     const prevWildcards = this.wildcardBlock.length + this.wildcardAllow.length;
@@ -453,6 +453,12 @@ export class OmniShieldFilterEngine {
     this.wildcardAllow = this.wildcardAllow.filter((w) => w.source !== 'user');
     const removedWildcards = prevWildcards - (this.wildcardBlock.length + this.wildcardAllow.length);
     this.stats.wildcards = Math.max(0, this.stats.wildcards - removedWildcards);
+    this._invalidate();
+  }
+
+  /** Replaces user rules wholesale (used by config import / recovery). */
+  setUserRules(rules = []) {
+    this.clearUserRules();
     let ok = 0;
     for (const rule of rules) {
       if (!rule) continue;
@@ -466,7 +472,6 @@ export class OmniShieldFilterEngine {
         matchType
       )) ok++;
     }
-    this._invalidate();
     return ok;
   }
 

@@ -211,6 +211,32 @@ test('corruption falls back to the previous good snapshot (auto-recovery)', asyn
   assert.equal(recovered.skipped[0].reason, 'hash-mismatch');
 });
 
+test('a malformed snapshot record is reported, not treated as missing or thrown', async () => {
+  const backup = new BackupManager({ storage: new MemoryStorage({ 'backup:broken': 'null' }) });
+  assert.deepEqual(await backup.restore('broken'), { ok: false, reason: 'corrupt-record' });
+  const recovery = await backup.recover();
+  assert.equal(recovery.reason, 'no-valid-snapshot');
+  assert.deepEqual(recovery.skipped, [{ id: 'broken', reason: 'corrupt-record' }]);
+});
+
+test('recovery skips invalid metadata and uses the storage key as the snapshot ID', async () => {
+  const storage = new MemoryStorage();
+  const backup = new BackupManager({ storage });
+  const saved = await backup.save({ settings: { autoUpdateFeeds: false } });
+  const key = `backup:${saved.id}`;
+  const record = JSON.parse(await storage.getItem(key));
+  await storage.setItem(key, JSON.stringify({ ...record, id: 'incorrect-id' }));
+  const payload = JSON.stringify({ createdAt: 999, state: null });
+  await storage.setItem('backup:malformed', JSON.stringify({ payload, hash: sha256Hex(payload) }));
+
+  const list = await backup.list();
+  assert.deepEqual(list.map(({ id, valid }) => ({ id, valid })), [
+    { id: saved.id, valid: true }, { id: 'malformed', valid: false }
+  ]);
+  assert.equal((await backup.restore('malformed')).ok, false);
+  assert.equal((await backup.recover()).state.settings.autoUpdateFeeds, false);
+});
+
 test('recovery with no snapshots says so instead of inventing defaults', async () => {
   const backup = new BackupManager({ storage: new MemoryStorage() });
   const result = await backup.recover();
@@ -227,6 +253,24 @@ test('snapshot count is bounded', async () => {
   const list = await backup.list();
   assert.equal(list.length, 3);
   assert.equal(list[0].valid, true);
+});
+
+test('an invalid newer snapshot does not displace a verified backup during pruning', async () => {
+  const storage = new MemoryStorage();
+  let now = 1_700_000_000_000;
+  const backup = new BackupManager({ storage, clock: () => now, maxSnapshots: 2 });
+  const first = await backup.save({ settings: { mode: 'first' } });
+  now += 1000;
+  const broken = await backup.save({ settings: { mode: 'broken' } });
+  const key = `backup:${broken.id}`;
+  const record = JSON.parse(await storage.getItem(key));
+  await storage.setItem(key, JSON.stringify({ ...record, hash: 'mismatch' }));
+  now += 1000;
+  const latest = await backup.save({ settings: { mode: 'latest' } });
+
+  const list = await backup.list();
+  assert.deepEqual(list.filter((s) => s.valid).map((s) => s.id), [latest.id, first.id]);
+  assert.equal((await backup.restore(first.id)).ok, true);
 });
 
 test('schema migrations upgrade older backups', () => {

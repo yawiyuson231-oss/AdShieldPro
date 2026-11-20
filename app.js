@@ -312,6 +312,7 @@ function buildState({ includeModel = false } = {}) {
 }
 
 function applyUserRules() {
+  state.engine.clearUserRules();
   for (const rule of state.customRules) {
     if (rule.enabled === false) { rule.applied = false; continue; }
     rule.applied = state.engine.addUserRule(rule.pattern, rule.isAllow, rule.matchType);
@@ -1359,7 +1360,7 @@ async function renderFeeds() {
         onclick: async () => {
           const target = !state.settings.aggressiveTier;
           if (target && !confirm('The aggressive tier blocks tag managers and social SDKs. Some sites may break. You can undo this instantly, and every block stays labelled. Continue?')) return;
-          await enableAggressiveTier(target);
+          if (!await enableAggressiveTier(target)) return;
           toast(target ? 'Aggressive tier enabled — reversible at any time.' : 'Aggressive tier disabled.', target ? 'warn' : 'ok');
         }
       }),
@@ -1520,7 +1521,8 @@ function renderSync() {
             class: 'sm ghost', text: 'Remove',
             onclick: () => {
               state.customRules = state.customRules.filter((r) => r !== rule);
-              state.engine.removeUserRule(rule.pattern, rule.isAllow);
+              // Different imported rules can share the same exact/suffix entries.
+              applyUserRules();
               state.aether?.reputation.cache.clear();
               scheduleSnapshot('rule-removed');
               renderSync();
