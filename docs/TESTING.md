@@ -109,6 +109,7 @@ rules, dashboard honesty/motion rules, security scoring and capability-report co
 | `AetherPhoneAgentTest` / `AetherSecurityReviewTest` | Phone evidence and logging opt-out, package metadata indicators, one-use file picker receipts and actual byte limits |
 | `SecurityCenterTestSuite` | Native rules/scanners, content signatures before and across read boundaries, corroborated executable headers, unreadable archive reporting, APK manifest parsing and exact app permission indicators |
 | `ScanJournal` | Strictly increasing scan ids, bounded retention, persistence round-trip incl. legacy records, honest empty report, quarantine path-traversal safety, progress clamping |
+| `DiagnosticReportTest` | Identifier scrubbing (URLs incl. query credentials, e-mails, plain/quoted/parenthesised paths, private addresses, hex and base64 tokens, bare hosts) while public resolver addresses survive, bounded free text, capped source list, deterministic output independent of input order, empty state reported as "not measured" |
 | `IntelligenceMapTestSuite` | Event sanitizer (evidence required, size bounds, secret/PII redaction, severity escalation), factory routing (DNS/scan/battery/VPN/automation), aggregator state derivation from real inputs only, dedupe policy, repository round-trip/prune/corrupt rows, hit-testing, pinch focal stability, tap-vs-drag, camera lerp/clamping, recommendations, aggregation performance budget |
 
 Instrumentation (`androidTest`) and manual on-device checks are still required for anything

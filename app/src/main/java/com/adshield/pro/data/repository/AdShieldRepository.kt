@@ -33,6 +33,11 @@ import com.adshield.pro.domain.model.VpnStatus
 import com.adshield.pro.domain.model.VpnTunnelReceipt
 import com.adshield.pro.engine.filter.FilterRuleEngine
 import com.adshield.pro.engine.intelligence.IntelligenceEventFactory
+import com.adshield.pro.engine.platform.DiagnosticBattery
+import com.adshield.pro.engine.platform.DiagnosticFilterSource
+import com.adshield.pro.engine.platform.DiagnosticReport
+import com.adshield.pro.engine.platform.DiagnosticReportInput
+import com.adshield.pro.engine.platform.DiagnosticScanTotals
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -896,6 +901,69 @@ class AdShieldRepository @Inject constructor(
         val privateDnsTileConfig: PrivateDnsTileConfig? = null,
         val usbDebuggingTileConfig: UsbDebuggingTileConfig? = null
     )
+
+    /**
+     * Renders the exportable diagnostic report.
+     *
+     * Reads only local state: DataStore settings, Room counters, filter metadata and the current
+     * tunnel runtime. No network call, no package enumeration beyond a count, and no identifier is
+     * written — raw text (a runtime error, a custom list name) goes through
+     * [com.adshield.pro.engine.platform.DiagnosticScrubber] inside the report builder.
+     *
+     * Scan and quarantine figures are passed in because they live in [com.adshield.pro.data.local.preferences.ScanJournalStore],
+     * which the repository does not own.
+     */
+    suspend fun buildDiagnosticReport(
+        scans: DiagnosticScanTotals,
+        quarantinedCount: Int,
+        quarantinedOriginalsRemoved: Int,
+        battery: DiagnosticBattery?,
+        nowEpochMs: Long = System.currentTimeMillis()
+    ): String = withContext(Dispatchers.IO) {
+        val settings = prefs.getSettingsSnapshot()
+        val runtime = _vpnRuntimeState.value
+        val sources = dao.getAllFilterSourcesNow()
+        // One statement, so a query arriving mid-report cannot make "blocked" exceed "total".
+        val counts = dao.countDnsLogStats()
+        DiagnosticReport.build(
+            DiagnosticReportInput(
+                generatedAtEpochMs = nowEpochMs,
+                appVersion = com.adshield.pro.BuildConfig.VERSION_NAME,
+                androidApiLevel = android.os.Build.VERSION.SDK_INT,
+                protectionMode = settings.protectionMode.name,
+                vpnStatus = runtime.status.name,
+                resolverLabel = settings.resolverConfig.preset.displayName,
+                dnsProtocol = settings.resolverConfig.protocol.label,
+                dnssecMode = settings.resolverConfig.dnssecMode.label,
+                failoverEnabled = settings.resolverConfig.failoverEnabled,
+                loadedRuleCount = runtime.loadedRuleCount,
+                totalQueries = counts.total,
+                blockedQueries = counts.blocked,
+                malwareBlocks = counts.malware,
+                detailedLoggingEnabled = settings.detailedDnsLoggingEnabled,
+                logRetentionDays = settings.logRetentionDays,
+                filterSources = sources.map { source ->
+                    DiagnosticFilterSource(
+                        name = source.name,
+                        enabled = source.isEnabled,
+                        ruleCount = source.ruleCount,
+                        statusMessage = source.lastStatusMessage
+                    )
+                },
+                customRuleCount = dao.getAllCustomRulesNow().size,
+                lastFilterUpdateEpochMs = settings.lastFilterUpdateEpochMs,
+                scans = scans,
+                quarantinedCount = quarantinedCount,
+                quarantinedOriginalsRemoved = quarantinedOriginalsRemoved,
+                excludedAppCount = settings.excludedAppPackages.size,
+                siteExceptionCount = settings.browserSiteExceptions.size,
+                scheduledScanEnabled = settings.scheduledScanEnabled,
+                scheduledScanIntervalHours = settings.scheduledScanIntervalHours,
+                battery = battery,
+                lastError = runtime.lastError
+            )
+        )
+    }
 
     suspend fun createConfigurationBackupJson(): String = withContext(Dispatchers.IO) {
         val settings = prefs.getSettingsSnapshot()

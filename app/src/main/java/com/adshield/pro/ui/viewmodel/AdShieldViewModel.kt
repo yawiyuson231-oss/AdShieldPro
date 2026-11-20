@@ -60,6 +60,8 @@ import com.adshield.pro.engine.browser.BrowserContentBlocker
 import com.adshield.pro.engine.browser.LinkSanitizer
 import com.adshield.pro.engine.browser.SearchSuggestionClient
 import com.adshield.pro.engine.platform.DeviceProfiler
+import com.adshield.pro.engine.platform.DiagnosticBattery
+import com.adshield.pro.engine.platform.DiagnosticScanTotals
 import com.adshield.pro.engine.platform.ProtectionSnoozeController
 import com.adshield.pro.engine.platform.ProtectionSnoozeEngine
 import com.adshield.pro.engine.platform.SystemPreferencesController
@@ -1342,6 +1344,37 @@ class AdShieldViewModel @Inject constructor(
             history = scanJournalStore.historySnapshot(),
             appVersion = com.adshield.pro.BuildConfig.VERSION_NAME,
             generatedAtEpochMs = System.currentTimeMillis()
+        )
+    }
+
+    /**
+     * Builds the identifier-free diagnostic report the user can share with support.
+     *
+     * Everything comes from state the app already holds: the scan journal, the quarantine index,
+     * the last battery telemetry snapshot and the repository's settings/DAO counters. Nothing is
+     * measured anew and nothing is sent anywhere.
+     */
+    suspend fun buildDiagnosticReport(): String = withContext(Dispatchers.Default) {
+        val history = scanJournalStore.historySnapshot()
+        val summary = ScanJournal.summarize(history)
+        val quarantine = scanJournalStore.quarantineSnapshot()
+        val telemetry = batteryRepository.telemetry.value
+        repository.buildDiagnosticReport(
+            scans = DiagnosticScanTotals(
+                total = summary.total,
+                clean = summary.clean,
+                suspicious = summary.suspicious,
+                dangerous = summary.dangerous,
+                lastScanEpochMs = summary.lastScanEpochMs
+            ),
+            quarantinedCount = quarantine.size,
+            quarantinedOriginalsRemoved = quarantine.count { it.originalRemoved },
+            battery = DiagnosticBattery(
+                levelPercent = telemetry.levelPercent.rawValue,
+                healthLabel = telemetry.healthLabel,
+                temperatureCelsius = telemetry.temperatureCelsius.rawValue,
+                isCharging = telemetry.isCharging
+            )
         )
     }
 

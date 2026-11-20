@@ -1113,7 +1113,8 @@ private fun SettingsDestination(
         onToggleAutoStartBoot = viewModel::setAutoStartOnBoot,
         onChangeThemePreference = viewModel::setDarkThemePreference,
         onExportBackupJson = viewModel::exportFullBackupJson,
-        onRestoreBackupJson = viewModel::restoreFullBackupJson
+        onRestoreBackupJson = viewModel::restoreFullBackupJson,
+        onBuildDiagnosticReport = viewModel::buildDiagnosticReport
     )
 }
 
