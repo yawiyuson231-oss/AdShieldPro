@@ -278,45 +278,6 @@ class AdShieldViewModel @Inject constructor(
     private val _isDndPolicyGranted = MutableStateFlow(optimizerEngine.isDoNotDisturbAccessGranted())
     val isDndPolicyGranted: StateFlow<Boolean> = _isDndPolicyGranted.asStateFlow()
 
-    init {
-        viewModelScope.launch {
-            while (isActive) {
-                delay(3_000L)
-                _statusTick.value = System.currentTimeMillis()
-            }
-        }
-        viewModelScope.launch {
-            customRules.collect {
-                refreshRuleConflicts()
-            }
-        }
-        // Security Center: keep the malware-block counter and protection score live.
-        viewModelScope.launch {
-            repository.malwareBlocksFlow.collect { count ->
-                _malwareBlocks.value = count
-                refreshSecurityPosture()
-            }
-        }
-        // Restore the scheduled-scan job after process death / app upgrade. WorkManager keeps the
-        // enqueue itself persistent; this reconciles it with the current user preference.
-        viewModelScope.launch {
-            val settings = preferencesRepository.getSettingsSnapshot()
-            ScheduledScanWorker.scheduleOrCancel(
-                appContext,
-                settings.scheduledScanEnabled,
-                settings.scheduledScanIntervalHours
-            )
-        }
-        // Initial Junk quick scan & periodic lightweight telemetry refresh while UI is open
-        viewModelScope.launch {
-            scanJunk(JunkCleanMode.QUICK_CLEAN)
-            loadInstalledGames()
-            while (isActive) {
-                refreshSystemTelemetry()
-                delay(5000L)
-            }
-        }
-    }
 
     fun showFeedback(message: String) {
         _uiFeedbackMessage.value = message
@@ -1769,4 +1730,36 @@ class AdShieldViewModel @Inject constructor(
             is SystemPreferenceWriteResult.RejectedBySystem -> showFeedback(result.reason)
         }
     }
+    // Launch collectors only after every state holder above has been initialized.
+    init {
+        viewModelScope.launch {
+            while (isActive) {
+                delay(3_000L)
+                _statusTick.value = System.currentTimeMillis()
+            }
+        }
+        viewModelScope.launch {
+            customRules.collect {
+                refreshRuleConflicts()
+            }
+        }
+        // Security Center: keep the malware-block counter and protection score live.
+        viewModelScope.launch {
+            repository.malwareBlocksFlow.collect { count ->
+                _malwareBlocks.value = count
+                refreshSecurityPosture()
+            }
+        }
+        // Process-start schedule recovery now lives in AdShieldApplication, including headless starts.
+        // Initial Junk quick scan & periodic lightweight telemetry refresh while UI is open
+        viewModelScope.launch {
+            scanJunk(JunkCleanMode.QUICK_CLEAN)
+            loadInstalledGames()
+            while (isActive) {
+                refreshSystemTelemetry()
+                delay(5000L)
+            }
+        }
+    }
+
 }

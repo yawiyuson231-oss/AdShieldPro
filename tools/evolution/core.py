@@ -70,6 +70,8 @@ def gate(report, checks):
                 'performance_budget', 'dependency_integrity', 'signing_verified',
                 'rollback_tested', 'independent_holdout')
     reasons = list(report['reasons'])
+    if report.get('eligible') is not True:
+        reasons.append('comparison is not eligible')
     if report.get('independent_holdout') is False:
         reasons.append('public regression corpus is not an independent holdout')
     for key in required:
@@ -118,8 +120,10 @@ class Journal:
             index = len(history)
             if index >= len(STAGES) or stage != STAGES[index]:
                 raise ValueError('invalid stage transition')
-            if stage == 'VERIFY' and gate(evidence['report'], evidence['checks'])['eligible'] is not True:
-                raise ValueError('verification rejected')
+            if stage == 'VERIFY':
+                if (evidence['report'] != history[-1]['evidence'].get('report')
+                        or gate(evidence['report'], evidence['checks'])['eligible'] is not True):
+                    raise ValueError('verification rejected or experiment report changed')
             if stage == 'DEPLOY':
                 # Bind approval to the exact verified evidence; DEPLOY records approval only.
                 verified = history[-1]['evidence']

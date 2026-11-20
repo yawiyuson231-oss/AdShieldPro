@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -48,6 +50,7 @@ class SecurityEngine @Inject constructor(
     private val fileScanner = FileThreatScanner()
     private val apkAnalyzer = ApkAnalyzer()
     private val appAuditor = AppRiskAuditor()
+    private val metadataAuditCache = BoundedAuditCache<AppRiskAuditor.AppSecurityProfile, AppRiskAuditor.AppRiskAudit>()
 
     // --- Web / link protection -------------------------------------------------
 
@@ -169,6 +172,8 @@ class SecurityEngine @Inject constructor(
             return@withContext AppRiskAuditor.VisibleAudit(0, emptyList())
         }
         val inspected = ArrayList<AppRiskAuditor.AppRiskAudit>(apps.size)
+        val resources = AuditResourceSampler(context)
+        var pacing = EvolutionWorkPolicy.plan(resources.sample())
         val flags = PackageManager.GET_PERMISSIONS or PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or
             PackageManager.MATCH_DISABLED_COMPONENTS
         apps.forEachIndexed { index, appInfo ->
@@ -194,7 +199,7 @@ class SecurityEngine @Inject constructor(
                         receiver.permission?.takeIf { it == "android.permission.BIND_DEVICE_ADMIN" }
                     }
                 }
-                inspected += appAuditor.audit(AppRiskAuditor.AppSecurityProfile(
+                val profile = AppRiskAuditor.AppSecurityProfile(
                     packageName = packageName,
                     appName = label,
                     versionName = info.versionName,
@@ -205,10 +210,18 @@ class SecurityEngine @Inject constructor(
                     isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0,
                     firstInstallTimeEpochMs = info.firstInstallTime,
                     declaredComponentPermissions = bindings
-                ))
+                )
+                // Re-read every permission/binding/source before using the complete profile as
+                // an in-memory key. No timestamp-only shortcut can hide permission changes.
+                inspected += metadataAuditCache.getOrCompute(profile, pacing.cacheEntries) { appAuditor.audit(profile) }
             }
             ensureActive()
             onProgress(index + 1, apps.size, label)
+            if ((index + 1) % pacing.batchSize == 0) {
+                yield()
+                if (pacing.yieldMillis > 0L) delay(pacing.yieldMillis)
+                pacing = EvolutionWorkPolicy.plan(resources.sample())
+            }
         }
         val ordered = inspected.sortedWith(compareByDescending<AppRiskAuditor.AppRiskAudit> { it.riskScore }
             .thenBy { it.profile.appName.lowercase() })

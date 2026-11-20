@@ -113,6 +113,15 @@ class IntelligenceMonitor @Inject constructor(
                 )
             }
 
+            val changedControls = SecurityConfigurationChanges.changedControls(before, settings)
+            if (changedControls.isNotEmpty()) {
+                recorder.record(IntelligenceEventFactory.privacySettingChanged(
+                    title = "Saved security configuration changed",
+                    detail = "Changed controls: ${changedControls.joinToString()}. Saved settings only; active routing was not probed.",
+                    timestampEpochMs = now
+                ))
+            }
+
             if (before.browserCosmeticFilteringEnabled != settings.browserCosmeticFilteringEnabled ||
                 before.browserBlockThirdPartyCookies != settings.browserBlockThirdPartyCookies
             ) {
