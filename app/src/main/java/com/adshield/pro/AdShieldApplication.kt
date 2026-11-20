@@ -21,7 +21,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@HiltAndroidApp
 /**
  * Marks coroutine scopes that live exactly as long as the process, so shutdown-critical
  * writes can be awaited without risking a dependency cycle (the VPN service needs the
@@ -36,6 +35,7 @@ interface ProcessScopeOwner {
     val appScope: CoroutineScope
 }
 
+@HiltAndroidApp
 class AdShieldApplication : Application(), Configuration.Provider, ProcessScopeOwner {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
