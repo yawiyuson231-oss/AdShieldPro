@@ -180,7 +180,8 @@ class KnowledgeGraph:
                 self._get('sources', row['source'])
                 self._insert('edges', row)
 
-    def review(self, kind, target, reviewer, rationale, status, *, reliability=None, license_allowed=None):
+    def review(self, kind, target, reviewer, rationale, status, *, reliability=None, license_allowed=None,
+               assessed_confidence=None):
         if kind not in ('source', 'edge') or status not in STATUSES:
             raise ValueError('invalid review kind/status')
         self._get('sources' if kind == 'source' else 'edges', target)
@@ -188,12 +189,15 @@ class KnowledgeGraph:
         text(rationale)
         if kind == 'source':
             confidence(reliability)
-            if type(license_allowed) is not bool:
-                raise ValueError('explicit license decision required')
+            if type(license_allowed) is not bool or assessed_confidence is not None:
+                raise ValueError('explicit license decision required; confidence assessment is edge-only')
         elif reliability is not None or license_allowed is not None:
             raise ValueError('source-only fields supplied to edge review')
+        if assessed_confidence is not None:
+            confidence(assessed_confidence)
         row = dict(kind=kind, target=target, reviewer=reviewer, rationale=rationale, status=status,
-                   reliability=reliability, license_allowed=license_allowed, reviewed_at=self._now().isoformat())
+                   reliability=reliability, license_allowed=license_allowed, assessed_confidence=assessed_confidence,
+                   reviewed_at=self._now().isoformat())
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
             self._capacity('reviews')
@@ -226,10 +230,12 @@ class KnowledgeGraph:
             reasons.append('source reliability below 0.8')
         if not er or er['status'] != 'verified':
             reasons.append('relationship not verified')
-        if edge['confidence'] < 0.8:
+        assessed = er.get('assessed_confidence') if er else None
+        effective_confidence = assessed if assessed is not None else edge['confidence']
+        if effective_confidence < 0.8:
             reasons.append('relationship confidence below 0.8')
         return dict(edge=edge, source=source, source_review=sr, edge_review=er,
-                    verification=er['status'] if er else 'unverified',
+                    confidence=effective_confidence, verification=er['status'] if er else 'unverified',
                     proposal_eligible=not reasons, reasons=reasons, protection_eligible=False)
 
     def propose(self, edge_id, title):

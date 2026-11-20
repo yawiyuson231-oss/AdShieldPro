@@ -83,7 +83,7 @@ python3 -m tools.evolution.artifacts compare /trusted/baseline.json .ci/evolutio
 
 The boundary manifest was generated from the original audited base commit `4fbc131ca4f4d0bd4e93eca2f73013e9cd867452`. It protects DNS/filter/service implementation, Android permissions/manifest, screens/components/themes/resources, primary Activity, and browser DNS/UI entry files. Added, removed or modified protected files fail the gate. It is enforced in Android, offline governance and production regression checks. Deliberately changing this baseline requires explicit source review; there is no automatic rebaselining command in CI.
 
-A fixed check plan returning success is not an independently verified release. Android signing is false until a real APK has passed `apksigner verify` and the observed signer matches an independently supplied trusted certificate digest. Existing `tools/release_signing.sh` remains the production key-custody/signing implementation; `verify_apk_signer` is a reusable read-only candidate check, not another signer.
+A fixed check plan returning success is not an independently verified release. Android signing is false until a real APK has passed `apksigner verify` and the observed signer matches an independently supplied trusted certificate digest. Existing `tools/release_signing.sh` remains the production key-custody/signing implementation; `verify_apk_signer` is a reusable read-only candidate check, not another signer. It verifies a private temporary snapshot, streams its SHA-256, and rejects concurrent replacement of the original APK so the reported certificate cannot accidentally attest different bytes.
 
 ## Research collection
 
@@ -97,7 +97,7 @@ python3 -m tools.evolution.research .cache/evolution/research.sqlite --input /pa
 
 The collector reads at most the **latest 100 Maven GitHub advisories**, intersects exact coordinates with the existing Gradle version catalog, and stores only unverified references. Cross-ecosystem entries in a Maven-filtered advisory response are ignored, not misinterpreted. A package-name match is `related_to`, not proof that the installed dependency version is affected. Full version-range, transitive, Android OS, native library and historical advisory coverage is **not** claimed.
 
-References carry `NOASSERTION` licensing and confidence 0.5; they cannot become eligible proposals without independent source/license/relevance review. Raw advisory descriptions, exploits and code are not imported. Withdrawn advisory IDs are surfaced for review, never made new proposals. Prior observations remain bounded by an 8-day TTL; this is not instantaneous withdrawal propagation.
+References carry `NOASSERTION` licensing and confidence 0.5; they cannot become eligible proposals without independent source/license/relevance review. After independent verification, `review('edge', ..., assessed_confidence=reviewed_value)` can append an explicit confidence assessment. This never rewrites the imported confidence; current relationship output exposes the effective assessment alongside immutable original evidence. Lowered confidence/dispute/retraction immediately blocks eligibility. Raw advisory descriptions, exploits and code are not imported. Withdrawn advisory IDs are surfaced for review, never made new proposals. Prior observations remain bounded by an 8-day TTL; this is not instantaneous withdrawal propagation.
 
 `evolution-research.yml` supports manual collection and a weekly schedule **on the default branch only after review/merge**. It restores branch-isolated public research history and uploads a review artifact; it has read-only repository permissions and never commits intelligence to the app. GitHub cache eviction can lose CI history: export/archive important evidence independently. Local collection updates an existing local graph transactionally. Failures/capacity limits fail closed without deleting prior evidence.
 
@@ -137,7 +137,7 @@ Compatibility/security/privacy/removal attestations must be strictly true. Suppl
 
 ## Verification and operational gates
 
-Local checks passed: 87 Python tests, 262 web JavaScript tests, 22 cloud API tests, 102 static verification checks, existing model reproducibility, UI performance gates, and all 109 frozen boundary hashes. Install the existing test dependencies first (`npm install` and `npm install --prefix cloud --omit=dev --ignore-scripts`); the fixed-command runner never silently installs tools.
+Local checks passed: 89 Python tests, 262 web JavaScript tests, 22 cloud API tests, 102 static verification checks, existing model reproducibility, UI performance gates, and all 109 frozen boundary hashes. Install the existing test dependencies first (`npm install` and `npm install --prefix cloud --omit=dev --ignore-scripts`); the fixed-command runner never silently installs tools.
 
 Android CI is separately exercised on this branch, including debug/release builds (throwaway CI release key), JVM tests, lint, package verification and Android 10 emulator smoke tests. See the current run references and final result in `EVOLUTION_VALIDATION.md`; a throwaway CI signer is not a production signer.
 

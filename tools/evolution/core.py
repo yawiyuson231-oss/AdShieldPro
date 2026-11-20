@@ -61,7 +61,7 @@ def evaluate(samples, baseline, candidate):
             'candidate_sha256': digest(candidate), 'baseline': old, 'candidate': new,
             'incorrect_classifications': incorrect,
             'slices': slices, 'reasons': reasons, 'eligible': not reasons,
-            'limitations': 'Synthetic/offline evidence only; not proof of real-world protection.'}
+            'limitations': 'Offline evaluation only; these metrics do not establish source/label authenticity or real-world protection.'}
 
 
 def gate(report, checks):

@@ -37,6 +37,32 @@ class ResearchIntakeTest(unittest.TestCase):
         finally:
             graph.close()
 
+    def test_explicit_review_can_assess_research_without_rewriting_imported_confidence(self):
+        bundle, _ = collect_bundle([self.advisory], {'fixture.group:artifact'}, self.now)
+        graph = KnowledgeGraph(':memory:', clock=lambda: self.now)
+        try:
+            graph.import_bundle(bundle)
+            source, edge = bundle['sources'][0]['id'], bundle['edges'][0]['id']
+            graph.review('source', source, 'test reviewer', 'Synthetic source/license review',
+                         'verified', reliability=0.9, license_allowed=True)
+            graph.review('edge', edge, 'test reviewer', 'Intent checked, confidence not assessed', 'verified')
+            self.assertFalse(graph.relationship(edge)['proposal_eligible'])
+            graph.review('edge', edge, 'test reviewer', 'Synthetic independent assessment',
+                         'verified', assessed_confidence=0.95)
+            result = graph.relationship(edge)
+            self.assertEqual(result['edge']['confidence'], 0.5)
+            self.assertEqual(result['confidence'], 0.95)
+            self.assertEqual(graph.propose(edge, 'Investigate synthetic applicability')['stage'], 'DISCOVER')
+            self.assertFalse(result['protection_eligible'])
+            graph.review('edge', edge, 'test reviewer', 'New uncertainty', 'disputed', assessed_confidence=0.1)
+            self.assertFalse(graph.relationship(edge)['proposal_eligible'])
+            for value in (True, float('nan'), -0.1, 1.1):
+                with self.assertRaises(ValueError):
+                    graph.review('edge', edge, 'test reviewer', 'Invalid assessment',
+                                 'verified', assessed_confidence=value)
+        finally:
+            graph.close()
+
     def test_irrelevant_and_withdrawn_entries_do_not_become_research_proposals(self):
         bundle, report = collect_bundle([self.advisory], {'other:module'}, self.now)
         self.assertEqual(bundle, dict(sources=[], nodes=[], edges=[]))

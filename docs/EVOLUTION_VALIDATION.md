@@ -16,7 +16,12 @@ Updated 2026-11-20. Results are tied to source revisions; historical `.ci` mirro
    - Collector startup now occurs after all ViewModel state-holder initializers. Resource pacing/cache and headless schedule-reconciliation changes were included in this passing source.
    - No public preview or production release was requested. Reports/debug APK are Actions artifacts; they are not signed production releases.
 
-Additional permission-history and final engineering/research/release gates are being validated in the next source checkpoint; do not attribute unrun changes to the earlier successful workflow.
+3. [Complete runtime/source run 44687547750](https://github.com/yawiyuson231-oss/AdShieldPro/actions/runs/44687547750), source `3846a315aaeeaa7740e41f3146f91718d343548d`:
+   - **Whole Android workflow passed**, including **409 JVM tests**, all 4 Android 10 Agent tests, both APK builds, package/signature checks, detector evidence validation, lint, and the new 109-file frozen-boundary gate.
+   - Includes declared-permission history, source-bound production approval workflow and bounded research/module/check tooling.
+   - Web CI, offline evolution governance and website assembly checks also passed on this source. Website assembly on the working branch does not deploy a production website.
+
+Final engineering review additionally hardened explicit confidence assessment (without rewriting imported evidence), streaming file hashes, and APK snapshot/certificate binding against a concurrently replaced build output. These engineering-only changes preserve Android runtime input bytes and are covered by 89 local Python tests; their final CI checkpoint is recorded below when available.
 
 ## Actual detection evidence
 
@@ -26,7 +31,7 @@ These public fixtures are development regressions, not a private holdout or evid
 
 ## Local checks
 
-Local checks passed: 87 Python evolution/delivery tests, fixture reproducibility, the 109-file frozen DNS/VPN/manifest/UI gate, bundled AETHER model reproducibility, UI-performance source gates, `npm run ci` (262 web JS tests and 102 static verification checks), and 22 cloud API tests. The aggregate fixed-command runner covers these checks; no tool/dependency installation, publication or APK installation is performed by that runner.
+Local checks passed: 89 Python evolution/delivery tests, fixture reproducibility, the 109-file frozen DNS/VPN/manifest/UI gate, bundled AETHER model reproducibility, UI-performance source gates, `npm run ci` (262 web JS tests and 102 static verification checks), and 22 cloud API tests. The aggregate fixed-command runner covers these checks; no tool/dependency installation, publication or APK installation is performed by that runner.
 
 The Phase 3 process-crash test deliberately exits a subprocess during an uncommitted SQLite transaction, then verifies original graph rows and integrity. This is a real SQLite transaction-recovery check, not an Android crash/reboot certification.
 

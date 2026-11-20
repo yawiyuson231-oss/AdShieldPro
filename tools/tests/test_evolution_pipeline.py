@@ -45,6 +45,22 @@ class EngineeringPipelineTest(unittest.TestCase):
         self.assertFalse(report['signing_verified'])
         self.assertFalse(report['release_eligible'])
 
+    def test_apk_replacement_during_verification_cannot_receive_the_previous_certificate_attestation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            apk = Path(directory) / 'fixture.apk'
+            apk.write_bytes(b'FAKE TEST APK version one')
+            certificate = 'a' * 64
+            def replace_original(argv, **kwargs):
+                snapshot = Path(argv[-1])
+                self.assertNotEqual(snapshot, apk)
+                self.assertEqual(snapshot.read_bytes(), b'FAKE TEST APK version one')
+                apk.write_bytes(b'replaced output after verification began')
+                return subprocess.CompletedProcess(argv, 0,
+                    stdout=f'Signer #1 certificate SHA-256 digest: {certificate}\n', stderr='')
+            with patch('tools.evolution.pipeline.subprocess.run', side_effect=replace_original):
+                with self.assertRaisesRegex(ValueError, 'changed during'):
+                    verify_apk_signer(apk, certificate)
+
     def test_apk_signer_is_verified_and_independently_pinned(self):
         with tempfile.TemporaryDirectory() as directory:
             apk = Path(directory) / 'fixture.apk'

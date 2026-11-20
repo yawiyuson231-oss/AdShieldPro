@@ -7,6 +7,8 @@ import math
 from pathlib import Path
 import subprocess
 import sys
+import shutil
+import tempfile
 
 from .artifacts import sha_file
 from .core import digest
@@ -73,16 +75,24 @@ def verify_apk_signer(apk, expected_sha256, apksigner='apksigner'):
     apk = Path(apk)
     if not apk.is_file() or apk.suffix != '.apk':
         raise ValueError('existing APK file required')
-    result = subprocess.run([apksigner, 'verify', '--verbose', '--print-certs', str(apk.resolve())],
-                            capture_output=True, text=True, timeout=60)
-    if result.returncode != 0:
-        raise ValueError('APK signature verification failed')
-    import re
-    certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]{64})\s*$',
-                              result.stdout, re.MULTILINE)
-    if len(certificates) != 1 or certificates[0].lower() != expected_sha256.lower():
-        raise ValueError('unexpected APK signer or multiple signers')
-    return dict(apk_sha256=sha_file(apk),
+    # Bind the certificate and digest to the same private snapshot, not to a build
+    # output that another build may replace between verification and hashing.
+    with tempfile.TemporaryDirectory(prefix='evolution-apk-verify-') as directory:
+        snapshot = Path(directory) / 'candidate.apk'
+        shutil.copyfile(apk, snapshot)
+        verified_digest = sha_file(snapshot)
+        result = subprocess.run([apksigner, 'verify', '--verbose', '--print-certs', str(snapshot)],
+                                capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise ValueError('APK signature verification failed')
+        import re
+        certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]{64})\s*$',
+                                  result.stdout, re.MULTILINE)
+        if len(certificates) != 1 or certificates[0].lower() != expected_sha256.lower():
+            raise ValueError('unexpected APK signer or multiple signers')
+        if sha_file(snapshot) != verified_digest or sha_file(apk) != verified_digest:
+            raise ValueError('APK changed during signature verification')
+    return dict(apk_sha256=verified_digest,
                 certificate_sha256=certificates[0].lower(), signing_verified=True, release_eligible=False)
 
 

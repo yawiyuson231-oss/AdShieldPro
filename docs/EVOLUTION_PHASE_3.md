@@ -81,7 +81,8 @@ try:
     # Values here must come from actual review, not the imported source's claims.
     graph.review('source', source_id, reviewer, license_and_source_review_reason,
                  'verified', reliability=reviewed_reliability, license_allowed=license_permitted)
-    graph.review('edge', edge_id, reviewer, independent_verification_reason, 'verified')
+    graph.review('edge', edge_id, reviewer, independent_verification_reason, 'verified',
+                 assessed_confidence=reviewed_relationship_confidence)
     proposal = graph.propose(edge_id, 'Investigate applicability to the existing Android app')
     tip = graph.record_discovery(journal, cycle_id, proposal['id'])
     # Store tip separately. EXPERIMENT, VERIFY, approval and release remain separate.
